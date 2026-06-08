@@ -4,23 +4,21 @@ import hashlib
 import datetime
 import threading
 import requests
-import time
-from flask import Flask, request, jsonify
-from flask_cors import CORS
 import socket
+from flask import Flask, request, jsonify, send_from_directory
+from flask_cors import CORS
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static', static_url_path='/static')
 CORS(app)
 
 # ------------------------- الإعدادات -------------------------
 PORT = int(os.environ.get('PORT', 5000))
 
-# تحديد مجلد البيانات: يُفضل استخدام متغير البيئة DATA_DIR، وإلا نحاول /data، فإن فشل نستخدم مجلداً داخل المشروع
+# تحديد مجلد البيانات
 DATA_DIR = os.environ.get('DATA_DIR', '/data')
 try:
     os.makedirs(DATA_DIR, exist_ok=True)
 except PermissionError:
-    # إذا لم تكن لدينا صلاحية الكتابة في /data، نستخدم مجلد ledger_data داخل الدليل الحالي
     DATA_DIR = os.path.join(os.getcwd(), 'ledger_data')
     os.makedirs(DATA_DIR, exist_ok=True)
     print(f"⚠️ تم استخدام مجلد بديل للبيانات: {DATA_DIR}")
@@ -51,7 +49,6 @@ def save_peers():
     with open(PEERS_FILE, 'w') as f:
         json.dump(list(PEERS), f, indent=2)
 
-# قفل لمزامنة الكتابة إلى الملف
 ledger_lock = threading.Lock()
 
 # ------------------------- فئة Block و Blockchain -------------------------
@@ -102,7 +99,6 @@ class Blockchain:
                     block.hash = block_data['hash']
                     self.chain.append(block)
         except FileNotFoundError:
-            # كتلة genesis
             genesis = Block(0, "Genesis", "0", "0", str(datetime.datetime.now()), "0", "genesis")
             self.chain = [genesis]
             self.save_chain()
@@ -331,6 +327,15 @@ def sync_trigger():
 @app.route('/health', methods=['GET'])
 def health():
     return jsonify({"status": "healthy", "chain_length": len(blockchain.chain)}), 200
+
+# ------------------------- خدمة الواجهة الأمامية -------------------------
+@app.route('/')
+def index():
+    return send_from_directory('static', 'index.html')
+
+@app.route('/static/<path:filename>')
+def serve_static(filename):
+    return send_from_directory('static', filename)
 
 # ------------------------- بدء التشغيل -------------------------
 if __name__ == '__main__':
