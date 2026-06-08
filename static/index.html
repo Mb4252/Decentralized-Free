@@ -13,7 +13,7 @@
         button { background-color: #2c7da0; color: white; border: none; cursor: pointer; font-weight: bold; padding: 10px 16px; border-radius: 40px; margin: 5px; transition: 0.2s; }
         button:disabled { background-color: #b0c4d9; cursor: not-allowed; }
         .flex-buttons { display: flex; gap: 12px; flex-wrap: wrap; }
-        input, .file-label { width: 100%; padding: 10px; border-radius: 40px; border: 1px solid #ccc; margin: 5px 0; }
+        input, .file-label, select { width: 100%; padding: 10px; border-radius: 40px; border: 1px solid #ccc; margin: 5px 0; }
         video, canvas, img { max-width: 100%; border-radius: 16px; border: 2px solid #ddd; background: #000; }
         .result { margin-top: 10px; padding: 10px; border-radius: 50px; text-align: center; font-weight: bold; }
         .success { background: #d4edda; color: #155724; }
@@ -34,7 +34,21 @@
     </div>
 
     <div class="card">
-        <h3>📄 صورة الوجه من الوثيقة</h3>
+        <h3>📋 نوع الوثيقة المستخدمة للتوثيق</h3>
+        <select id="documentType">
+            <option value="جواز سفر">🛂 جواز سفر</option>
+            <option value="بطاقة هوية وطنية">🪪 بطاقة هوية وطنية</option>
+            <option value="رخصة قيادة">🚗 رخصة قيادة</option>
+            <option value="شهادة جامعية">🎓 شهادة جامعية</option>
+            <option value="شهادة حرفية">🛠️ شهادة حرفية</option>
+            <option value="بطاقة عمل رسمية">💼 بطاقة عمل رسمية</option>
+            <option value="إفادة بنكية">🏦 إفادة بنكية</option>
+            <option value="أخرى">📄 أخرى</option>
+        </select>
+    </div>
+
+    <div class="card">
+        <h3>📄 صورة الوجه من الوثيقة (حسب النوع المختار)</h3>
         <input type="file" id="docImageInput" accept="image/jpeg, image/png">
         <div class="document-preview">
             <img id="docPreview" style="max-width:200px; display:none;">
@@ -74,6 +88,21 @@
         <div id="peersList" class="info" style="margin-top:10px;"></div>
     </div>
 
+    <!-- التحقق من التوثيق -->
+    <div class="card">
+        <h3>🔍 التحقق من توثيق شخص</h3>
+        <label>ابحث بالاسم أو بجزء من بصمة الوجه</label>
+        <div class="flex-buttons">
+            <input type="text" id="searchQuery" placeholder="مثال: أحمد أو a1b2c3d4" style="flex:3;">
+            <select id="searchType">
+                <option value="name">🔤 بالاسم</option>
+                <option value="face_hash_prefix">🧬 ببصمة الوجه (أول 6 خانات)</option>
+            </select>
+            <button id="verifyBtn">🔎 تحقق</button>
+        </div>
+        <div id="verificationResult" class="result"></div>
+    </div>
+
     <footer>🔒 الخصوصية: يتم إرسال البصمات (Hashes) فقط. لا تُحفظ أي صور شخصية على الخادم.</footer>
 </div>
 
@@ -94,9 +123,9 @@
     const registerBtn = document.getElementById('registerBtn');
     const fullNameInput = document.getElementById('fullName');
     const docPreview = document.getElementById('docPreview');
+    const documentTypeSelect = document.getElementById('documentType');
 
     async function loadModels() {
-        // استخدام CDM official weights من face-api.js
         const MODEL_URL = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights';
         try {
             await faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL);
@@ -109,7 +138,7 @@
             console.log("✅ تم تحميل نماذج الوجه");
         } catch(err) {
             console.error("فشل تحميل النماذج:", err);
-            document.getElementById('liveFaceResult').innerHTML = '<span class="error">❌ فشل تحميل نماذج الوجه، تأكد من الاتصال بالإنترنت</span>';
+            document.getElementById('liveFaceResult').innerHTML = '<span class="error">❌ فشل تحميل نماذج الوجه</span>';
         }
     }
 
@@ -211,6 +240,8 @@
     registerBtn.onclick = async () => {
         const name = fullNameInput.value.trim();
         if (!name) { alert("الرجاء إدخال الاسم"); return; }
+        if (!liveFaceHash || !documentFaceHash) { alert("لم يتم التقاط الوجه أو استخراج وجه المستند"); return; }
+        const docType = documentTypeSelect.value;
         let previousHash = "";
         try {
             const res = await fetch('/chain');
@@ -218,8 +249,12 @@
             if (data.chain.length) previousHash = data.chain[data.chain.length-1].hash;
         } catch(e) { previousHash = "0"; }
         const payload = {
-            name, face_hash: liveFaceHash, document_hash: documentFaceHash,
-            biometric_verified: true, previous_hash: previousHash
+            name: name,
+            face_hash: liveFaceHash,
+            document_hash: documentFaceHash,
+            document_type: docType,
+            biometric_verified: true,
+            previous_hash: previousHash
         };
         registerBtn.disabled = true;
         document.getElementById('registerStatus').innerHTML = '<span class="info">⏳ جاري التوثيق...</span>';
@@ -261,6 +296,47 @@
         await fetch('/sync', { method: 'POST' });
         alert('تم بدء المزامنة، انتظر قليلاً ثم قم بتحديث الصفحة لعرض السلسلة');
     };
+
+    // التحقق من التوثيق
+    document.getElementById('verifyBtn').onclick = async () => {
+        const searchQuery = document.getElementById('searchQuery').value.trim();
+        const searchType = document.getElementById('searchType').value;
+        if (!searchQuery) {
+            alert("الرجاء إدخال اسم أو بادئة بصمة");
+            return;
+        }
+        const resultDiv = document.getElementById('verificationResult');
+        resultDiv.innerHTML = '<span class="info">⏳ جاري التحقق...</span>';
+        try {
+            const response = await fetch('/verify_person', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    query_type: searchType,
+                    query_value: searchQuery
+                })
+            });
+            const data = await response.json();
+            if (response.ok && data.verified) {
+                let recordsHtml = '<ul style="text-align:right;">';
+                data.records.forEach(record => {
+                    recordsHtml += `<li>
+                        <strong>${record.name}</strong> - ${record.document_type}<br>
+                        تم التوثيق في ${record.timestamp}<br>
+                        بصمة الوجه: ${record.face_hash.substring(0,12)}...<br>
+                        رقم الكتلة: ${record.index} (العقدة: ${record.node_id})
+                    </li><br>`;
+                });
+                recordsHtml += '</ul>';
+                resultDiv.innerHTML = `<div class="success">${data.message}</div>${recordsHtml}`;
+            } else {
+                resultDiv.innerHTML = `<div class="error">${data.message || "لم يتم العثور على تطابق"}</div>`;
+            }
+        } catch (err) {
+            resultDiv.innerHTML = `<div class="error">خطأ في الاتصال: ${err.message}</div>`;
+        }
+    };
+
     loadPeers();
     loadModels();
     // تعطيل الأزرار في البداية
