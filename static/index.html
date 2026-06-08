@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>سجل الحقيقة اللامركزي - توثيق الهوية</title>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: #f0f2f5; margin: 0; padding: 20px; }
+        .container { max-width: 1000px; margin: 0 auto; background: white; border-radius: 24px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); padding: 20px 25px 35px; }
+        h1 { text-align: center; color: #1e3c72; border-bottom: 2px solid #2c7da0; padding-bottom: 10px; }
+        .card { background: #f9f9fc; border-radius: 20px; padding: 20px; margin-bottom: 25px; border: 1px solid #e0e4e8; }
+        button { background-color: #2c7da0; color: white; border: none; cursor: pointer; font-weight: bold; padding: 10px 16px; border-radius: 40px; margin: 5px; transition: 0.2s; }
+        button:disabled { background-color: #b0c4d9; cursor: not-allowed; }
+        .flex-buttons { display: flex; gap: 12px; flex-wrap: wrap; }
+        input, .file-label { width: 100%; padding: 10px; border-radius: 40px; border: 1px solid #ccc; margin: 5px 0; }
+        video, canvas, img { max-width: 100%; border-radius: 16px; border: 2px solid #ddd; background: #000; }
+        .result { margin-top: 10px; padding: 10px; border-radius: 50px; text-align: center; font-weight: bold; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+</head>
+<body>
+<div class="container">
+    <h1>📜 سجل الحقيقة اللامركزي (P2P)</h1>
+    <div class="sub">توثيق الهوية باستخدام التحقق البيومتري للوجه - لا تُحفظ الصور أبداً</div>
+
+    <div class="card">
+        <h3>👤 بيانات الهوية</h3>
+        <input type="text" id="fullName" placeholder="الاسم الكامل (مثال: أحمد محمد العلي)">
+    </div>
+
+    <div class="card">
+        <h3>📄 صورة الوجه من الوثيقة</h3>
+        <input type="file" id="docImageInput" accept="image/jpeg, image/png">
+        <div class="document-preview">
+            <img id="docPreview" style="max-width:200px; display:none;">
+        </div>
+        <button id="extractDocFaceBtn" disabled>🔍 استخراج الوجه من المستند</button>
+        <div id="docFaceResult" class="result"></div>
+    </div>
+
+    <div class="card">
+        <h3>📸 التحقق الحي بالكاميرا</h3>
+        <video id="video" autoplay muted playsinline style="width:100%; max-width:400px;"></video>
+        <div class="flex-buttons">
+            <button id="startCameraBtn">📷 تشغيل الكاميرا</button>
+            <button id="captureFaceBtn" disabled>🤳 التقاط الوجه</button>
+        </div>
+        <div id="liveFaceResult" class="result"></div>
+    </div>
+
+    <div class="card">
+        <h3>🔄 مقارنة الوجوه</h3>
+        <button id="compareFacesBtn" disabled>⚖️ مقارنة الوجه الحي مع وجه المستند</button>
+        <div id="comparisonResult" class="result"></div>
+    </div>
+
+    <button id="registerBtn" disabled>✅ توثيق الهوية وإضافتها إلى السجل اللامركزي</button>
+    <div id="registerStatus" class="result"></div>
+
+    <!-- إدارة العقد -->
+    <div class="card">
+        <h3>🌐 إعدادات الشبكة اللامركزية</h3>
+        <label>عنوان عقدة أخرى (مثال: https://node1.onrender.com)</label>
+        <div class="flex-buttons">
+            <input type="text" id="peerUrl" placeholder="https://..." style="flex:3;">
+            <button id="addPeerBtn">➕ إضافة عقدة</button>
+            <button id="syncNowBtn">🔄 مزامنة مع الشبكة</button>
+        </div>
+        <div id="peersList" class="info" style="margin-top:10px;"></div>
+    </div>
+
+    <footer>🔒 الخصوصية: يتم إرسال البصمات (Hashes) فقط. لا تُحفظ أي صور شخصية على الخادم.</footer>
+</div>
+
+<script>
+    let modelsLoaded = false;
+    let cameraStream = null;
+    let liveFaceDescriptor = null;
+    let documentFaceDescriptor = null;
+    let liveFaceHash = null;
+    let documentFaceHash = null;
+
+    const video = document.getElementById('video');
+    const startCameraBtn = document.getElementById('startCameraBtn');
+    const captureFaceBtn = document.getElementById('captureFaceBtn');
+    const docImageInput = document.getElementById('docImageInput');
+    const extractDocFaceBtn = document.getElementById('extractDocFaceBtn');
+    const compareBtn = document.getElementById('compareFacesBtn');
+    const registerBtn = document.getElementById('registerBtn');
+    const fullNameInput = document.getElementById('fullName');
+    const docPreview = document.getElementById('docPreview');
+
+    async function loadModels() {
+        const MODEL_URL = 'https://unpkg.com/face-api.js@0.22.2/weights';
+        await faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL);
+        await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+        await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+        modelsLoaded = true;
+        startCameraBtn.disabled = false;
+        docImageInput.disabled = false;
+        extractDocFaceBtn.disabled = false;
+    }
+
+    async function computeImageHash(canvas) {
+        return new Promise((resolve) => {
+            canvas.toBlob(async (blob) => {
+                const buf = await blob.arrayBuffer();
+                const wordArray = CryptoJS.lib.WordArray.create(buf);
+                resolve(CryptoJS.SHA256(wordArray).toString());
+            }, 'image/jpeg', 0.8);
+        });
+    }
+
+    async function extractFaceFromMedia(mediaElement) {
+        const detection = await faceapi.detectSingleFace(mediaElement).withFaceLandmarks().withFaceDescriptor();
+        if (!detection) return null;
+        const box = detection.detection.box;
+        const canvas = document.createElement('canvas');
+        canvas.width = box.width;
+        canvas.height = box.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(mediaElement, box.x, box.y, box.width, box.height, 0, 0, box.width, box.height);
+        const hash = await computeImageHash(canvas);
+        return { descriptor: detection.descriptor, croppedCanvas: canvas, hash };
+    }
+
+    startCameraBtn.onclick = async () => {
+        if (cameraStream) cameraStream.getTracks().forEach(t => t.stop());
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            cameraStream = stream;
+            video.srcObject = stream;
+            await video.play();
+            startCameraBtn.disabled = true;
+            captureFaceBtn.disabled = false;
+            document.getElementById('liveFaceResult').innerHTML = '<span class="info">✅ الكاميرا تعمل، اضغط التقاط الوجه</span>';
+        } catch (err) {
+            document.getElementById('liveFaceResult').innerHTML = '<span class="error">❌ لا يمكن الوصول للكاميرا</span>';
+        }
+    };
+
+    captureFaceBtn.onclick = async () => {
+        if (!modelsLoaded) return;
+        const result = await extractFaceFromMedia(video);
+        if (!result) {
+            document.getElementById('liveFaceResult').innerHTML = '<span class="error">😞 لم يتم اكتشاف وجه</span>';
+            return;
+        }
+        liveFaceDescriptor = result.descriptor;
+        liveFaceHash = result.hash;
+        document.getElementById('liveFaceResult').innerHTML = `<span class="success">✅ تم التقاط الوجه (بصمة: ${liveFaceHash.substring(0,10)}...)</span>`;
+        if (documentFaceDescriptor) compareBtn.disabled = false;
+    };
+
+    docImageInput.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            docPreview.src = ev.target.result;
+            docPreview.style.display = 'block';
+            extractDocFaceBtn.disabled = false;
+        };
+        reader.readAsDataURL(file);
+    };
+
+    extractDocFaceBtn.onclick = async () => {
+        if (!modelsLoaded || !docPreview.src) return;
+        const img = new Image();
+        img.src = docPreview.src;
+        await new Promise(r => { img.onload = r; });
+        const result = await extractFaceFromMedia(img);
+        if (!result) {
+            document.getElementById('docFaceResult').innerHTML = '<span class="error">⚠️ لم يتم العثور على وجه في المستند</span>';
+            return;
+        }
+        documentFaceDescriptor = result.descriptor;
+        documentFaceHash = result.hash;
+        document.getElementById('docFaceResult').innerHTML = `<span class="success">✅ تم استخراج الوجه من المستند (بصمة: ${documentFaceHash.substring(0,10)}...)</span>`;
+        if (liveFaceDescriptor) compareBtn.disabled = false;
+    };
+
+    compareBtn.onclick = async () => {
+        if (!liveFaceDescriptor || !documentFaceDescriptor) return;
+        const distance = faceapi.euclideanDistance(liveFaceDescriptor, documentFaceDescriptor);
+        const threshold = 0.6;
+        const isMatch = distance < threshold;
+        if (isMatch) {
+            document.getElementById('comparisonResult').innerHTML = `<span class="success">✅ تطابق الوجوه (المسافة: ${distance.toFixed(3)})</span>`;
+            registerBtn.disabled = false;
+        } else {
+            document.getElementById('comparisonResult').innerHTML = `<span class="error">❌ غير متطابق (المسافة: ${distance.toFixed(3)})</span>`;
+            registerBtn.disabled = true;
+        }
+    };
+
+    registerBtn.onclick = async () => {
+        const name = fullNameInput.value.trim();
+        if (!name) { alert("الرجاء إدخال الاسم"); return; }
+        let previousHash = "";
+        try {
+            const res = await fetch('/chain');
+            const data = await res.json();
+            if (data.chain.length) previousHash = data.chain[data.chain.length-1].hash;
+        } catch(e) { previousHash = "0"; }
+        const payload = {
+            name, face_hash: liveFaceHash, document_hash: documentFaceHash,
+            biometric_verified: true, previous_hash: previousHash
+        };
+        registerBtn.disabled = true;
+        document.getElementById('registerStatus').innerHTML = '<span class="info">⏳ جاري التوثيق...</span>';
+        try {
+            const response = await fetch('/add_block', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+            });
+            const result = await response.json();
+            if (response.ok) {
+                document.getElementById('registerStatus').innerHTML = `<span class="success">🎉 تم التوثيق! رقم الكتلة: ${result.block_index}</span>`;
+                registerBtn.disabled = true;
+            } else {
+                document.getElementById('registerStatus').innerHTML = `<span class="error">❌ فشل: ${result.error}</span>`;
+                registerBtn.disabled = false;
+            }
+        } catch(err) {
+            document.getElementById('registerStatus').innerHTML = `<span class="error">خطأ في الاتصال</span>`;
+            registerBtn.disabled = false;
+        }
+    };
+
+    async function loadPeers() {
+        const res = await fetch('/peers');
+        const peers = await res.json();
+        const peersDiv = document.getElementById('peersList');
+        if (peers.length) peersDiv.innerHTML = 'العقد المتصلة: ' + peers.join(', ');
+        else peersDiv.innerHTML = 'لا توجد عقد أخرى. يمكنك إضافة عقدة يدوياً.';
+    }
+    document.getElementById('addPeerBtn').onclick = async () => {
+        const peer = document.getElementById('peerUrl').value.trim();
+        if (!peer) return;
+        await fetch('/peers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({peer}) });
+        loadPeers();
+    };
+    document.getElementById('syncNowBtn').onclick = async () => {
+        await fetch('/sync', { method: 'POST' });
+        alert('تم بدء المزامنة، انتظر قليلاً');
+    };
+    loadPeers();
+    loadModels();
+    // تعطيل الأزرار في البداية
+    startCameraBtn.disabled = true;
+    captureFaceBtn.disabled = true;
+    extractDocFaceBtn.disabled = true;
+    compareBtn.disabled = true;
+    registerBtn.disabled = true;
+    docImageInput.disabled = true;
+
+    // تعليق حول إضافة فحص Deepfake:
+    // يمكن إضافة دالة checkDeepfake(videoElement) باستخدام TensorFlow.js قبل قبول الوجه.
+</script>
+</body>
+</html>
