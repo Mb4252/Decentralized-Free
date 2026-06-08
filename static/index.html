@@ -96,14 +96,21 @@
     const docPreview = document.getElementById('docPreview');
 
     async function loadModels() {
-        const MODEL_URL = 'https://unpkg.com/face-api.js@0.22.2/weights';
-        await faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL);
-        await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
-        await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
-        modelsLoaded = true;
-        startCameraBtn.disabled = false;
-        docImageInput.disabled = false;
-        extractDocFaceBtn.disabled = false;
+        // استخدام CDM official weights من face-api.js
+        const MODEL_URL = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights';
+        try {
+            await faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL);
+            await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+            await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+            modelsLoaded = true;
+            startCameraBtn.disabled = false;
+            docImageInput.disabled = false;
+            extractDocFaceBtn.disabled = false;
+            console.log("✅ تم تحميل نماذج الوجه");
+        } catch(err) {
+            console.error("فشل تحميل النماذج:", err);
+            document.getElementById('liveFaceResult').innerHTML = '<span class="error">❌ فشل تحميل نماذج الوجه، تأكد من الاتصال بالإنترنت</span>';
+        }
     }
 
     async function computeImageHash(canvas) {
@@ -145,7 +152,7 @@
     };
 
     captureFaceBtn.onclick = async () => {
-        if (!modelsLoaded) return;
+        if (!modelsLoaded) { alert("النماذج لم تُحمّل بعد، انتظر قليلاً"); return; }
         const result = await extractFaceFromMedia(video);
         if (!result) {
             document.getElementById('liveFaceResult').innerHTML = '<span class="error">😞 لم يتم اكتشاف وجه</span>';
@@ -165,12 +172,14 @@
             docPreview.src = ev.target.result;
             docPreview.style.display = 'block';
             extractDocFaceBtn.disabled = false;
+            document.getElementById('docFaceResult').innerHTML = '<span class="info">تم تحميل الصورة، اضغط استخراج الوجه</span>';
         };
         reader.readAsDataURL(file);
     };
 
     extractDocFaceBtn.onclick = async () => {
-        if (!modelsLoaded || !docPreview.src) return;
+        if (!modelsLoaded) { alert("النماذج لم تُحمّل بعد"); return; }
+        if (!docPreview.src) { alert("يرجى رفع صورة المستند أولاً"); return; }
         const img = new Image();
         img.src = docPreview.src;
         await new Promise(r => { img.onload = r; });
@@ -233,21 +242,24 @@
     };
 
     async function loadPeers() {
-        const res = await fetch('/peers');
-        const peers = await res.json();
-        const peersDiv = document.getElementById('peersList');
-        if (peers.length) peersDiv.innerHTML = 'العقد المتصلة: ' + peers.join(', ');
-        else peersDiv.innerHTML = 'لا توجد عقد أخرى. يمكنك إضافة عقدة يدوياً.';
+        try {
+            const res = await fetch('/peers');
+            const peers = await res.json();
+            const peersDiv = document.getElementById('peersList');
+            if (peers.length) peersDiv.innerHTML = 'العقد المتصلة: ' + peers.join(', ');
+            else peersDiv.innerHTML = 'لا توجد عقد أخرى. يمكنك إضافة عقدة يدوياً.';
+        } catch(e) { console.error(e); }
     }
     document.getElementById('addPeerBtn').onclick = async () => {
         const peer = document.getElementById('peerUrl').value.trim();
         if (!peer) return;
         await fetch('/peers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({peer}) });
         loadPeers();
+        alert('تمت إضافة العقدة، سيتم المزامنة تلقائياً');
     };
     document.getElementById('syncNowBtn').onclick = async () => {
         await fetch('/sync', { method: 'POST' });
-        alert('تم بدء المزامنة، انتظر قليلاً');
+        alert('تم بدء المزامنة، انتظر قليلاً ثم قم بتحديث الصفحة لعرض السلسلة');
     };
     loadPeers();
     loadModels();
@@ -258,9 +270,6 @@
     compareBtn.disabled = true;
     registerBtn.disabled = true;
     docImageInput.disabled = true;
-
-    // تعليق حول إضافة فحص Deepfake:
-    // يمكن إضافة دالة checkDeepfake(videoElement) باستخدام TensorFlow.js قبل قبول الوجه.
 </script>
 </body>
 </html>
