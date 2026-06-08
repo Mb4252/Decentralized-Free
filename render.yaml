@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: blockchain-node
+    runtime: python
+    repo: https://github.com/your-username/your-repo  # غيّره إلى رابط repo الخاص بك
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 120
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: PEERS
+        # أضف عناوين العقد الأخرى (يمكنك تركها فارغة ثم إضافتها يدوياً)
+        value: ""
+    disk:
+      name: blockchain-data
+      mountPath: /data
+      sizeGB: 1
+    healthCheckPath: /health
+
+  # اختياري: Cron job للمزامنة الدورية مع العقد الأخرى
+  - type: cron
+    name: sync-cron
+    schedule: "*/15 * * * *"   # كل 15 دقيقة
+    repo: https://github.com/your-username/your-repo
+    buildCommand: pip install -r requirements.txt
+    startCommand: python sync_script.py
+    envVars:
+      - key: PEERS
+        value: ""   # يمكن تعيينها بنفس قائمة العقد
