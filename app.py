@@ -13,17 +13,22 @@ app = Flask(__name__)
 CORS(app)
 
 # ------------------------- الإعدادات -------------------------
-# استخدام متغير البيئة PORT من Render (افتراضي 5000)
 PORT = int(os.environ.get('PORT', 5000))
 
-# مسار حفظ بيانات السلسلة (يجب أن يكون على Persistent Disk)
-DATA_DIR = os.environ.get('DATA_DIR', '/data')  # Render يوصي بـ /data
-os.makedirs(DATA_DIR, exist_ok=True)
+# تحديد مجلد البيانات: يُفضل استخدام متغير البيئة DATA_DIR، وإلا نحاول /data، فإن فشل نستخدم مجلداً داخل المشروع
+DATA_DIR = os.environ.get('DATA_DIR', '/data')
+try:
+    os.makedirs(DATA_DIR, exist_ok=True)
+except PermissionError:
+    # إذا لم تكن لدينا صلاحية الكتابة في /data، نستخدم مجلد ledger_data داخل الدليل الحالي
+    DATA_DIR = os.path.join(os.getcwd(), 'ledger_data')
+    os.makedirs(DATA_DIR, exist_ok=True)
+    print(f"⚠️ تم استخدام مجلد بديل للبيانات: {DATA_DIR}")
+
 LEDGER_FILE = os.path.join(DATA_DIR, 'ledger.json')
 PEERS_FILE = os.path.join(DATA_DIR, 'peers.json')
 
-# قائمة العقد الأخرى من متغير البيئة PEERS (مفصولة بفواصل)
-# مثال: PEERS=https://node1.onrender.com,https://node2.onrender.com
+# ------------------------- تحميل قائمة العقد -------------------------
 PEERS = set()
 env_peers = os.environ.get('PEERS', '')
 if env_peers:
@@ -32,7 +37,6 @@ if env_peers:
         if peer:
             PEERS.add(peer)
 
-# تحميل العقد من ملف peers.json إن وجد
 def load_peers():
     global PEERS
     try:
@@ -41,14 +45,13 @@ def load_peers():
             PEERS.update(saved_peers)
     except FileNotFoundError:
         pass
-    # حفظ القائمة الحالية
     save_peers()
 
 def save_peers():
     with open(PEERS_FILE, 'w') as f:
         json.dump(list(PEERS), f, indent=2)
 
-# قفل لمزامنة الكتابة إلى الملف (هام مع Gunicorn)
+# قفل لمزامنة الكتابة إلى الملف
 ledger_lock = threading.Lock()
 
 # ------------------------- فئة Block و Blockchain -------------------------
@@ -99,7 +102,7 @@ class Blockchain:
                     block.hash = block_data['hash']
                     self.chain.append(block)
         except FileNotFoundError:
-            # إنشاء كتلة genesis
+            # كتلة genesis
             genesis = Block(0, "Genesis", "0", "0", str(datetime.datetime.now()), "0", "genesis")
             self.chain = [genesis]
             self.save_chain()
@@ -160,17 +163,15 @@ class Blockchain:
             return True
         return False
 
-# ------------------------- إنشاء سلسلة الكتل -------------------------
 blockchain = Blockchain()
 
-# ------------------------- وظائف المزامنة والبث -------------------------
+# ------------------------- دوال المزامنة والبث -------------------------
 def sync_with_peer(peer_url):
     try:
         response = requests.get(f"{peer_url}/chain", timeout=5)
         if response.status_code == 200:
             data = response.json()
             peer_chain_data = data.get('chain', [])
-            # تحويل إلى كائنات Block
             peer_chain = []
             for bd in peer_chain_data:
                 b = Block(
@@ -190,7 +191,6 @@ def sync_with_peers():
     if not PEERS:
         print("لا توجد عقد أخرى للمزامنة")
         return
-    # جمع أطول سلسلة صالحة من جميع العقد
     longest_chain = None
     max_len = len(blockchain.chain)
     for peer in PEERS:
@@ -221,7 +221,7 @@ def broadcast_block(block_dict):
         except Exception as e:
             print(f"⚠️ فشل البث إلى {peer}: {e}")
 
-# ------------------------- واجهات API -------------------------
+# ------------------------- مسارات API -------------------------
 @app.route('/chain', methods=['GET'])
 def get_chain():
     chain_data = []
@@ -283,7 +283,6 @@ def add_block_peer():
         return jsonify({"error": "بيانات الكتلة غير مكتملة"}), 400
 
     with ledger_lock:
-        # التأكد من عدم وجود الكتلة مسبقاً
         for block in blockchain.chain:
             if block.hash == data['hash']:
                 return jsonify({"message": "الكتلة موجودة مسبقاً"}), 200
@@ -329,7 +328,6 @@ def sync_trigger():
     threading.Thread(target=sync_with_peers).start()
     return jsonify({"message": "جارٍ المزامنة في الخلفية"}), 202
 
-# ------------------------- نقطة صحية لـ Render -------------------------
 @app.route('/health', methods=['GET'])
 def health():
     return jsonify({"status": "healthy", "chain_length": len(blockchain.chain)}), 200
@@ -337,6 +335,5 @@ def health():
 # ------------------------- بدء التشغيل -------------------------
 if __name__ == '__main__':
     load_peers()
-    # مزامنة أولية
     threading.Thread(target=sync_with_peers).start()
     app.run(host='0.0.0.0', port=PORT, debug=False, threaded=True)
