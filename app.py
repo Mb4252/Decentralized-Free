@@ -5,7 +5,7 @@ import datetime
 import threading
 import requests
 import socket
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, redirect
 from flask_cors import CORS
 
 app = Flask(__name__, static_folder='static', static_url_path='/static')
@@ -413,14 +413,22 @@ def verify_person():
     else:
         return jsonify({"error": "query_type يجب أن يكون 'name' أو 'face_hash_prefix'"}), 400
 
-# ------------------------- خدمة الواجهة الأمامية -------------------------
+# ------------------------- صفحات الواجهة الأمامية -------------------------
 @app.route('/')
 def index():
-    return send_from_directory('static', 'index.html')
+    return redirect('/register')
 
-@app.route('/static/<path:filename>')
-def serve_static(filename):
-    return send_from_directory('static', filename)
+@app.route('/register')
+def register_page():
+    return send_from_directory('static', 'register.html')
+
+@app.route('/verification-result')
+def verification_result_page():
+    return send_from_directory('static', 'verification_result.html')
+
+@app.route('/profile')
+def profile_page():
+    return send_from_directory('static', 'profile.html')
 
 # ------------------------- بدء التشغيل -------------------------
 if __name__ == '__main__':
