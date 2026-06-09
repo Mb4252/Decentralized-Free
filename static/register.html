@@ -21,7 +21,28 @@
         .error { background: #f8d7da; color: #721c24; }
         .info { background: #d1ecf1; color: #0c5460; }
         .step { background: #e7f3ff; padding: 10px; border-radius: 50px; margin-bottom: 15px; }
-        .preview-img { max-width: 200px; max-height: 200px; margin-top: 10px; border-radius: 16px; border: 2px solid #2c7da0; display: block; }
+        .upload-area {
+            border: 2px dashed #2c7da0;
+            border-radius: 20px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            background: #f1f9ff;
+            transition: 0.3s;
+        }
+        .upload-area:hover { background: #e3f0fa; }
+        .preview-img { max-width: 100%; max-height: 200px; margin-top: 15px; border-radius: 16px; border: 2px solid #2c7da0; display: block; margin-left: auto; margin-right: auto; }
+        .file-input { display: none; }
+        .upload-label {
+            background-color: #2c7da0;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 40px;
+            font-weight: bold;
+            cursor: pointer;
+            display: inline-block;
+            margin-top: 10px;
+        }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
@@ -29,7 +50,7 @@
 <body>
 <div class="container">
     <h1>📜 الخطوة 1: تسجيل الهوية</h1>
-    <div class="step">🔹 أدخل الاسم الكامل 🔹 ارفع صورة وجه من وثيقة رسمية 🔹 قم بالتحقق الحي (إرمش + حركات الرأس)</div>
+    <div class="step">🔹 أدخل الاسم الكامل 🔹 أضف صورة وجه من وثيقة رسمية 🔹 قم بالتحقق الحي (إرمش + حركات الرأس)</div>
 
     <div class="card">
         <label>👤 الاسم الكامل (سيظهر في الملف الشخصي)</label>
@@ -49,12 +70,12 @@
     </div>
 
     <div class="card">
-        <label>📄 صورة الوجه من الوثيقة</label>
-        <input type="file" id="docImageInput" accept="image/jpeg, image/png, image/jpg">
-        <div id="previewContainer" style="text-align: center;">
-            <img id="docPreview" class="preview-img" style="display: none;">
+        <label>📄 صورة الوجه من الوثيقة (بطاقة هوية، جواز سفر، رخصة قيادة، ...)</label>
+        <div class="upload-area" id="uploadArea">
+            <span>📸 اضغط هنا لاختيار صورة الهوية</span>
+            <input type="file" id="docImageInput" accept="image/jpeg, image/png, image/jpg" class="file-input">
+            <div id="previewContainer" style="text-align: center;"></div>
         </div>
-        <div id="loadMsg" class="info" style="display: none;">✅ تم تحميل الصورة بنجاح</div>
         <button id="extractDocFaceBtn" disabled>🔍 استخراج الوجه من المستند</button>
         <div id="docFaceResult" class="result"></div>
     </div>
@@ -89,11 +110,11 @@
     const startLivenessBtn = document.getElementById('startLivenessCheck');
     const docImageInput = document.getElementById('docImageInput');
     const extractDocFaceBtn = document.getElementById('extractDocFaceBtn');
-    const docPreview = document.getElementById('docPreview');
-    const loadMsg = document.getElementById('loadMsg');
     const fullNameInput = document.getElementById('fullName');
     const documentTypeSelect = document.getElementById('documentType');
     const registerBtn = document.getElementById('registerAndContinue');
+    const uploadArea = document.getElementById('uploadArea');
+    const previewContainer = document.getElementById('previewContainer');
 
     // ------------------- تحميل النماذج -------------------
     async function loadModels() {
@@ -138,33 +159,42 @@
         return { descriptor: detection.descriptor, croppedCanvas: canvas, hash };
     }
 
-    // ------------------- معاينة الصورة فور الرفع -------------------
+    // ------------------- معاينة الصورة ورفعها -------------------
+    function showPreview(file) {
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = document.createElement('img');
+            img.src = e.target.result;
+            img.className = 'preview-img';
+            img.alt = 'معاينة صورة الهوية';
+            previewContainer.innerHTML = '';
+            previewContainer.appendChild(img);
+            // حفظ الصورة في متغير عام لاستخدامها لاحقاً
+            window.uploadedImageSrc = e.target.result;
+            // إعادة تعيين الوجه المستخرج
+            documentFaceDescriptor = null;
+            documentFaceHash = null;
+            document.getElementById('docFaceResult').innerHTML = '';
+            // تمكين زر استخراج الوجه
+            extractDocFaceBtn.disabled = false;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    // فتح نافذة اختيار الملف عند الضغط على منطقة الرفع
+    uploadArea.addEventListener('click', () => {
+        docImageInput.click();
+    });
+
     docImageInput.addEventListener('change', (event) => {
         const file = event.target.files[0];
         if (!file) return;
-
-        // التحقق من أن الملف صورة
         if (!file.type.startsWith('image/')) {
             alert('الرجاء اختيار ملف صورة (jpg, png)');
             return;
         }
-
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            docPreview.src = e.target.result;
-            docPreview.style.display = 'block';
-            loadMsg.style.display = 'block';
-            // إعادة تمكين زر الاستخراج بعد تحميل الصورة
-            extractDocFaceBtn.disabled = false;
-            // إعادة تعيين النتائج السابقة
-            document.getElementById('docFaceResult').innerHTML = '';
-            documentFaceDescriptor = null;
-            documentFaceHash = null;
-        };
-        reader.onerror = () => {
-            alert('حدث خطأ أثناء قراءة الملف');
-        };
-        reader.readAsDataURL(file);
+        showPreview(file);
     });
 
     // ------------------- استخراج وجه المستند -------------------
@@ -173,26 +203,25 @@
             alert("النماذج لم تُحمّل بعد، انتظر قليلاً");
             return;
         }
-        if (!docPreview.src || docPreview.style.display === 'none') {
-            alert("يرجى رفع صورة المستند أولاً");
+        if (!window.uploadedImageSrc) {
+            alert("يرجى اختيار صورة الهوية أولاً");
             return;
         }
-        // استخدام صورة HTMLImageElement للتأكد من تحميلها بالكامل
         const img = new Image();
         img.crossOrigin = "Anonymous";
-        img.src = docPreview.src;
+        img.src = window.uploadedImageSrc;
         await new Promise((resolve, reject) => {
             img.onload = resolve;
             img.onerror = reject;
         });
         const result = await extractFaceFromMedia(img);
         if (!result) {
-            document.getElementById('docFaceResult').innerHTML = '<span class="error">⚠️ لم يتم العثور على وجه واضح في المستند. حاول بصورة أفضل.</span>';
+            document.getElementById('docFaceResult').innerHTML = '<span class="error">⚠️ لم يتم العثور على وجه واضح في صورة الهوية. حاول بصورة أفضل مع إضاءة كافية.</span>';
             return;
         }
         documentFaceDescriptor = result.descriptor;
         documentFaceHash = result.hash;
-        document.getElementById('docFaceResult').innerHTML = `<span class="success">✅ تم استخراج الوجه من المستند بنجاح (البصمة: ${documentFaceHash.substring(0,10)}...)</span>`;
+        document.getElementById('docFaceResult').innerHTML = `<span class="success">✅ تم استخراج الوجه من الهوية بنجاح (البصمة: ${documentFaceHash.substring(0,10)}...)</span>`;
     };
 
     // ------------------- تشغيل الكاميرا -------------------
@@ -211,7 +240,7 @@
         }
     };
 
-    // ------------------- دوال فحص الحيوية (إرمش وحركات الرأس) -------------------
+    // ------------------- دوال فحص الحيوية -------------------
     async function detectEyeBlink(landmarks) {
         const leftEye = landmarks.getLeftEye();
         const rightEye = landmarks.getRightEye();
@@ -237,7 +266,6 @@
         const offset = (noseTip.x - faceCenterX) / faceWidth;
         if (offset < -0.1) return "يسار";
         if (offset > 0.1) return "يمين";
-        // تقدير الأعلى/الأسفل بناءً على y للأنف
         const faceTop = detectionBox.y;
         const faceBottom = detectionBox.y + detectionBox.height;
         const yRatio = (noseTip.y - faceTop) / detectionBox.height;
@@ -289,7 +317,6 @@
                     step++;
                     clearInterval(interval);
                     statusDiv.innerHTML = `<span class="success">🎉 اجتزت فحص الحيوية بنجاح!</span>`;
-                    // الآن نقوم بالتقاط الوجه النهائي للتحقق من المطابقة
                     const liveResult = await extractFaceFromMedia(video);
                     if (liveResult) {
                         liveFaceDescriptor = liveResult.descriptor;
@@ -299,11 +326,11 @@
                         faceMatched = matched;
                         const matchDiv = document.getElementById('finalComparisonResult');
                         if (matched) {
-                            matchDiv.innerHTML = `<span class="success">✅ الوجه الملتقط يطابق وجه المستند! (المسافة: ${distance.toFixed(3)})</span>`;
+                            matchDiv.innerHTML = `<span class="success">✅ الوجه الملتقط يطابق وجه الهوية! (المسافة: ${distance.toFixed(3)})</span>`;
                             registerBtn.disabled = false;
                             livenessPassed = true;
                         } else {
-                            matchDiv.innerHTML = `<span class="error">❌ الوجه الحي لا يطابق المستند (المسافة: ${distance.toFixed(3)})</span>`;
+                            matchDiv.innerHTML = `<span class="error">❌ الوجه الحي لا يطابق الهوية (المسافة: ${distance.toFixed(3)})</span>`;
                             registerBtn.disabled = true;
                         }
                     } else {
@@ -318,7 +345,7 @@
     
     startLivenessBtn.onclick = async () => {
         if (!documentFaceDescriptor) {
-            alert("يرجى استخراج وجه المستند أولاً");
+            alert("يرجى استخراج وجه الهوية أولاً");
             return;
         }
         startLivenessBtn.disabled = true;
@@ -371,7 +398,7 @@
     startLivenessBtn.disabled = true;
     extractDocFaceBtn.disabled = true;
     registerBtn.disabled = true;
-    docImageInput.disabled = true;
+    docImageInput.disabled = false;  // السماح باختيار الملف
 </script>
 </body>
 </html>
