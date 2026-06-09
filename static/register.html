@@ -19,19 +19,21 @@
         .btn-primary:disabled { background: #b0c4d9; cursor: not-allowed; }
         .btn-success { background: #28a745; color: white; }
         .btn-warning { background: #ffc107; color: #333; }
+        .btn-danger { background: #dc3545; color: white; }
         video { width: 100%; border-radius: 20px; border: 2px solid #ddd; background: #000; margin: 10px 0; }
         .result { margin: 10px 0; padding: 12px; border-radius: 40px; text-align: center; font-size: 0.85rem; }
         .success { background: #d4edda; color: #155724; }
         .error { background: #f8d7da; color: #721c24; }
         .info { background: #d1ecf1; color: #0c5460; }
         .step-indicator { display: flex; justify-content: space-between; margin-bottom: 20px; }
-        .step { flex: 1; text-align: center; padding: 6px; background: #e0e0e0; margin: 0 2px; border-radius: 40px; font-size: 0.7rem; color: #666; }
+        .step { flex: 1; text-align: center; padding: 8px; background: #e0e0e0; margin: 0 2px; border-radius: 40px; font-size: 0.7rem; color: #666; }
         .step.active { background: #2c7da0; color: white; }
         .step.completed { background: #28a745; color: white; }
         .camera-switch { display: flex; gap: 10px; margin: 10px 0; }
-        .camera-switch button { flex: 1; margin: 0; padding: 8px; font-size: 0.75rem; }
+        .camera-switch button { flex: 1; margin: 0; padding: 10px; font-size: 0.8rem; }
         .spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid #2c7da0; border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .warning-box { background: #fff3cd; border: 1px solid #ffc107; padding: 10px; border-radius: 20px; margin: 10px 0; text-align: center; }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
@@ -47,6 +49,7 @@
         <div class="step" id="step4">4️⃣ تسجيل</div>
     </div>
 
+    <!-- الخطوة 1: البيانات -->
     <div id="step1Content">
         <div class="card">
             <label>👤 الاسم الكامل</label>
@@ -54,262 +57,408 @@
             <label>📋 نوع الوثيقة</label>
             <select id="docType">
                 <option value="جواز سفر">🛂 جواز سفر</option>
-                <option value="بطاقة هوية">🪪 بطاقة هوية</option>
+                <option value="بطاقة هوية">🪪 بطاقة هوية وطنية</option>
                 <option value="رخصة قيادة">🚗 رخصة قيادة</option>
             </select>
-            <button id="nextStep1" class="btn-primary">▶️ التالي</button>
+            <button id="nextStep1" class="btn-primary">▶️ التالي: تصوير الوثيقة</button>
         </div>
     </div>
 
+    <!-- الخطوة 2: تصوير الوثيقة -->
     <div id="step2Content" style="display:none;">
         <div class="card">
+            <p style="text-align:center; color:#2c7da0;">📸 ضع الوثيقة أمام الكاميرا</p>
             <video id="docVideo" autoplay muted playsinline></video>
             <div class="camera-switch">
-                <button id="switchFront" class="btn-warning">📱 أمامية</button>
-                <button id="switchBack" class="btn-warning">📷 خلفية</button>
+                <button id="switchDocBack" class="btn-warning">📷 كاميرا خلفية</button>
+                <button id="switchDocFront" class="btn-warning">📱 كاميرا أمامية</button>
             </div>
-            <button id="captureDoc" class="btn-primary" disabled>📸 تصوير الوثيقة</button>
+            <button id="captureDocBtn" class="btn-primary" disabled>📸 تصوير الوثيقة</button>
             <div id="docResult" class="result"></div>
-            <button id="confirmDoc" class="btn-success" disabled>✅ تأكيد</button>
+            <button id="confirmDocBtn" class="btn-success" disabled>✅ تأكيد والمتابعة</button>
         </div>
     </div>
 
+    <!-- الخطوة 3: التقاط الوجه الحي -->
     <div id="step3Content" style="display:none;">
         <div class="card">
+            <p style="text-align:center; color:#2c7da0;">🎥 وجه الكاميرا نحو وجهك</p>
+            <div id="cameraPermissionWarning" class="warning-box" style="display:none;">
+                ⚠️ يرجى السماح بالوصول إلى الكاميرا
+            </div>
             <video id="liveVideo" autoplay muted playsinline></video>
             <div class="camera-switch">
-                <button id="switchLiveFront" class="btn-warning">📱 أمامية</button>
-                <button id="switchLiveBack" class="btn-warning">📷 خلفية</button>
+                <button id="switchLiveFront" class="btn-warning">📱 كاميرا أمامية</button>
+                <button id="switchLiveBack" class="btn-warning">📷 كاميرا خلفية</button>
             </div>
-            <button id="startCamera" class="btn-primary">📷 تشغيل الكاميرا</button>
-            <button id="captureFace" class="btn-primary" disabled>📸 التقاط الوجه</button>
+            <button id="startLiveCameraBtn" class="btn-primary">📷 تشغيل الكاميرا</button>
+            <button id="captureFaceBtn" class="btn-primary" disabled>📸 التقاط الوجه</button>
             <div id="faceResult" class="result"></div>
-            <button id="confirmFace" class="btn-success" disabled>✅ تأكيد</button>
+            <button id="confirmFaceBtn" class="btn-success" disabled>✅ تأكيد والمتابعة</button>
         </div>
     </div>
 
+    <!-- الخطوة 4: التسجيل -->
     <div id="step4Content" style="display:none;">
         <div class="card">
             <div id="finalResult" class="result"></div>
-            <button id="registerBtn" class="btn-success" disabled>📝 تسجيل</button>
+            <button id="registerBtn" class="btn-success" disabled>📝 تسجيل الهوية</button>
             <div id="registerStatus" class="result"></div>
         </div>
     </div>
 </div>
 
 <script>
+    // ------------------- المتغيرات -------------------
     let modelsLoaded = false;
-    let docStream = null, liveStream = null;
-    let docDescriptor = null, docHash = null;
-    let liveDescriptor = null, liveHash = null;
-    let capturedDoc = null;
-    let step = 1;
+    let docStream = null;
+    let liveStream = null;
+    let docDescriptor = null;
+    let docHash = null;
+    let liveDescriptor = null;
+    let liveHash = null;
+    let capturedDocImage = null;
+    let currentStep = 1;
+    let currentDocFacing = "environment";
+    let currentLiveFacing = "user";
 
-    const fullName = document.getElementById('fullName');
-    const docType = document.getElementById('docType');
+    // ------------------- عناصر DOM -------------------
+    const fullNameInput = document.getElementById('fullName');
+    const docTypeSelect = document.getElementById('docType');
     const docVideo = document.getElementById('docVideo');
     const liveVideo = document.getElementById('liveVideo');
+    const nextStep1 = document.getElementById('nextStep1');
+    const captureDocBtn = document.getElementById('captureDocBtn');
+    const confirmDocBtn = document.getElementById('confirmDocBtn');
+    const startLiveCameraBtn = document.getElementById('startLiveCameraBtn');
+    const captureFaceBtn = document.getElementById('captureFaceBtn');
+    const confirmFaceBtn = document.getElementById('confirmFaceBtn');
+    const registerBtn = document.getElementById('registerBtn');
 
+    // ------------------- تحميل النماذج -------------------
     async function loadModels() {
-        const url = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights';
-        await faceapi.nets.ssdMobilenetv1.loadFromUri(url);
-        await faceapi.nets.faceLandmark68Net.loadFromUri(url);
-        await faceapi.nets.faceRecognitionNet.loadFromUri(url);
-        modelsLoaded = true;
-        console.log("✅ جاهز");
+        const MODEL_URL = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights';
+        try {
+            await faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL);
+            await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+            await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+            modelsLoaded = true;
+            console.log("✅ نماذج الوجه جاهزة");
+        } catch(err) {
+            console.error("فشل تحميل النماذج:", err);
+            alert("فشل تحميل النماذج، تأكد من الاتصال بالإنترنت");
+        }
     }
 
-    async function computeHash(canvas) {
+    // ------------------- حساب الهاش -------------------
+    async function computeImageHash(canvas) {
         return new Promise((resolve) => {
             canvas.toBlob(async (blob) => {
                 const buf = await blob.arrayBuffer();
-                const hash = CryptoJS.SHA256(CryptoJS.lib.WordArray.create(buf)).toString();
-                resolve(hash);
+                const wordArray = CryptoJS.lib.WordArray.create(buf);
+                resolve(CryptoJS.SHA256(wordArray).toString());
             }, 'image/jpeg', 0.8);
         });
     }
 
-    async function extractFace(img) {
-        const detection = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
+    // ------------------- استخراج الوجه -------------------
+    async function extractFaceFromImage(imgElement) {
+        const detection = await faceapi.detectSingleFace(imgElement).withFaceLandmarks().withFaceDescriptor();
         if (!detection) return null;
         const box = detection.detection.box;
         const canvas = document.createElement('canvas');
         canvas.width = box.width;
         canvas.height = box.height;
         const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, box.x, box.y, box.width, box.height, 0, 0, box.width, box.height);
-        const hash = await computeHash(canvas);
-        return { descriptor: detection.descriptor, hash };
+        ctx.drawImage(imgElement, box.x, box.y, box.width, box.height, 0, 0, box.width, box.height);
+        const hash = await computeImageHash(canvas);
+        return { descriptor: detection.descriptor, croppedCanvas: canvas, hash };
     }
 
-    function goToStep(s) {
-        step = s;
-        for(let i=1;i<=4;i++) {
-            const el = document.getElementById(`step${i}`);
-            if(i < s) el.classList.add('completed');
-            else if(i === s) el.classList.add('active');
-            else el.classList.remove('active', 'completed');
+    // ------------------- مقارنة الوجوه -------------------
+    function compareFaces(desc1, desc2) {
+        if (!desc1 || !desc2) return { match: false, similarity: 0 };
+        const distance = faceapi.euclideanDistance(desc1, desc2);
+        const similarity = Math.round((1 - Math.min(distance, 1)) * 100);
+        return { match: distance < 0.6, similarity, distance };
+    }
+
+    // ------------------- التنقل بين الخطوات -------------------
+    function goToStep(step) {
+        currentStep = step;
+        for(let i=1; i<=4; i++) {
+            const stepEl = document.getElementById(`step${i}`);
+            if(i < step) {
+                stepEl.classList.add('completed');
+                stepEl.classList.remove('active');
+            } else if(i === step) {
+                stepEl.classList.add('active');
+                stepEl.classList.remove('completed');
+            } else {
+                stepEl.classList.remove('active', 'completed');
+            }
         }
-        document.getElementById('step1Content').style.display = s===1?'block':'none';
-        document.getElementById('step2Content').style.display = s===2?'block':'none';
-        document.getElementById('step3Content').style.display = s===3?'block':'none';
-        document.getElementById('step4Content').style.display = s===4?'block':'none';
+        document.getElementById('step1Content').style.display = step === 1 ? 'block' : 'none';
+        document.getElementById('step2Content').style.display = step === 2 ? 'block' : 'none';
+        document.getElementById('step3Content').style.display = step === 3 ? 'block' : 'none';
+        document.getElementById('step4Content').style.display = step === 4 ? 'block' : 'none';
     }
 
-    document.getElementById('nextStep1').onclick = () => {
-        if(!fullName.value.trim()) { alert("أدخل الاسم"); return; }
-        goToStep(2);
-        startDocCamera();
-    };
-
+    // ------------------- كاميرا الوثيقة -------------------
     async function startDocCamera() {
-        if(docStream) docStream.getTracks().forEach(t=>t.stop());
+        if (docStream) {
+            docStream.getTracks().forEach(track => track.stop());
+        }
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+            const constraints = {
+                video: { facingMode: { exact: currentDocFacing } }
+            };
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
             docStream = stream;
             docVideo.srcObject = stream;
             await docVideo.play();
-            document.getElementById('captureDoc').disabled = false;
-        } catch(e) { alert("خطأ في الكاميرا"); }
+            captureDocBtn.disabled = false;
+            document.getElementById('docResult').innerHTML = '<span class="success">✅ الكاميرا تعمل</span>';
+        } catch(err) {
+            console.error("خطأ في كاميرا الوثيقة:", err);
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                docStream = stream;
+                docVideo.srcObject = stream;
+                await docVideo.play();
+                captureDocBtn.disabled = false;
+                document.getElementById('docResult').innerHTML = '<span class="success">✅ الكاميرا تعمل</span>';
+            } catch(e) {
+                document.getElementById('docResult').innerHTML = '<span class="error">❌ لا يمكن تشغيل الكاميرا</span>';
+            }
+        }
     }
 
-    document.getElementById('captureDoc').onclick = async () => {
-        const btn = document.getElementById('captureDoc');
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner"></span> جاري...';
+    // تبديل كاميرا الوثيقة
+    document.getElementById('switchDocBack').onclick = () => {
+        currentDocFacing = "environment";
+        startDocCamera();
+    };
+    document.getElementById('switchDocFront').onclick = () => {
+        currentDocFacing = "user";
+        startDocCamera();
+    };
+
+    // التقاط الوثيقة
+    captureDocBtn.onclick = async () => {
+        captureDocBtn.disabled = true;
+        captureDocBtn.innerHTML = '<span class="spinner"></span> جاري التحليل...';
         
         const canvas = document.createElement('canvas');
         canvas.width = docVideo.videoWidth;
         canvas.height = docVideo.videoHeight;
         const ctx = canvas.getContext('2d');
-        ctx.drawImage(docVideo, 0, 0);
-        capturedDoc = canvas;
+        ctx.drawImage(docVideo, 0, 0, canvas.width, canvas.height);
+        capturedDocImage = canvas;
         
         const img = new Image();
         img.src = canvas.toDataURL();
-        await new Promise(r=>img.onload=r);
+        await new Promise(resolve => { img.onload = resolve; });
         
-        const face = await extractFace(img);
-        if(!face) {
-            document.getElementById('docResult').innerHTML = '<span class="error">❌ لم يتم العثور على وجه</span>';
-            btn.disabled = false;
-            btn.innerHTML = "📸 إعادة المحاولة";
+        const result = await extractFaceFromImage(img);
+        if (!result) {
+            document.getElementById('docResult').innerHTML = '<span class="error">❌ لم يتم العثور على وجه في الوثيقة</span>';
+            captureDocBtn.disabled = false;
+            captureDocBtn.innerHTML = "📸 إعادة المحاولة";
             return;
         }
         
-        docDescriptor = face.descriptor;
-        docHash = face.hash;
-        document.getElementById('docResult').innerHTML = '<span class="success">✅ تم استخراج الوجه</span>';
-        document.getElementById('confirmDoc').disabled = false;
-        btn.disabled = false;
-        btn.innerHTML = "📸 إعادة التصوير";
+        docDescriptor = result.descriptor;
+        docHash = result.hash;
+        document.getElementById('docResult').innerHTML = '<span class="success">✅ تم استخراج الوجه بنجاح</span>';
+        confirmDocBtn.disabled = false;
+        captureDocBtn.disabled = false;
+        captureDocBtn.innerHTML = "📸 إعادة التصوير";
     };
 
-    document.getElementById('confirmDoc').onclick = () => {
+    confirmDocBtn.onclick = () => {
         goToStep(3);
+        // إعادة تعيين حالة الكاميرا للوجه
+        if (liveStream) {
+            liveStream.getTracks().forEach(t => t.stop());
+            liveVideo.srcObject = null;
+        }
+        startLiveCameraBtn.disabled = false;
+        captureFaceBtn.disabled = true;
+        confirmFaceBtn.disabled = true;
+        document.getElementById('faceResult').innerHTML = '';
+        document.getElementById('cameraPermissionWarning').style.display = 'none';
     };
 
-    document.getElementById('startCamera').onclick = async () => {
-        if(liveStream) liveStream.getTracks().forEach(t=>t.stop());
+    nextStep1.onclick = () => {
+        if (!fullNameInput.value.trim()) {
+            alert("الرجاء إدخال الاسم الكامل");
+            return;
+        }
+        goToStep(2);
+        startDocCamera();
+    };
+
+    // ------------------- كاميرا الوجه الحي -------------------
+    async function startLiveCamera() {
+        if (liveStream) {
+            liveStream.getTracks().forEach(track => track.stop());
+        }
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+            const constraints = {
+                video: { facingMode: { exact: currentLiveFacing } }
+            };
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
             liveStream = stream;
             liveVideo.srcObject = stream;
             await liveVideo.play();
-            document.getElementById('startCamera').disabled = true;
-            document.getElementById('captureFace').disabled = false;
-        } catch(e) { alert("خطأ"); }
+            startLiveCameraBtn.disabled = true;
+            captureFaceBtn.disabled = false;
+            document.getElementById('faceResult').innerHTML = '<span class="success">✅ الكاميرا تعمل، اضغط التقاط الوجه</span>';
+            document.getElementById('cameraPermissionWarning').style.display = 'none';
+        } catch(err) {
+            console.error("خطأ في كاميرا الوجه:", err);
+            if (err.name === 'NotAllowedError') {
+                document.getElementById('cameraPermissionWarning').style.display = 'block';
+                document.getElementById('faceResult').innerHTML = '<span class="error">❌ يرجى السماح بالوصول إلى الكاميرا</span>';
+            } else {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                    liveStream = stream;
+                    liveVideo.srcObject = stream;
+                    await liveVideo.play();
+                    startLiveCameraBtn.disabled = true;
+                    captureFaceBtn.disabled = false;
+                    document.getElementById('faceResult').innerHTML = '<span class="success">✅ الكاميرا تعمل</span>';
+                } catch(e) {
+                    document.getElementById('faceResult').innerHTML = '<span class="error">❌ لا يمكن تشغيل الكاميرا</span>';
+                }
+            }
+        }
+    }
+
+    // تبديل كاميرا الوجه
+    document.getElementById('switchLiveFront').onclick = () => {
+        currentLiveFacing = "user";
+        startLiveCamera();
+    };
+    document.getElementById('switchLiveBack').onclick = () => {
+        currentLiveFacing = "environment";
+        startLiveCamera();
     };
 
-    document.getElementById('captureFace').onclick = async () => {
-        const btn = document.getElementById('captureFace');
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner"></span> جاري...';
+    startLiveCameraBtn.onclick = () => {
+        startLiveCamera();
+    };
+
+    // التقاط الوجه الحي
+    captureFaceBtn.onclick = async () => {
+        captureFaceBtn.disabled = true;
+        captureFaceBtn.innerHTML = '<span class="spinner"></span> جاري التحليل...';
         
-        const face = await extractFace(liveVideo);
-        if(!face) {
+        const result = await extractFaceFromImage(liveVideo);
+        if (!result) {
             document.getElementById('faceResult').innerHTML = '<span class="error">❌ لم يتم العثور على وجه</span>';
-            btn.disabled = false;
-            btn.innerHTML = "📸 إعادة المحاولة";
+            captureFaceBtn.disabled = false;
+            captureFaceBtn.innerHTML = "📸 إعادة المحاولة";
             return;
         }
         
-        liveDescriptor = face.descriptor;
-        liveHash = face.hash;
+        liveDescriptor = result.descriptor;
+        liveHash = result.hash;
         
-        const distance = faceapi.euclideanDistance(liveDescriptor, docDescriptor);
-        const match = distance < 0.6;
-        const similarity = Math.round((1 - distance) * 100);
+        const comparison = compareFaces(liveDescriptor, docDescriptor);
         
-        if(match) {
-            document.getElementById('faceResult').innerHTML = `<span class="success">✅ تطابق! التشابه: ${similarity}%</span>`;
-            document.getElementById('confirmFace').disabled = false;
+        if (comparison.match) {
+            document.getElementById('faceResult').innerHTML = `<span class="success">✅ الوجه يطابق الوثيقة! التشابه: ${comparison.similarity}%</span>`;
+            confirmFaceBtn.disabled = false;
         } else {
-            document.getElementById('faceResult').innerHTML = `<span class="error">❌ لا يطابق! التشابه: ${similarity}%</span>`;
+            document.getElementById('faceResult').innerHTML = `<span class="error">❌ الوجه لا يطابق الوثيقة! التشابه: ${comparison.similarity}%</span>`;
+            confirmFaceBtn.disabled = true;
         }
-        btn.disabled = false;
-        btn.innerHTML = "📸 إعادة المحاولة";
-    };
-
-    document.getElementById('confirmFace').onclick = () => {
-        goToStep(4);
-        document.getElementById('finalResult').innerHTML = `<div class="success">✅ تم التحقق<br>👤 ${fullName.value}<br>📋 ${docType.value}</div>`;
-        document.getElementById('registerBtn').disabled = false;
-    };
-
-    document.getElementById('registerBtn').onclick = async () => {
-        const btn = document.getElementById('registerBtn');
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner"></span> جاري التسجيل...';
         
-        let prevHash = "0";
+        captureFaceBtn.disabled = false;
+        captureFaceBtn.innerHTML = "📸 إعادة المحاولة";
+    };
+
+    confirmFaceBtn.onclick = () => {
+        goToStep(4);
+        const comparison = compareFaces(liveDescriptor, docDescriptor);
+        document.getElementById('finalResult').innerHTML = `
+            <div class="success">
+                ✅ تم التحقق بنجاح<br><br>
+                👤 ${fullNameInput.value}<br>
+                📋 ${docTypeSelect.value}<br>
+                🎯 نسبة التطابق: ${comparison.similarity}%
+            </div>
+        `;
+        registerBtn.disabled = false;
+    };
+
+    // ------------------- التسجيل -------------------
+    registerBtn.onclick = async () => {
+        registerBtn.disabled = true;
+        registerBtn.innerHTML = '<span class="spinner"></span> جاري التسجيل...';
+        
+        let previousHash = "0";
         try {
             const res = await fetch('/chain');
             const data = await res.json();
-            if(data.chain.length) prevHash = data.chain[data.chain.length-1].hash;
-        } catch(e) {}
+            if (data.chain && data.chain.length > 0) {
+                previousHash = data.chain[data.chain.length - 1].hash;
+            }
+        } catch(e) {
+            console.log("خطأ في جلب السلسلة:", e);
+        }
         
         const payload = {
-            name: fullName.value.trim(),
+            name: fullNameInput.value.trim(),
             face_hash: liveHash,
             document_hash: docHash,
-            document_type: docType.value,
+            document_type: docTypeSelect.value,
             biometric_verified: true,
-            previous_hash: prevHash
+            previous_hash: previousHash
         };
         
         try {
-            const res = await fetch('/add_block', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-            const result = await res.json();
-            if(res.ok) {
-                sessionStorage.setItem('verifiedName', fullName.value);
-                sessionStorage.setItem('verifiedDocType', docType.value);
+            const response = await fetch('/add_block', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const result = await response.json();
+            
+            if (response.ok) {
+                sessionStorage.setItem('verifiedName', fullNameInput.value.trim());
+                sessionStorage.setItem('verifiedDocType', docTypeSelect.value);
                 sessionStorage.setItem('verifiedTimestamp', new Date().toLocaleString());
-                document.getElementById('registerStatus').innerHTML = '<span class="success">🎉 تم التسجيل! جاري التوجيه...</span>';
-                setTimeout(() => { window.location.href = '/profile'; }, 1500);
+                document.getElementById('registerStatus').innerHTML = '<span class="success">🎉 تم التسجيل بنجاح! جاري التوجيه...</span>';
+                setTimeout(() => {
+                    window.location.href = '/profile';
+                }, 1500);
             } else {
-                document.getElementById('registerStatus').innerHTML = `<span class="error">❌ ${result.error}</span>`;
-                btn.disabled = false;
-                btn.innerHTML = "📝 إعادة المحاولة";
+                document.getElementById('registerStatus').innerHTML = `<span class="error">❌ فشل التسجيل: ${result.error}</span>`;
+                registerBtn.disabled = false;
+                registerBtn.innerHTML = "📝 إعادة المحاولة";
             }
         } catch(err) {
-            document.getElementById('registerStatus').innerHTML = `<span class="error">خطأ: ${err.message}</span>`;
-            btn.disabled = false;
-            btn.innerHTML = "📝 إعادة المحاولة";
+            document.getElementById('registerStatus').innerHTML = `<span class="error">❌ خطأ في الاتصال: ${err.message}</span>`;
+            registerBtn.disabled = false;
+            registerBtn.innerHTML = "📝 إعادة المحاولة";
         }
     };
 
-    document.getElementById('switchFront').onclick = () => { if(docStream) docStream.getTracks().forEach(t=>t.stop()); startDocCamera(); };
-    document.getElementById('switchBack').onclick = () => { if(docStream) docStream.getTracks().forEach(t=>t.stop()); startDocCamera(); };
-    document.getElementById('switchLiveFront').onclick = () => { if(liveStream) liveStream.getTracks().forEach(t=>t.stop()); document.getElementById('startCamera').click(); };
-    document.getElementById('switchLiveBack').onclick = () => { if(liveStream) liveStream.getTracks().forEach(t=>t.stop()); document.getElementById('startCamera').click(); };
-
+    // ------------------- بدء التشغيل -------------------
     loadModels();
-    document.getElementById('captureDoc').disabled = true;
-    document.getElementById('confirmDoc').disabled = true;
-    document.getElementById('captureFace').disabled = true;
-    document.getElementById('confirmFace').disabled = true;
-    document.getElementById('registerBtn').disabled = true;
+    goToStep(1);
+    
+    // تعطيل الأزرار في البداية
+    captureDocBtn.disabled = true;
+    confirmDocBtn.disabled = true;
+    startLiveCameraBtn.disabled = false;
+    captureFaceBtn.disabled = true;
+    confirmFaceBtn.disabled = true;
+    registerBtn.disabled = true;
 </script>
 </body>
 </html>
