@@ -161,4 +161,83 @@
             
             pendingVotes.push({
                 id: requestId,
-                requestor
+                requestorId: requestor.id,
+                requestorName: requestor.name,
+                timestamp: Date.now(),
+                status: 'pending'
+            });
+            
+            updatePendingVotesList();
+        }, 10000);
+    }
+    
+    function updatePendingVotesList() {
+        const container = document.getElementById('pendingVotesList');
+        if (pendingVotes.length === 0) {
+            container.innerHTML = '<div style="text-align:center; padding:20px; color:#999;">لا توجد طلبات تصويت نشطة</div>';
+            return;
+        }
+        
+        container.innerHTML = pendingVotes.filter(v => v.status === 'pending').map(vote => `
+            <div class="peer-item">
+                <div>
+                    <strong>📋 ${vote.requestorName}</strong><br>
+                    <small>الطلب: ${vote.id.substring(0, 12)}...</small>
+                </div>
+                <div class="vote-buttons">
+                    <button class="vote-btn approve" onclick="voteOnRequest('${vote.id}', true)">✅ موافق</button>
+                    <button class="vote-btn reject" onclick="voteOnRequest('${vote.id}', false)">❌ رفض</button>
+                </div>
+            </div>
+        `).join('');
+    }
+    
+    window.voteOnRequest = function(voteId, approved) {
+        const voteIndex = pendingVotes.findIndex(v => v.id === voteId);
+        if (voteIndex !== -1) {
+            pendingVotes[voteIndex].status = 'completed';
+            completedVotesCount++;
+            
+            // تحديث السمعة بناءً على دقة التصويت (محاكاة)
+            if (approved) {
+                myReputation = Math.min(100, myReputation + 2);
+            } else {
+                myReputation = Math.max(0, myReputation - 1);
+            }
+            
+            localStorage.setItem('witnessReputation', myReputation);
+            document.getElementById('myReputation').innerText = myReputation;
+            updateReputationClass('myReputation', myReputation);
+            
+            updatePendingVotesList();
+            updateNetworkStats();
+            
+            alert(`✅ تم تسجيل تصويتك: ${approved ? 'موافقة' : 'رفض'}\n⭐ سمعة جديدة: ${myReputation}`);
+        }
+    };
+    
+    function updateNetworkStats() {
+        const activePeers = peers.filter(p => Date.now() - p.lastSeen < 120000).length;
+        const avgRep = peers.length > 0 ? peers.reduce((sum, p) => sum + p.reputation, 0) / peers.length : 0;
+        
+        document.getElementById('activePeers').innerText = activePeers;
+        document.getElementById('avgReputation').innerText = Math.round(avgRep);
+        document.getElementById('completedVotes').innerText = completedVotesCount;
+    }
+    
+    document.getElementById('goToProfileBtn').onclick = () => {
+        window.location.href = '/profile';
+    };
+    
+    // ------------------- بدء التشغيل -------------------
+    simulateIncomingVoteRequests();
+    updateNetworkStats();
+    
+    // تحديث دوري للعقد النشطة
+    setInterval(() => {
+        peers = peers.filter(p => Date.now() - p.lastSeen < 120000);
+        updateNetworkStats();
+    }, 30000);
+</script>
+</body>
+</html>
