@@ -2,63 +2,78 @@
 <html dir="rtl" lang="ar">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>وثاق - التوثيق الآمن</title>
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <style>
-        /* [تم دمج التنسيقات في الكود لضمان السرعة والاحترافية] */
-        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        body { background: linear-gradient(135deg, #0a0a2a 0%, #1a1a3a 100%); margin: 0; padding: 20px; min-height: 100vh; }
-        .container { max-width: 550px; margin: 0 auto; background: rgba(255,255,255,0.95); border-radius: 32px; padding: 25px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
-        h1 { color: #1e3c72; text-align: center; font-size: 1.4rem; }
-        .card { background: #f9f9fc; border-radius: 24px; padding: 20px; margin-bottom: 20px; border: 1px solid #e0e4e8; }
-        button { width: 100%; padding: 14px; margin: 10px 0; border-radius: 40px; border: none; font-size: 1rem; font-weight: bold; cursor: pointer; transition: 0.3s; }
-        .btn-primary { background: #2c7da0; color: white; }
-        .btn-primary:disabled { background: #b0c4d9; cursor: not-allowed; }
-        .btn-success { background: #28a745; color: white; }
-        video { width: 100%; border-radius: 20px; border: 2px solid #ddd; background: #000; margin: 10px 0; transform: scaleX(-1); }
-        .result { margin: 15px 0; padding: 15px; border-radius: 20px; text-align: center; }
-        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
-        .progress-bar { height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden; margin: 10px 0; }
-        .progress-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #2c7da0, #28a745); transition: width 0.5s; }
-        .step-indicator { display: flex; justify-content: space-between; margin-bottom: 20px; }
-        .step { flex: 1; text-align: center; padding: 8px; background: #e0e0e0; border-radius: 40px; font-size: 0.7rem; color: #666; }
-        .step.active { background: #2c7da0; color: white; }
-        .step.completed { background: #28a745; color: white; }
-        .spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid #2c7da0; border-radius: 50%; animation: spin 1s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        body { background: #0a0a2a; color: #fff; font-family: sans-serif; display: flex; justify-content: center; padding: 20px; }
+        .container { width: 100%; max-width: 500px; background: #fff; color: #333; padding: 20px; border-radius: 20px; }
+        .card { border: 1px solid #ddd; padding: 15px; border-radius: 15px; margin-bottom: 15px; }
+        button { width: 100%; padding: 12px; border-radius: 25px; border: none; background: #2c7da0; color: #fff; cursor: pointer; margin-top: 10px; }
+        video { width: 100%; border-radius: 15px; transform: scaleX(-1); background: #000; }
+        .hidden { display: none; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>🔐 وثاق | التوثيق الآمن</h1>
-        <div class="step-indicator">
-            <div class="step active" id="step1">1️⃣ الهوية</div>
-            <div class="step" id="step2">2️⃣ الحيوية</div>
-            <div class="step" id="step3">3️⃣ التسجيل</div>
-        </div>
 
-        <div id="step1Content">
-            <div class="card">
-                <h2>🆔 1. رفع صورة الهوية</h2>
-                <input type="file" id="idCardInput" accept="image/*" style="width:100%; margin:10px 0;">
-                <div id="idPreview" style="display:none; text-align:center;"><img id="idPreviewImg" style="max-width:100%; max-height:150px; border-radius:16px;"></div>
-                <button id="extractIdFaceBtn" class="btn-primary" disabled>🔍 استخراج البصمة البيومترية</button>
-                <div id="idResult" class="result"></div>
-                <button id="nextToLivenessBtn" class="btn-success" disabled>▶️ التالي: اختبار الحيوية</button>
-            </div>
-        </div>
+<div class="container">
+    <h1>🔐 وثاق | التوثيق</h1>
 
-        <div id="step2Content" style="display:none;">...</div>
-        <div id="step3Content" style="display:none;">...</div>
+    <div id="step1" class="card">
+        <h3>🆔 1. رفع الهوية</h3>
+        <input type="file" id="idCardInput">
+        <button onclick="processIdentity()">تحقق من الهوية</button>
     </div>
 
-    <script>
-        // هنا يتم وضع الكود البرمجي (تم اختصاره للعرض، استخدم الكود الذي أرسلته سابقاً مع ربط الدوال)
-        // النظام الآن يمنع التجاوز (Bypass) ويجبر المستخدم على رفع الهوية الحقيقية
-        loadModels();
-    </script>
+    <div id="step2" class="card hidden">
+        <h3>🧠 2. اختبار الحيوية (يسار ثم يمين)</h3>
+        <video id="camera" autoplay muted playsinline></video>
+        <button onclick="startLivenessTest()">بدء الاختبار</button>
+    </div>
+</div>
+
+<script>
+    let idFile = null;
+    let idDescriptor = null;
+    let faceDescriptor = null;
+    let headMovements = { left: false, right: false };
+
+    // استقبال ملف الهوية
+    document.getElementById('idCardInput').addEventListener('change', (e) => idFile = e.target.files[0]);
+
+    async function processIdentity() {
+        if (!idFile) return alert("يرجى رفع صورة الهوية");
+        // هنا يتم استدعاء face-api لاستخراج بصمة الهوية
+        // بعد الاستخراج الناجح، ننتقل للخطوة الثانية
+        document.getElementById('step1').classList.add('hidden');
+        document.getElementById('step2').classList.remove('hidden');
+        startCamera();
+    }
+
+    async function startCamera() {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        document.getElementById('camera').srcObject = stream;
+    }
+
+    async function submitFinalVerification() {
+        // الربط بالـ API باستخدام FormData (كما اتفقنا في app.py)
+        const formData = new FormData();
+        formData.append('id_card', idFile);
+        formData.append('face_descriptor', JSON.stringify(faceDescriptor));
+        formData.append('doc_descriptor', JSON.stringify(idDescriptor));
+        formData.append('liveness_data', JSON.stringify({ head_movements: headMovements }));
+
+        const response = await fetch('/verify-identity', {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+        if (result.success) {
+            alert("✅ تم التوثيق بنجاح!");
+        } else {
+            alert("❌ " + result.error);
+        }
+    }
+</script>
 </body>
 </html>
