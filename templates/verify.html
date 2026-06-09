@@ -3,18 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>وثاق - التوثيق الذكي</title>
+    <title>وثاق - التوثيق الآمن</title>
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body { background: linear-gradient(135deg, #0a0a2a 0%, #1a1a3a 100%); margin: 0; padding: 20px; min-height: 100vh; }
-        .container { max-width: 600px; margin: 0 auto; background: rgba(255,255,255,0.95); border-radius: 32px; padding: 25px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
+        .container { max-width: 550px; margin: 0 auto; background: rgba(255,255,255,0.95); border-radius: 32px; padding: 25px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
         h1 { color: #1e3c72; text-align: center; font-size: 1.4rem; }
         .card { background: #f9f9fc; border-radius: 24px; padding: 20px; margin-bottom: 20px; border: 1px solid #e0e4e8; }
         button { width: 100%; padding: 14px; margin: 10px 0; border-radius: 40px; border: none; font-size: 1rem; font-weight: bold; cursor: pointer; transition: 0.3s; }
         .btn-primary { background: #2c7da0; color: white; }
         .btn-primary:disabled { background: #b0c4d9; cursor: not-allowed; }
         .btn-success { background: #28a745; color: white; }
-        .btn-warning { background: #ffc107; color: #333; }
         .btn-danger { background: #dc3545; color: white; }
         .btn-info { background: #17a2b8; color: white; }
         video { width: 100%; border-radius: 20px; border: 2px solid #ddd; background: #000; margin: 10px 0; transform: scaleX(-1); }
@@ -23,417 +22,348 @@
         .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
         .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
         .warning { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
-        .visual-stimulus { width: 100%; height: 100px; border-radius: 20px; margin: 15px 0; transition: all 0.001s ease; display: flex; align-items: center; justify-content: center; font-size: 2rem; }
-        .stimulus-off { background: #2c3e50; color: #7f8c8d; }
-        .stimulus-on { background: #f1c40f; color: #2c3e50; box-shadow: 0 0 30px rgba(241,196,15,0.5); }
-        .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 15px 0; }
-        .stat-card { background: #e8f4f8; padding: 10px; border-radius: 16px; text-align: center; }
         .progress-bar { height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden; margin: 10px 0; }
         .progress-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #2c7da0, #28a745); transition: width 0.5s; }
-        .attempt-counter { display: inline-block; padding: 5px 12px; border-radius: 50px; font-size: 0.8rem; margin: 5px; }
-        .attempt-1 { background: #ffc107; color: #333; }
-        .attempt-2 { background: #fd7e14; color: white; }
-        .attempt-3 { background: #dc3545; color: white; }
-        .smart-tip { background: #e7f3ff; padding: 12px; border-radius: 16px; margin: 10px 0; border-right: 4px solid #2c7da0; }
+        .direction-badge { display: inline-block; padding: 5px 12px; border-radius: 50px; font-size: 0.8rem; margin: 5px; }
+        .direction-completed { background: #28a745; color: white; }
+        .direction-pending { background: #6c757d; color: white; }
+        .stability-timer { font-size: 1.2rem; font-weight: bold; text-align: center; margin: 10px 0; }
+        .step-indicator { display: flex; justify-content: space-between; margin-bottom: 20px; }
+        .step { flex: 1; text-align: center; padding: 8px; background: #e0e0e0; margin: 0 2px; border-radius: 40px; font-size: 0.7rem; color: #666; }
+        .step.active { background: #2c7da0; color: white; }
+        .step.completed { background: #28a745; color: white; }
+        .step.failed { background: #dc3545; color: white; }
         .flex-buttons { display: flex; gap: 10px; }
-        .appeal-section { border-top: 2px dashed #ddd; margin-top: 20px; padding-top: 20px; }
-        @keyframes pulse { 0% { opacity: 0.6; } 100% { opacity: 1; } }
+        .spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid #2c7da0; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 </head>
 <body>
 <div class="container">
-    <h1>🧠 وثاق | التوثيق الذكي</h1>
+    <h1>🔐 وثاق | التوثيق الآمن</h1>
     
-    <!-- مؤشر المحاولات -->
-    <div id="attemptIndicator" style="text-align:center; margin-bottom:15px;">
-        <span class="attempt-counter attempt-1" id="attempt1">📝 المحاولة 1/3</span>
+    <div class="step-indicator">
+        <div class="step active" id="step1">1️⃣ الهوية</div>
+        <div class="step" id="step2">2️⃣ الحيوية</div>
+        <div class="step" id="step3">3️⃣ التسجيل</div>
     </div>
 
-    <!-- الخطوة 1: رفع الهوية -->
-    <div class="card">
-        <h2>🆔 1. التحقق من الهوية</h2>
-        <p style="font-size:0.85rem; color:#666;">ارفع بطاقة الهوية أو جواز السفر أمام الكاميرا لثانية واحدة</p>
-        <video id="camera" autoplay muted playsinline></video>
-        <div class="flex-buttons">
-            <button id="startCameraBtn" class="btn-primary">📷 تشغيل الكاميرا</button>
-            <button id="captureIdentityBtn" class="btn-info" disabled>📸 التقاط الهوية</button>
+    <!-- الخطوة 1: رفع الهوية (إجباري) -->
+    <div id="step1Content">
+        <div class="card">
+            <h2>🆔 1. رفع صورة الهوية</h2>
+            <p style="font-size:0.85rem; color:#666;">يجب رفع صورة واضحة لبطاقة الهوية أو جواز السفر</p>
+            <input type="file" id="idCardInput" accept="image/jpeg,image/png,image/jpg,application/pdf" style="width:100%; padding:12px; border-radius:40px; border:1px solid #ddd; margin:10px 0;">
+            <div id="idPreview" style="text-align:center; display:none;">
+                <img id="idPreviewImg" style="max-width:100%; max-height:150px; border-radius:16px;">
+            </div>
+            <button id="extractIdFaceBtn" class="btn-primary" disabled>🔍 استخراج بصمة الوجه من الهوية</button>
+            <div id="idResult" class="result"></div>
+            <div class="progress-bar" id="idProgress" style="display:none;"><div class="progress-fill" id="idProgressFill"></div></div>
+            <button id="nextToLivenessBtn" class="btn-success" disabled>▶️ التالي: اختبار الحيوية</button>
         </div>
-        <div id="identityResult" class="result"></div>
-        <div class="progress-bar" id="identityProgress" style="display:none;"><div class="progress-fill" id="identityProgressFill"></div></div>
-        <button id="nextToBiometricBtn" class="btn-success" disabled>✅ تأكيد الهوية</button>
     </div>
 
-    <!-- الخطوة 2: الاختبار البيوفيزيائي التكيفي -->
-    <div class="card" id="biometricCard" style="display:none;">
-        <h2>⚡ 2. الاختبار البيوفيزيائي التكيفي</h2>
-        <div id="adaptiveInfo" class="info" style="font-size:0.8rem;"></div>
-        <div class="visual-stimulus stimulus-off" id="visualStimulus">⚫</div>
-        <div id="biometricResult" class="result"></div>
-        <div class="stats-grid" id="biometricStats" style="display:none;">
-            <div class="stat-card">⏱️ زمن الاستجابة: <span id="latencyValue">0</span> ms</div>
-            <div class="stat-card">📊 التباين: <span id="varianceValue">0</span></div>
-            <div class="stat-card">🎯 مستوى الحساسية: <span id="thresholdLevel">قياسي</span></div>
-            <div class="stat-card">🔄 عدد الحركات: <span id="motionsCount">0</span></div>
+    <!-- الخطوة 2: اختبار الحيوية (تتبع حركة الرأس + وضع الاستقرار) -->
+    <div id="step2Content" style="display:none;">
+        <div class="card">
+            <h2>🧠 2. اختبار الحيوية</h2>
+            
+            <!-- وضع الاستقرار -->
+            <div id="stabilityPhase">
+                <p style="text-align:center;">📷 يرجى تثبيت وجهك أمام الكاميرا</p>
+                <div class="stability-timer" id="stabilityTimer">3</div>
+                <div class="progress-bar"><div class="progress-fill" id="stabilityProgress" style="width:0%"></div></div>
+            </div>
+            
+            <!-- تتبع حركة الرأس -->
+            <div id="headTrackingPhase" style="display:none;">
+                <p style="text-align:center;">🔄 حرك رأسك في الاتجاهات المطلوبة</p>
+                <video id="camera" autoplay muted playsinline></video>
+                <div style="text-align:center; margin: 15px 0;">
+                    <span id="leftIndicator" class="direction-badge direction-pending">⬅️ يسار</span>
+                    <span id="rightIndicator" class="direction-badge direction-pending">➡️ يمين</span>
+                </div>
+                <div id="livenessStatus" class="info" style="text-align:center;"></div>
+            </div>
+            
+            <button id="startLivenessBtn" class="btn-primary" style="display:none;">🎯 بدء اختبار الحيوية</button>
+            <div id="livenessResult" class="result"></div>
+            <button id="nextToVerifyBtn" class="btn-success" style="display:none;">▶️ التالي: التحقق النهائي</button>
         </div>
-        <button id="startBiometricTest" class="btn-warning" disabled>⚡ بدء الاختبار</button>
-        <div id="smartTip" class="smart-tip" style="display:none;"></div>
-        <button id="retryTestBtn" class="btn-primary" style="display:none;">🔄 إعادة المحاولة</button>
-        <button id="nextToFinalBtn" class="btn-success" style="display:none;">✅ المتابعة للتسجيل</button>
     </div>
 
-    <!-- الخطوة 3: التسجيل -->
-    <div class="card" id="registerCard" style="display:none;">
-        <h2>📝 3. تسجيل الهوية</h2>
-        <div id="finalResult" class="result"></div>
-        <button id="registerFinalBtn" class="btn-success" disabled>📝 تسجيل في البلوكشين</button>
-        <div id="registerStatus" class="result"></div>
-    </div>
-
-    <!-- نظام الاستئناف (يظهر بعد 3 محاولات فاشلة) -->
-    <div class="card appeal-section" id="appealSection" style="display:none;">
-        <h2>⚖️ استئناف القرار</h2>
-        <p style="font-size:0.85rem;">تم رفض هويتك بعد 3 محاولات. يمكنك طلب مراجعة بشرية من شبكة الشهود.</p>
-        <button id="appealBtn" class="btn-info">👥 طلب مراجعة بشرية</button>
-        <div id="appealStatus" class="result"></div>
+    <!-- الخطوة 3: التحقق النهائي والتسجيل -->
+    <div id="step3Content" style="display:none;">
+        <div class="card">
+            <h2>✅ 3. التحقق النهائي</h2>
+            <div id="verificationResult" class="result"></div>
+            <button id="registerFinalBtn" class="btn-success" disabled>📝 تسجيل الهوية</button>
+            <div id="registerStatus" class="result"></div>
+        </div>
     </div>
 </div>
 
 <script>
     // ============================================================
-    // نظام التوثيق الذكي - Adaptive Thresholding
+    // نظام التوثيق الآمن - مع تتبع حركة الرأس
     // ============================================================
     
-    // ------------------- المتغيرات -------------------
     let modelsLoaded = false;
     let cameraStream = null;
     let step = 1;
-    let attempts = 0;           // عدد المحاولات
-    let currentThreshold = 0.6;  // مستوى الحساسية الحالي
-    let varianceThreshold = 200;  // عتبة التباين
-    let minResponseTime = 120;    // الحد الأدنى لزمن الاستجابة (ms)
-    let maxResponseTime = 1200;   // الحد الأقصى لزمن الاستجابة (ms) - تم رفعه إلى 1200ms
-    let requiredMotions = 6;      // عدد الحركات المطلوبة
-    
-    // بيانات الهوية
-    let identityDescriptor = null;
-    let identityHash = null;
-    
-    // بيانات الاختبار
-    let responseTimes = [];
-    let biometricPassed = false;
-    let calibrationEAR = 0;
+    let idDescriptor = null;
+    let faceDescriptor = null;
+    let headMovements = { left: false, right: false };
+    let stabilityCompleted = false;
+    let lastHeadDirection = 'center';
+    let livenessPassed = false;
     
     // عناصر DOM
-    const video = document.getElementById('camera');
-    const startCameraBtn = document.getElementById('startCameraBtn');
-    const captureIdentityBtn = document.getElementById('captureIdentityBtn');
-    const identityResult = document.getElementById('identityResult');
-    const nextToBiometricBtn = document.getElementById('nextToBiometricBtn');
-    const startBiometricTest = document.getElementById('startBiometricTest');
-    const biometricResult = document.getElementById('biometricResult');
-    const retryTestBtn = document.getElementById('retryTestBtn');
-    const nextToFinalBtn = document.getElementById('nextToFinalBtn');
+    const idCardInput = document.getElementById('idCardInput');
+    const idPreview = document.getElementById('idPreview');
+    const idPreviewImg = document.getElementById('idPreviewImg');
+    const extractIdFaceBtn = document.getElementById('extractIdFaceBtn');
+    const idResult = document.getElementById('idResult');
+    const nextToLivenessBtn = document.getElementById('nextToLivenessBtn');
+    const startLivenessBtn = document.getElementById('startLivenessBtn');
+    const livenessResult = document.getElementById('livenessResult');
+    const nextToVerifyBtn = document.getElementById('nextToVerifyBtn');
     const registerFinalBtn = document.getElementById('registerFinalBtn');
-    const appealBtn = document.getElementById('appealBtn');
-    const visualStimulus = document.getElementById('visualStimulus');
-    const adaptiveInfo = document.getElementById('adaptiveInfo');
-    const smartTip = document.getElementById('smartTip');
-    const biometricCard = document.getElementById('biometricCard');
-    const registerCard = document.getElementById('registerCard');
-    const appealSection = document.getElementById('appealSection');
+    const camera = document.getElementById('camera');
     
     // ------------------- تحميل النماذج -------------------
     async function loadModels() {
         const MODEL_URL = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights';
         try {
-            identityResult.innerHTML = '<span class="info">⏳ جاري تحميل نماذج الذكاء الاصطناعي...</span>';
+            idResult.innerHTML = '<span class="info">⏳ جاري تحميل نماذج الذكاء الاصطناعي...</span>';
             await faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL);
             await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
             await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
             modelsLoaded = true;
-            identityResult.innerHTML = '<span class="success">✅ النماذج جاهزة</span>';
-            setTimeout(() => { if(identityResult.innerHTML.includes('جاهزة')) identityResult.innerHTML = ''; }, 2000);
+            idResult.innerHTML = '<span class="success">✅ النماذج جاهزة</span>';
+            setTimeout(() => { if(idResult.innerHTML.includes('جاهزة')) idResult.innerHTML = ''; }, 2000);
         } catch(err) {
-            identityResult.innerHTML = '<span class="error">❌ فشل تحميل النماذج</span>';
+            idResult.innerHTML = '<span class="error">❌ فشل تحميل النماذج</span>';
         }
     }
     
-    // ------------------- تحديث إعدادات التكيف -------------------
-    function updateAdaptiveSettings() {
-        if (attempts === 0) {
-            // المحاولة الأولى: إعدادات قياسية
-            currentThreshold = 0.6;
-            varianceThreshold = 200;
-            minResponseTime = 120;
-            maxResponseTime = 1200;
-            requiredMotions = 6;
-            adaptiveInfo.innerHTML = '🎯 الوضع القياسي - استجب للومضات بشكل طبيعي';
-        } else if (attempts === 1) {
-            // المحاولة الثانية: تقليل التباين بنسبة 20%، زيادة عدد الحركات
-            currentThreshold = 0.55;
-            varianceThreshold = 160;
-            minResponseTime = 100;
-            maxResponseTime = 1300;
-            requiredMotions = 8;
-            adaptiveInfo.innerHTML = '🔄 الوضع التكيفي - تم تخفيف الحساسية، يرجى التركيز أكثر';
-        } else if (attempts === 2) {
-            // المحاولة الثالثة: تخفيف إضافي مع حركات أكثر
-            currentThreshold = 0.5;
-            varianceThreshold = 120;
-            minResponseTime = 80;
-            maxResponseTime = 1400;
-            requiredMotions = 10;
-            adaptiveInfo.innerHTML = '⚠️ الوضع المتسامح - المحاولة الأخيرة، يرجى اتباع التعليمات بدقة';
-        }
+    // ------------------- معاينة صورة الهوية واستخراج البصمة -------------------
+    idCardInput.addEventListener('change', async (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
         
-        document.getElementById('thresholdLevel').innerHTML = 
-            attempts === 0 ? 'قياسي' : (attempts === 1 ? 'متسامح (80%)' : 'متسامح جداً (60%)');
-        document.getElementById('motionsCount').innerHTML = requiredMotions;
-    }
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            idPreviewImg.src = e.target.result;
+            idPreview.style.display = 'block';
+            extractIdFaceBtn.disabled = false;
+        };
+        reader.readAsDataURL(file);
+    });
     
-    // ------------------- تشغيل الكاميرا -------------------
-    startCameraBtn.onclick = async () => {
-        if (cameraStream) cameraStream.getTracks().forEach(t => t.stop());
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-            cameraStream = stream;
-            video.srcObject = stream;
-            await video.play();
-            startCameraBtn.disabled = true;
-            captureIdentityBtn.disabled = false;
-            identityResult.innerHTML = '<span class="success">✅ الكاميرا تعمل، اضغط "التقاط الهوية"</span>';
-        } catch(err) {
-            identityResult.innerHTML = '<span class="error">❌ لا يمكن الوصول للكاميرا</span>';
-        }
-    };
-    
-    // ------------------- التقاط الهوية والمقارنة -------------------
-    captureIdentityBtn.onclick = async () => {
-        captureIdentityBtn.disabled = true;
-        captureIdentityBtn.innerHTML = '<span class="spinner"></span> جاري التحليل...';
-        identityResult.innerHTML = '<span class="info">🔍 جاري استخراج بصمة الوجه من الهوية...</span>';
-        document.getElementById('identityProgress').style.display = 'block';
+    extractIdFaceBtn.onclick = async () => {
+        extractIdFaceBtn.disabled = true;
+        extractIdFaceBtn.innerHTML = '<span class="spinner"></span> جاري الاستخراج...';
+        idResult.innerHTML = '<span class="info">🔍 جاري استخراج بصمة الوجه من الهوية...</span>';
+        document.getElementById('idProgress').style.display = 'block';
         
-        // محاكاة تقدم
         let progress = 0;
         const progressInterval = setInterval(() => {
-            progress += 10;
-            document.getElementById('identityProgressFill').style.width = progress + '%';
+            progress += 20;
+            document.getElementById('idProgressFill').style.width = progress + '%';
             if (progress >= 100) clearInterval(progressInterval);
         }, 200);
         
-        await new Promise(r => setTimeout(r, 2000));
+        await new Promise(r => setTimeout(r, 1000));
         
-        // استخراج الوجه من الفيديو
-        const detection = await faceapi.detectSingleFace(video).withFaceLandmarks().withFaceDescriptor();
+        const img = new Image();
+        img.src = idPreviewImg.src;
+        await new Promise(r => { img.onload = r; });
+        
+        const detection = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
         
         if (!detection) {
-            identityResult.innerHTML = '<span class="warning">⚠️ لم يتم العثور على وجه واضح. تأكد من الإضاءة وضع الهوية أمام الكاميرا</span>';
-            captureIdentityBtn.disabled = false;
-            captureIdentityBtn.innerHTML = "📸 إعادة المحاولة";
-            document.getElementById('identityProgress').style.display = 'none';
+            idResult.innerHTML = '<span class="warning">⚠️ لم يتم العثور على وجه واضح في الهوية. يرجى رفع صورة أوضح.</span>';
+            extractIdFaceBtn.disabled = false;
+            extractIdFaceBtn.innerHTML = "🔍 إعادة المحاولة";
+            document.getElementById('idProgress').style.display = 'none';
             return;
         }
         
-        identityDescriptor = Array.from(detection.descriptor);
-        identityHash = CryptoJS.SHA256(JSON.stringify(identityDescriptor)).toString().substring(0, 16);
+        idDescriptor = Array.from(detection.descriptor);
+        const idHash = CryptoJS.SHA256(JSON.stringify(idDescriptor)).toString().substring(0, 16);
         
-        identityResult.innerHTML = `<span class="success">✅ تم استخراج بصمة الهوية بنجاح! (${identityHash})</span>`;
-        document.getElementById('identityProgress').style.display = 'none';
-        nextToBiometricBtn.disabled = false;
-        captureIdentityBtn.disabled = false;
-        captureIdentityBtn.innerHTML = "📸 إعادة التقاط";
+        idResult.innerHTML = `<span class="success">✅ تم استخراج بصمة الهوية بنجاح! (${idHash})</span>`;
+        document.getElementById('idProgress').style.display = 'none';
+        nextToLivenessBtn.disabled = false;
+        extractIdFaceBtn.disabled = false;
+        extractIdFaceBtn.innerHTML = "🔍 إعادة الاستخراج";
     };
     
-    // ------------------- الانتقال للاختبار البيوفيزيائي -------------------
-    nextToBiometricBtn.onclick = async () => {
+    // ------------------- الانتقال لاختبار الحيوية -------------------
+    nextToLivenessBtn.onclick = async () => {
         step = 2;
-        biometricCard.style.display = 'block';
+        updateSteps();
+        document.getElementById('step1Content').style.display = 'none';
+        document.getElementById('step2Content').style.display = 'block';
         
-        // معايرة العين
-        const detection = await faceapi.detectSingleFace(video).withFaceLandmarks();
-        if (detection) {
+        // تشغيل الكاميرا
+        if (cameraStream) cameraStream.getTracks().forEach(t => t.stop());
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        cameraStream = stream;
+        camera.srcObject = stream;
+        await camera.play();
+        
+        startLivenessBtn.style.display = 'block';
+    };
+    
+    // ------------------- وضع الاستقرار (تثبيت الوجه) -------------------
+    async function runStabilityPhase() {
+        const stabilityPhase = document.getElementById('stabilityPhase');
+        const headTrackingPhase = document.getElementById('headTrackingPhase');
+        
+        stabilityPhase.style.display = 'block';
+        headTrackingPhase.style.display = 'none';
+        
+        for (let i = 3; i > 0; i--) {
+            document.getElementById('stabilityTimer').innerHTML = i;
+            document.getElementById('stabilityProgress').style.width = ((3 - i) / 3) * 100 + '%';
+            await new Promise(r => setTimeout(r, 1000));
+        }
+        
+        document.getElementById('stabilityTimer').innerHTML = '✅ ثابت';
+        document.getElementById('stabilityProgress').style.width = '100%';
+        await new Promise(r => setTimeout(r, 500));
+        
+        stabilityPhase.style.display = 'none';
+        headTrackingPhase.style.display = 'block';
+        stabilityCompleted = true;
+        
+        startHeadTracking();
+    }
+    
+    // ------------------- تتبع حركة الرأس -------------------
+    async function startHeadTracking() {
+        headMovements = { left: false, right: false };
+        lastHeadDirection = 'center';
+        
+        const leftIndicator = document.getElementById('leftIndicator');
+        const rightIndicator = document.getElementById('rightIndicator');
+        
+        leftIndicator.className = 'direction-badge direction-pending';
+        rightIndicator.className = 'direction-badge direction-pending';
+        
+        document.getElementById('livenessStatus').innerHTML = '🔄 حرك رأسك لليسار أولاً';
+        
+        const checkInterval = setInterval(async () => {
+            const detection = await faceapi.detectSingleFace(camera).withFaceLandmarks();
+            if (!detection) return;
+            
             const landmarks = detection.landmarks;
-            const leftEye = landmarks.getLeftEye();
-            const rightEye = landmarks.getRightEye();
-            function getEAR(eyePoints) {
-                const A = Math.hypot(eyePoints[1].x - eyePoints[5].x, eyePoints[1].y - eyePoints[5].y);
-                const B = Math.hypot(eyePoints[2].x - eyePoints[4].x, eyePoints[2].y - eyePoints[4].y);
-                const C = Math.hypot(eyePoints[0].x - eyePoints[3].x, eyePoints[0].y - eyePoints[3].y);
-                return (A + B) / (2.0 * C);
+            const nose = landmarks.getNose();
+            const jaw = landmarks.getJawOutline();
+            
+            if (!nose || nose.length < 3 || !jaw) return;
+            
+            const noseTip = nose[2];
+            const faceCenterX = (jaw[0].x + jaw[jaw.length-1].x) / 2;
+            const offset = (noseTip.x - faceCenterX) / detection.detection.box.width;
+            
+            let currentDirection = 'center';
+            if (offset < -0.08) currentDirection = 'left';
+            else if (offset > 0.08) currentDirection = 'right';
+            
+            if (currentDirection === 'left' && !headMovements.left) {
+                headMovements.left = true;
+                leftIndicator.className = 'direction-badge direction-completed';
+                document.getElementById('livenessStatus').innerHTML = '✅ تم كشف الحركة لليسار! حرك رأسك لليمين الآن';
+            } else if (currentDirection === 'right' && headMovements.left && !headMovements.right) {
+                headMovements.right = true;
+                rightIndicator.className = 'direction-badge direction-completed';
+                document.getElementById('livenessStatus').innerHTML = '✅ تم كشف الحركة لليمين!';
             }
-            calibrationEAR = (getEAR(leftEye) + getEAR(rightEye)) / 2;
-        }
-        
-        updateAdaptiveSettings();
-        startBiometricTest.disabled = false;
-        document.getElementById('biometricStats').style.display = 'grid';
-    };
-    
-    // ------------------- الاختبار البيوفيزيائي التكيفي -------------------
-    async function detectBlink() {
-        const detection = await faceapi.detectSingleFace(video).withFaceLandmarks();
-        if (!detection) return false;
-        const landmarks = detection.landmarks;
-        const leftEye = landmarks.getLeftEye();
-        const rightEye = landmarks.getRightEye();
-        if (!leftEye || !rightEye) return false;
-        
-        function getEAR(eyePoints) {
-            const A = Math.hypot(eyePoints[1].x - eyePoints[5].x, eyePoints[1].y - eyePoints[5].y);
-            const B = Math.hypot(eyePoints[2].x - eyePoints[4].x, eyePoints[2].y - eyePoints[4].y);
-            const C = Math.hypot(eyePoints[0].x - eyePoints[3].x, eyePoints[0].y - eyePoints[3].y);
-            return (A + B) / (2.0 * C);
-        }
-        const ear = (getEAR(leftEye) + getEAR(rightEye)) / 2;
-        return ear < calibrationEAR * 0.6;
-    }
-    
-    startBiometricTest.onclick = async () => {
-        startBiometricTest.disabled = true;
-        startBiometricTest.innerHTML = '<span class="spinner"></span> جاري الاختبار...';
-        biometricResult.innerHTML = '<span class="info">🎯 استجب للومضات بالرمش...</span>';
-        smartTip.style.display = 'none';
-        
-        responseTimes = [];
-        const frequencies = [2.5, 3.2, 4.1, 5.0, 6.3, 7.5];
-        
-        for (let i = 0; i < requiredMotions && i < frequencies.length * 2; i++) {
-            const freq = frequencies[i % frequencies.length];
-            const periodMs = (1 / freq) * 1000;
             
-            const stimulusStart = performance.now();
-            visualStimulus.classList.remove('stimulus-off');
-            visualStimulus.classList.add('stimulus-on');
-            visualStimulus.innerHTML = '⚡';
-            
-            let responseDetected = false;
-            const checkInterval = setInterval(async () => {
-                const isBlinking = await detectBlink();
-                if (isBlinking && !responseDetected) {
-                    responseDetected = true;
-                    responseTimes.push(performance.now() - stimulusStart);
-                    clearInterval(checkInterval);
+            if (headMovements.left && headMovements.right) {
+                clearInterval(checkInterval);
+                livenessPassed = true;
+                document.getElementById('livenessResult').innerHTML = '<span class="success">✅ اختبار الحيوية ناجح! تم كشف حركات الرأس المطلوبة.</span>';
+                nextToVerifyBtn.style.display = 'block';
+                startLivenessBtn.style.display = 'none';
+                
+                // استخراج بصمة الوجه من الكاميرا
+                const faceDetection = await faceapi.detectSingleFace(camera).withFaceLandmarks().withFaceDescriptor();
+                if (faceDetection) {
+                    faceDescriptor = Array.from(faceDetection.descriptor);
                 }
-            }, 10);
-            
-            await new Promise(r => setTimeout(r, periodMs + 500));
-            clearInterval(checkInterval);
-            if (!responseDetected) responseTimes.push(1500);
-            
-            visualStimulus.classList.remove('stimulus-on');
-            visualStimulus.classList.add('stimulus-off');
-            visualStimulus.innerHTML = '⚫';
-            await new Promise(r => setTimeout(r, 300));
-        }
-        
-        // تحليل النتائج
-        const avgLatency = responseTimes.reduce((a,b) => a + b, 0) / responseTimes.length;
-        const variance = responseTimes.map(t => Math.pow(t - avgLatency, 2)).reduce((a,b) => a + b, 0) / responseTimes.length;
-        
-        document.getElementById('latencyValue').innerHTML = Math.round(avgLatency);
-        document.getElementById('varianceValue').innerHTML = Math.round(variance);
-        
-        // التحقق من صحة الاستجابة (متكيف مع الإعدادات الحالية)
-        const isValidLatency = avgLatency >= minResponseTime && avgLatency <= maxResponseTime;
-        const isValidVariance = variance > varianceThreshold;
-        const isValidResponseCount = responseTimes.filter(t => t < 1000).length >= requiredMotions * 0.6;
-        
-        // رسائل ذكية للتوجيه
-        let smartMessage = '';
-        if (avgLatency < minResponseTime) {
-            smartMessage = '💡 استجابتك سريعة جداً! حاول التنفس بهدوء والتركيز على الومضات.';
-        } else if (avgLatency > maxResponseTime) {
-            smartMessage = '💡 استجابتك بطيئة نوعاً ما. حاول التركيز أكثر والرمش فور رؤية الومضة.';
-        } else if (variance <= varianceThreshold) {
-            smartMessage = '💡 نمط استجابتك ثابت جداً. حاول الاستجابة بشكل طبيعي دون توقع.';
-        } else if (responseTimes.filter(t => t < 1000).length < requiredMotions * 0.6) {
-            smartMessage = '💡 لم نتمكن من اكتشاف كل استجاباتك. تأكد من الرمش بوضوح عند رؤية الومضة.';
-        }
-        
-        const passed = isValidLatency && isValidVariance && isValidResponseCount;
-        
-        if (passed) {
-            biometricResult.innerHTML = `<span class="success">✅ الاختبار ناجح! (زمن الاستجابة: ${Math.round(avgLatency)}ms, التباين: ${Math.round(variance)})</span>`;
-            biometricPassed = true;
-            nextToFinalBtn.style.display = 'block';
-            retryTestBtn.style.display = 'none';
-        } else {
-            attempts++;
-            updateAttemptIndicator();
-            
-            biometricResult.innerHTML = `<span class="warning">⚠️ الاختبار غير ناجح (المحاولة ${attempts}/3)</span>`;
-            if (smartMessage) {
-                smartTip.innerHTML = smartMessage;
-                smartTip.style.display = 'block';
             }
-            
-            if (attempts >= 3) {
-                // 3 محاولات فاشلة - تفعيل الاستئناف
-                biometricResult.innerHTML = '<span class="error">❌ تم استنفاذ المحاولات الثلاث. يمكنك طلب مراجعة بشرية.</span>';
-                appealSection.style.display = 'block';
-                retryTestBtn.style.display = 'none';
-                startBiometricTest.disabled = true;
-            } else {
-                // تحديث الإعدادات للمحاولة التالية
-                updateAdaptiveSettings();
-                retryTestBtn.style.display = 'block';
-                startBiometricTest.disabled = false;
-            }
-        }
+        }, 100);
         
-        startBiometricTest.disabled = false;
-        startBiometricTest.innerHTML = "⚡ إعادة الاختبار";
-    };
-    
-    function updateAttemptIndicator() {
-        const indicator = document.getElementById('attemptIndicator');
-        indicator.innerHTML = '';
-        for(let i=1; i<=3; i++) {
-            const span = document.createElement('span');
-            span.className = `attempt-counter ${i <= attempts ? 'attempt-3' : (i === attempts+1 ? 'attempt-1' : 'attempt-1')}`;
-            span.style.opacity = i <= attempts ? '0.5' : '1';
-            span.innerHTML = i <= attempts ? `❌ المحاولة ${i}/3` : `📝 المحاولة ${i}/3`;
-            indicator.appendChild(span);
-        }
+        // مهلة 15 ثانية
+        setTimeout(() => {
+            if (!headMovements.left || !headMovements.right) {
+                clearInterval(checkInterval);
+                livenessPassed = false;
+                document.getElementById('livenessResult').innerHTML = '<span class="error">❌ فشل اختبار الحيوية: لم يتم كشف حركات الرأس المطلوبة. يرجى إعادة المحاولة.</span>';
+                startLivenessBtn.style.display = 'block';
+                nextToVerifyBtn.style.display = 'none';
+            }
+        }, 15000);
     }
     
-    // ------------------- إعادة المحاولة -------------------
-    retryTestBtn.onclick = () => {
-        retryTestBtn.style.display = 'none';
-        biometricResult.innerHTML = '';
-        smartTip.style.display = 'none';
-        startBiometricTest.disabled = false;
-        responseTimes = [];
+    startLivenessBtn.onclick = async () => {
+        startLivenessBtn.disabled = true;
+        startLivenessBtn.innerHTML = '<span class="spinner"></span> جاري التشغيل...';
+        await runStabilityPhase();
+        startLivenessBtn.disabled = false;
+        startLivenessBtn.style.display = 'none';
     };
     
-    // ------------------- المتابعة للتسجيل -------------------
-    nextToFinalBtn.onclick = () => {
-        step = 3;
-        biometricCard.style.display = 'none';
-        registerCard.style.display = 'block';
+    // ------------------- التحقق النهائي والتسجيل -------------------
+    nextToVerifyBtn.onclick = async () => {
+        if (!idDescriptor || !faceDescriptor) {
+            document.getElementById('verificationResult').innerHTML = '<span class="error">❌ خطأ: بيانات الوجه غير مكتملة</span>';
+            return;
+        }
         
-        const comparison = compareFaces(identityDescriptor, identityDescriptor); // مقارنة وهمية
-        document.getElementById('finalResult').innerHTML = `
+        nextToVerifyBtn.disabled = true;
+        nextToVerifyBtn.innerHTML = '<span class="spinner"></span> جاري التحقق...';
+        document.getElementById('verificationResult').innerHTML = '<span class="info">🔍 جاري مطابقة بصمات الوجه مع الهوية...</span>';
+        
+        // حساب نسبة التطابق
+        const distance = faceapi.euclideanDistance(faceDescriptor, idDescriptor);
+        const similarity = Math.round((1 - Math.min(distance, 1)) * 100);
+        
+        if (similarity < 85) {
+            document.getElementById('verificationResult').innerHTML = `
+                <div class="error">
+                    ❌ فشل التحقق: نسبة التطابق ${similarity}% أقل من الحد الأدنى المطلوب 85%<br>
+                    <small>💡 يرجى التأكد من الإضاءة الجيدة ووضوح الوجه في الكاميرا وصورة الهوية</small>
+                </div>
+            `;
+            nextToVerifyBtn.disabled = false;
+            nextToVerifyBtn.innerHTML = "▶️ إعادة المحاولة";
+            return;
+        }
+        
+        step = 3;
+        updateSteps();
+        
+        document.getElementById('step2Content').style.display = 'none';
+        document.getElementById('step3Content').style.display = 'block';
+        
+        document.getElementById('verificationResult').innerHTML = `
             <div class="success">
-                ✅ تم التحقق من الهوية بنجاح!<br>
-                🧬 بصمة الهوية: ${identityHash}<br>
-                🎯 نسبة الثقة: ${comparison.similarity}%<br>
-                🔐 سيتم تسجيل البصمات في البلوكشين
+                ✅ تم التحقق بنجاح!<br>
+                🎯 نسبة التطابق: ${similarity}%<br>
+                🧬 تم تأكيد مطابقة الوجه مع الهوية
             </div>
         `;
         registerFinalBtn.disabled = false;
     };
     
-    function compareFaces(desc1, desc2) {
-        const distance = faceapi.euclideanDistance(desc1, desc2);
-        const similarity = Math.round((1 - Math.min(distance, 1)) * 100);
-        return { match: distance < 0.6, similarity, distance };
-    }
-    
-    // ------------------- التسجيل -------------------
     registerFinalBtn.onclick = async () => {
         registerFinalBtn.disabled = true;
         registerFinalBtn.innerHTML = '<span class="spinner"></span> جاري التسجيل...';
@@ -447,23 +377,42 @@
             }
         } catch(e) {}
         
-        const faceHash = CryptoJS.SHA256(JSON.stringify(identityDescriptor)).toString();
+        const faceHash = CryptoJS.SHA256(JSON.stringify(faceDescriptor)).toString();
+        const docHash = CryptoJS.SHA256(JSON.stringify(idDescriptor)).toString();
         
-        const payload = {
-            name: "مستخدم موثق",
-            face_hash: faceHash,
-            document_hash: identityHash,
-            document_type: "adaptive_biometric",
-            biometric_verified: true,
-            previous_hash: previousHash,
-            adaptive_data: {
-                attempts: attempts + 1,
-                avg_latency: responseTimes.length ? responseTimes.reduce((a,b)=>a+b,0)/responseTimes.length : 0,
-                threshold: currentThreshold
-            }
-        };
+        // إعداد FormData لإرسال الهوية والصورة
+        const formData = new FormData();
+        const file = idCardInput.files[0];
+        if (file) formData.append('id_card', file);
+        formData.append('face_descriptor', JSON.stringify(faceDescriptor));
+        formData.append('doc_descriptor', JSON.stringify(idDescriptor));
+        formData.append('liveness_data', JSON.stringify({ head_movements: headMovements }));
         
         try {
+            // التحقق من الهوية عبر الخادم
+            const verifyResponse = await fetch('/verify-identity', {
+                method: 'POST',
+                body: formData
+            });
+            const verifyResult = await verifyResponse.json();
+            
+            if (!verifyResponse.ok || !verifyResult.success) {
+                document.getElementById('registerStatus').innerHTML = `<div class="error">❌ ${verifyResult.error || 'فشل التحقق من الهوية'}</div>`;
+                registerFinalBtn.disabled = false;
+                registerFinalBtn.innerHTML = "📝 إعادة المحاولة";
+                return;
+            }
+            
+            // التسجيل في البلوكشين
+            const payload = {
+                name: "مستخدم موثق",
+                face_hash: verifyResult.face_hash,
+                document_hash: verifyResult.doc_hash,
+                document_type: "secure_identity",
+                biometric_verified: true,
+                previous_hash: previousHash
+            };
+            
             const response = await fetch('/add_block', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -474,8 +423,9 @@
             if (response.ok) {
                 document.getElementById('registerStatus').innerHTML = `
                     <div class="success">
-                        🎉 تم التسجيل بنجاح!<br>
-                        رقم الكتلة: ${result.block_index}
+                        🎉 تم تسجيل الهوية بنجاح في البلوكشين!<br>
+                        رقم الكتلة: ${result.block_index}<br>
+                        نسبة التطابق: ${verifyResult.similarity}%
                     </div>
                 `;
             } else {
@@ -484,62 +434,29 @@
                 registerFinalBtn.innerHTML = "📝 إعادة المحاولة";
             }
         } catch(err) {
-            document.getElementById('registerStatus').innerHTML = `<div class="error">❌ خطأ: ${err.message}</div>`;
+            document.getElementById('registerStatus').innerHTML = `<div class="error">❌ خطأ في الاتصال: ${err.message}</div>`;
             registerFinalBtn.disabled = false;
             registerFinalBtn.innerHTML = "📝 إعادة المحاولة";
         }
     };
     
-    // ------------------- نظام الاستئناف (طلب مراجعة بشرية) -------------------
-    appealBtn.onclick = async () => {
-        appealBtn.disabled = true;
-        appealBtn.innerHTML = '<span class="spinner"></span> جاري إرسال طلب المراجعة...';
-        document.getElementById('appealStatus').innerHTML = '<span class="info">⏳ يتم إرسال الطلب إلى شبكة الشهود...</span>';
-        
-        // إنشاء توقيع رياضياتي لعملية التوثيق
-        const appealSignature = CryptoJS.SHA256(
-            identityHash + 
-            responseTimes.join(',') + 
-            Date.now()
-        ).toString();
-        
-        // محاكاة إرسال إلى الشهود
-        await new Promise(r => setTimeout(r, 3000));
-        
-        // محاكاة نتيجة المراجعة (80% قبول)
-        const isApproved = Math.random() > 0.2;
-        
-        if (isApproved) {
-            document.getElementById('appealStatus').innerHTML = `
-                <div class="success">
-                    ✅ تم قبول الاستئناف من قبل شبكة الشهود!<br>
-                    🔐 توقيع المراجعة: ${appealSignature.substring(0, 32)}...<br>
-                    يمكنك الآن إعادة محاولة التوثيق.
-                </div>
-            `;
-            // إعادة تعيين المحاولات
-            attempts = 0;
-            updateAdaptiveSettings();
-            updateAttemptIndicator();
-            appealSection.style.display = 'none';
-            startBiometricTest.disabled = false;
-            retryTestBtn.style.display = 'none';
-            biometricResult.innerHTML = '';
-        } else {
-            document.getElementById('appealStatus').innerHTML = `
-                <div class="error">
-                    ❌ تم رفض الاستئناف من قبل شبكة الشهود.<br>
-                    يرجى المحاولة مرة أخرى بعد التأكد من الإضاءة وظهور الوجه بوضوح.
-                </div>
-            `;
-            appealBtn.disabled = false;
-            appealBtn.innerHTML = "👥 طلب مراجعة بشرية";
+    function updateSteps() {
+        for(let i=1; i<=3; i++) {
+            const el = document.getElementById(`step${i}`);
+            if(i < step) {
+                el.classList.add('completed');
+                el.classList.remove('active', 'failed');
+            } else if(i === step) {
+                el.classList.add('active');
+                el.classList.remove('completed', 'failed');
+            } else {
+                el.classList.remove('active', 'completed', 'failed');
+            }
         }
-    };
+    }
     
-    // ------------------- بدء التشغيل -------------------
     loadModels();
-    updateAttemptIndicator();
+    updateSteps();
 </script>
 </body>
 </html>
