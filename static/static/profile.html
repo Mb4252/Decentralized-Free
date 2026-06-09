@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>وثاق - ملفي الشخصي ونظام السمعة</title>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: linear-gradient(135deg, #0a0a2a 0%, #1a1a3a 100%); margin: 0; padding: 20px; min-height: 100vh; }
+        .container { max-width: 550px; margin: 0 auto; background: rgba(255,255,255,0.95); border-radius: 32px; padding: 25px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
+        h1 { color: #1e3c72; text-align: center; font-size: 1.4rem; }
+        .card { background: #f9f9fc; border-radius: 24px; padding: 20px; margin-bottom: 20px; border: 1px solid #e0e4e8; }
+        button { width: 100%; padding: 14px; margin: 10px 0; border-radius: 40px; border: none; font-size: 1rem; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        .btn-primary { background: #2c7da0; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-warning { background: #ffc107; color: #333; }
+        .result { margin: 15px 0; padding: 15px; border-radius: 20px; text-align: center; }
+        .success { background: #d4edda; color: #155724; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        .reputation-bar { background: #e0e0e0; border-radius: 20px; height: 20px; overflow: hidden; margin: 15px 0; }
+        .reputation-fill { height: 100%; width: 0%; transition: width 0.5s; border-radius: 20px; }
+        .reputation-high { background: linear-gradient(90deg, #28a745, #20c997); }
+        .reputation-med { background: linear-gradient(90deg, #ffc107, #fd7e14); }
+        .reputation-low { background: linear-gradient(90deg, #dc3545, #c82333); }
+        .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 15px 0; }
+        .stat-card { background: #e8f4f8; padding: 10px; border-radius: 16px; text-align: center; }
+        .history-item { padding: 12px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+        .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 0.7rem; font-weight: bold; }
+        .badge-success { background: #d4edda; color: #155724; }
+        .badge-warning { background: #fff3cd; color: #856404; }
+        .badge-danger { background: #f8d7da; color: #721c24; }
+        .flex-buttons { display: flex; gap: 10px; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+</head>
+<body>
+<div class="container">
+    <h1>📄 ملفي الشخصي | نظام السمعة</h1>
+    
+    <!-- معلومات الهوية -->
+    <div class="card">
+        <h3>🆔 هويتي الموثقة</h3>
+        <div><strong>الاسم:</strong> <span id="profileName">-</span></div>
+        <div><strong>نوع التوثيق:</strong> <span id="profileDocType">-</span></div>
+        <div><strong>تاريخ التوثيق:</strong> <span id="profileTime">-</span></div>
+        <div><strong>بصمة الهوية:</strong> <span id="identityHash" style="font-family:monospace; font-size:0.7rem;">-</span></div>
+    </div>
+    
+    <!-- نظام السمعة -->
+    <div class="card">
+        <h3>⭐ نظام السمعة (Reputation Score)</h3>
+        <div class="reputation-bar">
+            <div class="reputation-fill" id="reputationFill"></div>
+        </div>
+        <div class="stats-grid">
+            <div class="stat-card">⭐ السمعة الحالية: <span id="reputationValue">0</span></div>
+            <div class="stat-card">🏆 التصنيف: <span id="reputationRank">-</span></div>
+            <div class="stat-card">✅ التصويتات الناجحة: <span id="successfulVotes">0</span></div>
+            <div class="stat-card">❌ التصويتات الخاطئة: <span id="failedVotes">0</span></div>
+        </div>
+        <div class="info" style="font-size:0.8rem; text-align:center;">
+            ⚖️ آلية السمعة: +5 لكل تصويت صحيح | -10 لكل تصويت خاطئ | +20 عند قبول الاستئناف
+        </div>
+    </div>
+    
+    <!-- سجل الأنشطة -->
+    <div class="card">
+        <h3>📜 سجل الأنشطة والتواريخ</h3>
+        <div id="activityHistory" style="max-height: 200px; overflow-y: auto;">
+            <div style="text-align:center; padding:20px; color:#999;">لا توجد أنشطة مسجلة</div>
+        </div>
+    </div>
+    
+    <!-- البحث عن مستخدمين آخرين -->
+    <div class="card">
+        <h3>🔍 البحث عن مستخدم</h3>
+        <input type="text" id="searchName" placeholder="اسم المستخدم" style="width:100%; padding:12px; border-radius:40px; border:1px solid #ddd; margin-bottom:10px;">
+        <div class="flex-buttons">
+            <button id="searchBtn" class="btn-primary">🔎 بحث</button>
+            <button id="appealBtn" class="btn-warning">⚖️ استئناف</button>
+        </div>
+        <div id="searchResult" class="result" style="display:none;"></div>
+    </div>
+    
+    <div class="flex-buttons">
+        <button id="goToVerifyBtn" class="btn-primary">➕ توثيق جديد</button>
+        <button id="goToWitnessBtn" class="btn-success">🌐 شبكة الشهود</button>
+    </div>
+</div>
+
+<script>
+    // ------------------- تحميل بيانات الملف الشخصي -------------------
+    const profileName = sessionStorage.getItem('verifiedName') || 'مستخدم غير موثق';
+    const profileDocType = sessionStorage.getItem('verifiedDocType') || '-';
+    const profileTime = sessionStorage.getItem('verifiedTimestamp') || '-';
+    const identityHash = sessionStorage.getItem('identityHash') || 'غير مسجل';
+    let userReputation = parseInt(localStorage.getItem('userReputation') || '100');
+    let successfulVotes = parseInt(localStorage.getItem('successfulVotes') || '0');
+    let failedVotes = parseInt(localStorage.getItem('failedVotes') || '0');
+    let activityHistory = JSON.parse(localStorage.getItem('activityHistory') || '[]');
+    
+    document.getElementById('profileName').innerText = profileName;
+    document.getElementById('profileDocType').innerText = profileDocType;
+    document.getElementById('profileTime').innerText = profileTime;
+    document.getElementById('identityHash').innerText = identityHash.substring(0, 48) + '...';
+    
+    // ------------------- تحديث واجهة السمعة -------------------
+    function updateReputationUI() {
+        document.getElementById('reputationValue').innerText = userReputation;
+        document.getElementById('successfulVotes').innerText = successfulVotes;
+        document.getElementById('failedVotes').innerText = failedVotes;
+        
+        const fillPercent = Math.min(100, userReputation);
+        document.getElementById('reputationFill').style.width = fillPercent + '%';
+        
+        let rank = '';
+        let rankClass = '';
+        if (userReputation >= 90) {
+            rank = '🟢 موثوق عالياً (Trusted)';
+            rankClass = 'badge-success';
+        } else if (userReputation >= 70) {
+            rank = '🟡 موثوق (Verified)';
+            rankClass = 'badge-warning';
+        } else if (userReputation >= 50) {
+            rank = '🟠 قيد المراجعة (Pending)';
+            rankClass = 'badge-warning';
+        } else {
+            rank = '🔴 منخفض الثقة (Low Trust)';
+            rankClass = 'badge-danger';
+        }
+        
+        document.getElementById('reputationRank').innerHTML = `<span class="badge ${rankClass}">${rank}</span>`;
+        
+        if (userReputation >= 80) {
+            document.getElementById('reputationFill').className = 'reputation-fill reputation-high';
+        } else if (userReputation >= 50) {
+            document.getElementById('reputationFill').className = 'reputation-fill reputation-med';
+        } else {
+            document.getElementById('reputationFill').className = 'reputation-fill reputation-low';
+        }
+    }
+    
+    // ------------------- تحديث سجل الأنشطة -------------------
+    function updateActivityHistory() {
+        const container = document.getElementById('activityHistory');
+        if (activityHistory.length === 0) {
+            container.innerHTML = '<div style="text-align:center; padding:20px; color:#999;">لا توجد أنشطة مسجلة</div>';
+            return;
+        }
+        
+        container.innerHTML = activityHistory.slice().reverse().map(activity => `
+            <div class="history-item">
+                <div>
+                    <strong>${activity.type}</strong><br>
+                    <small>${activity.date}</small>
+                </div>
+                <div class="badge ${activity.status === 'success' ? 'badge-success' : 'badge-danger'}">${activity.detail}</div>
+            </div>
+        `).join('');
+    }
+    
+    function addActivity(type, detail, status = 'success') {
+        activityHistory.unshift({
+            type: type,
+            detail: detail,
+            date: new Date().toLocaleString(),
+            status: status
+        });
+        
+        if (activityHistory.length > 20) activityHistory.pop();
+        localStorage.setItem('activityHistory', JSON.stringify(activityHistory));
+        updateActivityHistory();
+    }
+    
+    // ------------------- محاكاة الحصول على بيانات من البلوكشين -------------------
+    async function fetchBlockchainData() {
+        try {
+            const response = await fetch('/chain');
+            const data = await response.json();
+            if (data.chain && data.chain.length > 0) {
+                const lastBlock = data.chain[data.chain.length - 1];
+                if (lastBlock.name === profileName && lastBlock.document_type === profileDocType) {
+                    addActivity('توثيق الهوية', `تم التوثيق في الكتلة ${lastBlock.index}`, 'success');
+                }
+            }
+        } catch(e) {
+            console.log('لا يمكن الاتصال بالبلوكشين');
+        }
+    }
+    
+    // ------------------- البحث عن مستخدم -------------------
+    document.getElementById('searchBtn').onclick = async () => {
+        const searchName = document.getElementById('searchName').value.trim();
+        if (!searchName) {
+            alert('أدخل اسم المستخدم');
+            return;
+        }
+        
+        const resultDiv = document.getElementById('searchResult');
+        resultDiv.style.display = 'block';
+        resultDiv.innerHTML = '<span class="spinner" style="display:inline-block; width:20px; height:20px;"></span> جاري البحث...';
+        
+        try {
+            const response = await fetch('/verify_person', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query_type: 'name', query_value: searchName })
+            });
+            const data = await response.json();
+            
+            if (data.verified && data.records.length > 0) {
+                const record = data.records[0];
+                resultDiv.innerHTML = `
+                    <div class="success">
+                        ✅ تم العثور على المستخدم<br>
+                        👤 ${record.name}<br>
+                        📋 ${record.document_type}<br>
+                        🕒 ${record.timestamp}<br>
+                        🔗 الكتلة: ${record.index}
+                    </div>
+                `;
+                addActivity('بحث', `تم البحث عن ${searchName}`, 'success');
+            } else {
+                resultDiv.innerHTML = `<div class="info">❌ لم يتم العثور على ${searchName}</div>`;
+            }
+        } catch(err) {
+            resultDiv.innerHTML = `<div class="info">خطأ في الاتصال: ${err.message}</div>`;
+        }
+    };
+    
+    // ------------------- نظام الاستئناف -------------------
+    document.getElementById('appealBtn').onclick = () => {
+        const searchName = document.getElementById('searchName').value.trim();
+        if (!searchName) {
+            alert('أدخل اسم المستخدم للاستئناف');
+            return;
+        }
+        
+        const resultDiv = document.getElementById('searchResult');
+        resultDiv.style.display = 'block';
+        resultDiv.innerHTML = '<span class="spinner" style="display:inline-block;"></span> جاري معالجة الاستئناف...';
+        
+        setTimeout(() => {
+            const appealAccepted = Math.random() > 0.3;
+            if (appealAccepted) {
+                userReputation = Math.min(100, userReputation + 20);
+                localStorage.setItem('userReputation', userReputation);
+                updateReputationUI();
+                addActivity('استئناف', `تم قبول استئناف ${searchName} +20 نقطة سمعة`, 'success');
+                resultDiv.innerHTML = `<div class="success">✅ تم قبول الاستئناف! تمت زيادة سمعة المستخدم +20 نقطة.</div>`;
+            } else {
+                userReputation = Math.max(0, userReputation - 10);
+                localStorage.setItem('userReputation', userReputation);
+                updateReputationUI();
+                addActivity('استئناف', `رفض استئناف ${searchName} -10 نقاط سمعة`, 'danger');
+                resultDiv.innerHTML = `<div class="info">❌ تم رفض الاستئناف. تم خصم 10 نقاط سمعة.</div>`;
+            }
+        }, 2000);
+    };
+    
+    // ------------------- أزرار التنقل -------------------
+    document.getElementById('goToVerifyBtn').onclick = () => window.location.href = '/verify';
+    document.getElementById('goToWitnessBtn').onclick = () => window.location.href = '/witness';
+    
+    // ------------------- بدء التشغيل -------------------
+    updateReputationUI();
+    updateActivityHistory();
+    fetchBlockchainData();
+    
+    // إضافة الأنشطة الافتراضية
+    if (activityHistory.length === 0 && profileName !== 'مستخدم غير موثق') {
+        addActivity('تسجيل', 'تم إنشاء الملف الشخصي', 'success');
+        addActivity('توثيق', 'تم توثيق الهوية بنجاح', 'success');
+    }
+</script>
+</body>
+</html>
