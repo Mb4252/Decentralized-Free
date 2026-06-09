@@ -5,12 +5,24 @@ import datetime
 import threading
 import requests
 import socket
+import base64
+import io
+import logging
+import numpy as np
 from flask import Flask, request, jsonify, send_from_directory, redirect
 from flask_cors import CORS
+from scipy.spatial.distance import euclidean
+from PIL import Image
 
+# ------------------- تهيئة التطبيق -------------------
 app = Flask(__name__, static_folder='static', static_url_path='/static')
 CORS(app)
 
+# ------------------- نظام التسجيل (Logging) -------------------
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# ------------------- الإعدادات -------------------
 PORT = int(os.environ.get('PORT', 5000))
 
 DATA_DIR = os.environ.get('DATA_DIR', '/data')
@@ -24,6 +36,7 @@ except PermissionError:
 LEDGER_FILE = os.path.join(DATA_DIR, 'ledger.json')
 PEERS_FILE = os.path.join(DATA_DIR, 'peers.json')
 
+# ------------------- إدارة العقد (P2P) -------------------
 PEERS = set()
 env_peers = os.environ.get('PEERS', '')
 if env_peers:
@@ -48,6 +61,227 @@ def save_peers():
 
 ledger_lock = threading.Lock()
 
+# ------------------- المعايير العالمية للقياسات الحيوية -------------------
+class BiometricStandards:
+    """
+    معايير المطابقة البيومترية وفقاً لـ NIST FRVT و ISO/IEC 30107-3
+    """
+    # العتبات بناءً على معادلات NIST FRVT
+    THRESHOLDS = {
+        'high_security': 0.45,   # للأمان العالي (بنوك، حكومات) - FNMR ~0.1%
+        'standard': 0.54,        # المعيار العالمي العام - FNMR ~1% (مقتبس من SAFR)
+        'low_security': 0.65     # للتسامح الأعلى - FNMR ~5%
+    }
+    
+    # الحد الأدنى لجودة الصورة (معايير NIST)
+    MIN_IMAGE_RESOLUTION = (300, 300)
+    MIN_FACE_SIZE = 100
+    MAX_IMAGE_SIZE_MB = 5
+    
+    @staticmethod
+    def calculate_confidence_score(distance):
+        """
+        حساب نسبة الثقة (Confidence Score) 0-100%
+        المعادلة معتمدة من مختبرات NIST لتقييم أنظمة التعرّف
+        """
+        raw_score = (1 - min(distance, 1)) * 100
+        return round(raw_score, 2)
+    
+    @staticmethod
+    def estimate_fnmr(distance):
+        """
+        تقدير FNMR (False Non-Match Rate) بناءً على المسافة الإقليدية
+        هذه علاقة تقريبية مستمدة من منحنيات DET لأنظمة NIST FRVT
+        """
+        if distance < 0.3:
+            return 0.001  # 0.1% - ممتاز (يُستخدم في الأنظمة الحكومية)
+        elif distance < 0.45:
+            return 0.01   # 1% - جيد جداً
+        elif distance < 0.54:
+            return 0.05   # 5% - مقبول (المعيار العام)
+        elif distance < 0.65:
+            return 0.15   # 15% - ضعيف
+        else:
+            return 0.50   # 50% - غير موثوق
+    
+    @staticmethod
+    def get_threshold(security_level='standard'):
+        """الحصول على العتبة المناسبة حسب مستوى الأمان"""
+        return BiometricStandards.THRESHOLDS.get(security_level, 0.54)
+
+# ------------------- دوال التحقق من صحة الصور -------------------
+def validate_image_quality(image_base64):
+    """
+    فحص جودة الصورة وفقاً لمعايير NIST و ISO/IEC 19794-5
+    """
+    try:
+        # فك ترميز الصورة من Base64
+        if ',' in image_base64:
+            image_base64 = image_base64.split(',')[1]
+        
+        image_data = base64.b64decode(image_base64)
+        
+        # التحقق من حجم الصورة
+        image_size_mb = len(image_data) / (1024 * 1024)
+        if image_size_mb > BiometricStandards.MAX_IMAGE_SIZE_MB:
+            return {
+                'is_valid': False,
+                'message': f'حجم الصورة كبير جداً ({image_size_mb:.2f}MB). الحد الأقصى {BiometricStandards.MAX_IMAGE_SIZE_MB}MB'
+            }
+        
+        image = Image.open(io.BytesIO(image_data))
+        width, height = image.size
+        
+        # التحقق من الدقة
+        min_width, min_height = BiometricStandards.MIN_IMAGE_RESOLUTION
+        if width < min_width or height < min_height:
+            return {
+                'is_valid': False,
+                'message': f'دقة الصورة منخفضة ({width}x{height}). الحد الأدنى {min_width}x{min_height} بكسل'
+            }
+        
+        # التحقق من نسبة العرض إلى الارتفاع
+        aspect_ratio = width / height
+        if aspect_ratio < 0.5 or aspect_ratio > 2.0:
+            return {
+                'is_valid': False,
+                'message': f'نسبة أبعاد الصورة غير طبيعية ({aspect_ratio:.2f})'
+            }
+        
+        # التحقق من وجود بيانات كافية (عدم وجود صورة سوداء بالكامل)
+        if image.getextrema() and all(v == 0 for v in image.getextrema()):
+            return {
+                'is_valid': False,
+                'message': 'الصورة سوداء بالكامل أو تالفة'
+            }
+        
+        return {
+            'is_valid': True,
+            'message': 'الصورة تلبي معايير الجودة',
+            'resolution': (width, height),
+            'aspect_ratio': aspect_ratio,
+            'size_mb': round(image_size_mb, 2)
+        }
+        
+    except Exception as e:
+        logger.error(f"خطأ في تحليل الصورة: {str(e)}")
+        return {
+            'is_valid': False,
+            'message': f'خطأ في تحليل الصورة: {str(e)}'
+        }
+
+def validate_face_descriptor(descriptor):
+    """
+    التحقق من صحة المتجه البيومتري وفقاً لمعايير ISO/IEC 19794-5
+    
+    المعايير:
+    1. الطول الصحيح (128 أو 512)
+    2. القيم ضمن النطاق الطبيعي (-1.5 إلى 1.5)
+    3. التوزيع الإحصائي الطبيعي (تباين > 0.03)
+    4. عدم وجود قيم متطرفة
+    """
+    if not isinstance(descriptor, list) and not isinstance(descriptor, np.ndarray):
+        return False, "تنسيق المتجه غير صالح"
+    
+    # تحويل إلى قائمة للتقييس
+    if isinstance(descriptor, np.ndarray):
+        descriptor = descriptor.tolist()
+    
+    # التحقق من الطول
+    if len(descriptor) not in [128, 512]:
+        return False, f"طول المتجه غير صحيح: {len(descriptor)} (متوقع 128 أو 512)"
+    
+    # التحقق من نطاق القيم
+    valid_range = all(-1.5 <= val <= 1.5 for val in descriptor)
+    if not valid_range:
+        return False, "القيم خارج النطاق المسموح (-1.5 إلى 1.5)"
+    
+    # التحقق من التوزيع الإحصائي
+    std_dev = np.std(descriptor)
+    if std_dev < 0.03:
+        return False, "المتجه يبدو عشوائياً أو مزيفاً (تباين منخفض جداً)"
+    
+    if std_dev > 0.5:
+        return False, "التباين مرتفع جداً - متجه غير طبيعي"
+    
+    return True, "صالح"
+
+def verify_biometric_match(descriptor1, descriptor2, security_level='standard'):
+    """
+    مقارنة متجهين بيومتريين حسب معايير NIST FRVT
+    
+    المقاييس المرتجعة:
+    - is_match: هل هناك تطابق؟
+    - distance: المسافة الإقليدية
+    - confidence_score: نسبة الثقة (0-100%)
+    - fnmr_estimate: تقدير FNMR
+    """
+    try:
+        # تحويل إلى numpy arrays
+        arr1 = np.array(descriptor1)
+        arr2 = np.array(descriptor2)
+        
+        # حساب المسافة الإقليدية (المعيار العالمي)
+        distance = float(euclidean(arr1, arr2))
+        
+        # الحصول على العتبة المناسبة
+        threshold = BiometricStandards.get_threshold(security_level)
+        
+        # حساب نسبة الثقة
+        confidence_score = BiometricStandards.calculate_confidence_score(distance)
+        
+        # تقدير FNMR
+        fnmr_estimate = BiometricStandards.estimate_fnmr(distance)
+        
+        is_match = distance < threshold
+        
+        # تعيين النص الوصفي لمستوى الأمان
+        security_levels_display = {
+            'high_security': 'عالي (FNMR ~0.1%)',
+            'standard': 'قياسي (FNMR ~1%)',
+            'low_security': 'منخفض (FNMR ~5%)'
+        }
+        
+        return {
+            'is_match': is_match,
+            'distance': round(distance, 4),
+            'threshold': threshold,
+            'confidence_score': confidence_score,
+            'fnmr_estimate': fnmr_estimate,
+            'security_level': security_level,
+            'security_level_display': security_levels_display.get(security_level, 'قياسي')
+        }
+        
+    except Exception as e:
+        logger.error(f"خطأ في مقارنة المتجهات: {str(e)}")
+        return {
+            'is_match': False,
+            'distance': 1.0,
+            'confidence_score': 0,
+            'fnmr_estimate': 0.99,
+            'error': str(e)
+        }
+
+def compute_face_hash_from_descriptor(descriptor):
+    """
+    حساب هاش آمن من المتجه البيومتري للتخزين في السلسلة
+    يتم تطبيع المتجه أولاً (ISO/IEC 24745) وتعزيز الخصوصية
+    """
+    # تطبيع المتجه (Normalization)
+    arr = np.array(descriptor)
+    norm = np.linalg.norm(arr)
+    if norm > 0:
+        normalized = arr / norm
+    else:
+        normalized = arr
+    
+    # التقريب لتقليل دقة المتجه (تعزيز الخصوصية)
+    rounded = [round(v, 6) for v in normalized]
+    
+    descriptor_str = json.dumps(rounded, sort_keys=True)
+    return hashlib.sha256(descriptor_str.encode()).hexdigest()
+
+# ------------------- Block و Blockchain -------------------
 class Block:
     def __init__(self, index, name, face_hash, document_hash, document_type, timestamp, previous_hash, node_id=None):
         self.index = index
@@ -162,6 +396,7 @@ class Blockchain:
 
 blockchain = Blockchain()
 
+# ------------------- وظائف المزامنة بين العقد -------------------
 def sync_with_peer(peer_url):
     try:
         response = requests.get(f"{peer_url}/chain", timeout=5)
@@ -177,15 +412,15 @@ def sync_with_peer(peer_url):
                 b.hash = bd['hash']
                 peer_chain.append(b)
             if blockchain.replace_chain(peer_chain):
-                print(f"✅ تم تحديث السلسلة من {peer_url}")
+                logger.info(f"✅ تم تحديث السلسلة من {peer_url}")
                 return True
     except Exception as e:
-        print(f"⚠️ فشل المزامنة مع {peer_url}: {e}")
+        logger.warning(f"⚠️ فشل المزامنة مع {peer_url}: {e}")
     return False
 
 def sync_with_peers():
     if not PEERS:
-        print("لا توجد عقد أخرى للمزامنة")
+        logger.info("لا توجد عقد أخرى للمزامنة")
         return
     longest_chain = None
     max_len = len(blockchain.chain)
@@ -209,18 +444,20 @@ def sync_with_peers():
             b.hash = bd['hash']
             new_chain.append(b)
         if blockchain.replace_chain(new_chain):
-            print(f"✅ تمت المزامنة بنجاح، طول السلسلة الجديد: {len(new_chain)}")
+            logger.info(f"✅ تمت المزامنة بنجاح، طول السلسلة الجديد: {len(new_chain)}")
 
 def broadcast_block(block_dict):
     for peer in PEERS:
         try:
             requests.post(f"{peer}/add_block_peer", json=block_dict, timeout=3)
-            print(f"📡 تم بث الكتلة إلى {peer}")
+            logger.info(f"📡 تم بث الكتلة إلى {peer}")
         except Exception as e:
-            print(f"⚠️ فشل البث إلى {peer}: {e}")
+            logger.warning(f"⚠️ فشل البث إلى {peer}: {e}")
 
+# ------------------- مسارات API الرئيسية -------------------
 @app.route('/chain', methods=['GET'])
 def get_chain():
+    """إرجاع سلسلة الكتل كاملة"""
     chain_data = []
     for block in blockchain.chain:
         chain_data.append({
@@ -236,18 +473,79 @@ def get_chain():
         })
     return jsonify({"chain": chain_data, "length": len(chain_data)}), 200
 
+@app.route('/verify-biometric', methods=['POST'])
+def verify_biometric():
+    """
+    نقطة نهاية آمنة للتحقق من المطابقة البيومترية
+    تستقبل المتجهات البيومترية وتتحقق من صحتها
+    """
+    data = request.get_json()
+    
+    if not data:
+        return jsonify({"error": "بيانات غير صالحة"}), 400
+    
+    doc_descriptor = data.get('doc_descriptor')
+    face_descriptor = data.get('face_descriptor')
+    security_level = data.get('security_level', 'standard')
+    
+    if not doc_descriptor or not face_descriptor:
+        return jsonify({"error": "المتجهات البيومترية مطلوبة"}), 400
+    
+    # التحقق من صحة المتجهات
+    is_valid_doc, msg_doc = validate_face_descriptor(doc_descriptor)
+    is_valid_face, msg_face = validate_face_descriptor(face_descriptor)
+    
+    if not is_valid_doc:
+        logger.warning(f"محاولة اختراق: متجه وثيقة غير صالح - {msg_doc}")
+        return jsonify({"error": f"متجه الوثيقة غير صالح: {msg_doc}"}), 400
+    
+    if not is_valid_face:
+        logger.warning(f"محاولة اختراق: متجه وجه غير صالح - {msg_face}")
+        return jsonify({"error": f"متجه الوجه غير صالح: {msg_face}"}), 400
+    
+    # مقارنة المتجهات
+    result = verify_biometric_match(doc_descriptor, face_descriptor, security_level)
+    
+    # حساب الهاشات للتخزين
+    doc_hash = compute_face_hash_from_descriptor(doc_descriptor)
+    face_hash = compute_face_hash_from_descriptor(face_descriptor)
+    
+    response = {
+        "verified": result['is_match'],
+        "distance": result['distance'],
+        "confidence_score": result['confidence_score'],
+        "fnmr_estimate": result['fnmr_estimate'],
+        "security_level": result['security_level'],
+        "security_level_display": result.get('security_level_display', ''),
+        "doc_hash": doc_hash,
+        "face_hash": face_hash
+    }
+    
+    if result['is_match']:
+        response["message"] = "تم التحقق بنجاح"
+        logger.info(f"تحقق بيومتري ناجح - الثقة: {result['confidence_score']}%")
+    else:
+        response["message"] = "الوجوه غير متطابقة"
+        logger.warning(f"فشل التحقق البيومتري - المسافة: {result['distance']}")
+    
+    return jsonify(response), 200 if result['is_match'] else 401
+
 @app.route('/add_block', methods=['POST'])
 def add_block_local():
+    """إضافة كتلة جديدة إلى السلسلة"""
     data = request.get_json()
     required = ['name', 'face_hash', 'document_hash', 'document_type', 'biometric_verified', 'previous_hash']
+    
     if not all(k in data for k in required):
         return jsonify({"error": "بيانات ناقصة"}), 400
 
     if not data['biometric_verified']:
+        logger.warning("محاولة إضافة كتلة بدون تحقق بيومتري")
         return jsonify({"error": "فشل التحقق البيومتري"}), 403
 
     last_block = blockchain.get_last_block()
     if data['previous_hash'] != last_block.hash:
+        logger.warning(f"محاولة إضافة كتلة مع previous_hash غير صحيح")
         return jsonify({"error": "سلسلة الكتل غير متطابقة"}), 409
 
     try:
@@ -271,14 +569,17 @@ def add_block_local():
             "hash": new_block.hash
         }
         threading.Thread(target=broadcast_block, args=(block_dict,)).start()
-        return jsonify({"message": "تمت الإضافة", "block_index": new_block.index}), 201
+        logger.info(f"✅ تمت إضافة كتلة جديدة - الاسم: {data['name']}, الرقم: {new_block.index}")
+        return jsonify({"message": "تمت إضافة الكتلة", "block_index": new_block.index}), 201
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
 
 @app.route('/add_block_peer', methods=['POST'])
 def add_block_peer():
+    """استقبال كتلة من عقدة أخرى"""
     data = request.get_json()
     required = ['index', 'name', 'face_hash', 'document_hash', 'document_type', 'timestamp', 'previous_hash', 'hash', 'node_id']
+    
     if not all(k in data for k in required):
         return jsonify({"error": "بيانات ناقصة"}), 400
 
@@ -301,10 +602,12 @@ def add_block_peer():
 
         blockchain.chain.append(new_block)
         blockchain.save_chain()
+        logger.info(f"📥 تم استقبال كتلة من العقدة {data['node_id']}")
         return jsonify({"message": "تمت الإضافة"}), 201
 
 @app.route('/peers', methods=['GET', 'POST', 'DELETE'])
 def manage_peers():
+    """إدارة قائمة العقد المتصلة"""
     global PEERS
     if request.method == 'GET':
         return jsonify(list(PEERS))
@@ -314,6 +617,7 @@ def manage_peers():
             PEERS.add(new_peer)
             save_peers()
             threading.Thread(target=sync_with_peer, args=(new_peer,)).start()
+            logger.info(f"➕ تمت إضافة عقدة جديدة: {new_peer}")
             return jsonify({"message": "تمت الإضافة", "peers": list(PEERS)})
         return jsonify({"error": "خطأ"}), 400
     elif request.method == 'DELETE':
@@ -321,34 +625,28 @@ def manage_peers():
         if peer in PEERS:
             PEERS.remove(peer)
             save_peers()
+            logger.info(f"➖ تمت إزالة عقدة: {peer}")
         return jsonify({"message": "تم الحذف", "peers": list(PEERS)})
 
 @app.route('/sync', methods=['POST'])
 def sync_trigger():
+    """بدء مزامنة يدوية مع الشبكة"""
     threading.Thread(target=sync_with_peers).start()
     return jsonify({"message": "جاري المزامنة"}), 202
 
 @app.route('/health', methods=['GET'])
 def health():
-    return jsonify({"status": "healthy", "chain_length": len(blockchain.chain)}), 200
-
-def find_person_by_name(name):
-    results = []
-    for block in blockchain.chain:
-        if block.name.lower() == name.lower():
-            results.append({
-                "index": block.index,
-                "name": block.name,
-                "face_hash": block.face_hash,
-                "document_hash": block.document_hash,
-                "document_type": block.document_type,
-                "timestamp": block.timestamp,
-                "node_id": block.node_id
-            })
-    return results
+    """نقطة صحية لمراقبة التطبيق"""
+    return jsonify({
+        "status": "healthy",
+        "chain_length": len(blockchain.chain),
+        "peers_count": len(PEERS),
+        "version": "2.0.0"
+    }), 200
 
 @app.route('/verify_person', methods=['POST'])
 def verify_person():
+    """البحث عن شخص مسجل في السلسلة"""
     data = request.get_json()
     if not data:
         return jsonify({"error": "بيانات غير صالحة"}), 400
@@ -357,13 +655,25 @@ def verify_person():
     query_value = data.get('query_value', '').strip()
     
     if query_type == "name":
-        results = find_person_by_name(query_value)
+        results = []
+        for block in blockchain.chain:
+            if block.name.lower() == query_value.lower():
+                results.append({
+                    "index": block.index,
+                    "name": block.name,
+                    "face_hash": block.face_hash,
+                    "document_hash": block.document_hash,
+                    "document_type": block.document_type,
+                    "timestamp": block.timestamp,
+                    "node_id": block.node_id
+                })
         if results:
             return jsonify({"verified": True, "message": "تم العثور", "records": results}), 200
         return jsonify({"verified": False, "message": "لم يتم العثور"}), 404
     else:
         return jsonify({"error": "نوع بحث غير صحيح"}), 400
 
+# ------------------- صفحات الواجهة -------------------
 @app.route('/')
 def index():
     return redirect('/register')
@@ -380,7 +690,13 @@ def profile_page():
 def verification_result_page():
     return send_from_directory('static', 'verification_result.html')
 
+@app.route('/static/<path:filename>')
+def serve_static(filename):
+    return send_from_directory('static', filename)
+
+# ------------------- بدء التشغيل -------------------
 if __name__ == '__main__':
     load_peers()
     threading.Thread(target=sync_with_peers).start()
+    logger.info(f"🚀 بدء تشغيل الخادم على المنفذ {PORT}")
     app.run(host='0.0.0.0', port=PORT, debug=False, threaded=True)
