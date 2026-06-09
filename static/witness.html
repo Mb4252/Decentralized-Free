@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>وثاق - شبكة الشهود</title>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: linear-gradient(135deg, #0a0a2a 0%, #1a1a3a 100%); margin: 0; padding: 20px; min-height: 100vh; }
+        .container { max-width: 550px; margin: 0 auto; background: rgba(255,255,255,0.95); border-radius: 32px; padding: 25px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
+        h1 { color: #1e3c72; text-align: center; font-size: 1.4rem; }
+        .card { background: #f9f9fc; border-radius: 24px; padding: 20px; margin-bottom: 20px; border: 1px solid #e0e4e8; }
+        button { width: 100%; padding: 14px; margin: 10px 0; border-radius: 40px; border: none; font-size: 1rem; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        .btn-primary { background: #2c7da0; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-warning { background: #ffc107; color: #333; }
+        .peer-list { max-height: 300px; overflow-y: auto; border: 1px solid #ddd; border-radius: 16px; margin: 15px 0; }
+        .peer-item { display: flex; justify-content: space-between; padding: 12px; border-bottom: 1px solid #eee; align-items: center; }
+        .vote-buttons { display: flex; gap: 10px; }
+        .vote-btn { padding: 5px 15px; border-radius: 30px; font-size: 0.8rem; cursor: pointer; border: none; }
+        .approve { background: #28a745; color: white; }
+        .reject { background: #dc3545; color: white; }
+        .reputation-high { color: #28a745; font-weight: bold; }
+        .reputation-med { color: #ffc107; font-weight: bold; }
+        .reputation-low { color: #dc3545; font-weight: bold; }
+        .result { margin: 15px 0; padding: 15px; border-radius: 20px; text-align: center; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        .spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid #2c7da0; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>🌐 شبكة الشهود | التصويت الجماعي</h1>
+    
+    <div class="card">
+        <h3>🖥️ معلومات عقدتي</h3>
+        <div><strong>اسم العقدة:</strong> <span id="nodeName">شاهد موثوق</span></div>
+        <div><strong>معرف العقدة:</strong> <span id="nodeId">-</span></div>
+        <div><strong>⭐ سمعتي:</strong> <span id="myReputation" class="reputation-high">100</span></div>
+        <button id="registerAsWitnessBtn" class="btn-primary">📝 تسجيل كشاهد</button>
+    </div>
+    
+    <div class="card">
+        <h3>📡 العقد المتصلة (الشهود المحيطون)</h3>
+        <div id="peersList" class="peer-list">
+            <div style="text-align:center; padding:20px; color:#999;">لا توجد عقد متصلة</div>
+        </div>
+        <button id="discoverPeersBtn" class="btn-primary">🔍 اكتشاف العقد</button>
+        <div id="discoveryStatus" class="info"></div>
+    </div>
+    
+    <div class="card">
+        <h3>🗳️ طلبات التصويت النشطة</h3>
+        <div id="pendingVotesList" class="peer-list">
+            <div style="text-align:center; padding:20px; color:#999;">لا توجد طلبات تصويت نشطة</div>
+        </div>
+    </div>
+    
+    <div class="card">
+        <h3>📊 إحصائيات الشبكة</h3>
+        <div><strong>العقد النشطة:</strong> <span id="activePeers">0</span></div>
+        <div><strong>متوسط السمعة:</strong> <span id="avgReputation">0</span></div>
+        <div><strong>طلبات التصويت المكتملة:</strong> <span id="completedVotes">0</span></div>
+    </div>
+    
+    <button id="goToProfileBtn" class="btn-success">📁 الذهاب إلى ملفي الشخصي</button>
+</div>
+
+<script>
+    // ------------------- المتغيرات -------------------
+    let nodeId = localStorage.getItem('witnessNodeId');
+    let nodeName = localStorage.getItem('witnessNodeName') || 'شاهد موثوق';
+    let myReputation = parseInt(localStorage.getItem('witnessReputation') || '100');
+    let peers = [];
+    let pendingVotes = [];
+    let completedVotesCount = 0;
+    
+    // ------------------- العقدة الحالية -------------------
+    document.getElementById('nodeName').innerText = nodeName;
+    document.getElementById('nodeId').innerText = nodeId || 'غير مسجل';
+    document.getElementById('myReputation').innerText = myReputation;
+    updateReputationClass('myReputation', myReputation);
+    
+    function updateReputationClass(elementId, reputation) {
+        const el = document.getElementById(elementId);
+        if (reputation >= 80) el.className = 'reputation-high';
+        else if (reputation >= 50) el.className = 'reputation-med';
+        else el.className = 'reputation-low';
+    }
+    
+    // ------------------- تسجيل كشاهد -------------------
+    document.getElementById('registerAsWitnessBtn').onclick = () => {
+        if (!nodeId) {
+            nodeId = 'witness_' + Math.random().toString(36).substring(2, 10);
+            localStorage.setItem('witnessNodeId', nodeId);
+            localStorage.setItem('witnessNodeName', nodeName);
+            localStorage.setItem('witnessReputation', myReputation);
+            document.getElementById('nodeId').innerText = nodeId;
+            alert('✅ تم تسجيلك كشاهد! معرف العقدة: ' + nodeId);
+        } else {
+            alert('أنت مسجل بالفعل كشاهد');
+        }
+    };
+    
+    // ------------------- اكتشاف العقد -------------------
+    document.getElementById('discoverPeersBtn').onclick = async () => {
+        const btn = document.getElementById('discoverPeersBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> جاري الاكتشاف...';
+        document.getElementById('discoveryStatus').innerHTML = '📡 بث إشارات discovery...';
+        
+        await new Promise(r => setTimeout(r, 2000));
+        
+        // محاكاة اكتشاف عقد قريبة
+        const mockPeers = [
+            { id: 'peer_001', name: 'عقدة أمنية مركزية', reputation: 95, signal: -42, lastSeen: Date.now() },
+            { id: 'peer_002', name: 'محطة تحقيق رقم 1', reputation: 88, signal: -48, lastSeen: Date.now() },
+            { id: 'peer_003', name: 'شاهد موثوق 3', reputation: 76, signal: -55, lastSeen: Date.now() },
+            { id: 'peer_004', name: 'عقدة مراقبة', reputation: 92, signal: -44, lastSeen: Date.now() }
+        ];
+        
+        peers = mockPeers.filter(p => p.id !== nodeId);
+        
+        const peersContainer = document.getElementById('peersList');
+        if (peers.length === 0) {
+            peersContainer.innerHTML = '<div style="text-align:center; padding:20px; color:#999;">لا توجد عقد متصلة</div>';
+        } else {
+            peersContainer.innerHTML = peers.map(peer => `
+                <div class="peer-item">
+                    <div>
+                        <strong>🖥️ ${peer.name}</strong><br>
+                        <small>${peer.id}</small>
+                    </div>
+                    <div>
+                        <span class="${peer.reputation >= 80 ? 'reputation-high' : peer.reputation >= 50 ? 'reputation-med' : 'reputation-low'}">⭐ ${peer.reputation}</span>
+                        <div><small>📡 ${peer.signal} dBm</small></div>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        document.getElementById('discoveryStatus').innerHTML = `✅ تم اكتشاف ${peers.length} عقدة قريبة`;
+        btn.disabled = false;
+        btn.innerHTML = "🔍 إعادة الاكتشاف";
+        
+        updateNetworkStats();
+    };
+    
+    // ------------------- محاكاة طلبات تصويت واردة -------------------
+    function simulateIncomingVoteRequests() {
+        setInterval(() => {
+            if (Math.random() > 0.3) return;
+            
+            const requestId = 'vote_' + Math.random().toString(36).substring(2, 10);
+            const requestor = peers.length > 0 ? peers[Math.floor(Math.random() * peers.length)] : null;
+            
+            if (!requestor) return;
+            
+            pendingVotes.push({
+                id: requestId,
+                requestor
