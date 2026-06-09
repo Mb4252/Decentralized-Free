@@ -6,14 +6,13 @@ import threading
 import requests
 import socket
 import math
+import base64
+import io
 from flask import Flask, request, jsonify, send_from_directory, redirect, render_template
 from flask_cors import CORS
+from PIL import Image
 
-app = Flask(__name__, 
-            static_folder='static', 
-            static_url_path='/static',
-            template_folder='templates')  # ✅ تحديد مجلد القوالب
-
+app = Flask(__name__, static_folder='static', static_url_path='/static', template_folder='templates')
 CORS(app)
 
 # ------------------- الإعدادات -------------------
@@ -29,6 +28,12 @@ except PermissionError:
 
 LEDGER_FILE = os.path.join(DATA_DIR, 'ledger.json')
 PEERS_FILE = os.path.join(DATA_DIR, 'peers.json')
+
+# ------------------- إعدادات الأمان -------------------
+MIN_MATCH_THRESHOLD = 85  # الحد الأدنى لنسبة التطابق (85%)
+REQUIRED_ID_CARD = True   # الهوية إجبارية
+MAX_IMAGE_SIZE_MB = 5
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'pdf'}
 
 # ------------------- إدارة العقد -------------------
 PEERS = set()
@@ -55,12 +60,27 @@ def save_peers():
 
 ledger_lock = threading.Lock()
 
-# ------------------- دوال المساعدة -------------------
+# ------------------- دوال مساعدة -------------------
 def euclidean_distance(a, b):
-    """حساب المسافة الإقليدية بين متجهين"""
     if len(a) != len(b):
         return float('inf')
     return math.sqrt(sum((x - y) ** 2 for x, y in zip(a, b)))
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def validate_id_card(file):
+    """التحقق من صحة ملف الهوية"""
+    if not file:
+        return False, "لا يوجد ملف هوية مرفوع"
+    
+    if file.filename == '':
+        return False, "لم يتم اختيار ملف"
+    
+    if not allowed_file(file.filename):
+        return False, "نوع الملف غير مدعوم. يُسمح فقط بـ: png, jpg, jpeg, pdf"
+    
+    return True, "صالح"
 
 # ------------------- Block و Blockchain -------------------
 class Block:
@@ -191,7 +211,113 @@ def broadcast_block(block_dict):
         except Exception as e:
             pass
 
-# ------------------- مسارات API -------------------
+# ------------------- مسارات API (مع قاعدة الخطوة الإجبارية) -------------------
+@app.route('/verify-identity', methods=['POST'])
+def verify_identity():
+    """
+    ✅ قاعدة الخطوة الإجبارية (Blocking Logic)
+    لا يمكن بدء التحقق بدون صورة الهوية
+    """
+    # 1. فحص وجود ملف الهوية
+    if 'id_card' not in request.files:
+        return jsonify({
+            "success": False,
+            "error": "❌ خطأ: لا يمكن بدء التحقق بدون صورة الهوية",
+            "code": "MISSING_ID_CARD"
+        }), 400
+    
+    id_card = request.files['id_card']
+    
+    # 2. التحقق من صحة الملف
+    is_valid, message = validate_id_card(id_card)
+    if not is_valid:
+        return jsonify({
+            "success": False,
+            "error": f"❌ خطأ في الهوية: {message}",
+            "code": "INVALID_ID_CARD"
+        }), 400
+    
+    # 3. التحقق من حجم الملف
+    id_card.seek(0, os.SEEK_END)
+    file_size_mb = id_card.tell() / (1024 * 1024)
+    id_card.seek(0)
+    
+    if file_size_mb > MAX_IMAGE_SIZE_MB:
+        return jsonify({
+            "success": False,
+            "error": f"❌ حجم الملف كبير جداً ({file_size_mb:.1f}MB). الحد الأقصى {MAX_IMAGE_SIZE_MB}MB",
+            "code": "FILE_TOO_LARGE"
+        }), 400
+    
+    # 4. استلام بصمات الوجه من العميل
+    data = request.form.to_dict()
+    face_descriptor_json = data.get('face_descriptor')
+    doc_descriptor_json = data.get('doc_descriptor')
+    
+    if not face_descriptor_json or not doc_descriptor_json:
+        return jsonify({
+            "success": False,
+            "error": "❌ خطأ: بيانات الوجه غير مكتملة",
+            "code": "MISSING_FACE_DATA"
+        }), 400
+    
+    try:
+        face_descriptor = json.loads(face_descriptor_json)
+        doc_descriptor = json.loads(doc_descriptor_json)
+    except json.JSONDecodeError:
+        return jsonify({
+            "success": False,
+            "error": "❌ خطأ: تنسيق البيانات غير صالح",
+            "code": "INVALID_DATA_FORMAT"
+        }), 400
+    
+    # 5. الربط الرياضي (Matching) - نسبة التطابق لا تقل عن 85%
+    if len(face_descriptor) != 128 or len(doc_descriptor) != 128:
+        return jsonify({
+            "success": False,
+            "error": "❌ خطأ: بصمات الوجه غير صالحة",
+            "code": "INVALID_DESCRIPTOR"
+        }), 400
+    
+    distance = euclidean_distance(face_descriptor, doc_descriptor)
+    similarity = max(0, min(100, (1 - distance) * 100))
+    
+    # 6. التحقق من نسبة التطابق
+    if similarity < MIN_MATCH_THRESHOLD:
+        return jsonify({
+            "success": False,
+            "error": f"❌ فشل التحقق: نسبة التطابق {similarity:.1f}% أقل من الحد الأدنى المطلوب {MIN_MATCH_THRESHOLD}%",
+            "code": "MATCH_FAILED",
+            "similarity": similarity,
+            "threshold": MIN_MATCH_THRESHOLD,
+            "tip": "يرجى التأكد من الإضاءة الجيدة ووضوح الوجه في كل من الكاميرا وصورة الهوية"
+        }), 401
+    
+    # 7. التحقق من الحيوية (يتم إرسالها من العميل)
+    liveness_data = json.loads(data.get('liveness_data', '{}'))
+    head_movements = liveness_data.get('head_movements', {})
+    
+    if not head_movements.get('left') or not head_movements.get('right'):
+        return jsonify({
+            "success": False,
+            "error": "❌ فشل اختبار الحيوية: لم يتم كشف حركات الرأس المطلوبة",
+            "code": "LIVENESS_FAILED",
+            "tip": "يرجى تحريك رأسك لليسار واليمين عند الطلب"
+        }), 401
+    
+    # 8. نجاح التحقق
+    face_hash = hashlib.sha256(json.dumps(face_descriptor).encode()).hexdigest()
+    doc_hash = hashlib.sha256(json.dumps(doc_descriptor).encode()).hexdigest()
+    
+    return jsonify({
+        "success": True,
+        "message": "✅ تم التحقق بنجاح",
+        "similarity": similarity,
+        "face_hash": face_hash,
+        "doc_hash": doc_hash,
+        "head_movements": head_movements
+    }), 200
+
 @app.route('/chain', methods=['GET'])
 def get_chain():
     chain_data = []
@@ -213,7 +339,7 @@ def get_chain():
 def add_block_local():
     data = request.get_json()
     required = ['name', 'face_hash', 'document_hash', 'document_type', 'biometric_verified', 'previous_hash']
-
+    
     if not all(k in data for k in required):
         return jsonify({"error": "بيانات ناقصة"}), 400
 
@@ -317,31 +443,23 @@ def verify_person():
         return jsonify({"verified": True, "records": results}), 200
     return jsonify({"verified": False}), 404
 
-# ============================================================
-# ✅ مسارات الصفحات (باستخدام render_template من مجلد templates)
-# ============================================================
-
+# ------------------- صفحات الواجهة -------------------
 @app.route('/')
 def index():
-    """الصفحة الرئيسية - إعادة توجيه إلى /verify"""
     return redirect('/verify')
 
 @app.route('/verify')
 def verify_page():
-    """صفحة التوثيق الرئيسية"""
     return render_template('verify.html')
 
 @app.route('/witness')
 def witness_page():
-    """صفحة الشهود والتصويت الجماعي"""
     return render_template('witness.html')
 
 @app.route('/profile')
 def profile_page():
-    """الملف الشخصي ونظام السمعة"""
     return render_template('profile.html')
 
-# مسار للملفات الثابتة (CSS, JS, icons, manifest)
 @app.route('/static/<path:filename>')
 def serve_static(filename):
     return send_from_directory('static', filename)
@@ -351,18 +469,10 @@ if __name__ == '__main__':
     load_peers()
     threading.Thread(target=sync_with_peers).start()
     print("=" * 50)
-    print("🚀 وثاق - نظام التوثيق اللامركزي")
+    print("🔐 وثاق - نظام التوثيق الآمن")
     print("=" * 50)
+    print(f"🎯 الحد الأدنى للتطابق: {MIN_MATCH_THRESHOLD}%")
     print(f"📁 مجلد البيانات: {DATA_DIR}")
-    print(f"📁 مجلد القوالب: templates/")
-    print(f"📁 مجلد الملفات الثابتة: static/")
-    print(f"🌐 الخادم يعمل على المنفذ: {PORT}")
-    print("-" * 50)
-    print("📍 المسارات المتاحة:")
-    print(f"   ✅ http://localhost:{PORT}/verify     → صفحة التوثيق")
-    print(f"   ✅ http://localhost:{PORT}/witness    → صفحة الشهود")
-    print(f"   ✅ http://localhost:{PORT}/profile    → الملف الشخصي")
-    print(f"   ✅ http://localhost:{PORT}/chain      → API سلسلة الكتل")
-    print(f"   ✅ http://localhost:{PORT}/health     → نقطة صحية")
+    print(f"🌐 الخادم: http://localhost:{PORT}")
     print("=" * 50)
     app.run(host='0.0.0.0', port=PORT, debug=False, threaded=True)
