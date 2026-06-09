@@ -6,13 +6,14 @@ import threading
 import requests
 import socket
 import math
-import base64
-import io
-from flask import Flask, request, jsonify, send_from_directory, redirect, render_template
+import secrets
+import string
+from flask import Flask, request, jsonify, send_from_directory, redirect, render_template, session
 from flask_cors import CORS
-from PIL import Image
+from functools import wraps
 
 app = Flask(__name__, static_folder='static', static_url_path='/static', template_folder='templates')
+app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 CORS(app)
 
 # ------------------- الإعدادات -------------------
@@ -28,14 +29,23 @@ except PermissionError:
 
 LEDGER_FILE = os.path.join(DATA_DIR, 'ledger.json')
 PEERS_FILE = os.path.join(DATA_DIR, 'peers.json')
+INVITES_FILE = os.path.join(DATA_DIR, 'invites.json')
+PENDING_VERIFICATIONS_FILE = os.path.join(DATA_DIR, 'pending_verifications.json')
 
-# ------------------- إعدادات الأمان -------------------
-MIN_MATCH_THRESHOLD = 85  # الحد الأدنى لنسبة التطابق (85%)
-REQUIRED_ID_CARD = True   # الهوية إجبارية
-MAX_IMAGE_SIZE_MB = 5
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'pdf'}
+# ------------------- إعدادات النظام -------------------
+# حالات التوثيق
+VERIFICATION_STATUS = {
+    'PENDING': 'pending',
+    'APPROVED': 'approved', 
+    'REJECTED': 'rejected'
+}
 
-# ------------------- إدارة العقد -------------------
+# عتبات التصويت
+MIN_TRUST_SCORE_TO_VOTE = 50
+CONSENSUS_THRESHOLD = 0.6  # 60% موافقة
+AI_AUTO_VALIDATOR_ACTIVE = True  # وضع التوثيق الذاتي (يتغير عند وجود شهود)
+
+# ------------------- تحميل البيانات -------------------
 PEERS = set()
 env_peers = os.environ.get('PEERS', '')
 if env_peers:
@@ -58,33 +68,88 @@ def save_peers():
     with open(PEERS_FILE, 'w') as f:
         json.dump(list(PEERS), f, indent=2)
 
+def load_invites():
+    try:
+        with open(INVITES_FILE, 'r') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {}
+
+def save_invites(invites):
+    with open(INVITES_FILE, 'w') as f:
+        json.dump(invites, f, indent=2)
+
+def load_pending_verifications():
+    try:
+        with open(PENDING_VERIFICATIONS_FILE, 'r') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {}
+
+def save_pending_verifications(pending):
+    with open(PENDING_VERIFICATIONS_FILE, 'w') as f:
+        json.dump(pending, f, indent=2)
+
 ledger_lock = threading.Lock()
 
 # ------------------- دوال مساعدة -------------------
+def generate_invite_code():
+    """توليد رمز دعوة فريد"""
+    return ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(12))
+
 def euclidean_distance(a, b):
     if len(a) != len(b):
         return float('inf')
     return math.sqrt(sum((x - y) ** 2 for x, y in zip(a, b)))
 
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+# ------------------- نظام الشهود والثقة -------------------
+class TrustScoreManager:
+    """إدارة درجات الثقة للشهود والمستخدمين"""
+    
+    def __init__(self):
+        self.trust_scores = {}
+        self.load_trust_scores()
+    
+    def load_trust_scores(self):
+        try:
+            with open(os.path.join(DATA_DIR, 'trust_scores.json'), 'r') as f:
+                self.trust_scores = json.load(f)
+        except FileNotFoundError:
+            self.trust_scores = {}
+    
+    def save_trust_scores(self):
+        with open(os.path.join(DATA_DIR, 'trust_scores.json'), 'w') as f:
+            json.dump(self.trust_scores, f, indent=2)
+    
+    def get_trust_score(self, user_id):
+        return self.trust_scores.get(user_id, {'score': 100, 'total_votes': 0, 'correct_votes': 0})
+    
+    def update_trust_score(self, user_id, is_correct_vote):
+        """تحديث درجة الثقة بناءً على صحة التصويت"""
+        if user_id not in self.trust_scores:
+            self.trust_scores[user_id] = {'score': 100, 'total_votes': 0, 'correct_votes': 0}
+        
+        self.trust_scores[user_id]['total_votes'] += 1
+        if is_correct_vote:
+            self.trust_scores[user_id]['correct_votes'] += 1
+            self.trust_scores[user_id]['score'] = min(100, self.trust_scores[user_id]['score'] + 5)
+        else:
+            self.trust_scores[user_id]['score'] = max(0, self.trust_scores[user_id]['score'] - 10)
+        
+        self.save_trust_scores()
+        return self.trust_scores[user_id]['score']
+    
+    def can_vote(self, user_id):
+        """التحقق مما إذا كان المستخدم يمكنه التصويت"""
+        score = self.get_trust_score(user_id)['score']
+        return score >= MIN_TRUST_SCORE_TO_VOTE
 
-def validate_id_card(file):
-    """التحقق من صحة ملف الهوية"""
-    if not file:
-        return False, "لا يوجد ملف هوية مرفوع"
-    
-    if file.filename == '':
-        return False, "لم يتم اختيار ملف"
-    
-    if not allowed_file(file.filename):
-        return False, "نوع الملف غير مدعوم. يُسمح فقط بـ: png, jpg, jpeg, pdf"
-    
-    return True, "صالح"
+trust_manager = TrustScoreManager()
 
 # ------------------- Block و Blockchain -------------------
 class Block:
-    def __init__(self, index, name, face_hash, document_hash, document_type, timestamp, previous_hash, node_id=None):
+    def __init__(self, index, name, face_hash, document_hash, document_type, timestamp, previous_hash, 
+                 node_id=None, status='pending', witness_votes=None, trust_score_required=0):
         self.index = index
         self.name = name
         self.face_hash = face_hash
@@ -93,6 +158,9 @@ class Block:
         self.timestamp = timestamp
         self.previous_hash = previous_hash
         self.node_id = node_id or socket.gethostname()
+        self.status = status  # pending, approved, rejected
+        self.witness_votes = witness_votes or {'approve': [], 'reject': []}
+        self.trust_score_required = trust_score_required
         self.hash = self.compute_hash()
 
     def compute_hash(self):
@@ -104,7 +172,10 @@ class Block:
             "document_type": self.document_type,
             "timestamp": self.timestamp,
             "previous_hash": self.previous_hash,
-            "node_id": self.node_id
+            "node_id": self.node_id,
+            "status": self.status,
+            "witness_votes": self.witness_votes,
+            "trust_score_required": self.trust_score_required
         }, sort_keys=True).encode()
         return hashlib.sha256(block_string).hexdigest()
 
@@ -128,12 +199,16 @@ class Blockchain:
                         block_data.get('document_type', 'غير محدد'),
                         block_data['timestamp'],
                         block_data['previous_hash'],
-                        block_data.get('node_id', 'unknown')
+                        block_data.get('node_id', 'unknown'),
+                        block_data.get('status', 'approved'),
+                        block_data.get('witness_votes', {'approve': [], 'reject': []}),
+                        block_data.get('trust_score_required', 0)
                     )
                     block.hash = block_data['hash']
                     self.chain.append(block)
         except FileNotFoundError:
-            genesis = Block(0, "Genesis", "0", "0", "genesis", str(datetime.datetime.now()), "0", "genesis")
+            genesis = Block(0, "Genesis", "0", "0", "genesis", str(datetime.datetime.now()), "0", 
+                           "genesis", 'approved', {'approve': [], 'reject': []}, 0)
             self.chain = [genesis]
             self.save_chain()
 
@@ -150,6 +225,9 @@ class Blockchain:
                     "timestamp": block.timestamp,
                     "previous_hash": block.previous_hash,
                     "node_id": block.node_id,
+                    "status": block.status,
+                    "witness_votes": block.witness_votes,
+                    "trust_score_required": block.trust_score_required,
                     "hash": block.hash
                 })
             with open(self.ledger_file, 'w') as f:
@@ -158,9 +236,8 @@ class Blockchain:
     def get_last_block(self):
         return self.chain[-1]
 
-    def add_block(self, name, face_hash, document_hash, document_type, biometric_verified, node_id):
-        if not biometric_verified:
-            raise ValueError("التحقق البيومتري مطلوب")
+    def add_pending_block(self, name, face_hash, document_hash, document_type, node_id, trust_score_required=0):
+        """إضافة بلوك بحالة PENDING"""
         last_block = self.get_last_block()
         new_block = Block(
             last_block.index + 1,
@@ -170,11 +247,46 @@ class Blockchain:
             document_type,
             str(datetime.datetime.now()),
             last_block.hash,
-            node_id
+            node_id,
+            'pending',
+            {'approve': [], 'reject': []},
+            trust_score_required
         )
-        self.chain.append(new_block)
-        self.save_chain()
         return new_block
+    
+    def approve_block(self, block_index, witness_id, approved):
+        """تصويت شاهد على بلوك معلق"""
+        for block in self.chain:
+            if block.index == block_index:
+                if approved:
+                    if witness_id not in block.witness_votes['approve']:
+                        block.witness_votes['approve'].append(witness_id)
+                else:
+                    if witness_id not in block.witness_votes['reject']:
+                        block.witness_votes['reject'].append(witness_id)
+                
+                # التحقق من الوصول إلى التوافق
+                total_votes = len(block.witness_votes['approve']) + len(block.witness_votes['reject'])
+                if total_votes > 0:
+                    approval_rate = len(block.witness_votes['approve']) / total_votes
+                    if approval_rate >= CONSENSUS_THRESHOLD:
+                        block.status = 'approved'
+                        self.save_chain()
+                        return True, 'approved'
+                    elif len(block.witness_votes['reject']) > total_votes * 0.5:
+                        block.status = 'rejected'
+                        self.save_chain()
+                        return False, 'rejected'
+                
+                self.save_chain()
+                return None, 'pending'
+        return False, 'not_found'
+    
+    def get_pending_blocks(self):
+        return [block for block in self.chain if block.status == 'pending']
+    
+    def get_approved_blocks(self):
+        return [block for block in self.chain if block.status == 'approved']
 
 blockchain = Blockchain()
 
@@ -192,8 +304,10 @@ def sync_with_peers():
                     for bd in data['chain']:
                         b = Block(
                             bd['index'], bd['name'], bd['face_hash'], bd['document_hash'],
-                            bd.get('document_type', 'غير محدد'), bd['timestamp'],
-                            bd['previous_hash'], bd.get('node_id')
+                            bd.get('document_type', 'غير محدد'), bd['timestamp'], bd['previous_hash'],
+                            bd.get('node_id'), bd.get('status', 'approved'),
+                            bd.get('witness_votes', {'approve': [], 'reject': []}),
+                            bd.get('trust_score_required', 0)
                         )
                         b.hash = bd['hash']
                         peer_chain.append(b)
@@ -211,113 +325,236 @@ def broadcast_block(block_dict):
         except Exception as e:
             pass
 
-# ------------------- مسارات API (مع قاعدة الخطوة الإجبارية) -------------------
-@app.route('/verify-identity', methods=['POST'])
-def verify_identity():
-    """
-    ✅ قاعدة الخطوة الإجبارية (Blocking Logic)
-    لا يمكن بدء التحقق بدون صورة الهوية
-    """
-    # 1. فحص وجود ملف الهوية
-    if 'id_card' not in request.files:
-        return jsonify({
-            "success": False,
-            "error": "❌ خطأ: لا يمكن بدء التحقق بدون صورة الهوية",
-            "code": "MISSING_ID_CARD"
-        }), 400
+# ------------------- مسارات API -------------------
+@app.route('/invite', methods=['POST'])
+def create_invite():
+    """إنشاء رمز دعوة (للمستخدمين الموثقين فقط)"""
+    data = request.get_json()
+    inviter = data.get('inviter')
     
-    id_card = request.files['id_card']
+    # التحقق من أن الداعي مستخدم موثق
+    is_verified = False
+    for block in blockchain.chain:
+        if block.name == inviter and block.status == 'approved':
+            is_verified = True
+            break
     
-    # 2. التحقق من صحة الملف
-    is_valid, message = validate_id_card(id_card)
-    if not is_valid:
-        return jsonify({
-            "success": False,
-            "error": f"❌ خطأ في الهوية: {message}",
-            "code": "INVALID_ID_CARD"
-        }), 400
+    if not is_verified:
+        return jsonify({"error": "Only verified users can invite others"}), 403
     
-    # 3. التحقق من حجم الملف
-    id_card.seek(0, os.SEEK_END)
-    file_size_mb = id_card.tell() / (1024 * 1024)
-    id_card.seek(0)
+    invites = load_invites()
+    invite_code = generate_invite_code()
+    invites[invite_code] = {
+        "inviter": inviter,
+        "created_at": str(datetime.datetime.now()),
+        "used": False,
+        "used_by": None
+    }
+    save_invites(invites)
     
-    if file_size_mb > MAX_IMAGE_SIZE_MB:
-        return jsonify({
-            "success": False,
-            "error": f"❌ حجم الملف كبير جداً ({file_size_mb:.1f}MB). الحد الأقصى {MAX_IMAGE_SIZE_MB}MB",
-            "code": "FILE_TOO_LARGE"
-        }), 400
+    return jsonify({"invite_code": invite_code}), 200
+
+@app.route('/verify-invite', methods=['POST'])
+def verify_invite():
+    """التحقق من صحة رمز الدعوة"""
+    data = request.get_json()
+    invite_code = data.get('invite_code')
     
-    # 4. استلام بصمات الوجه من العميل
-    data = request.form.to_dict()
-    face_descriptor_json = data.get('face_descriptor')
-    doc_descriptor_json = data.get('doc_descriptor')
+    invites = load_invites()
     
-    if not face_descriptor_json or not doc_descriptor_json:
-        return jsonify({
-            "success": False,
-            "error": "❌ خطأ: بيانات الوجه غير مكتملة",
-            "code": "MISSING_FACE_DATA"
-        }), 400
+    if invite_code not in invites:
+        return jsonify({"valid": False, "error": "Invalid invite code"}), 404
     
-    try:
-        face_descriptor = json.loads(face_descriptor_json)
-        doc_descriptor = json.loads(doc_descriptor_json)
-    except json.JSONDecodeError:
-        return jsonify({
-            "success": False,
-            "error": "❌ خطأ: تنسيق البيانات غير صالح",
-            "code": "INVALID_DATA_FORMAT"
-        }), 400
-    
-    # 5. الربط الرياضي (Matching) - نسبة التطابق لا تقل عن 85%
-    if len(face_descriptor) != 128 or len(doc_descriptor) != 128:
-        return jsonify({
-            "success": False,
-            "error": "❌ خطأ: بصمات الوجه غير صالحة",
-            "code": "INVALID_DESCRIPTOR"
-        }), 400
-    
-    distance = euclidean_distance(face_descriptor, doc_descriptor)
-    similarity = max(0, min(100, (1 - distance) * 100))
-    
-    # 6. التحقق من نسبة التطابق
-    if similarity < MIN_MATCH_THRESHOLD:
-        return jsonify({
-            "success": False,
-            "error": f"❌ فشل التحقق: نسبة التطابق {similarity:.1f}% أقل من الحد الأدنى المطلوب {MIN_MATCH_THRESHOLD}%",
-            "code": "MATCH_FAILED",
-            "similarity": similarity,
-            "threshold": MIN_MATCH_THRESHOLD,
-            "tip": "يرجى التأكد من الإضاءة الجيدة ووضوح الوجه في كل من الكاميرا وصورة الهوية"
-        }), 401
-    
-    # 7. التحقق من الحيوية (يتم إرسالها من العميل)
-    liveness_data = json.loads(data.get('liveness_data', '{}'))
-    head_movements = liveness_data.get('head_movements', {})
-    
-    if not head_movements.get('left') or not head_movements.get('right'):
-        return jsonify({
-            "success": False,
-            "error": "❌ فشل اختبار الحيوية: لم يتم كشف حركات الرأس المطلوبة",
-            "code": "LIVENESS_FAILED",
-            "tip": "يرجى تحريك رأسك لليسار واليمين عند الطلب"
-        }), 401
-    
-    # 8. نجاح التحقق
-    face_hash = hashlib.sha256(json.dumps(face_descriptor).encode()).hexdigest()
-    doc_hash = hashlib.sha256(json.dumps(doc_descriptor).encode()).hexdigest()
+    if invites[invite_code]['used']:
+        return jsonify({"valid": False, "error": "Invite code already used"}), 409
     
     return jsonify({
-        "success": True,
-        "message": "✅ تم التحقق بنجاح",
-        "similarity": similarity,
-        "face_hash": face_hash,
-        "doc_hash": doc_hash,
-        "head_movements": head_movements
+        "valid": True,
+        "inviter": invites[invite_code]['inviter'],
+        "created_at": invites[invite_code]['created_at']
     }), 200
 
+@app.route('/propose-verification', methods=['POST'])
+def propose_verification():
+    """اقتراح توثيق جديد (حالة PENDING)"""
+    data = request.get_json()
+    required = ['name', 'face_hash', 'document_hash', 'document_type', 'invite_code']
+    
+    if not all(k in data for k in required):
+        return jsonify({"error": "بيانات ناقصة"}), 400
+    
+    # التحقق من رمز الدعوة
+    invites = load_invites()
+    invite_code = data.get('invite_code')
+    
+    if invite_code not in invites or invites[invite_code]['used']:
+        return jsonify({"error": "Invalid or used invite code"}), 403
+    
+    # إنشاء بلوك بحالة PENDING
+    trust_score_required = 0 if not PEERS else MIN_TRUST_SCORE_TO_VOTE
+    new_block = blockchain.add_pending_block(
+        data['name'],
+        data['face_hash'],
+        data['document_hash'],
+        data['document_type'],
+        request.remote_addr,
+        trust_score_required
+    )
+    
+    # حفظ البلوك في السلسلة كـ PENDING
+    with ledger_lock:
+        blockchain.chain.append(new_block)
+        blockchain.save_chain()
+    
+    # تحديث حالة رمز الدعوة
+    invites[invite_code]['used'] = True
+    invites[invite_code]['used_by'] = data['name']
+    save_invites(invites)
+    
+    # بث البلوك للشهود
+    block_dict = {
+        "index": new_block.index,
+        "name": new_block.name,
+        "face_hash": new_block.face_hash,
+        "document_hash": new_block.document_hash,
+        "document_type": new_block.document_type,
+        "timestamp": new_block.timestamp,
+        "previous_hash": new_block.previous_hash,
+        "node_id": new_block.node_id,
+        "status": new_block.status,
+        "trust_score_required": new_block.trust_score_required,
+        "hash": new_block.hash
+    }
+    
+    # إذا كان هناك شهود، بث لهم. وإلا استخدم AI Auto-Validator
+    if len(PEERS) > 0:
+        threading.Thread(target=broadcast_block, args=(block_dict,)).start()
+        return jsonify({
+            "message": "Verification proposed. Waiting for witness approval.",
+            "block_index": new_block.index,
+            "status": "pending"
+        }), 202
+    else:
+        # وضع التوثيق الذاتي (AI Auto-Validator)
+        new_block.status = 'approved'
+        blockchain.save_chain()
+        return jsonify({
+            "message": "Auto-verified (AI Validator). No witnesses available.",
+            "block_index": new_block.index,
+            "status": "approved"
+        }), 201
+
+@app.route('/vote', methods=['POST'])
+def vote_on_verification():
+    """تصويت شاهد على توثيق معلق"""
+    data = request.get_json()
+    required = ['block_index', 'approved', 'witness_id', 'trust_score']
+    
+    if not all(k in data for k in required):
+        return jsonify({"error": "بيانات ناقصة"}), 400
+    
+    # التحقق من أن الشاهد لديه ثقة كافية للتصويت
+    if data['trust_score'] < MIN_TRUST_SCORE_TO_VOTE:
+        return jsonify({"error": f"Insufficient trust score. Minimum required: {MIN_TRUST_SCORE_TO_VOTE}"}), 403
+    
+    result, status = blockchain.approve_block(data['block_index'], data['witness_id'], data['approved'])
+    
+    if status == 'approved':
+        # تحديث درجة ثقة الشاهد (محاكاة)
+        is_correct = True  # في النظام الحقيقي، يتم التحقق لاحقاً
+        trust_manager.update_trust_score(data['witness_id'], is_correct)
+        
+        # إعلام جميع العقد بالقرار النهائي
+        for block in blockchain.chain:
+            if block.index == data['block_index']:
+                final_block_dict = {
+                    "index": block.index,
+                    "name": block.name,
+                    "face_hash": block.face_hash,
+                    "document_hash": block.document_hash,
+                    "document_type": block.document_type,
+                    "timestamp": block.timestamp,
+                    "previous_hash": block.previous_hash,
+                    "node_id": block.node_id,
+                    "status": block.status,
+                    "hash": block.hash
+                }
+                threading.Thread(target=broadcast_block, args=(final_block_dict,)).start()
+                break
+        
+        return jsonify({"message": f"Verification {status}!", "status": status}), 200
+    elif status == 'rejected':
+        return jsonify({"message": f"Verification {status}!", "status": status}), 200
+    else:
+        return jsonify({"message": "Vote recorded. Still pending.", "status": "pending"}), 200
+
+@app.route('/pending-verifications', methods=['GET'])
+def get_pending_verifications():
+    """الحصول على قائمة التوثيقات المعلقة"""
+    pending = blockchain.get_pending_blocks()
+    result = []
+    for block in pending:
+        result.append({
+            "index": block.index,
+            "name": block.name,
+            "timestamp": block.timestamp,
+            "trust_score_required": block.trust_score_required,
+            "approve_count": len(block.witness_votes['approve']),
+            "reject_count": len(block.witness_votes['reject'])
+        })
+    return jsonify({"pending": result}), 200
+
+@app.route('/trust-score', methods=['GET'])
+def get_trust_score():
+    """الحصول على درجة ثقة المستخدم"""
+    user_id = request.args.get('user_id')
+    if not user_id:
+        return jsonify({"error": "user_id required"}), 400
+    
+    score = trust_manager.get_trust_score(user_id)
+    return jsonify({"trust_score": score}), 200
+
+@app.route('/witnesses', methods=['GET'])
+def get_witnesses():
+    """الحصول على قائمة الشهود النشطين"""
+    witnesses = []
+    for peer in PEERS:
+        try:
+            resp = requests.get(f"{peer}/health", timeout=2)
+            if resp.status_code == 200:
+                witnesses.append({"url": peer, "status": "active"})
+        except:
+            witnesses.append({"url": peer, "status": "inactive"})
+    
+    return jsonify({"witnesses": witnesses, "auto_validator_active": len(PEERS) == 0}), 200
+
+@app.route('/register-witness', methods=['POST'])
+def register_witness():
+    """تسجيل شاهد جديد"""
+    data = request.get_json()
+    witness_url = data.get('witness_url')
+    invite_code = data.get('invite_code')
+    
+    if not witness_url or not invite_code:
+        return jsonify({"error": "witness_url and invite_code required"}), 400
+    
+    # التحقق من رمز الدعوة
+    invites = load_invites()
+    if invite_code not in invites or invites[invite_code]['used']:
+        return jsonify({"error": "Invalid invite code"}), 403
+    
+    # إضافة الشاهد
+    PEERS.add(witness_url)
+    save_peers()
+    
+    # تحديث حالة رمز الدعوة
+    invites[invite_code]['used'] = True
+    invites[invite_code]['used_by'] = witness_url
+    save_invites(invites)
+    
+    return jsonify({"message": "Witness registered successfully", "peers": list(PEERS)}), 200
+
+# ------------------- المسارات الأساسية -------------------
 @app.route('/chain', methods=['GET'])
 def get_chain():
     chain_data = []
@@ -331,48 +568,18 @@ def get_chain():
             "timestamp": block.timestamp,
             "previous_hash": block.previous_hash,
             "node_id": block.node_id,
+            "status": block.status,
             "hash": block.hash
         })
     return jsonify({"chain": chain_data, "length": len(chain_data)}), 200
 
-@app.route('/add_block', methods=['POST'])
-def add_block_local():
-    data = request.get_json()
-    required = ['name', 'face_hash', 'document_hash', 'document_type', 'biometric_verified', 'previous_hash']
-    
-    if not all(k in data for k in required):
-        return jsonify({"error": "بيانات ناقصة"}), 400
-
-    if not data['biometric_verified']:
-        return jsonify({"error": "فشل التحقق"}), 403
-
-    last_block = blockchain.get_last_block()
-    if data['previous_hash'] != last_block.hash:
-        return jsonify({"error": "السلسلة غير متطابقة"}), 409
-
-    try:
-        new_block = blockchain.add_block(
-            data['name'], data['face_hash'], data['document_hash'],
-            data['document_type'], data['biometric_verified'], request.remote_addr
-        )
-        block_dict = {
-            "index": new_block.index, "name": new_block.name,
-            "face_hash": new_block.face_hash, "document_hash": new_block.document_hash,
-            "document_type": new_block.document_type, "timestamp": new_block.timestamp,
-            "previous_hash": new_block.previous_hash, "node_id": new_block.node_id,
-            "hash": new_block.hash
-        }
-        threading.Thread(target=broadcast_block, args=(block_dict,)).start()
-        return jsonify({"message": "تمت الإضافة", "block_index": new_block.index}), 201
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
-
 @app.route('/add_block_peer', methods=['POST'])
 def add_block_peer():
+    """استقبال بلوك من عقدة أخرى (للمزامنة)"""
     data = request.get_json()
     required = ['index', 'name', 'face_hash', 'document_hash', 'document_type',
-                'timestamp', 'previous_hash', 'hash', 'node_id']
-
+                'timestamp', 'previous_hash', 'hash', 'node_id', 'status']
+    
     if not all(k in data for k in required):
         return jsonify({"error": "بيانات ناقصة"}), 400
 
@@ -387,7 +594,10 @@ def add_block_peer():
 
         new_block = Block(
             data['index'], data['name'], data['face_hash'], data['document_hash'],
-            data['document_type'], data['timestamp'], data['previous_hash'], data['node_id']
+            data['document_type'], data['timestamp'], data['previous_hash'], 
+            data['node_id'], data.get('status', 'pending'),
+            data.get('witness_votes', {'approve': [], 'reject': []}),
+            data.get('trust_score_required', 0)
         )
         new_block.hash = data['hash']
 
@@ -395,33 +605,15 @@ def add_block_peer():
         blockchain.save_chain()
         return jsonify({"message": "تمت الإضافة"}), 201
 
-@app.route('/peers', methods=['GET', 'POST', 'DELETE'])
-def manage_peers():
-    global PEERS
-    if request.method == 'GET':
-        return jsonify(list(PEERS))
-    elif request.method == 'POST':
-        new_peer = request.json.get('peer')
-        if new_peer and new_peer not in PEERS:
-            PEERS.add(new_peer)
-            save_peers()
-            return jsonify({"message": "تمت الإضافة", "peers": list(PEERS)})
-        return jsonify({"error": "خطأ"}), 400
-    elif request.method == 'DELETE':
-        peer = request.json.get('peer')
-        if peer in PEERS:
-            PEERS.remove(peer)
-            save_peers()
-        return jsonify({"message": "تم الحذف", "peers": list(PEERS)})
-
-@app.route('/sync', methods=['POST'])
-def sync_trigger():
-    threading.Thread(target=sync_with_peers).start()
-    return jsonify({"message": "جاري المزامنة"}), 202
-
 @app.route('/health', methods=['GET'])
 def health():
-    return jsonify({"status": "healthy", "chain_length": len(blockchain.chain)}), 200
+    return jsonify({
+        "status": "healthy",
+        "chain_length": len(blockchain.chain),
+        "peers_count": len(PEERS),
+        "auto_validator_active": len(PEERS) == 0,
+        "pending_count": len(blockchain.get_pending_blocks())
+    }), 200
 
 @app.route('/verify_person', methods=['POST'])
 def verify_person():
@@ -432,12 +624,12 @@ def verify_person():
     query_value = data.get('query_value', '').strip()
     results = []
     for block in blockchain.chain:
-        if block.name.lower() == query_value.lower():
+        if block.name.lower() == query_value.lower() and block.status == 'approved':
             results.append({
                 "index": block.index, "name": block.name,
                 "face_hash": block.face_hash, "document_hash": block.document_hash,
                 "document_type": block.document_type, "timestamp": block.timestamp,
-                "node_id": block.node_id
+                "node_id": block.node_id, "status": block.status
             })
     if results:
         return jsonify({"verified": True, "records": results}), 200
@@ -469,9 +661,10 @@ if __name__ == '__main__':
     load_peers()
     threading.Thread(target=sync_with_peers).start()
     print("=" * 50)
-    print("🔐 وثاق - نظام التوثيق الآمن")
+    print("🔐 وثاق - نظام التوثيق بالشهود (Witness-based System)")
     print("=" * 50)
-    print(f"🎯 الحد الأدنى للتطابق: {MIN_MATCH_THRESHOLD}%")
+    print(f"🎯 وضع التوثيق الذاتي (AI Validator): {'نشط' if len(PEERS) == 0 else 'غير نشط - يوجد شهود'}")
+    print(f"👥 عدد الشهود: {len(PEERS)}")
     print(f"📁 مجلد البيانات: {DATA_DIR}")
     print(f"🌐 الخادم: http://localhost:{PORT}")
     print("=" * 50)
