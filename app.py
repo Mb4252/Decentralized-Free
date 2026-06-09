@@ -11,7 +11,6 @@ from flask_cors import CORS
 app = Flask(__name__, static_folder='static', static_url_path='/static')
 CORS(app)
 
-# ------------------------- الإعدادات -------------------------
 PORT = int(os.environ.get('PORT', 5000))
 
 DATA_DIR = os.environ.get('DATA_DIR', '/data')
@@ -49,7 +48,6 @@ def save_peers():
 
 ledger_lock = threading.Lock()
 
-# ------------------------- Block و Blockchain -------------------------
 class Block:
     def __init__(self, index, name, face_hash, document_hash, document_type, timestamp, previous_hash, node_id=None):
         self.index = index
@@ -92,7 +90,7 @@ class Blockchain:
                         block_data['name'],
                         block_data['face_hash'],
                         block_data['document_hash'],
-                        block_data['document_type'],
+                        block_data.get('document_type', 'غير محدد'),
                         block_data['timestamp'],
                         block_data['previous_hash'],
                         block_data.get('node_id', 'unknown')
@@ -164,7 +162,6 @@ class Blockchain:
 
 blockchain = Blockchain()
 
-# ------------------------- المزامنة والبث -------------------------
 def sync_with_peer(peer_url):
     try:
         response = requests.get(f"{peer_url}/chain", timeout=5)
@@ -175,7 +172,7 @@ def sync_with_peer(peer_url):
             for bd in peer_chain_data:
                 b = Block(
                     bd['index'], bd['name'], bd['face_hash'], bd['document_hash'],
-                    bd['document_type'], bd['timestamp'], bd['previous_hash'], bd.get('node_id', 'unknown')
+                    bd.get('document_type', 'غير محدد'), bd['timestamp'], bd['previous_hash'], bd.get('node_id', 'unknown')
                 )
                 b.hash = bd['hash']
                 peer_chain.append(b)
@@ -207,7 +204,7 @@ def sync_with_peers():
         for bd in longest_chain:
             b = Block(
                 bd['index'], bd['name'], bd['face_hash'], bd['document_hash'],
-                bd['document_type'], bd['timestamp'], bd['previous_hash'], bd.get('node_id')
+                bd.get('document_type', 'غير محدد'), bd['timestamp'], bd['previous_hash'], bd.get('node_id')
             )
             b.hash = bd['hash']
             new_chain.append(b)
@@ -222,7 +219,6 @@ def broadcast_block(block_dict):
         except Exception as e:
             print(f"⚠️ فشل البث إلى {peer}: {e}")
 
-# ------------------------- مسارات API -------------------------
 @app.route('/chain', methods=['GET'])
 def get_chain():
     chain_data = []
@@ -252,7 +248,7 @@ def add_block_local():
 
     last_block = blockchain.get_last_block()
     if data['previous_hash'] != last_block.hash:
-        return jsonify({"error": "سلسلة الكتل غير متطابقة، يرجى المزامنة أولاً"}), 409
+        return jsonify({"error": "سلسلة الكتل غير متطابقة"}), 409
 
     try:
         new_block = blockchain.add_block(
@@ -275,7 +271,7 @@ def add_block_local():
             "hash": new_block.hash
         }
         threading.Thread(target=broadcast_block, args=(block_dict,)).start()
-        return jsonify({"message": "تمت إضافة الكتلة وبثها", "block_index": new_block.index}), 201
+        return jsonify({"message": "تمت الإضافة", "block_index": new_block.index}), 201
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
 
@@ -284,16 +280,16 @@ def add_block_peer():
     data = request.get_json()
     required = ['index', 'name', 'face_hash', 'document_hash', 'document_type', 'timestamp', 'previous_hash', 'hash', 'node_id']
     if not all(k in data for k in required):
-        return jsonify({"error": "بيانات الكتلة غير مكتملة"}), 400
+        return jsonify({"error": "بيانات ناقصة"}), 400
 
     with ledger_lock:
         for block in blockchain.chain:
             if block.hash == data['hash']:
-                return jsonify({"message": "الكتلة موجودة مسبقاً"}), 200
+                return jsonify({"message": "موجودة"}), 200
 
         last = blockchain.get_last_block()
         if data['previous_hash'] != last.hash:
-            return jsonify({"error": "الكتلة السابقة غير متطابقة، يرجى المزامنة"}), 409
+            return jsonify({"error": "غير متطابقة"}), 409
 
         new_block = Block(
             data['index'], data['name'], data['face_hash'], data['document_hash'],
@@ -301,11 +297,11 @@ def add_block_peer():
         )
         new_block.hash = data['hash']
         if new_block.hash != new_block.compute_hash():
-            return jsonify({"error": "هاش الكتلة غير صحيح"}), 400
+            return jsonify({"error": "هاش غير صحيح"}), 400
 
         blockchain.chain.append(new_block)
         blockchain.save_chain()
-        return jsonify({"message": "تمت إضافة الكتلة من العقدة"}), 201
+        return jsonify({"message": "تمت الإضافة"}), 201
 
 @app.route('/peers', methods=['GET', 'POST', 'DELETE'])
 def manage_peers():
@@ -318,8 +314,8 @@ def manage_peers():
             PEERS.add(new_peer)
             save_peers()
             threading.Thread(target=sync_with_peer, args=(new_peer,)).start()
-            return jsonify({"message": f"تمت إضافة {new_peer}", "peers": list(PEERS)})
-        return jsonify({"error": "يرجى إرسال peer صحيح"}), 400
+            return jsonify({"message": "تمت الإضافة", "peers": list(PEERS)})
+        return jsonify({"error": "خطأ"}), 400
     elif request.method == 'DELETE':
         peer = request.json.get('peer')
         if peer in PEERS:
@@ -330,13 +326,12 @@ def manage_peers():
 @app.route('/sync', methods=['POST'])
 def sync_trigger():
     threading.Thread(target=sync_with_peers).start()
-    return jsonify({"message": "جارٍ المزامنة في الخلفية"}), 202
+    return jsonify({"message": "جاري المزامنة"}), 202
 
 @app.route('/health', methods=['GET'])
 def health():
     return jsonify({"status": "healthy", "chain_length": len(blockchain.chain)}), 200
 
-# ------------------------- التحقق من توثيق شخص -------------------------
 def find_person_by_name(name):
     results = []
     for block in blockchain.chain:
@@ -348,24 +343,7 @@ def find_person_by_name(name):
                 "document_hash": block.document_hash,
                 "document_type": block.document_type,
                 "timestamp": block.timestamp,
-                "node_id": block.node_id,
-                "hash": block.hash
-            })
-    return results
-
-def find_person_by_face_hash(face_hash_prefix):
-    results = []
-    for block in blockchain.chain:
-        if block.face_hash.startswith(face_hash_prefix):
-            results.append({
-                "index": block.index,
-                "name": block.name,
-                "face_hash": block.face_hash,
-                "document_hash": block.document_hash,
-                "document_type": block.document_type,
-                "timestamp": block.timestamp,
-                "node_id": block.node_id,
-                "hash": block.hash
+                "node_id": block.node_id
             })
     return results
 
@@ -378,42 +356,14 @@ def verify_person():
     query_type = data.get('query_type')
     query_value = data.get('query_value', '').strip()
     
-    if not query_type or not query_value:
-        return jsonify({"error": "يجب تحديد query_type و query_value"}), 400
-    
     if query_type == "name":
         results = find_person_by_name(query_value)
         if results:
-            return jsonify({
-                "verified": True,
-                "message": f"✅ تم العثور على {query_value} في السجل اللامركزي",
-                "records": results
-            }), 200
-        else:
-            return jsonify({
-                "verified": False,
-                "message": f"❌ لم يتم العثور على '{query_value}' في السجل"
-            }), 404
-            
-    elif query_type == "face_hash_prefix":
-        if len(query_value) < 6:
-            return jsonify({"error": "يجب أن تحتوي بادئة بصمة الوجه على 6 خانات على الأقل"}), 400
-        results = find_person_by_face_hash(query_value)
-        if results:
-            return jsonify({
-                "verified": True,
-                "message": f"✅ تم العثور على بصمة تطابق البادئة '{query_value}'",
-                "records": results
-            }), 200
-        else:
-            return jsonify({
-                "verified": False,
-                "message": f"❌ لا توجد بصمة تبدأ بـ '{query_value}'"
-            }), 404
+            return jsonify({"verified": True, "message": "تم العثور", "records": results}), 200
+        return jsonify({"verified": False, "message": "لم يتم العثور"}), 404
     else:
-        return jsonify({"error": "query_type يجب أن يكون 'name' أو 'face_hash_prefix'"}), 400
+        return jsonify({"error": "نوع بحث غير صحيح"}), 400
 
-# ------------------------- صفحات الواجهة الأمامية -------------------------
 @app.route('/')
 def index():
     return redirect('/register')
@@ -422,15 +372,14 @@ def index():
 def register_page():
     return send_from_directory('static', 'register.html')
 
-@app.route('/verification-result')
-def verification_result_page():
-    return send_from_directory('static', 'verification_result.html')
-
 @app.route('/profile')
 def profile_page():
     return send_from_directory('static', 'profile.html')
 
-# ------------------------- بدء التشغيل -------------------------
+@app.route('/verification-result')
+def verification_result_page():
+    return send_from_directory('static', 'verification_result.html')
+
 if __name__ == '__main__':
     load_peers()
     threading.Thread(target=sync_with_peers).start()
