@@ -3,114 +3,155 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>سجل الحقيقة - تسجيل الهوية</title>
-    <!-- PWA manifest -->
+    <title>وثاق - تسجيل الهوية</title>
     <link rel="manifest" href="/static/manifest.json">
     <meta name="theme-color" content="#2c7da0">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        body { background: #f0f2f5; margin: 0; padding: 20px; }
-        .container { max-width: 900px; margin: 0 auto; background: white; border-radius: 24px; padding: 25px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
-        h1 { color: #1e3c72; text-align: center; border-bottom: 2px solid #2c7da0; padding-bottom: 10px; }
-        .card { background: #f9f9fc; border-radius: 20px; padding: 20px; margin-bottom: 20px; border: 1px solid #e0e4e8; }
-        label { display: block; margin: 10px 0 5px; font-weight: bold; }
-        input, select, button { width: 100%; padding: 12px; margin: 8px 0; border-radius: 40px; border: 1px solid #ccc; font-size: 1rem; }
-        button { background-color: #2c7da0; color: white; border: none; cursor: pointer; font-weight: bold; transition: 0.2s; }
-        button:disabled { background-color: #b0c4d9; cursor: not-allowed; }
-        video { width: 100%; max-width: 400px; border-radius: 16px; border: 2px solid #ddd; background: #000; display: block; margin: 10px auto; }
-        .flex-buttons { display: flex; gap: 10px; flex-wrap: wrap; }
-        .result { margin-top: 10px; padding: 10px; border-radius: 50px; text-align: center; }
+        body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); margin: 0; padding: 20px; min-height: 100vh; }
+        .container { max-width: 500px; margin: 0 auto; background: white; border-radius: 32px; padding: 25px; box-shadow: 0 20px 40px rgba(0,0,0,0.2); }
+        h1 { color: #1e3c72; text-align: center; font-size: 1.6rem; }
+        .card { background: #f9f9fc; border-radius: 24px; padding: 20px; margin-bottom: 20px; border: 1px solid #e0e4e8; }
+        label { display: block; margin: 10px 0 5px; font-weight: bold; color: #2c3e50; }
+        input, select { width: 100%; padding: 14px; margin: 8px 0; border-radius: 40px; border: 1px solid #ddd; font-size: 1rem; }
+        button { width: 100%; padding: 14px; margin: 10px 0; border-radius: 40px; border: none; font-size: 1rem; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        .btn-primary { background: #2c7da0; color: white; }
+        .btn-primary:disabled { background: #b0c4d9; cursor: not-allowed; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-warning { background: #ffc107; color: #333; }
+        .btn-danger { background: #dc3545; color: white; }
+        video { width: 100%; border-radius: 20px; border: 2px solid #ddd; background: #000; margin: 10px 0; }
+        .result { margin: 10px 0; padding: 12px; border-radius: 40px; text-align: center; font-size: 0.9rem; }
         .success { background: #d4edda; color: #155724; }
         .error { background: #f8d7da; color: #721c24; }
         .info { background: #d1ecf1; color: #0c5460; }
-        .step { background: #e7f3ff; padding: 10px; border-radius: 50px; margin-bottom: 15px; }
-        .upload-area {
-            border: 2px dashed #2c7da0;
-            border-radius: 20px;
-            padding: 20px;
-            text-align: center;
-            cursor: pointer;
-            background: #f1f9ff;
-            transition: 0.3s;
-        }
-        .upload-area:hover { background: #e3f0fa; }
-        .preview-img { max-width: 100%; max-height: 200px; margin-top: 15px; border-radius: 16px; border: 2px solid #2c7da0; display: block; margin-left: auto; margin-right: auto; }
-        .file-input { display: none; }
+        .instruction { background: #e7f3ff; padding: 15px; border-radius: 50px; margin: 10px 0; text-align: center; font-size: 1.2rem; font-weight: bold; color: #2c7da0; }
+        .step-indicator { display: flex; justify-content: space-between; margin-bottom: 25px; }
+        .step { flex: 1; text-align: center; padding: 8px; background: #e0e0e0; margin: 0 3px; border-radius: 40px; font-size: 0.75rem; color: #666; }
+        .step.active { background: #2c7da0; color: white; }
+        .step.completed { background: #28a745; color: white; }
+        .camera-switch { display: flex; gap: 10px; margin: 10px 0; }
+        .camera-switch button { flex: 1; margin: 0; padding: 10px; font-size: 0.9rem; }
+        .capture-btn { background: #ff5722; }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 </head>
 <body>
 <div class="container">
-    <h1>📜 الخطوة 1: تسجيل الهوية</h1>
-    <div class="step">🔹 أدخل الاسم الكامل 🔹 أضف صورة وجه من وثيقة رسمية 🔹 قم بالتحقق الحي (إرمش + حركات الرأس)</div>
-
-    <div class="card">
-        <label>👤 الاسم الكامل (سيظهر في الملف الشخصي)</label>
-        <input type="text" id="fullName" placeholder="مثال: أحمد محمد العلي">
+    <h1>📜 وثاق | Wethaq</h1>
+    
+    <div class="step-indicator">
+        <div class="step active" id="step1">1️⃣ بيانات</div>
+        <div class="step" id="step2">2️⃣ تصوير الهوية</div>
+        <div class="step" id="step3">3️⃣ التحقق الحي</div>
+        <div class="step" id="step4">4️⃣ مطابقة</div>
+        <div class="step" id="step5">5️⃣ تسجيل</div>
     </div>
 
-    <div class="card">
-        <label>📋 نوع الوثيقة</label>
-        <select id="documentType">
-            <option value="جواز سفر">🛂 جواز سفر</option>
-            <option value="بطاقة هوية وطنية">🪪 بطاقة هوية وطنية</option>
-            <option value="رخصة قيادة">🚗 رخصة قيادة</option>
-            <option value="شهادة جامعية">🎓 شهادة جامعية</option>
-            <option value="شهادة حرفية">🛠️ شهادة حرفية</option>
-            <option value="أخرى">📄 أخرى</option>
-        </select>
-    </div>
-
-    <div class="card">
-        <label>📄 صورة الوجه من الوثيقة (بطاقة هوية، جواز سفر، رخصة قيادة، ...)</label>
-        <div class="upload-area" id="uploadArea">
-            <span>📸 اضغط هنا لاختيار صورة الهوية</span>
-            <input type="file" id="docImageInput" accept="image/jpeg, image/png, image/jpg" class="file-input">
-            <div id="previewContainer" style="text-align: center;"></div>
+    <!-- الخطوة 1: بيانات المستخدم -->
+    <div id="step1Content">
+        <div class="card">
+            <label>👤 الاسم الكامل</label>
+            <input type="text" id="fullName" placeholder="مثال: أحمد محمد العلي">
+            
+            <label>📋 نوع الوثيقة</label>
+            <select id="documentType">
+                <option value="جواز سفر">🛂 جواز سفر</option>
+                <option value="بطاقة هوية وطنية">🪪 بطاقة هوية وطنية</option>
+                <option value="رخصة قيادة">🚗 رخصة قيادة</option>
+                <option value="بطاقة تعريف">🆔 بطاقة تعريف</option>
+            </select>
+            
+            <button id="goToDocCameraBtn" class="btn-primary">▶️ التالي: تصوير الوثيقة</button>
         </div>
-        <button id="extractDocFaceBtn" disabled>🔍 استخراج الوجه من المستند</button>
-        <div id="docFaceResult" class="result"></div>
     </div>
 
-    <div class="card">
-        <label>📸 التحقق الحي (الكاميرا)</label>
-        <video id="video" autoplay muted playsinline></video>
-        <div class="flex-buttons">
-            <button id="startCameraBtn">📷 تشغيل الكاميرا</button>
-            <button id="startLivenessCheck" disabled>🔐 بدء فحص الحيوية (إرمش + حركات)</button>
+    <!-- الخطوة 2: تصوير وثيقة الهوية -->
+    <div id="step2Content" style="display:none;">
+        <div class="card">
+            <p style="text-align:center; color:#2c7da0;">📸 ضع وثيقة الهوية أمام الكاميرا</p>
+            <video id="docVideo" autoplay muted playsinline></video>
+            <div class="camera-switch">
+                <button id="switchDocCameraFront" class="btn-warning">📱 كاميرا أمامية</button>
+                <button id="switchDocCameraBack" class="btn-warning">📷 كاميرا خلفية</button>
+            </div>
+            <button id="captureDocBtn" class="capture-btn" disabled>📸 التقاط صورة الوثيقة</button>
+            <button id="extractDocFaceBtn" class="btn-primary" disabled>🔍 استخراج الوجه من الوثيقة</button>
+            <div id="docFaceResult" class="result"></div>
+            <button id="goToLivenessBtn" class="btn-success" disabled>▶️ التالي: التحقق الحي</button>
         </div>
-        <div id="livenessStatus" class="result"></div>
-        <div id="finalComparisonResult" class="result"></div>
     </div>
 
-    <button id="registerAndContinue" disabled>✅ تسجيل والمتابعة للنتيجة</button>
-    <div id="registerStatus" class="result"></div>
+    <!-- الخطوة 3: التحقق الحي (إرمش وحركات) -->
+    <div id="step3Content" style="display:none;">
+        <div class="card">
+            <p style="text-align:center; color:#2c7da0;">🎥 وجه الكاميرا نحو وجهك</p>
+            <video id="liveVideo" autoplay muted playsinline></video>
+            <div class="camera-switch">
+                <button id="switchLiveCameraFront" class="btn-warning">📱 كاميرا أمامية</button>
+                <button id="switchLiveCameraBack" class="btn-warning">📷 كاميرا خلفية</button>
+            </div>
+            <button id="startLiveCameraBtn" class="btn-primary">📷 تشغيل الكاميرا</button>
+            <button id="startLivenessBtn" class="btn-primary" disabled>🔐 بدء فحص الحيوية</button>
+            <div id="livenessStatus" class="result"></div>
+            <div id="instructionBox" class="instruction" style="display:none;"></div>
+            <button id="goToMatchBtn" class="btn-success" disabled>▶️ التالي: مطابقة الوجوه</button>
+        </div>
+    </div>
+
+    <!-- الخطوة 4: نتيجة المطابقة -->
+    <div id="step4Content" style="display:none;">
+        <div class="card">
+            <div id="comparisonResult" class="result"></div>
+            <button id="goToRegisterBtn" class="btn-success" disabled>✅ تسجيل الهوية</button>
+        </div>
+    </div>
+
+    <!-- الخطوة 5: جاري التسجيل -->
+    <div id="step5Content" style="display:none;">
+        <div class="card" style="text-align:center">
+            <div id="registerStatus" class="result"></div>
+        </div>
+    </div>
 </div>
 
 <script>
+    // ------------------- المتغيرات -------------------
     let modelsLoaded = false;
-    let cameraStream = null;
+    let docStream = null;
+    let liveStream = null;
     let documentFaceDescriptor = null;
     let documentFaceHash = null;
+    let capturedDocImage = null;
     let liveFaceDescriptor = null;
     let liveFaceHash = null;
     let livenessPassed = false;
     let faceMatched = false;
+    let currentStep = 1;
+    let currentDocFacingMode = "user";
+    let currentLiveFacingMode = "user";
 
-    const video = document.getElementById('video');
-    const startCameraBtn = document.getElementById('startCameraBtn');
-    const startLivenessBtn = document.getElementById('startLivenessCheck');
-    const docImageInput = document.getElementById('docImageInput');
-    const extractDocFaceBtn = document.getElementById('extractDocFaceBtn');
+    // ------------------- DOM Elements -------------------
     const fullNameInput = document.getElementById('fullName');
     const documentTypeSelect = document.getElementById('documentType');
-    const registerBtn = document.getElementById('registerAndContinue');
-    const uploadArea = document.getElementById('uploadArea');
-    const previewContainer = document.getElementById('previewContainer');
+    const docVideo = document.getElementById('docVideo');
+    const liveVideo = document.getElementById('liveVideo');
+    const goToDocCameraBtn = document.getElementById('goToDocCameraBtn');
+    const captureDocBtn = document.getElementById('captureDocBtn');
+    const extractDocFaceBtn = document.getElementById('extractDocFaceBtn');
+    const goToLivenessBtn = document.getElementById('goToLivenessBtn');
+    const startLiveCameraBtn = document.getElementById('startLiveCameraBtn');
+    const startLivenessBtn = document.getElementById('startLivenessBtn');
+    const goToMatchBtn = document.getElementById('goToMatchBtn');
+    const goToRegisterBtn = document.getElementById('goToRegisterBtn');
+    const instructionBox = document.getElementById('instructionBox');
+    const switchDocCameraFront = document.getElementById('switchDocCameraFront');
+    const switchDocCameraBack = document.getElementById('switchDocCameraBack');
+    const switchLiveCameraFront = document.getElementById('switchLiveCameraFront');
+    const switchLiveCameraBack = document.getElementById('switchLiveCameraBack');
 
+    // ------------------- تحميل النماذج -------------------
     async function loadModels() {
         const MODEL_URL = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights';
         try {
@@ -118,16 +159,14 @@
             await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
             await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
             modelsLoaded = true;
-            startCameraBtn.disabled = false;
-            docImageInput.disabled = false;
-            extractDocFaceBtn.disabled = false;
             console.log("✅ نماذج الوجه جاهزة");
         } catch(err) {
             console.error(err);
-            alert("فشل تحميل النماذج، تأكد من الاتصال بالإنترنت");
+            alert("فشل تحميل النماذج");
         }
     }
 
+    // ------------------- حساب هاش الصورة -------------------
     async function computeImageHash(canvas) {
         return new Promise((resolve) => {
             canvas.toBlob(async (blob) => {
@@ -138,76 +177,168 @@
         });
     }
 
-    async function extractFaceFromMedia(mediaElement) {
-        const detection = await faceapi.detectSingleFace(mediaElement).withFaceLandmarks().withFaceDescriptor();
+    // ------------------- استخراج الوجه -------------------
+    async function extractFaceFromImage(imgElement) {
+        const detection = await faceapi.detectSingleFace(imgElement).withFaceLandmarks().withFaceDescriptor();
         if (!detection) return null;
         const box = detection.detection.box;
         const canvas = document.createElement('canvas');
         canvas.width = box.width;
         canvas.height = box.height;
         const ctx = canvas.getContext('2d');
-        ctx.drawImage(mediaElement, box.x, box.y, box.width, box.height, 0, 0, box.width, box.height);
+        ctx.drawImage(imgElement, box.x, box.y, box.width, box.height, 0, 0, box.width, box.height);
         const hash = await computeImageHash(canvas);
         return { descriptor: detection.descriptor, croppedCanvas: canvas, hash };
     }
 
-    function showPreview(file) {
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const img = document.createElement('img');
-            img.src = e.target.result;
-            img.className = 'preview-img';
-            img.alt = 'معاينة صورة الهوية';
-            previewContainer.innerHTML = '';
-            previewContainer.appendChild(img);
-            window.uploadedImageSrc = e.target.result;
-            documentFaceDescriptor = null;
-            documentFaceHash = null;
-            document.getElementById('docFaceResult').innerHTML = '';
-            extractDocFaceBtn.disabled = false;
-        };
-        reader.readAsDataURL(file);
+    // ------------------- التبديل بين الخطوات -------------------
+    function updateSteps() {
+        for(let i=1; i<=5; i++) {
+            const stepEl = document.getElementById(`step${i}`);
+            if(i < currentStep) {
+                stepEl.classList.add('completed');
+                stepEl.classList.remove('active');
+            } else if(i === currentStep) {
+                stepEl.classList.add('active');
+                stepEl.classList.remove('completed');
+            } else {
+                stepEl.classList.remove('active', 'completed');
+            }
+        }
     }
 
-    uploadArea.addEventListener('click', () => docImageInput.click());
-    docImageInput.addEventListener('change', (event) => {
-        const file = event.target.files[0];
-        if (file && file.type.startsWith('image/')) showPreview(file);
-        else alert('الرجاء اختيار ملف صورة');
-    });
+    function goToStep(step) {
+        currentStep = step;
+        updateSteps();
+        document.getElementById('step1Content').style.display = step === 1 ? 'block' : 'none';
+        document.getElementById('step2Content').style.display = step === 2 ? 'block' : 'none';
+        document.getElementById('step3Content').style.display = step === 3 ? 'block' : 'none';
+        document.getElementById('step4Content').style.display = step === 4 ? 'block' : 'none';
+        document.getElementById('step5Content').style.display = step === 5 ? 'block' : 'none';
+    }
 
-    extractDocFaceBtn.onclick = async () => {
-        if (!modelsLoaded) { alert("النماذج لم تُحمّل بعد"); return; }
-        if (!window.uploadedImageSrc) { alert("يرجى اختيار صورة الهوية أولاً"); return; }
+    // ------------------- تشغيل كاميرا الوثيقة -------------------
+    async function startDocCamera(facingMode) {
+        if (docStream) docStream.getTracks().forEach(t => t.stop());
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: { exact: facingMode } } 
+            });
+            docStream = stream;
+            docVideo.srcObject = stream;
+            await docVideo.play();
+            captureDocBtn.disabled = false;
+        } catch(err) {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                docStream = stream;
+                docVideo.srcObject = stream;
+                await docVideo.play();
+                captureDocBtn.disabled = false;
+            } catch(e) {
+                alert("لا يمكن تشغيل الكاميرا");
+            }
+        }
+    }
+
+    switchDocCameraFront.onclick = () => { currentDocFacingMode = "user"; startDocCamera("user"); };
+    switchDocCameraBack.onclick = () => { currentDocFacingMode = "environment"; startDocCamera("environment"); };
+
+    // ------------------- التقاط صورة الوثيقة -------------------
+    captureDocBtn.onclick = async () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = docVideo.videoWidth;
+        canvas.height = docVideo.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(docVideo, 0, 0, canvas.width, canvas.height);
+        capturedDocImage = canvas;
+        
         const img = new Image();
-        img.src = window.uploadedImageSrc;
-        await new Promise((resolve) => { img.onload = resolve; });
-        const result = await extractFaceFromMedia(img);
+        img.src = canvas.toDataURL();
+        await new Promise(r => { img.onload = r; });
+        
+        const result = await extractFaceFromImage(img);
         if (!result) {
-            document.getElementById('docFaceResult').innerHTML = '<span class="error">⚠️ لم يتم العثور على وجه واضح في صورة الهوية.</span>';
+            document.getElementById('docFaceResult').innerHTML = '<span class="error">❌ لم يتم العثور على وجه واضح في الوثيقة</span>';
+            extractDocFaceBtn.disabled = true;
             return;
         }
         documentFaceDescriptor = result.descriptor;
         documentFaceHash = result.hash;
-        document.getElementById('docFaceResult').innerHTML = `<span class="success">✅ تم استخراج الوجه (البصمة: ${documentFaceHash.substring(0,10)}...)</span>`;
+        document.getElementById('docFaceResult').innerHTML = '<span class="success">✅ تم استخراج الوجه من الوثيقة بنجاح</span>';
+        extractDocFaceBtn.disabled = false;
     };
 
-    startCameraBtn.onclick = async () => {
-        if (cameraStream) cameraStream.getTracks().forEach(t => t.stop());
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-            cameraStream = stream;
-            video.srcObject = stream;
-            await video.play();
-            startCameraBtn.disabled = true;
-            startLivenessBtn.disabled = false;
-            document.getElementById('livenessStatus').innerHTML = '<span class="info">✅ الكاميرا تعمل، اضغط "بدء فحص الحيوية"</span>';
-        } catch(err) {
-            document.getElementById('livenessStatus').innerHTML = '<span class="error">❌ لا يمكن الوصول للكاميرا</span>';
+    extractDocFaceBtn.onclick = async () => {
+        if (!capturedDocImage) {
+            alert("يرجى التقاط صورة للوثيقة أولاً");
+            return;
+        }
+        const img = new Image();
+        img.src = capturedDocImage.toDataURL();
+        await new Promise(r => { img.onload = r; });
+        const result = await extractFaceFromImage(img);
+        if (result) {
+            documentFaceDescriptor = result.descriptor;
+            documentFaceHash = result.hash;
+            document.getElementById('docFaceResult').innerHTML = '<span class="success">✅ تم تأكيد استخراج الوجه</span>';
+            goToLivenessBtn.disabled = false;
+        } else {
+            document.getElementById('docFaceResult').innerHTML = '<span class="error">❌ فشل الاستخراج</span>';
         }
     };
 
+    goToDocCameraBtn.onclick = () => {
+        if (!fullNameInput.value.trim()) {
+            alert("الرجاء إدخال الاسم");
+            return;
+        }
+        goToStep(2);
+        startDocCamera(currentDocFacingMode);
+    };
+
+    goToLivenessBtn.onclick = () => {
+        if (!documentFaceDescriptor) {
+            alert("يرجى استخراج وجه الوثيقة أولاً");
+            return;
+        }
+        goToStep(3);
+    };
+
+    // ------------------- كاميرا التحقق الحي -------------------
+    async function startLiveCamera(facingMode) {
+        if (liveStream) liveStream.getTracks().forEach(t => t.stop());
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: { exact: facingMode } } 
+            });
+            liveStream = stream;
+            liveVideo.srcObject = stream;
+            await liveVideo.play();
+            startLiveCameraBtn.disabled = true;
+            startLivenessBtn.disabled = false;
+        } catch(err) {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                liveStream = stream;
+                liveVideo.srcObject = stream;
+                await liveVideo.play();
+                startLiveCameraBtn.disabled = true;
+                startLivenessBtn.disabled = false;
+            } catch(e) {
+                alert("لا يمكن تشغيل الكاميرا");
+            }
+        }
+    }
+
+    switchLiveCameraFront.onclick = () => { currentLiveFacingMode = "user"; startLiveCamera("user"); };
+    switchLiveCameraBack.onclick = () => { currentLiveFacingMode = "environment"; startLiveCamera("environment"); };
+
+    startLiveCameraBtn.onclick = () => {
+        startLiveCamera(currentLiveFacingMode);
+    };
+
+    // ------------------- فحص الحيوية -------------------
     async function detectEyeBlink(landmarks) {
         const leftEye = landmarks.getLeftEye();
         const rightEye = landmarks.getRightEye();
@@ -223,77 +354,114 @@
         return (leftEAR + rightEAR) / 2 < 0.25;
     }
 
-    function getHeadDirection(landmarks, box) {
+    function getHeadDirection(landmarks, detectionBox) {
         const nose = landmarks.getNose();
         if (!nose || nose.length < 3) return "مستقيم";
         const noseTip = nose[2];
-        const faceCenterX = box.x + box.width/2;
-        const offset = (noseTip.x - faceCenterX) / box.width;
+        const faceWidth = detectionBox.width;
+        const faceCenterX = detectionBox.x + faceWidth/2;
+        const offset = (noseTip.x - faceCenterX) / faceWidth;
         if (offset < -0.1) return "يسار";
         if (offset > 0.1) return "يمين";
-        const yRatio = (noseTip.y - box.y) / box.height;
-        if (yRatio < 0.3) return "أعلى";
-        if (yRatio > 0.7) return "أسفل";
+        const faceTop = detectionBox.y;
+        const faceBottom = detectionBox.y + detectionBox.height;
+        const yRatio = (noseTip.y - faceTop) / detectionBox.height;
+        if (yRatio < 0.25) return "أعلى";
+        if (yRatio > 0.75) return "أسفل";
         return "مستقيم";
     }
 
     async function runLivenessCheck() {
-        const instructions = ["إرمش الآن", "أدر رأسك يساراً", "أدر رأسك يميناً", "أدر رأسك للأعلى", "أدر رأسك للأسفل"];
+        const instructions = ["👁️ أرمش الآن", "⬅️ أدر رأسك يساراً", "➡️ أدر رأسك يميناً", "⬆️ ارفع رأسك للأعلى", "⬇️ اخفض رأسك للأسفل"];
         let step = 0;
-        let blink = false, left = false, right = false, up = false, down = false;
-        const statusDiv = document.getElementById('livenessStatus');
-        statusDiv.innerHTML = `<span class="info">⏳ اتبع التعليمات: ${instructions[0]}</span>`;
+        let blinkDone = false, leftDone = false, rightDone = false, upDone = false, downDone = false;
+        
+        instructionBox.style.display = 'block';
+        instructionBox.innerHTML = instructions[0];
+        
         return new Promise((resolve) => {
             const interval = setInterval(async () => {
-                if (!video.videoWidth) return;
-                const detection = await faceapi.detectSingleFace(video).withFaceLandmarks();
+                if (!liveVideo.videoWidth) return;
+                const detection = await faceapi.detectSingleFace(liveVideo).withFaceLandmarks();
                 if (!detection) return;
-                const landmarks = detection.landmarks;
-                const box = detection.detection.box;
-                const isBlinking = await detectEyeBlink(landmarks);
-                if (step === 0 && isBlinking && !blink) { blink = true; step++; statusDiv.innerHTML = `<span class="success">✅ إرماش! الآن ${instructions[1]}</span>`; }
-                const dir = getHeadDirection(landmarks, box);
-                if (step === 1 && dir === "يسار" && !left) { left = true; step++; statusDiv.innerHTML = `<span class="success">✅ يسار! الآن ${instructions[2]}</span>`; }
-                if (step === 2 && dir === "يمين" && !right) { right = true; step++; statusDiv.innerHTML = `<span class="success">✅ يمين! الآن ${instructions[3]}</span>`; }
-                if (step === 3 && dir === "أعلى" && !up) { up = true; step++; statusDiv.innerHTML = `<span class="success">✅ أعلى! الآن ${instructions[4]}</span>`; }
-                if (step === 4 && dir === "أسفل" && !down) {
-                    down = true; step++;
+                
+                const isBlinking = await detectEyeBlink(detection.landmarks);
+                const direction = getHeadDirection(detection.landmarks, detection.detection.box);
+                
+                if (step === 0 && isBlinking && !blinkDone) {
+                    blinkDone = true;
+                    step++;
+                    instructionBox.innerHTML = instructions[1];
+                }
+                if (step === 1 && direction === "يسار" && !leftDone) {
+                    leftDone = true;
+                    step++;
+                    instructionBox.innerHTML = instructions[2];
+                }
+                if (step === 2 && direction === "يمين" && !rightDone) {
+                    rightDone = true;
+                    step++;
+                    instructionBox.innerHTML = instructions[3];
+                }
+                if (step === 3 && direction === "أعلى" && !upDone) {
+                    upDone = true;
+                    step++;
+                    instructionBox.innerHTML = instructions[4];
+                }
+                if (step === 4 && direction === "أسفل" && !downDone) {
+                    downDone = true;
+                    step++;
                     clearInterval(interval);
-                    statusDiv.innerHTML = `<span class="success">🎉 اجتزت فحص الحيوية!</span>`;
-                    const live = await extractFaceFromMedia(video);
-                    if (live && documentFaceDescriptor) {
-                        liveFaceDescriptor = live.descriptor;
-                        liveFaceHash = live.hash;
-                        const dist = faceapi.euclideanDistance(liveFaceDescriptor, documentFaceDescriptor);
-                        const matched = dist < 0.6;
+                    instructionBox.style.display = 'none';
+                    document.getElementById('livenessStatus').innerHTML = '<span class="success">🎉 اجتزت فحص الحيوية بنجاح!</span>';
+                    
+                    const liveResult = await extractFaceFromImage(liveVideo);
+                    if (liveResult) {
+                        liveFaceDescriptor = liveResult.descriptor;
+                        liveFaceHash = liveResult.hash;
+                        const distance = faceapi.euclideanDistance(liveFaceDescriptor, documentFaceDescriptor);
+                        const matched = distance < 0.6;
                         faceMatched = matched;
-                        const matchDiv = document.getElementById('finalComparisonResult');
+                        livenessPassed = true;
                         if (matched) {
-                            matchDiv.innerHTML = `<span class="success">✅ الوجه الملتقط يطابق وجه الهوية (المسافة: ${dist.toFixed(3)})</span>`;
-                            registerBtn.disabled = false;
-                            livenessPassed = true;
+                            document.getElementById('livenessStatus').innerHTML += `<br><span class="success">✅ الوجه الحي يطابق الوثيقة! (المسافة: ${distance.toFixed(3)})</span>`;
+                            goToMatchBtn.disabled = false;
                         } else {
-                            matchDiv.innerHTML = `<span class="error">❌ الوجه الحي لا يطابق الهوية (المسافة: ${dist.toFixed(3)})</span>`;
+                            document.getElementById('livenessStatus').innerHTML += `<br><span class="error">❌ الوجه لا يطابق الوثيقة (المسافة: ${distance.toFixed(3)})</span>`;
                         }
-                    } else {
-                        statusDiv.innerHTML = '<span class="error">فشل التقاط الوجه الحي</span>';
                     }
                     resolve(true);
                 }
-            }, 500);
+            }, 300);
         });
     }
 
     startLivenessBtn.onclick = async () => {
-        if (!documentFaceDescriptor) { alert("يرجى استخراج وجه الهوية أولاً"); return; }
         startLivenessBtn.disabled = true;
         await runLivenessCheck();
     };
 
-    registerBtn.onclick = async () => {
+    goToMatchBtn.onclick = () => {
+        if (!livenessPassed || !faceMatched) {
+            alert("لم يكتمل فحص الحيوية أو الوجه غير مطابق");
+            return;
+        }
+        goToStep(4);
+        document.getElementById('comparisonResult').innerHTML = `
+            <div class="success">
+                ✅ تم التحقق من الهوية بنجاح<br><br>
+                👤 الاسم: ${fullNameInput.value}<br>
+                📋 نوع الوثيقة: ${documentTypeSelect.value}<br>
+                🔗 جاهز للتسجيل في سلسلة الكتل
+            </div>
+        `;
+        goToRegisterBtn.disabled = false;
+    };
+
+    // ------------------- التسجيل -------------------
+    goToRegisterBtn.onclick = async () => {
+        goToStep(5);
         const name = fullNameInput.value.trim();
-        if (!name) { alert("الرجاء إدخال الاسم"); return; }
-        if (!livenessPassed || !faceMatched) { alert("لم يكتمل فحص الحيوية أو تطابق الوجه"); return; }
         const docType = documentTypeSelect.value;
         let previousHash = "";
         try {
@@ -301,37 +469,52 @@
             const data = await res.json();
             if (data.chain.length) previousHash = data.chain[data.chain.length-1].hash;
         } catch(e) { previousHash = "0"; }
-        const payload = { name, face_hash: liveFaceHash, document_hash: documentFaceHash, document_type: docType, biometric_verified: true, previous_hash: previousHash };
-        registerBtn.disabled = true;
-        document.getElementById('registerStatus').innerHTML = '<span class="info">⏳ جاري التسجيل...</span>';
+        
+        const payload = {
+            name: name,
+            face_hash: liveFaceHash,
+            document_hash: documentFaceHash,
+            document_type: docType,
+            biometric_verified: true,
+            previous_hash: previousHash
+        };
+        
+        document.getElementById('registerStatus').innerHTML = '<span class="info">⏳ جاري التسجيل في سلسلة الكتل...</span>';
         try {
-            const response = await fetch('/add_block', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            const response = await fetch('/add_block', { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: JSON.stringify(payload) 
+            });
             const result = await response.json();
             if (response.ok) {
                 sessionStorage.setItem('verifiedName', name);
                 sessionStorage.setItem('verifiedDocType', docType);
                 sessionStorage.setItem('verifiedTimestamp', new Date().toLocaleString());
-                window.location.href = '/verification-result';
+                document.getElementById('registerStatus').innerHTML = '<span class="success">🎉 تم التسجيل بنجاح! جاري التوجيه...</span>';
+                setTimeout(() => {
+                    window.location.href = '/profile';
+                }, 2000);
             } else {
                 document.getElementById('registerStatus').innerHTML = `<span class="error">❌ فشل التسجيل: ${result.error}</span>`;
-                registerBtn.disabled = false;
             }
         } catch(err) {
-            document.getElementById('registerStatus').innerHTML = `<span class="error">خطأ في الاتصال</span>`;
-            registerBtn.disabled = false;
+            document.getElementById('registerStatus').innerHTML = `<span class="error">خطأ: ${err.message}</span>`;
         }
     };
 
+    // ------------------- بدء التشغيل -------------------
     loadModels();
-    startCameraBtn.disabled = true;
-    startLivenessBtn.disabled = true;
+    goToStep(1);
+    
+    // تعطيل الأزرار في البداية
+    captureDocBtn.disabled = true;
     extractDocFaceBtn.disabled = true;
-    registerBtn.disabled = true;
-    docImageInput.disabled = false;
-    // تسجيل Service Worker للتطبيق (PWA)
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/static/sw.js').catch(err => console.error('Service Worker registration failed:', err));
-    }
+    goToLivenessBtn.disabled = true;
+    startLiveCameraBtn.disabled = false;
+    startLivenessBtn.disabled = true;
+    goToMatchBtn.disabled = true;
+    goToRegisterBtn.disabled = true;
 </script>
 </body>
 </html>
