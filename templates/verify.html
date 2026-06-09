@@ -39,6 +39,50 @@
         .status-rejected { background: #dc3545; color: white; }
         .system-status-card { background: linear-gradient(135deg, #e8f4f8, #d1ecf1); border-radius: 20px; padding: 15px; margin-bottom: 20px; text-align: center; }
         .remaining-slots { font-size: 1.2rem; font-weight: bold; color: #2c7da0; }
+        
+        /* تحسينات لرفع الصور من الهاتف */
+        .upload-buttons {
+            display: flex;
+            gap: 10px;
+            margin: 10px 0;
+            flex-wrap: wrap;
+        }
+        .upload-buttons button {
+            flex: 1;
+            margin: 0;
+            font-size: 0.9rem;
+            padding: 12px;
+        }
+        .camera-btn { background: #28a745; color: white; }
+        .gallery-btn { background: #17a2b8; color: white; }
+        .preview-img {
+            max-width: 100%;
+            max-height: 200px;
+            border-radius: 16px;
+            margin-top: 10px;
+            border: 2px solid #28a745;
+        }
+        .image-container {
+            text-align: center;
+            margin: 15px 0;
+            padding: 10px;
+            background: #f0f8ff;
+            border-radius: 16px;
+            display: none;
+        }
+        .paste-area {
+            border: 2px dashed #ccc;
+            border-radius: 16px;
+            padding: 15px;
+            text-align: center;
+            margin: 10px 0;
+            background: #fafafa;
+            font-size: 0.8rem;
+            color: #666;
+        }
+        .file-input {
+            display: none;
+        }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
@@ -47,7 +91,7 @@
 <div class="container">
     <h1>🔐 وثاق | التوثيق بالشهود</h1>
     
-    <!-- ✅ عرض حالة النظام والمقاعد المتبقية -->
+    <!-- عرض حالة النظام -->
     <div class="system-status-card" id="systemStatusCard">
         <div id="statusSpinner" class="spinner" style="width:20px; height:20px;"></div>
         <div id="statusText">جاري تحميل حالة النظام...</div>
@@ -60,7 +104,7 @@
         <div class="step" id="step4">4️⃣ التسجيل</div>
     </div>
 
-    <!-- الخطوة 1: إدخال رمز الدعوة (أو تخطيه للمستخدمين الأوائل) -->
+    <!-- الخطوة 1: إدخال رمز الدعوة -->
     <div id="step1Content">
         <div class="card">
             <h2>🎫 1. رمز الدعوة</h2>
@@ -72,15 +116,33 @@
         </div>
     </div>
 
-    <!-- الخطوة 2: رفع الهوية -->
+    <!-- الخطوة 2: رفع الهوية - نسخة محسنة للهواتف -->
     <div id="step2Content" style="display:none;">
         <div class="card">
             <h2>🆔 2. رفع صورة الهوية</h2>
-            <p style="font-size:0.85rem; color:#666;">يجب رفع صورة واضحة لبطاقة الهوية أو جواز السفر</p>
-            <input type="file" id="idCardInput" accept="image/jpeg,image/png,image/jpg" style="width:100%; padding:12px; border-radius:40px; border:1px solid #ddd; margin:10px 0;">
-            <div id="idPreview" style="text-align:center; display:none;">
-                <img id="idPreviewImg" style="max-width:100%; max-height:150px; border-radius:16px;">
+            <p style="font-size:0.85rem; color:#dc3545;">⚠️ يسمح فقط بـ: بطاقة هوية، جواز سفر، رخصة قيادة</p>
+            
+            <!-- أزرار رفع الصور المحسنة للهواتف -->
+            <div class="upload-buttons">
+                <button id="openCameraBtn" class="camera-btn">📸 تصوير مباشر</button>
+                <button id="openGalleryBtn" class="gallery-btn">🖼️ اختيار من المعرض</button>
             </div>
+            
+            <!-- input مخفي لاختيار الملفات -->
+            <input type="file" id="imageFileInput" accept="image/*" capture="environment" class="file-input">
+            <input type="file" id="galleryFileInput" accept="image/jpeg,image/png,image/jpg" class="file-input">
+            
+            <!-- منطقة عرض الصورة -->
+            <div id="imagePreviewContainer" class="image-container">
+                <img id="previewImage" class="preview-img">
+                <p style="color:#28a745; margin-top:5px;">✅ تم تحميل الصورة بنجاح</p>
+            </div>
+            
+            <!-- منطقة لصق الصورة (Paste) -->
+            <div id="pasteArea" class="paste-area" contenteditable="true">
+                📋 أو الصق الصورة هنا (Ctrl+V)
+            </div>
+            
             <button id="extractIdFaceBtn" class="btn-primary" disabled>🔍 استخراج بصمة الوجه من الهوية</button>
             <div id="idResult" class="result"></div>
             <button id="nextToLivenessBtn" class="btn-success" disabled>▶️ التالي: اختبار الحيوية</button>
@@ -125,7 +187,7 @@
 
 <script>
     // ============================================================
-    // نظام التوثيق بالشهود - Witness-based Verification
+    // نظام التوثيق بالشهود - مع دعم رفع الصور من الهواتف
     // ============================================================
     
     let modelsLoaded = false;
@@ -139,6 +201,7 @@
     let blockIndex = null;
     let verificationStatus = null;
     let systemStatus = null;
+    let currentImageData = null;  // تخزين بيانات الصورة الحالية
     
     // عناصر DOM
     const inviteCodeInput = document.getElementById('inviteCode');
@@ -146,11 +209,18 @@
     const inviteResult = document.getElementById('inviteResult');
     const inviteMessage = document.getElementById('inviteMessage');
     const nextToIdentityBtn = document.getElementById('nextToIdentityBtn');
-    const idCardInput = document.getElementById('idCardInput');
-    const idPreview = document.getElementById('idPreview');
-    const idPreviewImg = document.getElementById('idPreviewImg');
+    
+    // عناصر رفع الصور
+    const openCameraBtn = document.getElementById('openCameraBtn');
+    const openGalleryBtn = document.getElementById('openGalleryBtn');
+    const imageFileInput = document.getElementById('imageFileInput');
+    const galleryFileInput = document.getElementById('galleryFileInput');
+    const imagePreviewContainer = document.getElementById('imagePreviewContainer');
+    const previewImage = document.getElementById('previewImage');
+    const pasteArea = document.getElementById('pasteArea');
     const extractIdFaceBtn = document.getElementById('extractIdFaceBtn');
     const idResult = document.getElementById('idResult');
+    
     const nextToLivenessBtn = document.getElementById('nextToLivenessBtn');
     const startLivenessBtn = document.getElementById('startLivenessBtn');
     const livenessResult = document.getElementById('livenessResult');
@@ -169,7 +239,6 @@
             const response = await fetch('/system-status');
             const data = await response.json();
             systemStatus = data;
-            
             statusSpinner.style.display = 'none';
             
             if (data.invite_only_mode) {
@@ -200,28 +269,94 @@
             await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
             await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
             modelsLoaded = true;
+            console.log("✅ النماذج جاهزة");
         } catch(err) {
             console.error("فشل تحميل النماذج", err);
         }
     }
     
-    // ------------------- التحقق من رمز الدعوة (مع دعم المستخدمين الأوائل) -------------------
+    // ------------------- معالجة الصورة المرفوعة -------------------
+    function handleImageFile(file) {
+        if (!file) return;
+        
+        if (!file.type.startsWith('image/')) {
+            idResult.innerHTML = '<span class="error">❌ يرجى اختيار ملف صورة</span>';
+            return;
+        }
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            currentImageData = e.target.result;
+            previewImage.src = currentImageData;
+            imagePreviewContainer.style.display = 'block';
+            extractIdFaceBtn.disabled = false;
+            idResult.innerHTML = '<span class="success">✅ تم تحميل الصورة بنجاح! اضغط "استخراج بصمة الوجه"</span>';
+        };
+        reader.onerror = function() {
+            idResult.innerHTML = '<span class="error">❌ فشل في قراءة الملف</span>';
+        };
+        reader.readAsDataURL(file);
+    }
+    
+    // ------------------- فتح الكاميرا مباشرة -------------------
+    openCameraBtn.onclick = () => {
+        imageFileInput.setAttribute('capture', 'environment');
+        imageFileInput.click();
+    };
+    
+    // ------------------- فتح المعرض -------------------
+    openGalleryBtn.onclick = () => {
+        imageFileInput.removeAttribute('capture');
+        imageFileInput.click();
+    };
+    
+    // ------------------- معالج اختيار الملف -------------------
+    imageFileInput.addEventListener('change', (event) => {
+        const file = event.target.files[0];
+        if (file) handleImageFile(file);
+        imageFileInput.value = '';
+    });
+    
+    galleryFileInput.addEventListener('change', (event) => {
+        const file = event.target.files[0];
+        if (file) handleImageFile(file);
+        galleryFileInput.value = '';
+    });
+    
+    // ------------------- لصق الصورة (Ctrl+V) -------------------
+    pasteArea.addEventListener('paste', (e) => {
+        const items = e.clipboardData.items;
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].type.indexOf('image') !== -1) {
+                const blob = items[i].getAsFile();
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    currentImageData = event.target.result;
+                    previewImage.src = currentImageData;
+                    imagePreviewContainer.style.display = 'block';
+                    extractIdFaceBtn.disabled = false;
+                    idResult.innerHTML = '<span class="success">✅ تم لصق الصورة بنجاح! اضغط "استخراج بصمة الوجه"</span>';
+                };
+                reader.readAsDataURL(blob);
+                break;
+            }
+        }
+    });
+    
+    // ------------------- التحقق من رمز الدعوة -------------------
     verifyInviteBtn.onclick = async () => {
         const code = inviteCodeInput.value.trim().toUpperCase();
         
-        // ✅ التحقق أولاً من حالة النظام
         const statusRes = await fetch('/system-status');
         const status = await statusRes.json();
         
         if (!status.invite_only_mode) {
-            // ✅ التسجيل مجاني (أول 100 مستخدم)
             inviteCode = null;
             inviteResult.innerHTML = `<span class="success">✅ مرحباً بك! أنت من أوائل المستخدمين. لا حاجة لرمز دعوة.</span>`;
             nextToIdentityBtn.disabled = false;
             return;
         }
         
-        // إذا كان النظام في وضع الدعوات فقط، تحقق من الرمز
         if (!code) {
             inviteResult.innerHTML = '<span class="error">❌ النظام في وضع الدعوات فقط. الرجاء إدخال رمز الدعوة.</span>';
             return;
@@ -261,20 +396,7 @@
         document.getElementById('step2Content').style.display = 'block';
     };
     
-    // ------------------- رفع الصورة واستخراج البصمة -------------------
-    idCardInput.addEventListener('change', (event) => {
-        const file = event.target.files[0];
-        if (!file) return;
-        
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            idPreviewImg.src = e.target.result;
-            idPreview.style.display = 'block';
-            extractIdFaceBtn.disabled = false;
-        };
-        reader.readAsDataURL(file);
-    });
-    
+    // ------------------- استخراج بصمة الهوية -------------------
     async function isRealIdentityDocument(imageElement) {
         const faceDetection = await faceapi.detectSingleFace(imageElement).withFaceLandmarks();
         if (!faceDetection) {
@@ -294,12 +416,17 @@
     }
     
     extractIdFaceBtn.onclick = async () => {
+        if (!currentImageData) {
+            idResult.innerHTML = '<span class="error">❌ يرجى رفع صورة الهوية أولاً</span>';
+            return;
+        }
+        
         extractIdFaceBtn.disabled = true;
         extractIdFaceBtn.innerHTML = '<span class="spinner"></span> جاري الاستخراج...';
         idResult.innerHTML = '<span class="info">🔍 جاري استخراج بصمة الوجه...</span>';
         
         const img = new Image();
-        img.src = idPreviewImg.src;
+        img.src = currentImageData;
         await new Promise(r => { img.onload = r; });
         
         const identityCheck = await isRealIdentityDocument(img);
@@ -325,7 +452,7 @@
         extractIdFaceBtn.innerHTML = "🔍 إعادة الاستخراج";
     };
     
-    // ------------------- الانتقال للخطوة 3 -------------------
+    // ------------------- باقي الدوال (اختبار الحيوية والتسجيل) -------------------
     nextToLivenessBtn.onclick = async () => {
         if (!idDescriptor) {
             idResult.innerHTML = '<span class="error">❌ يجب استخراج بصمة الهوية أولاً!</span>';
@@ -346,7 +473,6 @@
         startLivenessBtn.style.display = 'block';
     };
     
-    // ------------------- اختبار الحيوية -------------------
     async function runStabilityPhase() {
         const stabilityPhase = document.getElementById('stabilityPhase');
         const headTrackingPhase = document.getElementById('headTrackingPhase');
@@ -425,14 +551,12 @@
         startLivenessBtn.style.display = 'none';
     };
     
-    // ------------------- إرسال للشهود -------------------
     nextToRegisterBtn.onclick = async () => {
         if (!idDescriptor || !faceDescriptor) {
             livenessResult.innerHTML = '<span class="error">❌ بيانات الوجه غير مكتملة</span>';
             return;
         }
         
-        // حساب نسبة التطابق
         const distance = faceapi.euclideanDistance(faceDescriptor, idDescriptor);
         const similarity = Math.round((1 - Math.min(distance, 1)) * 100);
         
@@ -489,7 +613,6 @@
         }
     };
     
-    // ------------------- التحقق من الحالة -------------------
     checkStatusBtn.onclick = async () => {
         checkStatusBtn.disabled = true;
         checkStatusBtn.innerHTML = '<span class="spinner"></span> جاري التحقق...';
