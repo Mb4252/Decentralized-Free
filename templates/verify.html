@@ -37,6 +37,8 @@
         .status-pending { background: #ffc107; color: #333; }
         .status-approved { background: #28a745; color: white; }
         .status-rejected { background: #dc3545; color: white; }
+        .system-status-card { background: linear-gradient(135deg, #e8f4f8, #d1ecf1); border-radius: 20px; padding: 15px; margin-bottom: 20px; text-align: center; }
+        .remaining-slots { font-size: 1.2rem; font-weight: bold; color: #2c7da0; }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
@@ -45,6 +47,12 @@
 <div class="container">
     <h1>🔐 وثاق | التوثيق بالشهود</h1>
     
+    <!-- ✅ عرض حالة النظام والمقاعد المتبقية -->
+    <div class="system-status-card" id="systemStatusCard">
+        <div id="statusSpinner" class="spinner" style="width:20px; height:20px;"></div>
+        <div id="statusText">جاري تحميل حالة النظام...</div>
+    </div>
+    
     <div class="step-indicator">
         <div class="step active" id="step1">1️⃣ الدعوة</div>
         <div class="step" id="step2">2️⃣ الهوية</div>
@@ -52,11 +60,11 @@
         <div class="step" id="step4">4️⃣ التسجيل</div>
     </div>
 
-    <!-- الخطوة 1: إدخال رمز الدعوة -->
+    <!-- الخطوة 1: إدخال رمز الدعوة (أو تخطيه للمستخدمين الأوائل) -->
     <div id="step1Content">
         <div class="card">
             <h2>🎫 1. رمز الدعوة</h2>
-            <p style="font-size:0.85rem; color:#666;">النظام يعمل بنظام الدعوات فقط. أدخل رمز الدعوة من مستخدم موثق.</p>
+            <p id="inviteMessage" style="font-size:0.85rem; color:#666;">النظام يعمل بنظام الدعوات فقط. أدخل رمز الدعوة من مستخدم موثق.</p>
             <input type="text" id="inviteCode" placeholder="XXXX-XXXX-XXXX" style="width:100%; padding:12px; border-radius:40px; border:1px solid #ddd; margin:10px 0; text-align:center;">
             <button id="verifyInviteBtn" class="btn-primary">🔍 التحقق من رمز الدعوة</button>
             <div id="inviteResult" class="result"></div>
@@ -130,11 +138,13 @@
     let inviteCode = null;
     let blockIndex = null;
     let verificationStatus = null;
+    let systemStatus = null;
     
     // عناصر DOM
     const inviteCodeInput = document.getElementById('inviteCode');
     const verifyInviteBtn = document.getElementById('verifyInviteBtn');
     const inviteResult = document.getElementById('inviteResult');
+    const inviteMessage = document.getElementById('inviteMessage');
     const nextToIdentityBtn = document.getElementById('nextToIdentityBtn');
     const idCardInput = document.getElementById('idCardInput');
     const idPreview = document.getElementById('idPreview');
@@ -150,6 +160,37 @@
     const checkStatusBtn = document.getElementById('checkStatusBtn');
     const goToProfileBtn = document.getElementById('goToProfileBtn');
     const camera = document.getElementById('camera');
+    const statusText = document.getElementById('statusText');
+    const statusSpinner = document.getElementById('statusSpinner');
+    
+    // ------------------- تحميل حالة النظام -------------------
+    async function loadSystemStatus() {
+        try {
+            const response = await fetch('/system-status');
+            const data = await response.json();
+            systemStatus = data;
+            
+            statusSpinner.style.display = 'none';
+            
+            if (data.invite_only_mode) {
+                statusText.innerHTML = `
+                    <span style="color:#dc3545;">⚠️ النظام في وضع الدعوات فقط (Invite-Only)</span><br>
+                    <small>يلزم رمز دعوة للتسجيل | عدد المستخدمين الموثقين: ${data.total_verified_users}</small>
+                `;
+                inviteMessage.innerHTML = '⚠️ النظام في وضع الدعوات فقط. أدخل رمز الدعوة من مستخدم موثق.';
+            } else {
+                statusText.innerHTML = `
+                    <span style="color:#28a745;">✅ التسجيل مفتوح للمستخدمين الأوائل</span><br>
+                    <span class="remaining-slots">🎫 المقاعد المتبقية: ${data.free_registrations_remaining} / ${data.max_free_users}</span><br>
+                    <small>عدد المستخدمين الموثقين: ${data.total_verified_users}</small>
+                `;
+                inviteMessage.innerHTML = `🎉 أنت من المستخدمين الأوائل! لا حاجة لرمز دعوة. المقاعد المتبقية: ${data.free_registrations_remaining}`;
+            }
+        } catch(e) {
+            console.error("فشل تحميل حالة النظام", e);
+            statusText.innerHTML = '<span style="color:#dc3545;">⚠️ لا يمكن الاتصال بالخادم</span>';
+        }
+    }
     
     // ------------------- تحميل النماذج -------------------
     async function loadModels() {
@@ -164,11 +205,25 @@
         }
     }
     
-    // ------------------- التحقق من رمز الدعوة -------------------
+    // ------------------- التحقق من رمز الدعوة (مع دعم المستخدمين الأوائل) -------------------
     verifyInviteBtn.onclick = async () => {
         const code = inviteCodeInput.value.trim().toUpperCase();
+        
+        // ✅ التحقق أولاً من حالة النظام
+        const statusRes = await fetch('/system-status');
+        const status = await statusRes.json();
+        
+        if (!status.invite_only_mode) {
+            // ✅ التسجيل مجاني (أول 100 مستخدم)
+            inviteCode = null;
+            inviteResult.innerHTML = `<span class="success">✅ مرحباً بك! أنت من أوائل المستخدمين. لا حاجة لرمز دعوة.</span>`;
+            nextToIdentityBtn.disabled = false;
+            return;
+        }
+        
+        // إذا كان النظام في وضع الدعوات فقط، تحقق من الرمز
         if (!code) {
-            inviteResult.innerHTML = '<span class="error">❌ الرجاء إدخال رمز الدعوة</span>';
+            inviteResult.innerHTML = '<span class="error">❌ النظام في وضع الدعوات فقط. الرجاء إدخال رمز الدعوة.</span>';
             return;
         }
         
@@ -377,7 +432,7 @@
             return;
         }
         
-        // حساب نسبة التطابق (تحقق إضافي)
+        // حساب نسبة التطابق
         const distance = faceapi.euclideanDistance(faceDescriptor, idDescriptor);
         const similarity = Math.round((1 - Math.min(distance, 1)) * 100);
         
@@ -485,6 +540,8 @@
         }
     }
     
+    // ------------------- بدء التشغيل -------------------
+    loadSystemStatus();
     loadModels();
     updateSteps();
 </script>
