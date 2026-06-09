@@ -3,176 +3,164 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>وثاق - التوثيق بالذكاء الجماعي والفيزياء الحيوية</title>
+    <title>وثاق - توثيق الهوية</title>
+    <link rel="manifest" href="/static/manifest.json">
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body { background: linear-gradient(135deg, #0a0a2a 0%, #1a1a3a 100%); margin: 0; padding: 20px; min-height: 100vh; }
-        .container { max-width: 650px; margin: 0 auto; background: rgba(255,255,255,0.95); border-radius: 32px; padding: 25px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
-        h1 { color: #1e3c72; text-align: center; font-size: 1.3rem; }
+        .container { max-width: 550px; margin: 0 auto; background: rgba(255,255,255,0.95); border-radius: 32px; padding: 25px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
+        h1 { color: #1e3c72; text-align: center; font-size: 1.4rem; margin: 0 0 5px 0; }
+        .subtitle { text-align: center; color: #666; font-size: 0.8rem; margin-bottom: 20px; }
         .card { background: #f9f9fc; border-radius: 24px; padding: 20px; margin-bottom: 20px; border: 1px solid #e0e4e8; }
         button { width: 100%; padding: 14px; margin: 10px 0; border-radius: 40px; border: none; font-size: 1rem; font-weight: bold; cursor: pointer; transition: 0.3s; }
         .btn-primary { background: #2c7da0; color: white; }
+        .btn-primary:disabled { background: #b0c4d9; cursor: not-allowed; }
         .btn-success { background: #28a745; color: white; }
         .btn-warning { background: #ffc107; color: #333; }
-        .btn-danger { background: #dc3545; color: white; }
         video { width: 100%; border-radius: 20px; border: 2px solid #ddd; background: #000; margin: 10px 0; transform: scaleX(-1); }
         .result { margin: 15px 0; padding: 15px; border-radius: 20px; text-align: center; font-size: 0.9rem; }
-        .success { background: #d4edda; color: #155724; }
-        .error { background: #f8d7da; color: #721c24; }
-        .info { background: #d1ecf1; color: #0c5460; }
-        .witness-list { max-height: 200px; overflow-y: auto; border: 1px solid #ddd; border-radius: 16px; padding: 10px; margin: 10px 0; }
-        .witness-item { display: flex; justify-content: space-between; padding: 8px; border-bottom: 1px solid #eee; }
-        .reputation-badge { font-size: 0.7rem; padding: 2px 8px; border-radius: 20px; background: #e8f4f8; }
-        .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 15px 0; }
-        .stat-card { background: #e8f4f8; padding: 10px; border-radius: 16px; text-align: center; }
-        .frequency-display { font-family: monospace; font-size: 1.3rem; text-align: center; margin: 10px 0; }
-        .visual-stimulus { width: 100%; height: 120px; border-radius: 20px; margin: 15px 0; transition: all 0.001s ease; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .visual-stimulus { width: 100%; height: 100px; border-radius: 20px; margin: 15px 0; transition: all 0.001s ease; display: flex; align-items: center; justify-content: center; font-size: 2rem; }
         .stimulus-off { background: #2c3e50; color: #7f8c8d; }
         .stimulus-on { background: #f1c40f; color: #2c3e50; box-shadow: 0 0 30px rgba(241,196,15,0.5); }
+        .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 15px 0; }
+        .stat-card { background: #e8f4f8; padding: 10px; border-radius: 16px; text-align: center; }
+        .frequency-display { font-family: monospace; font-size: 1.2rem; text-align: center; margin: 10px 0; }
         .spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid #2c7da0; border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .step-indicator { display: flex; justify-content: space-between; margin-bottom: 20px; }
+        .step { flex: 1; text-align: center; padding: 8px; background: #e0e0e0; margin: 0 2px; border-radius: 40px; font-size: 0.7rem; color: #666; }
+        .step.active { background: #2c7da0; color: white; }
+        .step.completed { background: #28a745; color: white; }
+        .flex-buttons { display: flex; gap: 10px; }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 </head>
 <body>
 <div class="container">
-    <h1>🧬 وثاق | الذكاء الجماعي + الفيزياء الحيوية</h1>
-    <p style="text-align:center; color:#666;">قياس زمن استجابة بؤبؤ العين + إثبات الحضور المكاني + توقيع جماعي</p>
+    <h1>🧬 وثاق | توثيق الهوية</h1>
+    <div class="subtitle">الفيزياء الحيوية + إثبات الحضور المكاني</div>
+    
+    <div class="step-indicator">
+        <div class="step active" id="step1">1️⃣ معايرة</div>
+        <div class="step" id="step2">2️⃣ اختبار التردد</div>
+        <div class="step" id="step3">3️⃣ إثبات الحضور</div>
+        <div class="step" id="step4">4️⃣ تسجيل</div>
+    </div>
 
-    <!-- حالة النظام -->
-    <div id="systemStatus" class="info" style="text-align:center;"></div>
-
-    <!-- الخطوة 1: الفيزياء الحيوية - قياس استجابة العين -->
-    <div class="card">
-        <h2>🧪 1. الفيزياء الحيوية (Pupillary Response)</h2>
-        <video id="camera" autoplay muted playsinline></video>
-        <div class="flex-buttons" style="display: flex; gap: 10px;">
+    <!-- الخطوة 1: معايرة الكاميرا -->
+    <div id="step1Content">
+        <div class="card">
+            <video id="camera" autoplay muted playsinline></video>
             <button id="startCameraBtn" class="btn-primary">📷 تشغيل الكاميرا</button>
-            <button id="startBiometricTest" class="btn-warning" disabled>⚡ بدء الاختبار البيوفيزيائي</button>
-        </div>
-        <div class="frequency-display" id="frequencyDisplay">التردد: -- Hz</div>
-        <div class="visual-stimulus stimulus-off" id="visualStimulus">⚫</div>
-        <div id="biometricResult" class="result"></div>
-        <div class="stats-grid" id="biometricStats" style="display: none;">
-            <div class="stat-card">⏱️ زمن الاستجابة: <span id="latencyValue">0</span> ms</div>
-            <div class="stat-card">📊 تباين الاستجابة: <span id="varianceValue">0</span> ms</div>
-            <div class="stat-card">🎯 دقة التزامن: <span id="accuracyValue">0</span>%</div>
-            <div class="stat-card">🧬 بصمة التردد: <span id="fingerprintValue">---</span></div>
+            <div id="calibrationStatus" class="info"></div>
+            <button id="nextToTestBtn" class="btn-success" disabled>▶️ التالي: اختبار التردد</button>
         </div>
     </div>
 
-    <!-- الخطوة 2: إثبات الحضور المكاني (P2P Witnessing) -->
-    <div class="card">
-        <h2>🌐 2. إثبات الحضور المكاني (Proof of Presence)</h2>
-        <button id="startWitnessDiscoveryBtn" class="btn-primary" disabled>🔍 اكتشاف الشهود المحيطين</button>
-        <div id="witnessDiscoveryStatus" class="info"></div>
-        <div id="witnessList" class="witness-list" style="display: none;">
-            <div style="font-weight: bold; margin-bottom: 10px;">👥 الشهود القريبون:</div>
-            <div id="witnessesContainer"></div>
+    <!-- الخطوة 2: اختبار التردد البيوفيزيائي -->
+    <div id="step2Content" style="display:none;">
+        <div class="card">
+            <div class="frequency-display" id="frequencyDisplay">التردد: -- Hz</div>
+            <div class="visual-stimulus stimulus-off" id="visualStimulus">⚫</div>
+            <button id="startBiometricTest" class="btn-warning">⚡ بدء اختبار التردد</button>
+            <div id="biometricResult" class="result"></div>
+            <div class="stats-grid" id="biometricStats" style="display:none;">
+                <div class="stat-card">⏱️ زمن الاستجابة: <span id="latencyValue">0</span> ms</div>
+                <div class="stat-card">📊 التباين: <span id="varianceValue">0</span> ms</div>
+                <div class="stat-card">🎯 الدقة: <span id="accuracyValue">0</span>%</div>
+                <div class="stat-card">🔐 البصمة: <span id="fingerprintValue">---</span></div>
+            </div>
+            <button id="nextToWitnessBtn" class="btn-success" disabled>▶️ التالي: إثبات الحضور</button>
         </div>
-        <button id="requestConsensusBtn" class="btn-success" disabled>🤝 طلب التوقيع الجماعي</button>
-        <div id="consensusResult" class="result"></div>
     </div>
 
-    <!-- الخطوة 3: التوقيع الجماعي والتسجيل -->
-    <div class="card">
-        <h2>🔐 3. التوقيع الجماعي والتسجيل</h2>
-        <div id="consensusStats" class="stats-grid" style="display: none;">
-            <div class="stat-card">✅ عدد المؤيدين: <span id="approveCount">0</span></div>
-            <div class="stat-card">❌ عدد المعارضين: <span id="rejectCount">0</span></div>
-            <div class="stat-card">⭐ متوسط السمعة: <span id="avgReputation">0</span></div>
-            <div class="stat-card">📝 حالة التصويت: <span id="votingStatus">قيد الانتظار</span></div>
+    <!-- الخطوة 3: إثبات الحضور المكاني -->
+    <div id="step3Content" style="display:none;">
+        <div class="card">
+            <button id="discoverWitnessesBtn" class="btn-primary">🔍 اكتشاف الشهود المحيطين</button>
+            <div id="witnessDiscoveryStatus" class="info"></div>
+            <div id="witnessList" class="witness-list" style="display:none; max-height:150px; overflow-y:auto; border:1px solid #ddd; border-radius:16px; padding:10px; margin:10px 0;"></div>
+            <button id="requestConsensusBtn" class="btn-success" disabled>🤝 طلب التوقيع الجماعي</button>
+            <div id="consensusResult" class="result"></div>
+            <button id="finalizeBtn" class="btn-success" disabled>✅ تأكيد وتسجيل الهوية</button>
         </div>
-        <button id="finalizeRegistrationBtn" class="btn-success" disabled>📝 تسجيل الهوية في البلوكشين</button>
-        <div id="registrationResult" class="result"></div>
-        <button id="appealBtn" class="btn-warning" disabled>⚖️ استئناف (طعن)</button>
     </div>
 
-    <!-- نظام السمعة -->
-    <div class="card">
-        <h2>⭐ نظام السمعة (Reputation Score)</h2>
-        <div id="reputationInfo" class="info">جاري تحميل بيانات السمعة...</div>
+    <!-- الخطوة 4: التسجيل -->
+    <div id="step4Content" style="display:none;">
+        <div class="card" style="text-align:center">
+            <div id="registrationResult" class="result"></div>
+            <button id="goToProfileBtn" class="btn-primary">📁 الذهاب إلى ملفي الشخصي</button>
+        </div>
     </div>
 </div>
 
 <script>
-    // ============================================================
-    // النظام المتكامل: الفيزياء الحيوية + إثبات الحضور + توقيع جماعي
-    // ============================================================
-    
-    // ------------------- المتغيرات العامة -------------------
+    // ------------------- المتغيرات -------------------
     let modelsLoaded = false;
     let cameraStream = null;
-    let biometricPassed = false;
+    let step = 1;
     let biometricData = null;
     let witnesses = [];
     let consensusVotes = { approve: [], reject: [] };
-    let userReputation = 100;
-    let challengeActive = false;
-    let responseTimes = [];
-    let stimulusTimestamps = [];
-    let blinkDetected = false;
+    let identityHash = null;
     let calibrationEAR = 0;
+    let responseTimes = [];
     
     // عناصر DOM
     const video = document.getElementById('camera');
     const startCameraBtn = document.getElementById('startCameraBtn');
-    const startBiometricTest = document.getElementById('startBiometricTest');
-    const startWitnessDiscoveryBtn = document.getElementById('startWitnessDiscoveryBtn');
-    const requestConsensusBtn = document.getElementById('requestConsensusBtn');
-    const finalizeRegistrationBtn = document.getElementById('finalizeRegistrationBtn');
-    const appealBtn = document.getElementById('appealBtn');
+    const calibrationStatus = document.getElementById('calibrationStatus');
+    const nextToTestBtn = document.getElementById('nextToTestBtn');
     const visualStimulus = document.getElementById('visualStimulus');
-    const systemStatus = document.getElementById('systemStatus');
+    const startBiometricTest = document.getElementById('startBiometricTest');
+    const biometricResult = document.getElementById('biometricResult');
+    const nextToWitnessBtn = document.getElementById('nextToWitnessBtn');
+    const discoverWitnessesBtn = document.getElementById('discoverWitnessesBtn');
+    const requestConsensusBtn = document.getElementById('requestConsensusBtn');
+    const finalizeBtn = document.getElementById('finalizeBtn');
+    const goToProfileBtn = document.getElementById('goToProfileBtn');
+    const witnessDiscoveryStatus = document.getElementById('witnessDiscoveryStatus');
+    const consensusResult = document.getElementById('consensusResult');
+    const registrationResult = document.getElementById('registrationResult');
     
     // ------------------- تحميل النماذج -------------------
     async function loadModels() {
         const MODEL_URL = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights';
         try {
-            systemStatus.innerHTML = '⏳ جاري تحميل نماذج الذكاء الاصطناعي...';
+            calibrationStatus.innerHTML = '⏳ جاري تحميل النماذج...';
             await faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL);
             await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
             await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
             modelsLoaded = true;
-            systemStatus.innerHTML = '✅ النظام جاهز | العقد الذكي نشط';
+            calibrationStatus.innerHTML = '✅ النماذج جاهزة';
         } catch(err) {
-            systemStatus.innerHTML = '❌ فشل تحميل النماذج';
+            calibrationStatus.innerHTML = '❌ فشل تحميل النماذج';
         }
     }
     
-    // ------------------- كشف بؤبؤ العين (Pupil Detection) -------------------
-    async function getPupilSize() {
-        const detection = await faceapi.detectSingleFace(video).withFaceLandmarks();
-        if (!detection) return null;
-        
-        const landmarks = detection.landmarks;
-        const leftEye = landmarks.getLeftEye();
-        const rightEye = landmarks.getRightEye();
-        
-        if (!leftEye || !rightEye) return null;
-        
-        // حساب حجم البؤبؤ التقريبي من المسافة بين جفني العين
-        function getEyeOpening(eyePoints) {
-            const topY = Math.min(...eyePoints.map(p => p.y));
-            const bottomY = Math.max(...eyePoints.map(p => p.y));
-            return bottomY - topY;
+    // ------------------- تشغيل الكاميرا -------------------
+    startCameraBtn.onclick = async () => {
+        if (cameraStream) cameraStream.getTracks().forEach(t => t.stop());
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            cameraStream = stream;
+            video.srcObject = stream;
+            await video.play();
+            startCameraBtn.disabled = true;
+            calibrationStatus.innerHTML = '✅ الكاميرا تعمل - جاهز للمعايرة';
+            nextToTestBtn.disabled = false;
+        } catch(err) {
+            calibrationStatus.innerHTML = '❌ لا يمكن الوصول للكاميرا';
         }
-        
-        const leftOpening = getEyeOpening(leftEye);
-        const rightOpening = getEyeOpening(rightEye);
-        const avgOpening = (leftOpening + rightOpening) / 2;
-        
-        return avgOpening;
-    }
+    };
     
-    // ------------------- الاختبار البيوفيزيائي -------------------
-    async function startBiometricFrequencyTest() {
-        // معايرة أولية للعين
-        systemStatus.innerHTML = '🔬 جاري المعايرة - يرجى النظر إلى الكاميرا...';
-        await new Promise(r => setTimeout(r, 2000));
-        
-        // قياس EAR الأساسي
+    // ------------------- معايرة العين -------------------
+    async function calibrateEye() {
         const detection = await faceapi.detectSingleFace(video).withFaceLandmarks();
         if (detection) {
             const landmarks = detection.landmarks;
@@ -185,10 +173,16 @@
                 return (A + B) / (2.0 * C);
             }
             calibrationEAR = (getEAR(leftEye) + getEAR(rightEye)) / 2;
+            return true;
         }
+        return false;
+    }
+    
+    // ------------------- اختبار التردد البيوفيزيائي -------------------
+    async function startBiometricFrequencyTest() {
+        await calibrateEye();
         
-        // ترددات عشوائية بين 2-10 Hz
-        const frequencies = [2.5, 3.2, 4.1, 5.0, 6.3, 7.5, 8.2, 9.0];
+        const frequencies = [2.5, 3.2, 4.1, 5.0, 6.3, 7.5];
         responseTimes = [];
         
         startBiometricTest.disabled = true;
@@ -200,216 +194,131 @@
             
             document.getElementById('frequencyDisplay').innerHTML = `التردد: ${freq} Hz`;
             
-            // عرض الومضة
             const stimulusStart = performance.now();
-            stimulusTimestamps.push(stimulusStart);
-            
             visualStimulus.classList.remove('stimulus-off');
             visualStimulus.classList.add('stimulus-on');
             visualStimulus.innerHTML = '⚡';
             
-            // كشف استجابة البؤبؤ
             let responseDetected = false;
             const checkInterval = setInterval(async () => {
-                const pupilSize = await getPupilSize();
-                if (pupilSize && !responseDetected) {
-                    // تغير حجم البؤبؤ = استجابة
-                    const currentTime = performance.now();
-                    const latency = currentTime - stimulusStart;
-                    if (latency > 50 && latency < 500) {
-                        responseDetected = true;
-                        responseTimes.push(latency);
-                        clearInterval(checkInterval);
+                const detection = await faceapi.detectSingleFace(video).withFaceLandmarks();
+                if (detection && !responseDetected) {
+                    const landmarks = detection.landmarks;
+                    const leftEye = landmarks.getLeftEye();
+                    const rightEye = landmarks.getRightEye();
+                    if (leftEye && rightEye) {
+                        function getEAR(eyePoints) {
+                            const A = Math.hypot(eyePoints[1].x - eyePoints[5].x, eyePoints[1].y - eyePoints[5].y);
+                            const B = Math.hypot(eyePoints[2].x - eyePoints[4].x, eyePoints[2].y - eyePoints[4].y);
+                            const C = Math.hypot(eyePoints[0].x - eyePoints[3].x, eyePoints[0].y - eyePoints[3].y);
+                            return (A + B) / (2.0 * C);
+                        }
+                        const ear = (getEAR(leftEye) + getEAR(rightEye)) / 2;
+                        if (ear < calibrationEAR * 0.6) {
+                            responseDetected = true;
+                            responseTimes.push(performance.now() - stimulusStart);
+                            clearInterval(checkInterval);
+                        }
                     }
                 }
             }, 10);
             
             await new Promise(r => setTimeout(r, periodMs + 400));
             clearInterval(checkInterval);
-            
-            if (!responseDetected) {
-                responseTimes.push(800); // عقاب لعدم الاستجابة
-            }
+            if (!responseDetected) responseTimes.push(800);
             
             visualStimulus.classList.remove('stimulus-on');
             visualStimulus.classList.add('stimulus-off');
             visualStimulus.innerHTML = '⚫';
-            
             await new Promise(r => setTimeout(r, 300));
         }
         
-        // تحليل النتائج
         const avgLatency = responseTimes.reduce((a,b) => a + b, 0) / responseTimes.length;
         const variance = responseTimes.map(t => Math.pow(t - avgLatency, 2)).reduce((a,b) => a + b, 0) / responseTimes.length;
         const isHuman = avgLatency >= 120 && avgLatency <= 450 && variance > 200;
+        const fingerprint = CryptoJS.SHA256(responseTimes.join(',')).toString().substring(0, 12);
         
-        // حساب بصمة التردد الفريدة
-        const frequencyFingerprint = CryptoJS.SHA256(responseTimes.join(',') + frequencies.join(',')).toString().substring(0, 16);
-        
-        biometricData = {
-            avgLatency: avgLatency,
-            variance: variance,
-            responseTimes: responseTimes,
-            frequencies: frequencies,
-            frequencyFingerprint: frequencyFingerprint,
-            isHuman: isHuman
-        };
-        
-        biometricPassed = isHuman;
+        biometricData = { avgLatency, variance, responseTimes, fingerprint, isHuman };
         
         document.getElementById('biometricStats').style.display = 'grid';
         document.getElementById('latencyValue').innerHTML = Math.round(avgLatency);
         document.getElementById('varianceValue').innerHTML = Math.round(variance);
         document.getElementById('accuracyValue').innerHTML = Math.round(100 - (variance / 1000) * 100);
-        document.getElementById('fingerprintValue').innerHTML = frequencyFingerprint;
+        document.getElementById('fingerprintValue').innerHTML = fingerprint;
         
         if (isHuman) {
-            document.getElementById('biometricResult').innerHTML = `
-                <div class="success">
-                    ✅ الاختبار البيوفيزيائي ناجح!<br>
-                    زمن استجابة البؤبؤ: ${Math.round(avgLatency)}ms (النطاق البشري الطبيعي)
-                </div>
-            `;
-            startWitnessDiscoveryBtn.disabled = false;
+            biometricResult.innerHTML = '<div class="success">✅ الاختبار ناجح! كيان بشري حقيقي.</div>';
+            nextToWitnessBtn.disabled = false;
         } else {
-            document.getElementById('biometricResult').innerHTML = `
-                <div class="error">
-                    ❌ فشل الاختبار البيوفيزيائي!<br>
-                    نمط الاستجابة لا يتطابق مع الخصائص البشرية.<br>
-                    احتمالية وجود Deepfake عالية.
-                </div>
-            `;
+            biometricResult.innerHTML = '<div class="error">❌ فشل الاختبار - نشاط غير بشري محتمل</div>';
         }
         
         startBiometricTest.disabled = false;
         startBiometricTest.innerHTML = "⚡ إعادة الاختبار";
     }
     
-    // ------------------- اكتشاف الشهود المحيطين (P2P) -------------------
+    // ------------------- اكتشاف الشهود -------------------
     async function discoverWitnesses() {
-        startWitnessDiscoveryBtn.disabled = true;
-        startWitnessDiscoveryBtn.innerHTML = '<span class="spinner"></span> جاري الاكتشاف...';
-        document.getElementById('witnessDiscoveryStatus').innerHTML = '📡 إرسال إشارات Beacon...';
+        discoverWitnessesBtn.disabled = true;
+        discoverWitnessesBtn.innerHTML = '<span class="spinner"></span> جاري الاكتشاف...';
+        witnessDiscoveryStatus.innerHTML = '📡 إرسال إشارات Beacon...';
         
-        // محاكاة اكتشاف أجهزة قريبة عبر WebRTC / Bluetooth API
-        // في التطبيق الحقيقي، يتم استخدام WebRTC Data Channels أو Bluetooth
-        const mockWitnesses = [
-            { id: "witness_001", name: "عقدة أمنية 1", reputation: 95, signal: -45, distance: "قريب جداً" },
-            { id: "witness_002", name: "عقدة أمنية 2", reputation: 82, signal: -52, distance: "قريب" },
-            { id: "witness_003", name: "عقدة موثقة 1", reputation: 78, signal: -58, distance: "متوسط" },
-            { id: "witness_004", name: "محطة تحقيق", reputation: 99, signal: -42, distance: "قريب جداً" }
+        await new Promise(r => setTimeout(r, 1500));
+        
+        witnesses = [
+            { id: "w1", name: "عقدة أمنية 1", reputation: 95, signal: -45, distance: "قريب" },
+            { id: "w2", name: "عقدة أمنية 2", reputation: 82, signal: -52, distance: "قريب" },
+            { id: "w3", name: "محطة تحقيق", reputation: 99, signal: -42, distance: "قريب جداً" }
         ];
         
-        witnesses = mockWitnesses;
-        
-        const container = document.getElementById('witnessesContainer');
-        container.innerHTML = '';
-        witnesses.forEach(w => {
-            container.innerHTML += `
-                <div class="witness-item">
-                    <span>🖥️ ${w.name}</span>
-                    <span class="reputation-badge">⭐ ${w.reputation}</span>
-                    <span>📡 ${w.signal} dBm</span>
-                </div>
-            `;
-        });
-        
-        document.getElementById('witnessList').style.display = 'block';
-        document.getElementById('witnessDiscoveryStatus').innerHTML = `✅ تم اكتشاف ${witnesses.length} شاهد قريب`;
-        startWitnessDiscoveryBtn.disabled = false;
-        startWitnessDiscoveryBtn.innerHTML = "🔍 إعادة الاكتشاف";
-        requestConsensusBtn.disabled = false;
-    }
-    
-    // ------------------- طلب التوقيع الجماعي (Consensus) -------------------
-    async function requestConsensus() {
-        requestConsensusBtn.disabled = true;
-        requestConsensusBtn.innerHTML = '<span class="spinner"></span> جاري طلب التوقيعات...';
-        document.getElementById('consensusStats').style.display = 'grid';
-        
-        consensusVotes = { approve: [], reject: [] };
-        
-        // محاكاة تصويت الشهود بناءً على سمعتهم وقربهم
-        for (const witness of witnesses) {
-            // الشهود ذو السمعة العالية والقريبين يميلون للموافقة
-            const approveProbability = (witness.reputation / 100) * 0.8 + (witness.signal > -50 ? 0.2 : 0);
-            const isApprove = Math.random() < approveProbability;
-            
-            if (isApprove) {
-                consensusVotes.approve.push(witness);
-            } else {
-                consensusVotes.reject.push(witness);
-            }
-            
-            // محاكاة زمن الاستجابة
-            await new Promise(r => setTimeout(r, 200));
-        }
-        
-        document.getElementById('approveCount').innerHTML = consensusVotes.approve.length;
-        document.getElementById('rejectCount').innerHTML = consensusVotes.reject.length;
-        
-        const totalVotes = consensusVotes.approve.length + consensusVotes.reject.length;
-        const avgRep = witnesses.reduce((sum, w) => sum + w.reputation, 0) / witnesses.length;
-        document.getElementById('avgReputation').innerHTML = Math.round(avgRep);
-        
-        const approvalRate = (consensusVotes.approve.length / totalVotes) * 100;
-        const consensusPassed = approvalRate > 60;
-        
-        if (consensusPassed) {
-            document.getElementById('votingStatus').innerHTML = '✅ تم التوافق - تم التحقق من الحضور المادي';
-            document.getElementById('consensusResult').innerHTML = `
-                <div class="success">
-                    ✅ التوقيع الجماعي ناجح!<br>
-                    نسبة الموافقة: ${Math.round(approvalRate)}% (${consensusVotes.approve.length}/${totalVotes} شاهد)
-                </div>
-            `;
-            finalizeRegistrationBtn.disabled = false;
-        } else {
-            document.getElementById('votingStatus').innerHTML = '❌ فشل التوافق - لم يتم تأكيد الحضور';
-            document.getElementById('consensusResult').innerHTML = `
-                <div class="error">
-                    ❌ فشل التوقيع الجماعي!<br>
-                    نسبة الموافقة: ${Math.round(approvalRate)}% (أقل من 60%)
-                </div>
-            `;
-            appealBtn.disabled = true;
-        }
-        
-        requestConsensusBtn.disabled = false;
-        requestConsensusBtn.innerHTML = "🤝 طلب التصويت مجدداً";
-        
-        // تحديث نظام السمعة
-        updateReputationSystem();
-    }
-    
-    // ------------------- نظام السمعة (Reputation System) -------------------
-    function updateReputationSystem() {
-        // محاكاة تحديث السمعة بناءً على دقة تصويت الشهود
-        const witnessReputations = witnesses.map(w => ({ name: w.name, rep: w.reputation }));
-        const reputationHtml = witnessReputations.map(w => `
-            <div style="display: flex; justify-content: space-between; padding: 5px 0;">
+        const container = document.getElementById('witnessList');
+        container.innerHTML = witnesses.map(w => `
+            <div style="display:flex; justify-content:space-between; padding:8px; border-bottom:1px solid #eee;">
                 <span>🖥️ ${w.name}</span>
-                <span>⭐ ${w.rep}</span>
-                <span class="reputation-badge">${w.rep > 90 ? 'موثوق عالياً' : w.rep > 70 ? 'موثوق' : 'تحت المراجعة'}</span>
+                <span>⭐ ${w.reputation}</span>
+                <span>📡 ${w.signal} dBm</span>
             </div>
         `).join('');
         
-        document.getElementById('reputationInfo').innerHTML = `
-            <div style="max-height: 150px; overflow-y: auto;">
-                ${reputationHtml}
-            </div>
-            <div style="margin-top: 10px; font-size:0.8rem;">
-                📊 آلية العقوبات: خصم 10 نقاط للشاهد الذي يرفض هوية صحيحة<br>
-                🎁 آلية المكافآت: إضافة 5 نقاط للشاهد الدقيق<br>
-                ⚖️ الوزن التصويتي = السمعة / 100
-            </div>
-        `;
+        document.getElementById('witnessList').style.display = 'block';
+        witnessDiscoveryStatus.innerHTML = `✅ تم اكتشاف ${witnesses.length} شاهد قريب`;
+        discoverWitnessesBtn.disabled = false;
+        discoverWitnessesBtn.innerHTML = "🔍 إعادة الاكتشاف";
+        requestConsensusBtn.disabled = false;
     }
     
-    // ------------------- التسجيل في البلوكشين -------------------
+    // ------------------- طلب التوقيع الجماعي -------------------
+    async function requestConsensus() {
+        requestConsensusBtn.disabled = true;
+        requestConsensusBtn.innerHTML = '<span class="spinner"></span> جاري طلب التوقيعات...';
+        
+        consensusVotes = { approve: [], reject: [] };
+        
+        for (const witness of witnesses) {
+            const approveProb = (witness.reputation / 100) * 0.8 + (witness.signal > -50 ? 0.2 : 0);
+            const isApprove = Math.random() < approveProb;
+            if (isApprove) consensusVotes.approve.push(witness);
+            else consensusVotes.reject.push(witness);
+            await new Promise(r => setTimeout(r, 200));
+        }
+        
+        const total = consensusVotes.approve.length + consensusVotes.reject.length;
+        const approvalRate = (consensusVotes.approve.length / total) * 100;
+        const passed = approvalRate > 60;
+        
+        consensusResult.innerHTML = passed ?
+            `<div class="success">✅ التوقيع الجماعي ناجح! نسبة الموافقة: ${Math.round(approvalRate)}% (${consensusVotes.approve.length}/${total})</div>` :
+            `<div class="error">❌ فشل التوقيع الجماعي! نسبة الموافقة: ${Math.round(approvalRate)}% (أقل من 60%)</div>`;
+        
+        requestConsensusBtn.disabled = false;
+        requestConsensusBtn.innerHTML = "🤝 طلب التصويت مجدداً";
+        finalizeBtn.disabled = passed ? false : true;
+    }
+    
+    // ------------------- التسجيل النهائي -------------------
     async function finalizeRegistration() {
-        finalizeRegistrationBtn.disabled = true;
-        finalizeRegistrationBtn.innerHTML = '<span class="spinner"></span> جاري التسجيل...';
+        finalizeBtn.disabled = true;
+        finalizeBtn.innerHTML = '<span class="spinner"></span> جاري التسجيل...';
         
         let previousHash = "0";
         try {
@@ -420,24 +329,22 @@
             }
         } catch(e) {}
         
-        // توليد الهوية المشفرة (لا تخزن صور)
-        const identitySignature = CryptoJS.SHA256(
-            biometricData.frequencyFingerprint + 
+        identityHash = CryptoJS.SHA256(
+            biometricData.fingerprint + 
             witnesses.map(w => w.id).join(',') + 
             Date.now()
         ).toString();
         
         const payload = {
             name: "مستخدم موثق",
-            face_hash: identitySignature,
-            document_hash: biometricData.frequencyFingerprint,
-            document_type: "collective_intelligence",
-            biometric_verified: biometricPassed,
+            face_hash: identityHash,
+            document_hash: biometricData.fingerprint,
+            document_type: "frequency_sync_identity",
+            biometric_verified: true,
             previous_hash: previousHash,
             consensus_data: {
                 approval_rate: (consensusVotes.approve.length / (consensusVotes.approve.length + consensusVotes.reject.length)) * 100,
-                witnesses_count: witnesses.length,
-                avg_reputation: witnesses.reduce((sum, w) => sum + w.reputation, 0) / witnesses.length
+                witnesses_count: witnesses.length
             }
         };
         
@@ -450,88 +357,58 @@
             const result = await response.json();
             
             if (response.ok) {
-                document.getElementById('registrationResult').innerHTML = `
+                sessionStorage.setItem('verifiedName', 'مستخدم موثق');
+                sessionStorage.setItem('verifiedDocType', 'frequency_sync_identity');
+                sessionStorage.setItem('verifiedTimestamp', new Date().toLocaleString());
+                sessionStorage.setItem('identityHash', identityHash);
+                sessionStorage.setItem('reputation', '100');
+                
+                registrationResult.innerHTML = `
                     <div class="success">
-                        🎉 تم تسجيل الهوية في البلوكشين!<br>
+                        🎉 تم تسجيل الهوية بنجاح!<br>
                         رقم الكتلة: ${result.block_index}<br>
-                        🔐 بصمة الهوية: ${identitySignature.substring(0, 32)}...
+                        🔐 بصمة الهوية: ${identityHash.substring(0, 32)}...
                     </div>
                 `;
-                appealBtn.disabled = false;
+                document.getElementById('goToProfileBtn').style.display = 'block';
+                goToProfileBtn.style.display = 'block';
             } else {
-                document.getElementById('registrationResult').innerHTML = `<div class="error">❌ فشل التسجيل: ${result.error}</div>`;
-                finalizeRegistrationBtn.disabled = false;
-                finalizeRegistrationBtn.innerHTML = "📝 إعادة المحاولة";
+                registrationResult.innerHTML = `<div class="error">❌ فشل التسجيل: ${result.error}</div>`;
+                finalizeBtn.disabled = false;
+                finalizeBtn.innerHTML = "✅ إعادة المحاولة";
             }
         } catch(err) {
-            document.getElementById('registrationResult').innerHTML = `<div class="error">❌ خطأ: ${err.message}</div>`;
-            finalizeRegistrationBtn.disabled = false;
-            finalizeRegistrationBtn.innerHTML = "📝 إعادة المحاولة";
+            registrationResult.innerHTML = `<div class="error">❌ خطأ: ${err.message}</div>`;
+            finalizeBtn.disabled = false;
+            finalizeBtn.innerHTML = "✅ إعادة المحاولة";
         }
     }
     
-    // ------------------- نظام الطعن والاستئناف -------------------
-    async function appealDecision() {
-        appealBtn.disabled = true;
-        appealBtn.innerHTML = '<span class="spinner"></span> جاري معالجة الاستئناف...';
-        
-        // محاكاة عملية الاستئناف: إعادة فحص البيانات من قبل عقد ذات سمعة عالية
-        document.getElementById('registrationResult').innerHTML = `
-            <div class="info">
-                ⚖️ جاري الاستئناف... يتم إعادة التحقق من قبل محكمين موثوقين (سمعة > 90)
-            </div>
-        `;
-        
-        await new Promise(r => setTimeout(r, 3000));
-        
-        // محاكاة نتيجة الاستئناف (95% نجاح للهويات الصحيحة)
-        const appealSuccess = biometricPassed && Math.random() > 0.05;
-        
-        if (appealSuccess) {
-            document.getElementById('registrationResult').innerHTML = `
-                <div class="success">
-                    ✅ تم قبول الاستئناف! تم تصحيح حالة الهوية.<br>
-                    📈 تمت زيادة سمعة المستخدم +20 نقطة.<br>
-                    📉 تم خصم 10 نقاط من الشهود الذين صوتوا ضد هوية صحيحة.
-                </div>
-            `;
-        } else {
-            document.getElementById('registrationResult').innerHTML = `
-                <div class="error">
-                    ❌ تم رفض الاستئناف. القرار النهائي: الهوية غير صالحة.
-                </div>
-            `;
+    // ------------------- التنقل بين الخطوات -------------------
+    function goToStep(s) {
+        step = s;
+        for(let i=1; i<=4; i++) {
+            const el = document.getElementById(`step${i}`);
+            if(i < s) { el.classList.add('completed'); el.classList.remove('active'); }
+            else if(i === s) { el.classList.add('active'); el.classList.remove('completed'); }
+            else { el.classList.remove('active', 'completed'); }
         }
-        
-        appealBtn.disabled = false;
-        appealBtn.innerHTML = "⚖️ طلب استئناف جديد";
+        document.getElementById('step1Content').style.display = s===1?'block':'none';
+        document.getElementById('step2Content').style.display = s===2?'block':'none';
+        document.getElementById('step3Content').style.display = s===3?'block':'none';
+        document.getElementById('step4Content').style.display = s===4?'block':'none';
     }
     
-    // ------------------- تشغيل الكاميرا -------------------
-    startCameraBtn.onclick = async () => {
-        if (cameraStream) cameraStream.getTracks().forEach(t => t.stop());
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-            cameraStream = stream;
-            video.srcObject = stream;
-            await video.play();
-            startCameraBtn.disabled = true;
-            startBiometricTest.disabled = false;
-            systemStatus.innerHTML = '✅ الكاميرا تعمل | جاهز للاختبار البيوفيزيائي';
-        } catch(err) {
-            systemStatus.innerHTML = `❌ لا يمكن الوصول للكاميرا: ${err.message}`;
-        }
-    };
-    
-    // ------------------- ربط الأحداث -------------------
+    nextToTestBtn.onclick = async () => { await calibrateEye(); goToStep(2); };
+    nextToWitnessBtn.onclick = () => goToStep(3);
     startBiometricTest.onclick = startBiometricFrequencyTest;
-    startWitnessDiscoveryBtn.onclick = discoverWitnesses;
+    discoverWitnessesBtn.onclick = discoverWitnesses;
     requestConsensusBtn.onclick = requestConsensus;
-    finalizeRegistrationBtn.onclick = finalizeRegistration;
-    appealBtn.onclick = appealDecision;
+    finalizeBtn.onclick = finalizeRegistration;
+    goToProfileBtn.onclick = () => window.location.href = '/profile';
     
-    // ------------------- بدء التشغيل -------------------
     loadModels();
+    goToStep(1);
 </script>
 </body>
 </html>
