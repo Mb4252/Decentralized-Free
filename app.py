@@ -164,7 +164,7 @@ class Blockchain:
 
 blockchain = Blockchain()
 
-# ------------------------- وظائف المزامنة والبث -------------------------
+# ------------------------- المزامنة والبث -------------------------
 def sync_with_peer(peer_url):
     try:
         response = requests.get(f"{peer_url}/chain", timeout=5)
