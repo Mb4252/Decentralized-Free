@@ -32,18 +32,39 @@ PEERS_FILE = os.path.join(DATA_DIR, 'peers.json')
 INVITES_FILE = os.path.join(DATA_DIR, 'invites.json')
 PENDING_VERIFICATIONS_FILE = os.path.join(DATA_DIR, 'pending_verifications.json')
 
+# ------------------- نظام الدعوات - السماح لأول 100 مستخدم بدون رمز -------------------
+MAX_FREE_USERS = 100  # عدد المستخدمين المسموح لهم بالتسجيل المجاني
+FREE_USERS_FILE = os.path.join(DATA_DIR, 'free_users_count.json')
+
+def get_free_users_count():
+    """الحصول على عدد المستخدمين الذين سجلوا بدون رمز دعوة"""
+    try:
+        with open(FREE_USERS_FILE, 'r') as f:
+            data = json.load(f)
+            return data.get('count', 0)
+    except FileNotFoundError:
+        return 0
+
+def increment_free_users_count():
+    """زيادة عداد المستخدمين المجانيين"""
+    count = get_free_users_count() + 1
+    with open(FREE_USERS_FILE, 'w') as f:
+        json.dump({'count': count}, f)
+    return count
+
+def can_register_without_invite():
+    """التحقق مما إذا كان التسجيل بدون رمز دعوة لا يزال متاحاً"""
+    return get_free_users_count() < MAX_FREE_USERS
+
 # ------------------- إعدادات النظام -------------------
-# حالات التوثيق
 VERIFICATION_STATUS = {
     'PENDING': 'pending',
     'APPROVED': 'approved', 
     'REJECTED': 'rejected'
 }
 
-# عتبات التصويت
 MIN_TRUST_SCORE_TO_VOTE = 50
 CONSENSUS_THRESHOLD = 0.6  # 60% موافقة
-AI_AUTO_VALIDATOR_ACTIVE = True  # وضع التوثيق الذاتي (يتغير عند وجود شهود)
 
 # ------------------- تحميل البيانات -------------------
 PEERS = set()
@@ -104,8 +125,6 @@ def euclidean_distance(a, b):
 
 # ------------------- نظام الشهود والثقة -------------------
 class TrustScoreManager:
-    """إدارة درجات الثقة للشهود والمستخدمين"""
-    
     def __init__(self):
         self.trust_scores = {}
         self.load_trust_scores()
@@ -125,7 +144,6 @@ class TrustScoreManager:
         return self.trust_scores.get(user_id, {'score': 100, 'total_votes': 0, 'correct_votes': 0})
     
     def update_trust_score(self, user_id, is_correct_vote):
-        """تحديث درجة الثقة بناءً على صحة التصويت"""
         if user_id not in self.trust_scores:
             self.trust_scores[user_id] = {'score': 100, 'total_votes': 0, 'correct_votes': 0}
         
@@ -140,7 +158,6 @@ class TrustScoreManager:
         return self.trust_scores[user_id]['score']
     
     def can_vote(self, user_id):
-        """التحقق مما إذا كان المستخدم يمكنه التصويت"""
         score = self.get_trust_score(user_id)['score']
         return score >= MIN_TRUST_SCORE_TO_VOTE
 
@@ -158,7 +175,7 @@ class Block:
         self.timestamp = timestamp
         self.previous_hash = previous_hash
         self.node_id = node_id or socket.gethostname()
-        self.status = status  # pending, approved, rejected
+        self.status = status
         self.witness_votes = witness_votes or {'approve': [], 'reject': []}
         self.trust_score_required = trust_score_required
         self.hash = self.compute_hash()
@@ -237,7 +254,6 @@ class Blockchain:
         return self.chain[-1]
 
     def add_pending_block(self, name, face_hash, document_hash, document_type, node_id, trust_score_required=0):
-        """إضافة بلوك بحالة PENDING"""
         last_block = self.get_last_block()
         new_block = Block(
             last_block.index + 1,
@@ -255,7 +271,6 @@ class Blockchain:
         return new_block
     
     def approve_block(self, block_index, witness_id, approved):
-        """تصويت شاهد على بلوك معلق"""
         for block in self.chain:
             if block.index == block_index:
                 if approved:
@@ -265,7 +280,6 @@ class Blockchain:
                     if witness_id not in block.witness_votes['reject']:
                         block.witness_votes['reject'].append(witness_id)
                 
-                # التحقق من الوصول إلى التوافق
                 total_votes = len(block.witness_votes['approve']) + len(block.witness_votes['reject'])
                 if total_votes > 0:
                     approval_rate = len(block.witness_votes['approve']) / total_votes
@@ -328,11 +342,9 @@ def broadcast_block(block_dict):
 # ------------------- مسارات API -------------------
 @app.route('/invite', methods=['POST'])
 def create_invite():
-    """إنشاء رمز دعوة (للمستخدمين الموثقين فقط)"""
     data = request.get_json()
     inviter = data.get('inviter')
     
-    # التحقق من أن الداعي مستخدم موثق
     is_verified = False
     for block in blockchain.chain:
         if block.name == inviter and block.status == 'approved':
@@ -356,7 +368,6 @@ def create_invite():
 
 @app.route('/verify-invite', methods=['POST'])
 def verify_invite():
-    """التحقق من صحة رمز الدعوة"""
     data = request.get_json()
     invite_code = data.get('invite_code')
     
@@ -376,21 +387,45 @@ def verify_invite():
 
 @app.route('/propose-verification', methods=['POST'])
 def propose_verification():
-    """اقتراح توثيق جديد (حالة PENDING)"""
     data = request.get_json()
-    required = ['name', 'face_hash', 'document_hash', 'document_type', 'invite_code']
+    required = ['name', 'face_hash', 'document_hash', 'document_type']
     
     if not all(k in data for k in required):
         return jsonify({"error": "بيانات ناقصة"}), 400
     
-    # التحقق من رمز الدعوة
-    invites = load_invites()
     invite_code = data.get('invite_code')
+    free_users_count = get_free_users_count()
     
-    if invite_code not in invites or invites[invite_code]['used']:
-        return jsonify({"error": "Invalid or used invite code"}), 403
+    # ✅ المنطق الجديد: أول 100 مستخدم بدون رمز دعوة
+    if free_users_count < MAX_FREE_USERS:
+        # لا حاجة لرمز دعوة
+        pass
+    elif not invite_code:
+        remaining = MAX_FREE_USERS - free_users_count
+        return jsonify({"error": f"⚠️ تم الوصول للحد الأقصى ({MAX_FREE_USERS}) مستخدم مجاني. يلزم رمز دعوة. المقاعد المتبقية: {remaining}"}), 403
+    else:
+        # التحقق من رمز الدعوة للمستخدمين الجدد
+        invites = load_invites()
+        if invite_code not in invites or invites[invite_code]['used']:
+            return jsonify({"error": "رمز دعوة غير صالح أو مستخدم"}), 403
+        
+        # تحديث حالة رمز الدعوة
+        invites[invite_code]['used'] = True
+        invites[invite_code]['used_by'] = data['name']
+        save_invites(invites)
     
-    # إنشاء بلوك بحالة PENDING
+    # ✅ زيادة العداد إذا كان هذا مستخدم جديد
+    registered_before = False
+    for block in blockchain.chain:
+        if block.name == data['name']:
+            registered_before = True
+            break
+    
+    if not registered_before and free_users_count < MAX_FREE_USERS:
+        increment_free_users_count()
+        new_count = get_free_users_count()
+        print(f"📊 مستخدم جديد مجاني! المستخدم رقم {new_count} من {MAX_FREE_USERS}")
+    
     trust_score_required = 0 if not PEERS else MIN_TRUST_SCORE_TO_VOTE
     new_block = blockchain.add_pending_block(
         data['name'],
@@ -401,17 +436,10 @@ def propose_verification():
         trust_score_required
     )
     
-    # حفظ البلوك في السلسلة كـ PENDING
     with ledger_lock:
         blockchain.chain.append(new_block)
         blockchain.save_chain()
     
-    # تحديث حالة رمز الدعوة
-    invites[invite_code]['used'] = True
-    invites[invite_code]['used_by'] = data['name']
-    save_invites(invites)
-    
-    # بث البلوك للشهود
     block_dict = {
         "index": new_block.index,
         "name": new_block.name,
@@ -426,7 +454,6 @@ def propose_verification():
         "hash": new_block.hash
     }
     
-    # إذا كان هناك شهود، بث لهم. وإلا استخدم AI Auto-Validator
     if len(PEERS) > 0:
         threading.Thread(target=broadcast_block, args=(block_dict,)).start()
         return jsonify({
@@ -435,7 +462,6 @@ def propose_verification():
             "status": "pending"
         }), 202
     else:
-        # وضع التوثيق الذاتي (AI Auto-Validator)
         new_block.status = 'approved'
         blockchain.save_chain()
         return jsonify({
@@ -446,25 +472,21 @@ def propose_verification():
 
 @app.route('/vote', methods=['POST'])
 def vote_on_verification():
-    """تصويت شاهد على توثيق معلق"""
     data = request.get_json()
     required = ['block_index', 'approved', 'witness_id', 'trust_score']
     
     if not all(k in data for k in required):
         return jsonify({"error": "بيانات ناقصة"}), 400
     
-    # التحقق من أن الشاهد لديه ثقة كافية للتصويت
     if data['trust_score'] < MIN_TRUST_SCORE_TO_VOTE:
         return jsonify({"error": f"Insufficient trust score. Minimum required: {MIN_TRUST_SCORE_TO_VOTE}"}), 403
     
     result, status = blockchain.approve_block(data['block_index'], data['witness_id'], data['approved'])
     
     if status == 'approved':
-        # تحديث درجة ثقة الشاهد (محاكاة)
-        is_correct = True  # في النظام الحقيقي، يتم التحقق لاحقاً
+        is_correct = True
         trust_manager.update_trust_score(data['witness_id'], is_correct)
         
-        # إعلام جميع العقد بالقرار النهائي
         for block in blockchain.chain:
             if block.index == data['block_index']:
                 final_block_dict = {
@@ -490,7 +512,6 @@ def vote_on_verification():
 
 @app.route('/pending-verifications', methods=['GET'])
 def get_pending_verifications():
-    """الحصول على قائمة التوثيقات المعلقة"""
     pending = blockchain.get_pending_blocks()
     result = []
     for block in pending:
@@ -506,7 +527,6 @@ def get_pending_verifications():
 
 @app.route('/trust-score', methods=['GET'])
 def get_trust_score():
-    """الحصول على درجة ثقة المستخدم"""
     user_id = request.args.get('user_id')
     if not user_id:
         return jsonify({"error": "user_id required"}), 400
@@ -516,7 +536,6 @@ def get_trust_score():
 
 @app.route('/witnesses', methods=['GET'])
 def get_witnesses():
-    """الحصول على قائمة الشهود النشطين"""
     witnesses = []
     for peer in PEERS:
         try:
@@ -530,7 +549,6 @@ def get_witnesses():
 
 @app.route('/register-witness', methods=['POST'])
 def register_witness():
-    """تسجيل شاهد جديد"""
     data = request.get_json()
     witness_url = data.get('witness_url')
     invite_code = data.get('invite_code')
@@ -538,21 +556,46 @@ def register_witness():
     if not witness_url or not invite_code:
         return jsonify({"error": "witness_url and invite_code required"}), 400
     
-    # التحقق من رمز الدعوة
     invites = load_invites()
     if invite_code not in invites or invites[invite_code]['used']:
         return jsonify({"error": "Invalid invite code"}), 403
     
-    # إضافة الشاهد
     PEERS.add(witness_url)
     save_peers()
     
-    # تحديث حالة رمز الدعوة
     invites[invite_code]['used'] = True
     invites[invite_code]['used_by'] = witness_url
     save_invites(invites)
     
     return jsonify({"message": "Witness registered successfully", "peers": list(PEERS)}), 200
+
+@app.route('/system-status', methods=['GET'])
+def system_status():
+    """عرض حالة النظام وعدد المستخدمين المتبقيين"""
+    free_users = get_free_users_count()
+    remaining = MAX_FREE_USERS - free_users
+    total_users = len([b for b in blockchain.chain if b.status == 'approved' and b.index > 0])
+    
+    return jsonify({
+        "total_verified_users": total_users,
+        "free_registrations_used": free_users,
+        "free_registrations_remaining": max(0, remaining),
+        "invite_only_mode": remaining <= 0,
+        "max_free_users": MAX_FREE_USERS
+    }), 200
+
+@app.route('/stats', methods=['GET'])
+def public_stats():
+    """صفحة عامة لإحصائيات النظام"""
+    free_users = get_free_users_count()
+    total_users = len([b for b in blockchain.chain if b.status == 'approved' and b.index > 0])
+    
+    return jsonify({
+        "total_verified_users": total_users,
+        "free_registrations_used": free_users,
+        "free_registrations_remaining": max(0, MAX_FREE_USERS - free_users),
+        "invite_only": free_users >= MAX_FREE_USERS
+    }), 200
 
 # ------------------- المسارات الأساسية -------------------
 @app.route('/chain', methods=['GET'])
@@ -575,7 +618,6 @@ def get_chain():
 
 @app.route('/add_block_peer', methods=['POST'])
 def add_block_peer():
-    """استقبال بلوك من عقدة أخرى (للمزامنة)"""
     data = request.get_json()
     required = ['index', 'name', 'face_hash', 'document_hash', 'document_type',
                 'timestamp', 'previous_hash', 'hash', 'node_id', 'status']
@@ -607,12 +649,16 @@ def add_block_peer():
 
 @app.route('/health', methods=['GET'])
 def health():
+    free_users = get_free_users_count()
+    remaining = MAX_FREE_USERS - free_users
     return jsonify({
         "status": "healthy",
         "chain_length": len(blockchain.chain),
         "peers_count": len(PEERS),
         "auto_validator_active": len(PEERS) == 0,
-        "pending_count": len(blockchain.get_pending_blocks())
+        "pending_count": len(blockchain.get_pending_blocks()),
+        "free_registrations_remaining": max(0, remaining),
+        "invite_only_mode": remaining <= 0
     }), 200
 
 @app.route('/verify_person', methods=['POST'])
@@ -634,6 +680,38 @@ def verify_person():
     if results:
         return jsonify({"verified": True, "records": results}), 200
     return jsonify({"verified": False}), 404
+
+@app.route('/request-invite', methods=['POST'])
+def request_invite():
+    """طلب رمز دعوة من مستخدم جديد"""
+    data = request.get_json()
+    email = data.get('email')
+    reason = data.get('reason', '')
+    
+    if not email:
+        return jsonify({"error": "Email required"}), 400
+    
+    INVITE_REQUESTS_FILE = os.path.join(DATA_DIR, 'invite_requests.json')
+    try:
+        with open(INVITE_REQUESTS_FILE, 'r') as f:
+            requests_db = json.load(f)
+    except FileNotFoundError:
+        requests_db = {}
+    
+    request_id = str(len(requests_db) + 1)
+    requests_db[request_id] = {
+        "email": email,
+        "reason": reason,
+        "status": "pending",
+        "created_at": str(datetime.datetime.now())
+    }
+    
+    with open(INVITE_REQUESTS_FILE, 'w') as f:
+        json.dump(requests_db, f, indent=2)
+    
+    print(f"📧 طلب دعوة جديد من: {email}")
+    
+    return jsonify({"message": "Request submitted. You will receive an invite within 24 hours."}), 200
 
 # ------------------- صفحات الواجهة -------------------
 @app.route('/')
@@ -660,11 +738,14 @@ def serve_static(filename):
 if __name__ == '__main__':
     load_peers()
     threading.Thread(target=sync_with_peers).start()
+    free_remaining = MAX_FREE_USERS - get_free_users_count()
     print("=" * 50)
     print("🔐 وثاق - نظام التوثيق بالشهود (Witness-based System)")
     print("=" * 50)
     print(f"🎯 وضع التوثيق الذاتي (AI Validator): {'نشط' if len(PEERS) == 0 else 'غير نشط - يوجد شهود'}")
     print(f"👥 عدد الشهود: {len(PEERS)}")
+    print(f"📊 المقاعد المجانية المتبقية: {free_remaining} / {MAX_FREE_USERS}")
+    print(f"🔐 وضع الدعوات: {'مغلق (Invite-Only)' if free_remaining <= 0 else 'مفتوح'}")
     print(f"📁 مجلد البيانات: {DATA_DIR}")
     print(f"🌐 الخادم: http://localhost:{PORT}")
     print("=" * 50)
