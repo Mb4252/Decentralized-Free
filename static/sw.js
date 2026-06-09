@@ -1,25 +1,54 @@
 const CACHE_NAME = 'wethaq-cache-v1';
 const urlsToCache = [
   '/',
-  '/register',
-  '/static/register.html',
-  '/static/verification_result.html',
+  '/verify',
+  '/witness',
+  '/profile',
+  '/static/verify.html',
+  '/static/witness.html',
   '/static/profile.html',
-  '/static/manifest.json',
-  'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js'
+  '/static/manifest.json'
 ];
 
 self.addEventListener('install', event => {
+  console.log('Service Worker: Installing...');
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(urlsToCache))
+      .then(cache => {
+        console.log('Service Worker: Caching app shell');
+        return cache.addAll(urlsToCache);
+      })
+      .catch(err => console.error('Service Worker: Cache failed', err))
   );
 });
 
 self.addEventListener('fetch', event => {
+  const requestUrl = new URL(event.request.url);
+
+  // استراتيجية Network First للملفات من CDN (مثل الـ API)
+  if (requestUrl.hostname.includes('cdn.jsdelivr.net') || 
+      requestUrl.hostname.includes('cdnjs.cloudflare.com')) {
+    event.respondWith(
+      fetch(event.request)
+        .then(response => {
+          return response;
+        })
+        .catch(() => {
+          // يمكن إعادة محاولة أو عرض صفحة خطأ بسيطة
+          return new Response('Network request failed', { status: 503 });
+        })
+    );
+    return;
+  }
+
+  // استراتيجية Cache First للملفات المحلية
   event.respondWith(
     caches.match(event.request)
-      .then(response => response || fetch(event.request))
+      .then(response => {
+        if (response) {
+          return response;
+        }
+        return fetch(event.request);
+      })
   );
 });
