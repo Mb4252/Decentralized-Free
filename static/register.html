@@ -2,7 +2,7 @@
 <html dir="rtl" lang="ar">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>سجل الحقيقة - تسجيل الهوية</title>
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
@@ -21,6 +21,7 @@
         .error { background: #f8d7da; color: #721c24; }
         .info { background: #d1ecf1; color: #0c5460; }
         .step { background: #e7f3ff; padding: 10px; border-radius: 50px; margin-bottom: 15px; }
+        .preview-img { max-width: 200px; max-height: 200px; margin-top: 10px; border-radius: 16px; border: 2px solid #2c7da0; display: block; }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
@@ -49,8 +50,11 @@
 
     <div class="card">
         <label>📄 صورة الوجه من الوثيقة</label>
-        <input type="file" id="docImageInput" accept="image/jpeg, image/png">
-        <img id="docPreview" style="max-width:150px; display:none; margin-top:10px;">
+        <input type="file" id="docImageInput" accept="image/jpeg, image/png, image/jpg">
+        <div id="previewContainer" style="text-align: center;">
+            <img id="docPreview" class="preview-img" style="display: none;">
+        </div>
+        <div id="loadMsg" class="info" style="display: none;">✅ تم تحميل الصورة بنجاح</div>
         <button id="extractDocFaceBtn" disabled>🔍 استخراج الوجه من المستند</button>
         <div id="docFaceResult" class="result"></div>
     </div>
@@ -86,6 +90,7 @@
     const docImageInput = document.getElementById('docImageInput');
     const extractDocFaceBtn = document.getElementById('extractDocFaceBtn');
     const docPreview = document.getElementById('docPreview');
+    const loadMsg = document.getElementById('loadMsg');
     const fullNameInput = document.getElementById('fullName');
     const documentTypeSelect = document.getElementById('documentType');
     const registerBtn = document.getElementById('registerAndContinue');
@@ -133,32 +138,61 @@
         return { descriptor: detection.descriptor, croppedCanvas: canvas, hash };
     }
 
+    // ------------------- معاينة الصورة فور الرفع -------------------
+    docImageInput.addEventListener('change', (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        // التحقق من أن الملف صورة
+        if (!file.type.startsWith('image/')) {
+            alert('الرجاء اختيار ملف صورة (jpg, png)');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            docPreview.src = e.target.result;
+            docPreview.style.display = 'block';
+            loadMsg.style.display = 'block';
+            // إعادة تمكين زر الاستخراج بعد تحميل الصورة
+            extractDocFaceBtn.disabled = false;
+            // إعادة تعيين النتائج السابقة
+            document.getElementById('docFaceResult').innerHTML = '';
+            documentFaceDescriptor = null;
+            documentFaceHash = null;
+        };
+        reader.onerror = () => {
+            alert('حدث خطأ أثناء قراءة الملف');
+        };
+        reader.readAsDataURL(file);
+    });
+
     // ------------------- استخراج وجه المستند -------------------
     extractDocFaceBtn.onclick = async () => {
-        if (!modelsLoaded || !docPreview.src) return;
+        if (!modelsLoaded) {
+            alert("النماذج لم تُحمّل بعد، انتظر قليلاً");
+            return;
+        }
+        if (!docPreview.src || docPreview.style.display === 'none') {
+            alert("يرجى رفع صورة المستند أولاً");
+            return;
+        }
+        // استخدام صورة HTMLImageElement للتأكد من تحميلها بالكامل
         const img = new Image();
+        img.crossOrigin = "Anonymous";
         img.src = docPreview.src;
-        await new Promise(r => { img.onload = r; });
+        await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+        });
         const result = await extractFaceFromMedia(img);
         if (!result) {
-            document.getElementById('docFaceResult').innerHTML = '<span class="error">⚠️ لم يتم العثور على وجه في المستند</span>';
+            document.getElementById('docFaceResult').innerHTML = '<span class="error">⚠️ لم يتم العثور على وجه واضح في المستند. حاول بصورة أفضل.</span>';
             return;
         }
         documentFaceDescriptor = result.descriptor;
         documentFaceHash = result.hash;
-        document.getElementById('docFaceResult').innerHTML = `<span class="success">✅ تم استخراج الوجه من المستند</span>`;
-    };
-
-    docImageInput.onchange = (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-            docPreview.src = ev.target.result;
-            docPreview.style.display = 'block';
-            extractDocFaceBtn.disabled = false;
-        };
-        reader.readAsDataURL(file);
+        document.getElementById('docFaceResult').innerHTML = `<span class="success">✅ تم استخراج الوجه من المستند بنجاح (البصمة: ${documentFaceHash.substring(0,10)}...)</span>`;
     };
 
     // ------------------- تشغيل الكاميرا -------------------
@@ -173,17 +207,15 @@
             startLivenessBtn.disabled = false;
             document.getElementById('livenessStatus').innerHTML = '<span class="info">✅ الكاميرا تعمل، اضغط "بدء فحص الحيوية"</span>';
         } catch(err) {
-            document.getElementById('livenessStatus').innerHTML = '<span class="error">❌ لا يمكن الوصول للكاميرا</span>';
+            document.getElementById('livenessStatus').innerHTML = '<span class="error">❌ لا يمكن الوصول للكاميرا: تأكد من الأذونات</span>';
         }
     };
 
     // ------------------- دوال فحص الحيوية (إرمش وحركات الرأس) -------------------
     async function detectEyeBlink(landmarks) {
-        // مؤشرات العين اليسرى واليمنى (face-api.js توفر landmarks)
         const leftEye = landmarks.getLeftEye();
         const rightEye = landmarks.getRightEye();
         if (!leftEye || !rightEye) return false;
-        // حساب EAR بسيط (مسافة عمودية / أفقية)
         function getEAR(eyePoints) {
             const A = Math.hypot(eyePoints[1].x - eyePoints[5].x, eyePoints[1].y - eyePoints[5].y);
             const B = Math.hypot(eyePoints[2].x - eyePoints[4].x, eyePoints[2].y - eyePoints[4].y);
@@ -193,11 +225,10 @@
         const leftEAR = getEAR(leftEye);
         const rightEAR = getEAR(rightEye);
         const avgEAR = (leftEAR + rightEAR) / 2;
-        return avgEAR < 0.25; // قيمة تقريبية للغمضة
+        return avgEAR < 0.25;
     }
 
     function getHeadDirection(landmarks, detectionBox) {
-        // تقدير بسيط: مركز الوجه ونسبة عرض/ارتفاع الوجه
         const nose = landmarks.getNose();
         if (!nose || nose.length < 3) return "مستقيم";
         const noseTip = nose[2];
@@ -206,14 +237,19 @@
         const offset = (noseTip.x - faceCenterX) / faceWidth;
         if (offset < -0.1) return "يسار";
         if (offset > 0.1) return "يمين";
+        // تقدير الأعلى/الأسفل بناءً على y للأنف
+        const faceTop = detectionBox.y;
+        const faceBottom = detectionBox.y + detectionBox.height;
+        const yRatio = (noseTip.y - faceTop) / detectionBox.height;
+        if (yRatio < 0.3) return "أعلى";
+        if (yRatio > 0.7) return "أسفل";
         return "مستقيم";
     }
 
     async function runLivenessCheck() {
-        const instructions = ["إرمش الآن", "أدر رأسك يساراً", "أدر رأسك يميناً", "أدر رأسك للأعلى (شمال)", "أدر رأسك للأسفل (جنوب)"];
+        const instructions = ["إرمش الآن", "أدر رأسك يساراً", "أدر رأسك يميناً", "أدر رأسك للأعلى", "أدر رأسك للأسفل"];
         let step = 0;
-        let blinkDetected = false;
-        let leftDetected = false, rightDetected = false, upDetected = false, downDetected = false;
+        let blinkDetected = false, leftDetected = false, rightDetected = false, upDetected = false, downDetected = false;
         
         const statusDiv = document.getElementById('livenessStatus');
         statusDiv.innerHTML = `<span class="info">⏳ اتبع التعليمات: ${instructions[0]}</span>`;
@@ -226,14 +262,12 @@
                 const landmarks = detection.landmarks;
                 const box = detection.detection.box;
                 
-                // كشف الإرماش
                 const isBlinking = await detectEyeBlink(landmarks);
                 if (step === 0 && isBlinking && !blinkDetected) {
                     blinkDetected = true;
                     step++;
                     statusDiv.innerHTML = `<span class="success">✅ تم الإرماش! الآن ${instructions[1]}</span>`;
                 }
-                // اتجاه الرأس
                 const direction = getHeadDirection(landmarks, box);
                 if (step === 1 && direction === "يسار" && !leftDetected) {
                     leftDetected = true;
@@ -245,45 +279,38 @@
                     step++;
                     statusDiv.innerHTML = `<span class="success">✅ تم التوجه يميناً! الآن ${instructions[3]}</span>`;
                 }
-                if (step === 3 && direction === "مستقيم") {
-                    // الكشف عن الأعلى والأسفل: نستخدم إحداثيات الأنف بالنسبة للوجه
-                    const noseTip = landmarks.getNose()[2];
-                    const faceTop = box.y;
-                    const faceBottom = box.y + box.height;
-                    const isUp = noseTip.y < faceTop + box.height*0.3;
-                    const isDown = noseTip.y > faceBottom - box.height*0.3;
-                    if (isUp && !upDetected) {
-                        upDetected = true;
-                        step++;
-                        statusDiv.innerHTML = `<span class="success">✅ تم الرفع للأعلى! الآن ${instructions[4]}</span>`;
-                    }
-                    if (step === 4 && isDown && !downDetected) {
-                        downDetected = true;
-                        step++;
-                        clearInterval(interval);
-                        statusDiv.innerHTML = `<span class="success">🎉 اجتزت فحص الحيوية بنجاح!</span>`;
-                        // الآن نقوم بالتقاط الوجه النهائي للتحقق من المطابقة
-                        const liveResult = await extractFaceFromMedia(video);
-                        if (liveResult) {
-                            liveFaceDescriptor = liveResult.descriptor;
-                            liveFaceHash = liveResult.hash;
-                            const distance = faceapi.euclideanDistance(liveFaceDescriptor, documentFaceDescriptor);
-                            const matched = distance < 0.6;
-                            faceMatched = matched;
-                            const matchDiv = document.getElementById('finalComparisonResult');
-                            if (matched) {
-                                matchDiv.innerHTML = '<span class="success">✅ الوجه الملتقط يطابق وجه المستند!</span>';
-                                registerBtn.disabled = false;
-                                livenessPassed = true;
-                            } else {
-                                matchDiv.innerHTML = `<span class="error">❌ الوجه الحي لا يطابق المستند (المسافة: ${distance.toFixed(3)})</span>`;
-                                registerBtn.disabled = true;
-                            }
+                if (step === 3 && direction === "أعلى" && !upDetected) {
+                    upDetected = true;
+                    step++;
+                    statusDiv.innerHTML = `<span class="success">✅ تم الرفع للأعلى! الآن ${instructions[4]}</span>`;
+                }
+                if (step === 4 && direction === "أسفل" && !downDetected) {
+                    downDetected = true;
+                    step++;
+                    clearInterval(interval);
+                    statusDiv.innerHTML = `<span class="success">🎉 اجتزت فحص الحيوية بنجاح!</span>`;
+                    // الآن نقوم بالتقاط الوجه النهائي للتحقق من المطابقة
+                    const liveResult = await extractFaceFromMedia(video);
+                    if (liveResult) {
+                        liveFaceDescriptor = liveResult.descriptor;
+                        liveFaceHash = liveResult.hash;
+                        const distance = faceapi.euclideanDistance(liveFaceDescriptor, documentFaceDescriptor);
+                        const matched = distance < 0.6;
+                        faceMatched = matched;
+                        const matchDiv = document.getElementById('finalComparisonResult');
+                        if (matched) {
+                            matchDiv.innerHTML = `<span class="success">✅ الوجه الملتقط يطابق وجه المستند! (المسافة: ${distance.toFixed(3)})</span>`;
+                            registerBtn.disabled = false;
+                            livenessPassed = true;
                         } else {
-                            statusDiv.innerHTML = '<span class="error">فشل التقاط الوجه الحي</span>';
+                            matchDiv.innerHTML = `<span class="error">❌ الوجه الحي لا يطابق المستند (المسافة: ${distance.toFixed(3)})</span>`;
+                            registerBtn.disabled = true;
                         }
-                        resolve(true);
+                    } else {
+                        statusDiv.innerHTML = '<span class="error">فشل التقاط الوجه الحي، حاول مرة أخرى</span>';
+                        registerBtn.disabled = true;
                     }
+                    resolve(true);
                 }
             }, 500);
         });
@@ -324,7 +351,6 @@
             const response = await fetch('/add_block', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
             const result = await response.json();
             if (response.ok) {
-                // تخزين اسم المستخدم لتظهر في الصفحة التالية
                 sessionStorage.setItem('verifiedName', name);
                 sessionStorage.setItem('verifiedDocType', docType);
                 sessionStorage.setItem('verifiedTimestamp', new Date().toLocaleString());
@@ -334,7 +360,7 @@
                 registerBtn.disabled = false;
             }
         } catch(err) {
-            document.getElementById('registerStatus').innerHTML = `<span class="error">خطأ في الاتصال</span>`;
+            document.getElementById('registerStatus').innerHTML = `<span class="error">خطأ في الاتصال: ${err.message}</span>`;
             registerBtn.disabled = false;
         }
     };
