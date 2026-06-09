@@ -22,7 +22,7 @@
 <body>
 <div class="container">
     <h1>📄 الملف الشخصي</h1>
-    <div class="card" id="profileCard">
+    <div class="card">
         <p>👤 الاسم: <strong id="profileName"></strong></p>
         <p>📋 نوع الوثيقة: <strong id="profileDocType"></strong></p>
         <p>🕒 تاريخ التوثيق: <strong id="profileTime"></strong></p>
@@ -47,23 +47,17 @@
 </div>
 
 <script>
-    // عرض بيانات المستخدم المسجل حالياً (من sessionStorage)
     document.getElementById('profileName').innerText = sessionStorage.getItem('verifiedName') || "غير متوفر";
     document.getElementById('profileDocType').innerText = sessionStorage.getItem('verifiedDocType') || "غير متوفر";
     document.getElementById('profileTime').innerText = sessionStorage.getItem('verifiedTimestamp') || "غير متوفر";
 
-    // جلب رقم الكتلة والعقدة لأحدث كتلة مرتبطة بهذا الاسم (من الخادم)
     async function fetchUserBlock() {
         const name = sessionStorage.getItem('verifiedName');
         if (!name) return;
-        const response = await fetch('/verify_person', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query_type: 'name', query_value: name })
-        });
-        const data = await response.json();
-        if (data.verified && data.records.length > 0) {
-            const latest = data.records[data.records.length - 1];
+        const res = await fetch('/verify_person', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query_type: 'name', query_value: name }) });
+        const data = await res.json();
+        if (data.verified && data.records.length) {
+            const latest = data.records[data.records.length-1];
             document.getElementById('profileBlockIndex').innerText = latest.index;
             document.getElementById('profileNodeId').innerText = latest.node_id;
         } else {
@@ -73,7 +67,6 @@
     }
     fetchUserBlock();
 
-    // البحث
     document.getElementById('searchBtn').onclick = async () => {
         const query = document.getElementById('searchQuery').value.trim();
         const type = document.getElementById('searchType').value;
@@ -81,11 +74,7 @@
         const resultDiv = document.getElementById('searchResult');
         resultDiv.innerHTML = '<span class="info">⏳ جاري البحث...</span>';
         try {
-            const res = await fetch('/verify_person', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ query_type: type, query_value: query })
-            });
+            const res = await fetch('/verify_person', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query_type: type, query_value: query }) });
             const data = await res.json();
             if (res.ok && data.verified) {
                 let html = `<div class="success">${data.message}</div><ul>`;
