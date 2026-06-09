@@ -9,7 +9,11 @@ import math
 from flask import Flask, request, jsonify, send_from_directory, redirect, render_template
 from flask_cors import CORS
 
-app = Flask(__name__, static_folder='static', static_url_path='/static')
+app = Flask(__name__, 
+            static_folder='static', 
+            static_url_path='/static',
+            template_folder='templates')  # ✅ تحديد مجلد القوالب
+
 CORS(app)
 
 # ------------------- الإعدادات -------------------
@@ -51,8 +55,9 @@ def save_peers():
 
 ledger_lock = threading.Lock()
 
-# ------------------- دوال المسافة الإقليدية -------------------
+# ------------------- دوال المساعدة -------------------
 def euclidean_distance(a, b):
+    """حساب المسافة الإقليدية بين متجهين"""
     if len(a) != len(b):
         return float('inf')
     return math.sqrt(sum((x - y) ** 2 for x, y in zip(a, b)))
@@ -313,7 +318,7 @@ def verify_person():
     return jsonify({"verified": False}), 404
 
 # ============================================================
-# ✅ ✅ ✅ مسارات الصفحات (ROUTES) - هذا هو الحل لمشكلتك ✅ ✅ ✅
+# ✅ مسارات الصفحات (باستخدام render_template من مجلد templates)
 # ============================================================
 
 @app.route('/')
@@ -323,20 +328,20 @@ def index():
 
 @app.route('/verify')
 def verify_page():
-    """صفحة التوثيق الرئيسية (الفيزياء الحيوية + إثبات الحضور)"""
-    return send_from_directory('static', 'verify.html')
+    """صفحة التوثيق الرئيسية"""
+    return render_template('verify.html')
 
 @app.route('/witness')
 def witness_page():
     """صفحة الشهود والتصويت الجماعي"""
-    return send_from_directory('static', 'witness.html')
+    return render_template('witness.html')
 
 @app.route('/profile')
 def profile_page():
     """الملف الشخصي ونظام السمعة"""
-    return send_from_directory('static', 'profile.html')
+    return render_template('profile.html')
 
-# مسار احتياطي للملفات الثابتة
+# مسار للملفات الثابتة (CSS, JS, icons, manifest)
 @app.route('/static/<path:filename>')
 def serve_static(filename):
     return send_from_directory('static', filename)
@@ -345,11 +350,19 @@ def serve_static(filename):
 if __name__ == '__main__':
     load_peers()
     threading.Thread(target=sync_with_peers).start()
-    print(f"🚀 بدء تشغيل الخادم على المنفذ {PORT}")
+    print("=" * 50)
+    print("🚀 وثاق - نظام التوثيق اللامركزي")
+    print("=" * 50)
     print(f"📁 مجلد البيانات: {DATA_DIR}")
-    print(f"📍 المسارات المتاحة:")
-    print(f"   - /verify → صفحة التوثيق")
-    print(f"   - /witness → صفحة الشهود")
-    print(f"   - /profile → الملف الشخصي")
-    print(f"   - /chain → API سلسلة الكتل")
+    print(f"📁 مجلد القوالب: templates/")
+    print(f"📁 مجلد الملفات الثابتة: static/")
+    print(f"🌐 الخادم يعمل على المنفذ: {PORT}")
+    print("-" * 50)
+    print("📍 المسارات المتاحة:")
+    print(f"   ✅ http://localhost:{PORT}/verify     → صفحة التوثيق")
+    print(f"   ✅ http://localhost:{PORT}/witness    → صفحة الشهود")
+    print(f"   ✅ http://localhost:{PORT}/profile    → الملف الشخصي")
+    print(f"   ✅ http://localhost:{PORT}/chain      → API سلسلة الكتل")
+    print(f"   ✅ http://localhost:{PORT}/health     → نقطة صحية")
+    print("=" * 50)
     app.run(host='0.0.0.0', port=PORT, debug=False, threaded=True)
