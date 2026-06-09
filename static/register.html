@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>سجل الحقيقة - تسجيل الهوية</title>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: #f0f2f5; margin: 0; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; background: white; border-radius: 24px; padding: 25px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        h1 { color: #1e3c72; text-align: center; border-bottom: 2px solid #2c7da0; padding-bottom: 10px; }
+        .card { background: #f9f9fc; border-radius: 20px; padding: 20px; margin-bottom: 20px; border: 1px solid #e0e4e8; }
+        label { display: block; margin: 10px 0 5px; font-weight: bold; }
+        input, select, button { width: 100%; padding: 12px; margin: 8px 0; border-radius: 40px; border: 1px solid #ccc; font-size: 1rem; }
+        button { background-color: #2c7da0; color: white; border: none; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        button:disabled { background-color: #b0c4d9; cursor: not-allowed; }
+        video { width: 100%; max-width: 400px; border-radius: 16px; border: 2px solid #ddd; background: #000; display: block; margin: 10px auto; }
+        .flex-buttons { display: flex; gap: 10px; flex-wrap: wrap; }
+        .result { margin-top: 10px; padding: 10px; border-radius: 50px; text-align: center; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        .step { background: #e7f3ff; padding: 10px; border-radius: 50px; margin-bottom: 15px; }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+</head>
+<body>
+<div class="container">
+    <h1>📜 الخطوة 1: تسجيل الهوية</h1>
+    <div class="step">🔹 أدخل الاسم الكامل 🔹 ارفع صورة وجه من وثيقة رسمية 🔹 قم بالتحقق الحي (إرمش + حركات الرأس)</div>
+
+    <div class="card">
+        <label>👤 الاسم الكامل (سيظهر في الملف الشخصي)</label>
+        <input type="text" id="fullName" placeholder="مثال: أحمد محمد العلي">
+    </div>
+
+    <div class="card">
+        <label>📋 نوع الوثيقة</label>
+        <select id="documentType">
+            <option value="جواز سفر">🛂 جواز سفر</option>
+            <option value="بطاقة هوية وطنية">🪪 بطاقة هوية وطنية</option>
+            <option value="رخصة قيادة">🚗 رخصة قيادة</option>
+            <option value="شهادة جامعية">🎓 شهادة جامعية</option>
+            <option value="شهادة حرفية">🛠️ شهادة حرفية</option>
+            <option value="أخرى">📄 أخرى</option>
+        </select>
+    </div>
+
+    <div class="card">
+        <label>📄 صورة الوجه من الوثيقة</label>
+        <input type="file" id="docImageInput" accept="image/jpeg, image/png">
+        <img id="docPreview" style="max-width:150px; display:none; margin-top:10px;">
+        <button id="extractDocFaceBtn" disabled>🔍 استخراج الوجه من المستند</button>
+        <div id="docFaceResult" class="result"></div>
+    </div>
+
+    <div class="card">
+        <label>📸 التحقق الحي (الكاميرا)</label>
+        <video id="video" autoplay muted playsinline></video>
+        <div class="flex-buttons">
+            <button id="startCameraBtn">📷 تشغيل الكاميرا</button>
+            <button id="startLivenessCheck" disabled>🔐 بدء فحص الحيوية (إرمش + حركات)</button>
+        </div>
+        <div id="livenessStatus" class="result"></div>
+        <div id="finalComparisonResult" class="result"></div>
+    </div>
+
+    <button id="registerAndContinue" disabled>✅ تسجيل والمتابعة للنتيجة</button>
+    <div id="registerStatus" class="result"></div>
+</div>
+
+<script>
+    let modelsLoaded = false;
+    let cameraStream = null;
+    let documentFaceDescriptor = null;
+    let documentFaceHash = null;
+    let liveFaceDescriptor = null;
+    let liveFaceHash = null;
+    let livenessPassed = false;
+    let faceMatched = false;
+
+    const video = document.getElementById('video');
+    const startCameraBtn = document.getElementById('startCameraBtn');
+    const startLivenessBtn = document.getElementById('startLivenessCheck');
+    const docImageInput = document.getElementById('docImageInput');
+    const extractDocFaceBtn = document.getElementById('extractDocFaceBtn');
+    const docPreview = document.getElementById('docPreview');
+    const fullNameInput = document.getElementById('fullName');
+    const documentTypeSelect = document.getElementById('documentType');
+    const registerBtn = document.getElementById('registerAndContinue');
+
+    // ------------------- تحميل النماذج -------------------
+    async function loadModels() {
+        const MODEL_URL = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights';
+        try {
+            await faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL);
+            await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+            await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+            modelsLoaded = true;
+            startCameraBtn.disabled = false;
+            docImageInput.disabled = false;
+            extractDocFaceBtn.disabled = false;
+            console.log("✅ نماذج الوجه جاهزة");
+        } catch(err) {
+            console.error(err);
+            alert("فشل تحميل النماذج، تأكد من الاتصال بالإنترنت");
+        }
+    }
+
+    // ------------------- حساب هاش الصورة -------------------
+    async function computeImageHash(canvas) {
+        return new Promise((resolve) => {
+            canvas.toBlob(async (blob) => {
+                const buf = await blob.arrayBuffer();
+                const wordArray = CryptoJS.lib.WordArray.create(buf);
+                resolve(CryptoJS.SHA256(wordArray).toString());
+            }, 'image/jpeg', 0.8);
+        });
+    }
+
+    // ------------------- استخراج الوجه من عنصر media -------------------
+    async function extractFaceFromMedia(mediaElement) {
+        const detection = await faceapi.detectSingleFace(mediaElement).withFaceLandmarks().withFaceDescriptor();
+        if (!detection) return null;
+        const box = detection.detection.box;
+        const canvas = document.createElement('canvas');
+        canvas.width = box.width;
+        canvas.height = box.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(mediaElement, box.x, box.y, box.width, box.height, 0, 0, box.width, box.height);
+        const hash = await computeImageHash(canvas);
+        return { descriptor: detection.descriptor, croppedCanvas: canvas, hash };
+    }
+
+    // ------------------- استخراج وجه المستند -------------------
+    extractDocFaceBtn.onclick = async () => {
+        if (!modelsLoaded || !docPreview.src) return;
+        const img = new Image();
+        img.src = docPreview.src;
+        await new Promise(r => { img.onload = r; });
+        const result = await extractFaceFromMedia(img);
+        if (!result) {
+            document.getElementById('docFaceResult').innerHTML = '<span class="error">⚠️ لم يتم العثور على وجه في المستند</span>';
+            return;
+        }
+        documentFaceDescriptor = result.descriptor;
+        documentFaceHash = result.hash;
+        document.getElementById('docFaceResult').innerHTML = `<span class="success">✅ تم استخراج الوجه من المستند</span>`;
+    };
+
+    docImageInput.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            docPreview.src = ev.target.result;
+            docPreview.style.display = 'block';
+            extractDocFaceBtn.disabled = false;
+        };
+        reader.readAsDataURL(file);
+    };
+
+    // ------------------- تشغيل الكاميرا -------------------
+    startCameraBtn.onclick = async () => {
+        if (cameraStream) cameraStream.getTracks().forEach(t => t.stop());
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            cameraStream = stream;
+            video.srcObject = stream;
+            await video.play();
+            startCameraBtn.disabled = true;
+            startLivenessBtn.disabled = false;
+            document.getElementById('livenessStatus').innerHTML = '<span class="info">✅ الكاميرا تعمل، اضغط "بدء فحص الحيوية"</span>';
+        } catch(err) {
+            document.getElementById('livenessStatus').innerHTML = '<span class="error">❌ لا يمكن الوصول للكاميرا</span>';
+        }
+    };
+
+    // ------------------- دوال فحص الحيوية (إرمش وحركات الرأس) -------------------
+    async function detectEyeBlink(landmarks) {
+        // مؤشرات العين اليسرى واليمنى (face-api.js توفر landmarks)
+        const leftEye = landmarks.getLeftEye();
+        const rightEye = landmarks.getRightEye();
+        if (!leftEye || !rightEye) return false;
+        // حساب EAR بسيط (مسافة عمودية / أفقية)
+        function getEAR(eyePoints) {
+            const A = Math.hypot(eyePoints[1].x - eyePoints[5].x, eyePoints[1].y - eyePoints[5].y);
+            const B = Math.hypot(eyePoints[2].x - eyePoints[4].x, eyePoints[2].y - eyePoints[4].y);
+            const C = Math.hypot(eyePoints[0].x - eyePoints[3].x, eyePoints[0].y - eyePoints[3].y);
+            return (A + B) / (2.0 * C);
+        }
+        const leftEAR = getEAR(leftEye);
+        const rightEAR = getEAR(rightEye);
+        const avgEAR = (leftEAR + rightEAR) / 2;
+        return avgEAR < 0.25; // قيمة تقريبية للغمضة
+    }
+
+    function getHeadDirection(landmarks, detectionBox) {
+        // تقدير بسيط: مركز الوجه ونسبة عرض/ارتفاع الوجه
+        const nose = landmarks.getNose();
+        if (!nose || nose.length < 3) return "مستقيم";
+        const noseTip = nose[2];
+        const faceWidth = detectionBox.width;
+        const faceCenterX = detectionBox.x + faceWidth/2;
+        const offset = (noseTip.x - faceCenterX) / faceWidth;
+        if (offset < -0.1) return "يسار";
+        if (offset > 0.1) return "يمين";
+        return "مستقيم";
+    }
+
+    async function runLivenessCheck() {
+        const instructions = ["إرمش الآن", "أدر رأسك يساراً", "أدر رأسك يميناً", "أدر رأسك للأعلى (شمال)", "أدر رأسك للأسفل (جنوب)"];
+        let step = 0;
+        let blinkDetected = false;
+        let leftDetected = false, rightDetected = false, upDetected = false, downDetected = false;
+        
+        const statusDiv = document.getElementById('livenessStatus');
+        statusDiv.innerHTML = `<span class="info">⏳ اتبع التعليمات: ${instructions[0]}</span>`;
+        
+        return new Promise((resolve) => {
+            const interval = setInterval(async () => {
+                if (!video.videoWidth) return;
+                const detection = await faceapi.detectSingleFace(video).withFaceLandmarks();
+                if (!detection) return;
+                const landmarks = detection.landmarks;
+                const box = detection.detection.box;
+                
+                // كشف الإرماش
+                const isBlinking = await detectEyeBlink(landmarks);
+                if (step === 0 && isBlinking && !blinkDetected) {
+                    blinkDetected = true;
+                    step++;
+                    statusDiv.innerHTML = `<span class="success">✅ تم الإرماش! الآن ${instructions[1]}</span>`;
+                }
+                // اتجاه الرأس
+                const direction = getHeadDirection(landmarks, box);
+                if (step === 1 && direction === "يسار" && !leftDetected) {
+                    leftDetected = true;
+                    step++;
+                    statusDiv.innerHTML = `<span class="success">✅ تم التوجه يساراً! الآن ${instructions[2]}</span>`;
+                }
+                if (step === 2 && direction === "يمين" && !rightDetected) {
+                    rightDetected = true;
+                    step++;
+                    statusDiv.innerHTML = `<span class="success">✅ تم التوجه يميناً! الآن ${instructions[3]}</span>`;
+                }
+                if (step === 3 && direction === "مستقيم") {
+                    // الكشف عن الأعلى والأسفل: نستخدم إحداثيات الأنف بالنسبة للوجه
+                    const noseTip = landmarks.getNose()[2];
+                    const faceTop = box.y;
+                    const faceBottom = box.y + box.height;
+                    const isUp = noseTip.y < faceTop + box.height*0.3;
+                    const isDown = noseTip.y > faceBottom - box.height*0.3;
+                    if (isUp && !upDetected) {
+                        upDetected = true;
+                        step++;
+                        statusDiv.innerHTML = `<span class="success">✅ تم الرفع للأعلى! الآن ${instructions[4]}</span>`;
+                    }
+                    if (step === 4 && isDown && !downDetected) {
+                        downDetected = true;
+                        step++;
+                        clearInterval(interval);
+                        statusDiv.innerHTML = `<span class="success">🎉 اجتزت فحص الحيوية بنجاح!</span>`;
+                        // الآن نقوم بالتقاط الوجه النهائي للتحقق من المطابقة
+                        const liveResult = await extractFaceFromMedia(video);
+                        if (liveResult) {
+                            liveFaceDescriptor = liveResult.descriptor;
+                            liveFaceHash = liveResult.hash;
+                            const distance = faceapi.euclideanDistance(liveFaceDescriptor, documentFaceDescriptor);
+                            const matched = distance < 0.6;
+                            faceMatched = matched;
+                            const matchDiv = document.getElementById('finalComparisonResult');
+                            if (matched) {
+                                matchDiv.innerHTML = '<span class="success">✅ الوجه الملتقط يطابق وجه المستند!</span>';
+                                registerBtn.disabled = false;
+                                livenessPassed = true;
+                            } else {
+                                matchDiv.innerHTML = `<span class="error">❌ الوجه الحي لا يطابق المستند (المسافة: ${distance.toFixed(3)})</span>`;
+                                registerBtn.disabled = true;
+                            }
+                        } else {
+                            statusDiv.innerHTML = '<span class="error">فشل التقاط الوجه الحي</span>';
+                        }
+                        resolve(true);
+                    }
+                }
+            }, 500);
+        });
+    }
+    
+    startLivenessBtn.onclick = async () => {
+        if (!documentFaceDescriptor) {
+            alert("يرجى استخراج وجه المستند أولاً");
+            return;
+        }
+        startLivenessBtn.disabled = true;
+        await runLivenessCheck();
+    };
+
+    // ------------------- التسجيل والمتابعة -------------------
+    registerBtn.onclick = async () => {
+        const name = fullNameInput.value.trim();
+        if (!name) { alert("الرجاء إدخال الاسم"); return; }
+        if (!livenessPassed || !faceMatched) { alert("لم يكتمل فحص الحيوية أو تطابق الوجه"); return; }
+        const docType = documentTypeSelect.value;
+        let previousHash = "";
+        try {
+            const res = await fetch('/chain');
+            const data = await res.json();
+            if (data.chain.length) previousHash = data.chain[data.chain.length-1].hash;
+        } catch(e) { previousHash = "0"; }
+        const payload = {
+            name: name,
+            face_hash: liveFaceHash,
+            document_hash: documentFaceHash,
+            document_type: docType,
+            biometric_verified: true,
+            previous_hash: previousHash
+        };
+        registerBtn.disabled = true;
+        document.getElementById('registerStatus').innerHTML = '<span class="info">⏳ جاري التسجيل...</span>';
+        try {
+            const response = await fetch('/add_block', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            const result = await response.json();
+            if (response.ok) {
+                // تخزين اسم المستخدم لتظهر في الصفحة التالية
+                sessionStorage.setItem('verifiedName', name);
+                sessionStorage.setItem('verifiedDocType', docType);
+                sessionStorage.setItem('verifiedTimestamp', new Date().toLocaleString());
+                window.location.href = '/verification-result';
+            } else {
+                document.getElementById('registerStatus').innerHTML = `<span class="error">❌ فشل التسجيل: ${result.error}</span>`;
+                registerBtn.disabled = false;
+            }
+        } catch(err) {
+            document.getElementById('registerStatus').innerHTML = `<span class="error">خطأ في الاتصال</span>`;
+            registerBtn.disabled = false;
+        }
+    };
+
+    loadModels();
+    // تعطيل الأزرار في البداية
+    startCameraBtn.disabled = true;
+    startLivenessBtn.disabled = true;
+    extractDocFaceBtn.disabled = true;
+    registerBtn.disabled = true;
+    docImageInput.disabled = true;
+</script>
+</body>
+</html>
