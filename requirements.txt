@@ -1,10 +1,9 @@
-setuptools==65.5.0
-wheel==0.38.0
-pip==23.3.1
 Flask==2.3.3
 Flask-CORS==4.0.0
-requests==2.31.0
 gunicorn==21.2.0
-numpy==1.23.5
-scipy==1.10.1
-Pillow==9.5.0
+opencv-python==4.8.1.78
+Pillow==10.0.0
+scikit-image==0.21.0
+scipy==1.11.4
+numpy==1.24.3
+requests==2.31.0
