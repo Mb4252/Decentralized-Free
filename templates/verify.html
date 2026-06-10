@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>وثاق - التوثيق بالشهود</title>
+    <title>وثاق - التوثيق الذكي</title>
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body { background: linear-gradient(135deg, #0a0a2a 0%, #1a1a3a 100%); margin: 0; padding: 20px; min-height: 100vh; }
@@ -16,82 +16,49 @@
         .btn-success { background: #28a745; color: white; }
         .btn-warning { background: #ffc107; color: #333; }
         .btn-info { background: #17a2b8; color: white; }
+        .btn-retry { background: #fd7e14; color: white; }
         video { width: 100%; border-radius: 20px; border: 2px solid #ddd; background: #000; margin: 10px 0; transform: scaleX(-1); }
         .result { margin: 15px 0; padding: 15px; border-radius: 20px; text-align: center; font-size: 0.9rem; }
         .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
         .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
         .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
         .warning { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+        .guidance-box { background: #e7f3ff; border-radius: 60px; padding: 12px 20px; margin: 10px 0; text-align: center; font-weight: bold; transition: all 0.3s; }
+        .guidance-good { background: #d4edda; color: #155724; border-right: 5px solid #28a745; }
+        .guidance-warning { background: #fff3cd; color: #856404; border-right: 5px solid #ffc107; }
+        .guidance-bad { background: #f8d7da; color: #721c24; border-right: 5px solid #dc3545; }
         .progress-bar { height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden; margin: 10px 0; }
-        .progress-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #2c7da0, #28a745); transition: width 0.5s; }
+        .progress-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #2c7da0, #28a745); transition: width 0.3s; }
         .direction-badge { display: inline-block; padding: 5px 12px; border-radius: 50px; font-size: 0.8rem; margin: 5px; }
         .direction-completed { background: #28a745; color: white; }
         .direction-pending { background: #6c757d; color: white; }
+        .direction-active { background: #ffc107; color: #333; animation: pulse 1s infinite; }
         .step-indicator { display: flex; justify-content: space-between; margin-bottom: 20px; }
         .step { flex: 1; text-align: center; padding: 8px; background: #e0e0e0; margin: 0 2px; border-radius: 40px; font-size: 0.7rem; color: #666; }
         .step.active { background: #2c7da0; color: white; }
         .step.completed { background: #28a745; color: white; }
         .spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid #2c7da0; border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .status-badge { display: inline-block; padding: 4px 12px; border-radius: 50px; font-size: 0.75rem; font-weight: bold; }
-        .status-pending { background: #ffc107; color: #333; }
-        .status-approved { background: #28a745; color: white; }
-        .status-rejected { background: #dc3545; color: white; }
+        @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
+        .auto-capture-indicator { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.7); color: white; padding: 5px 10px; border-radius: 20px; font-size: 0.7rem; }
         .system-status-card { background: linear-gradient(135deg, #e8f4f8, #d1ecf1); border-radius: 20px; padding: 15px; margin-bottom: 20px; text-align: center; }
         .remaining-slots { font-size: 1.2rem; font-weight: bold; color: #2c7da0; }
-        
-        /* تحسينات لرفع الصور من الهاتف */
-        .upload-buttons {
-            display: flex;
-            gap: 10px;
-            margin: 10px 0;
-            flex-wrap: wrap;
-        }
-        .upload-buttons button {
-            flex: 1;
-            margin: 0;
-            font-size: 0.9rem;
-            padding: 12px;
-        }
+        .upload-buttons { display: flex; gap: 10px; margin: 10px 0; flex-wrap: wrap; }
+        .upload-buttons button { flex: 1; margin: 0; font-size: 0.9rem; padding: 12px; }
         .camera-btn { background: #28a745; color: white; }
         .gallery-btn { background: #17a2b8; color: white; }
-        .preview-img {
-            max-width: 100%;
-            max-height: 200px;
-            border-radius: 16px;
-            margin-top: 10px;
-            border: 2px solid #28a745;
-        }
-        .image-container {
-            text-align: center;
-            margin: 15px 0;
-            padding: 10px;
-            background: #f0f8ff;
-            border-radius: 16px;
-            display: none;
-        }
-        .paste-area {
-            border: 2px dashed #ccc;
-            border-radius: 16px;
-            padding: 15px;
-            text-align: center;
-            margin: 10px 0;
-            background: #fafafa;
-            font-size: 0.8rem;
-            color: #666;
-        }
-        .file-input {
-            display: none;
-        }
+        .preview-img { max-width: 100%; max-height: 200px; border-radius: 16px; margin-top: 10px; border: 2px solid #28a745; }
+        .image-container { text-align: center; margin: 15px 0; padding: 10px; background: #f0f8ff; border-radius: 16px; display: none; }
+        .file-input { display: none; }
+        .retry-btn { background: #fd7e14; color: white; margin-top: 5px; }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 </head>
 <body>
 <div class="container">
-    <h1>🔐 وثاق | التوثيق بالشهود</h1>
+    <h1>🔐 وثاق | التوثيق الذكي</h1>
     
-    <!-- عرض حالة النظام -->
     <div class="system-status-card" id="systemStatusCard">
         <div id="statusSpinner" class="spinner" style="width:20px; height:20px;"></div>
         <div id="statusText">جاري تحميل حالة النظام...</div>
@@ -104,7 +71,7 @@
         <div class="step" id="step4">4️⃣ التسجيل</div>
     </div>
 
-    <!-- الخطوة 1: إدخال رمز الدعوة -->
+    <!-- الخطوة 1: رمز الدعوة -->
     <div id="step1Content">
         <div class="card">
             <h2>🎫 1. رمز الدعوة</h2>
@@ -116,31 +83,23 @@
         </div>
     </div>
 
-    <!-- الخطوة 2: رفع الهوية - نسخة محسنة للهواتف -->
+    <!-- الخطوة 2: رفع الهوية -->
     <div id="step2Content" style="display:none;">
         <div class="card">
             <h2>🆔 2. رفع صورة الهوية</h2>
             <p style="font-size:0.85rem; color:#dc3545;">⚠️ يسمح فقط بـ: بطاقة هوية، جواز سفر، رخصة قيادة</p>
             
-            <!-- أزرار رفع الصور المحسنة للهواتف -->
             <div class="upload-buttons">
                 <button id="openCameraBtn" class="camera-btn">📸 تصوير مباشر</button>
                 <button id="openGalleryBtn" class="gallery-btn">🖼️ اختيار من المعرض</button>
             </div>
             
-            <!-- input مخفي لاختيار الملفات -->
             <input type="file" id="imageFileInput" accept="image/*" capture="environment" class="file-input">
             <input type="file" id="galleryFileInput" accept="image/jpeg,image/png,image/jpg" class="file-input">
             
-            <!-- منطقة عرض الصورة -->
             <div id="imagePreviewContainer" class="image-container">
                 <img id="previewImage" class="preview-img">
                 <p style="color:#28a745; margin-top:5px;">✅ تم تحميل الصورة بنجاح</p>
-            </div>
-            
-            <!-- منطقة لصق الصورة (Paste) -->
-            <div id="pasteArea" class="paste-area" contenteditable="true">
-                📋 أو الصق الصورة هنا (Ctrl+V)
             </div>
             
             <button id="extractIdFaceBtn" class="btn-primary" disabled>🔍 استخراج بصمة الوجه من الهوية</button>
@@ -149,25 +108,43 @@
         </div>
     </div>
 
-    <!-- الخطوة 3: اختبار الحيوية -->
+    <!-- الخطوة 3: اختبار الحيوية (محسّن) -->
     <div id="step3Content" style="display:none;">
         <div class="card">
             <h2>🧠 3. اختبار الحيوية</h2>
+            
+            <!-- إرشادات حية -->
+            <div id="guidanceBox" class="guidance-box guidance-info">
+                📷 جاري تجهيز الكاميرا...
+            </div>
+            
+            <!-- وضع الاستقرار -->
             <div id="stabilityPhase">
                 <p style="text-align:center;">📷 يرجى تثبيت وجهك أمام الكاميرا</p>
-                <div class="stability-timer" id="stabilityTimer">3</div>
+                <div class="stability-timer" id="stabilityTimer">6</div>
                 <div class="progress-bar"><div class="progress-fill" id="stabilityProgress" style="width:0%"></div></div>
             </div>
+            
+            <!-- تتبع حركة الرأس -->
             <div id="headTrackingPhase" style="display:none;">
                 <p style="text-align:center;">🔄 حرك رأسك في الاتجاهات المطلوبة</p>
-                <video id="camera" autoplay muted playsinline></video>
+                <video id="camera" autoplay muted playsinline style="width:100%; border-radius:20px;"></video>
                 <div style="text-align:center; margin: 15px 0;">
                     <span id="leftIndicator" class="direction-badge direction-pending">⬅️ يسار</span>
                     <span id="rightIndicator" class="direction-badge direction-pending">➡️ يمين</span>
+                    <span id="upIndicator" class="direction-badge direction-pending">⬆️ أعلى</span>
+                    <span id="downIndicator" class="direction-badge direction-pending">⬇️ أسفل</span>
                 </div>
                 <div id="livenessStatus" class="info" style="text-align:center;"></div>
+                <div id="directionTimer" style="text-align:center; font-size:0.8rem; color:#666;"></div>
             </div>
+            
+            <div class="auto-capture-indicator" id="autoCaptureStatus" style="display:none; position:static; margin-bottom:10px; text-align:center; background:#28a745; border-radius:30px;">
+                🎯 سيتم الالتقاط تلقائياً...
+            </div>
+            
             <button id="startLivenessBtn" class="btn-primary" style="display:none;">🎯 بدء اختبار الحيوية</button>
+            <button id="retryDirectionBtn" class="btn-retry" style="display:none;">🔄 إعادة المحاولة (الاتجاه الحالي)</button>
             <div id="livenessResult" class="result"></div>
             <button id="nextToRegisterBtn" class="btn-success" style="display:none;">▶️ التالي: إرسال للشهود</button>
         </div>
@@ -187,7 +164,7 @@
 
 <script>
     // ============================================================
-    // نظام التوثيق بالشهود - مع دعم رفع الصور من الهواتف
+    // نظام التوثيق الذكي - مع تحسينات تجربة المستخدم
     // ============================================================
     
     let modelsLoaded = false;
@@ -195,13 +172,27 @@
     let step = 1;
     let idDescriptor = null;
     let faceDescriptor = null;
-    let headMovements = { left: false, right: false };
+    let headMovements = { left: false, right: false, up: false, down: false };
     let livenessPassed = false;
     let inviteCode = null;
     let blockIndex = null;
     let verificationStatus = null;
     let systemStatus = null;
-    let currentImageData = null;  // تخزين بيانات الصورة الحالية
+    let currentImageData = null;
+    
+    // متغيرات التحسينات
+    let currentDirectionIndex = 0;
+    let directionStartTime = 0;
+    let directionTimeout = null;
+    let autoCaptureActive = false;
+    let guidanceInterval = null;
+    let stabilityInterval = null;
+    let directions = ['left', 'right', 'up', 'down'];
+    let directionNames = {'left': 'يسار', 'right': 'يمين', 'up': 'أعلى', 'down': 'أسفل'};
+    let directionCompleted = false;
+    let currentAttemptDirection = null;
+    let retryCount = 0;
+    const MAX_RETRIES_PER_DIRECTION = 2;
     
     // عناصر DOM
     const inviteCodeInput = document.getElementById('inviteCode');
@@ -209,20 +200,17 @@
     const inviteResult = document.getElementById('inviteResult');
     const inviteMessage = document.getElementById('inviteMessage');
     const nextToIdentityBtn = document.getElementById('nextToIdentityBtn');
-    
-    // عناصر رفع الصور
     const openCameraBtn = document.getElementById('openCameraBtn');
     const openGalleryBtn = document.getElementById('openGalleryBtn');
     const imageFileInput = document.getElementById('imageFileInput');
     const galleryFileInput = document.getElementById('galleryFileInput');
     const imagePreviewContainer = document.getElementById('imagePreviewContainer');
     const previewImage = document.getElementById('previewImage');
-    const pasteArea = document.getElementById('pasteArea');
     const extractIdFaceBtn = document.getElementById('extractIdFaceBtn');
     const idResult = document.getElementById('idResult');
-    
     const nextToLivenessBtn = document.getElementById('nextToLivenessBtn');
     const startLivenessBtn = document.getElementById('startLivenessBtn');
+    const retryDirectionBtn = document.getElementById('retryDirectionBtn');
     const livenessResult = document.getElementById('livenessResult');
     const nextToRegisterBtn = document.getElementById('nextToRegisterBtn');
     const registerResult = document.getElementById('registerResult');
@@ -232,6 +220,13 @@
     const camera = document.getElementById('camera');
     const statusText = document.getElementById('statusText');
     const statusSpinner = document.getElementById('statusSpinner');
+    const guidanceBox = document.getElementById('guidanceBox');
+    const autoCaptureStatus = document.getElementById('autoCaptureStatus');
+    const leftIndicator = document.getElementById('leftIndicator');
+    const rightIndicator = document.getElementById('rightIndicator');
+    const upIndicator = document.getElementById('upIndicator');
+    const downIndicator = document.getElementById('downIndicator');
+    const directionTimer = document.getElementById('directionTimer');
     
     // ------------------- تحميل حالة النظام -------------------
     async function loadSystemStatus() {
@@ -242,21 +237,14 @@
             statusSpinner.style.display = 'none';
             
             if (data.invite_only_mode) {
-                statusText.innerHTML = `
-                    <span style="color:#dc3545;">⚠️ النظام في وضع الدعوات فقط (Invite-Only)</span><br>
-                    <small>يلزم رمز دعوة للتسجيل | عدد المستخدمين الموثقين: ${data.total_verified_users}</small>
-                `;
-                inviteMessage.innerHTML = '⚠️ النظام في وضع الدعوات فقط. أدخل رمز الدعوة من مستخدم موثق.';
+                statusText.innerHTML = `<span style="color:#dc3545;">⚠️ النظام في وضع الدعوات فقط</span><br><small>عدد المستخدمين: ${data.total_verified_users}</small>`;
+                inviteMessage.innerHTML = '⚠️ النظام في وضع الدعوات فقط. أدخل رمز الدعوة.';
             } else {
-                statusText.innerHTML = `
-                    <span style="color:#28a745;">✅ التسجيل مفتوح للمستخدمين الأوائل</span><br>
-                    <span class="remaining-slots">🎫 المقاعد المتبقية: ${data.free_registrations_remaining} / ${data.max_free_users}</span><br>
-                    <small>عدد المستخدمين الموثقين: ${data.total_verified_users}</small>
-                `;
-                inviteMessage.innerHTML = `🎉 أنت من المستخدمين الأوائل! لا حاجة لرمز دعوة. المقاعد المتبقية: ${data.free_registrations_remaining}`;
+                statusText.innerHTML = `<span style="color:#28a745;">✅ التسجيل مفتوح</span><br><span class="remaining-slots">🎫 المتبقي: ${data.free_registrations_remaining} / ${data.max_free_users}</span>`;
+                inviteMessage.innerHTML = `🎉 المقاعد المتبقية: ${data.free_registrations_remaining}`;
             }
         } catch(e) {
-            console.error("فشل تحميل حالة النظام", e);
+            console.error(e);
             statusText.innerHTML = '<span style="color:#dc3545;">⚠️ لا يمكن الاتصال بالخادم</span>';
         }
     }
@@ -265,21 +253,103 @@
     async function loadModels() {
         const MODEL_URL = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights';
         try {
+            guidanceBox.innerHTML = '⏳ جاري تحميل نماذج الذكاء الاصطناعي...';
+            guidanceBox.className = 'guidance-box guidance-info';
             await faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL);
             await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
             await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
             modelsLoaded = true;
-            console.log("✅ النماذج جاهزة");
+            guidanceBox.innerHTML = '✅ النماذج جاهزة';
+            guidanceBox.className = 'guidance-box guidance-good';
+            setTimeout(() => { guidanceBox.style.display = 'none'; }, 2000);
         } catch(err) {
-            console.error("فشل تحميل النماذج", err);
+            console.error(err);
+            guidanceBox.innerHTML = '❌ فشل تحميل النماذج';
+            guidanceBox.className = 'guidance-box guidance-bad';
         }
     }
     
-    // ------------------- معالجة الصورة المرفوعة -------------------
-    function handleImageFile(file) {
-        if (!file) return;
+    // ------------------- وظائف الإرشاد الحي -------------------
+    function updateGuidance(message, type = 'info') {
+        guidanceBox.style.display = 'block';
+        guidanceBox.innerHTML = message;
+        if (type === 'good') guidanceBox.className = 'guidance-box guidance-good';
+        else if (type === 'warning') guidanceBox.className = 'guidance-box guidance-warning';
+        else if (type === 'bad') guidanceBox.className = 'guidance-box guidance-bad';
+        else guidanceBox.className = 'guidance-box';
+    }
+    
+    function startAutoCapture() {
+        autoCaptureActive = true;
+        autoCaptureStatus.style.display = 'block';
+        setTimeout(() => {
+            autoCaptureStatus.style.display = 'none';
+        }, 3000);
+    }
+    
+    // ------------------- التحقق من جودة الوجه -------------------
+    async function checkFaceQuality() {
+        const detection = await faceapi.detectSingleFace(camera).withFaceLandmarks();
+        if (!detection) {
+            updateGuidance('⚠️ لم يتم اكتشاف وجه. يرجى مواجهة الكاميرا', 'bad');
+            return { detected: false, quality: 0 };
+        }
         
-        if (!file.type.startsWith('image/')) {
+        const box = detection.detection.box;
+        const videoWidth = camera.videoWidth;
+        const videoHeight = camera.videoHeight;
+        
+        // التحقق من المركز
+        const centerX = box.x + box.width / 2;
+        const centerY = box.y + box.height / 2;
+        const isCentered = Math.abs(centerX - videoWidth / 2) < videoWidth * 0.15 &&
+                          Math.abs(centerY - videoHeight / 2) < videoHeight * 0.15;
+        
+        // التحقق من الحجم
+        const faceSize = (box.width * box.height) / (videoWidth * videoHeight);
+        const isGoodSize = faceSize > 0.08 && faceSize < 0.35;
+        
+        // التحقق من الإضاءة
+        const canvas = document.createElement('canvas');
+        canvas.width = box.width;
+        canvas.height = box.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(camera, box.x, box.y, box.width, box.height, 0, 0, box.width, box.height);
+        const imageData = ctx.getImageData(0, 0, box.width, box.height);
+        const pixels = imageData.data;
+        let brightness = 0;
+        for (let i = 0; i < pixels.length; i += 4) {
+            brightness += (pixels[i] + pixels[i+1] + pixels[i+2]) / 3;
+        }
+        brightness /= (pixels.length / 4);
+        const isGoodLighting = brightness > 60 && brightness < 220;
+        
+        // إرشادات
+        if (!isCentered) {
+            if (centerX < videoWidth / 2 - videoWidth * 0.1) updateGuidance('👉 اتجه قليلاً لليمين', 'warning');
+            else if (centerX > videoWidth / 2 + videoWidth * 0.1) updateGuidance('👈 اتجه قليلاً لليسار', 'warning');
+            else if (centerY < videoHeight / 2 - videoHeight * 0.1) updateGuidance('👇 اخفض وجهك قليلاً', 'warning');
+            else if (centerY > videoHeight / 2 + videoHeight * 0.1) updateGuidance('👆 ارفع وجهك قليلاً', 'warning');
+        } else if (!isGoodSize) {
+            if (faceSize < 0.08) updateGuidance('🔍 اقترب من الكاميرا', 'warning');
+            else if (faceSize > 0.35) updateGuidance('🔍 ابتعد قليلاً عن الكاميرا', 'warning');
+        } else if (!isGoodLighting) {
+            if (brightness < 60) updateGuidance('💡 الإضاءة ضعيفة. يرجى زيادة الإضاءة', 'warning');
+            else updateGuidance('💡 الإضاءة قوية جداً. تجنب الإضاءة الخلفية', 'warning');
+        } else {
+            updateGuidance('✅ وضع الوجه ممتاز! جاري التثبيت...', 'good');
+        }
+        
+        return {
+            detected: true,
+            quality: (isCentered ? 40 : 0) + (isGoodSize ? 30 : 0) + (isGoodLighting ? 30 : 0),
+            isPerfect: isCentered && isGoodSize && isGoodLighting
+        };
+    }
+    
+    // ------------------- معالجة الصورة -------------------
+    function handleImageFile(file) {
+        if (!file || !file.type.startsWith('image/')) {
             idResult.innerHTML = '<span class="error">❌ يرجى اختيار ملف صورة</span>';
             return;
         }
@@ -290,7 +360,7 @@
             previewImage.src = currentImageData;
             imagePreviewContainer.style.display = 'block';
             extractIdFaceBtn.disabled = false;
-            idResult.innerHTML = '<span class="success">✅ تم تحميل الصورة بنجاح! اضغط "استخراج بصمة الوجه"</span>';
+            idResult.innerHTML = '<span class="success">✅ تم تحميل الصورة! اضغط "استخراج بصمة الوجه"</span>';
         };
         reader.onerror = function() {
             idResult.innerHTML = '<span class="error">❌ فشل في قراءة الملف</span>';
@@ -298,19 +368,16 @@
         reader.readAsDataURL(file);
     }
     
-    // ------------------- فتح الكاميرا مباشرة -------------------
     openCameraBtn.onclick = () => {
         imageFileInput.setAttribute('capture', 'environment');
         imageFileInput.click();
     };
     
-    // ------------------- فتح المعرض -------------------
     openGalleryBtn.onclick = () => {
         imageFileInput.removeAttribute('capture');
         imageFileInput.click();
     };
     
-    // ------------------- معالج اختيار الملف -------------------
     imageFileInput.addEventListener('change', (event) => {
         const file = event.target.files[0];
         if (file) handleImageFile(file);
@@ -323,42 +390,21 @@
         galleryFileInput.value = '';
     });
     
-    // ------------------- لصق الصورة (Ctrl+V) -------------------
-    pasteArea.addEventListener('paste', (e) => {
-        const items = e.clipboardData.items;
-        for (let i = 0; i < items.length; i++) {
-            if (items[i].type.indexOf('image') !== -1) {
-                const blob = items[i].getAsFile();
-                const reader = new FileReader();
-                reader.onload = function(event) {
-                    currentImageData = event.target.result;
-                    previewImage.src = currentImageData;
-                    imagePreviewContainer.style.display = 'block';
-                    extractIdFaceBtn.disabled = false;
-                    idResult.innerHTML = '<span class="success">✅ تم لصق الصورة بنجاح! اضغط "استخراج بصمة الوجه"</span>';
-                };
-                reader.readAsDataURL(blob);
-                break;
-            }
-        }
-    });
-    
     // ------------------- التحقق من رمز الدعوة -------------------
     verifyInviteBtn.onclick = async () => {
         const code = inviteCodeInput.value.trim().toUpperCase();
-        
         const statusRes = await fetch('/system-status');
         const status = await statusRes.json();
         
         if (!status.invite_only_mode) {
             inviteCode = null;
-            inviteResult.innerHTML = `<span class="success">✅ مرحباً بك! أنت من أوائل المستخدمين. لا حاجة لرمز دعوة.</span>`;
+            inviteResult.innerHTML = `<span class="success">✅ مرحباً بك! أنت من أوائل المستخدمين.</span>`;
             nextToIdentityBtn.disabled = false;
             return;
         }
         
         if (!code) {
-            inviteResult.innerHTML = '<span class="error">❌ النظام في وضع الدعوات فقط. الرجاء إدخال رمز الدعوة.</span>';
+            inviteResult.innerHTML = '<span class="error">❌ الرجاء إدخال رمز الدعوة</span>';
             return;
         }
         
@@ -375,20 +421,19 @@
             
             if (result.valid) {
                 inviteCode = code;
-                inviteResult.innerHTML = `<span class="success">✅ رمز دعوة صالح! مرحباً بك.</span>`;
+                inviteResult.innerHTML = `<span class="success">✅ رمز دعوة صالح!</span>`;
                 nextToIdentityBtn.disabled = false;
             } else {
-                inviteResult.innerHTML = `<span class="error">❌ ${result.error || 'رمز دعوة غير صالح'}</span>`;
+                inviteResult.innerHTML = `<span class="error">❌ ${result.error || 'رمز غير صالح'}</span>`;
             }
         } catch(err) {
             inviteResult.innerHTML = `<span class="error">❌ خطأ في الاتصال</span>`;
         }
         
         verifyInviteBtn.disabled = false;
-        verifyInviteBtn.innerHTML = "🔍 التحقق من رمز الدعوة";
+        verifyInviteBtn.innerHTML = "🔍 التحقق";
     };
     
-    // ------------------- الانتقال للخطوة 2 -------------------
     nextToIdentityBtn.onclick = () => {
         step = 2;
         updateSteps();
@@ -399,31 +444,24 @@
     // ------------------- استخراج بصمة الهوية -------------------
     async function isRealIdentityDocument(imageElement) {
         const faceDetection = await faceapi.detectSingleFace(imageElement).withFaceLandmarks();
-        if (!faceDetection) {
-            return { isValid: false, reason: "لم يتم العثور على وجه في الصورة" };
-        }
+        if (!faceDetection) return { isValid: false, reason: "لم يتم العثور على وجه" };
         
         const box = faceDetection.detection.box;
         const faceRatio = (box.width * box.height) / (imageElement.width * imageElement.height);
         
-        if (faceRatio > 0.25) {
-            return { isValid: false, reason: "هذه صورة شخصية وليست هوية رسمية" };
-        }
-        if (faceRatio < 0.02) {
-            return { isValid: false, reason: "الوجه صغير جداً" };
-        }
-        return { isValid: true, reason: "تم التحقق من صحة الهوية" };
+        if (faceRatio > 0.25) return { isValid: false, reason: "صورة شخصية وليست هوية" };
+        if (faceRatio < 0.02) return { isValid: false, reason: "الوجه صغير جداً" };
+        return { isValid: true, reason: "صالح" };
     }
     
     extractIdFaceBtn.onclick = async () => {
         if (!currentImageData) {
-            idResult.innerHTML = '<span class="error">❌ يرجى رفع صورة الهوية أولاً</span>';
+            idResult.innerHTML = '<span class="error">❌ يرجى رفع الصورة أولاً</span>';
             return;
         }
         
         extractIdFaceBtn.disabled = true;
-        extractIdFaceBtn.innerHTML = '<span class="spinner"></span> جاري الاستخراج...';
-        idResult.innerHTML = '<span class="info">🔍 جاري استخراج بصمة الوجه...</span>';
+        extractIdFaceBtn.innerHTML = '<span class="spinner"></span> جاري...';
         
         const img = new Image();
         img.src = currentImageData;
@@ -446,13 +484,13 @@
         }
         
         idDescriptor = Array.from(detection.descriptor);
-        idResult.innerHTML = `<span class="success">✅ تم استخراج بصمة الهوية بنجاح!</span>`;
+        idResult.innerHTML = `<span class="success">✅ تم استخراج بصمة الهوية!</span>`;
         nextToLivenessBtn.disabled = false;
         extractIdFaceBtn.disabled = false;
         extractIdFaceBtn.innerHTML = "🔍 إعادة الاستخراج";
     };
     
-    // ------------------- باقي الدوال (اختبار الحيوية والتسجيل) -------------------
+    // ------------------- اختبار الحيوية المحسن -------------------
     nextToLivenessBtn.onclick = async () => {
         if (!idDescriptor) {
             idResult.innerHTML = '<span class="error">❌ يجب استخراج بصمة الهوية أولاً!</span>';
@@ -465,39 +503,77 @@
         document.getElementById('step3Content').style.display = 'block';
         
         if (cameraStream) cameraStream.getTracks().forEach(t => t.stop());
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        
+        // تقليل جودة الفيديو للسرعة
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { width: { ideal: 480 }, height: { ideal: 360 }, facingMode: "user" } 
+        });
         cameraStream = stream;
         camera.srcObject = stream;
         await camera.play();
         
         startLivenessBtn.style.display = 'block';
+        updateGuidance('✅ الكاميرا جاهزة. اضغط بدء الاختبار', 'good');
     };
     
+    // ------------------- وضع الاستقرار -------------------
     async function runStabilityPhase() {
         const stabilityPhase = document.getElementById('stabilityPhase');
         const headTrackingPhase = document.getElementById('headTrackingPhase');
         
         stabilityPhase.style.display = 'block';
         headTrackingPhase.style.display = 'none';
+        updateGuidance('📷 يرجى تثبيت وجهك أمام الكاميرا لمدة 6 ثوان', 'info');
         
-        for (let i = 3; i > 0; i--) {
-            document.getElementById('stabilityTimer').innerHTML = i;
-            document.getElementById('stabilityProgress').style.width = ((3 - i) / 3) * 100 + '%';
-            await new Promise(r => setTimeout(r, 1000));
-        }
+        let stabilityCheckInterval;
+        let perfectFrames = 0;
+        const requiredPerfectFrames = 15;
+        
+        await new Promise((resolve) => {
+            let seconds = 6;
+            const timer = setInterval(async () => {
+                const quality = await checkFaceQuality();
+                if (quality.isPerfect) perfectFrames++;
+                else perfectFrames = Math.max(0, perfectFrames - 1);
+                
+                document.getElementById('stabilityTimer').innerHTML = seconds;
+                document.getElementById('stabilityProgress').style.width = ((6 - seconds) / 6) * 100 + '%';
+                
+                if (seconds <= 0 || perfectFrames >= requiredPerfectFrames) {
+                    clearInterval(timer);
+                    if (stabilityCheckInterval) clearInterval(stabilityCheckInterval);
+                    resolve();
+                }
+                seconds--;
+            }, 1000);
+            
+            stabilityCheckInterval = setInterval(async () => {
+                await checkFaceQuality();
+            }, 200);
+        });
         
         stabilityPhase.style.display = 'none';
         headTrackingPhase.style.display = 'block';
+        updateGuidance('🔄 ابدأ بتحريك رأسك حسب التعليمات', 'good');
+        
         startHeadTracking();
     }
     
+    // ------------------- تتبع حركة الرأس المحسن -------------------
     async function startHeadTracking() {
-        headMovements = { left: false, right: false };
-        const leftIndicator = document.getElementById('leftIndicator');
-        const rightIndicator = document.getElementById('rightIndicator');
-        leftIndicator.className = 'direction-badge direction-pending';
-        rightIndicator.className = 'direction-badge direction-pending';
-        document.getElementById('livenessStatus').innerHTML = '🔄 حرك رأسك لليسار أولاً';
+        headMovements = { left: false, right: false, up: false, down: false };
+        currentDirectionIndex = 0;
+        retryCount = 0;
+        
+        const indicators = {
+            left: leftIndicator, right: rightIndicator, up: upIndicator, down: downIndicator
+        };
+        
+        Object.values(indicators).forEach(i => {
+            i.className = 'direction-badge direction-pending';
+        });
+        
+        updateDirectionDisplay();
         
         const checkInterval = setInterval(async () => {
             const detection = await faceapi.detectSingleFace(camera).withFaceLandmarks();
@@ -505,43 +581,86 @@
             
             const nose = detection.landmarks.getNose();
             const jaw = detection.landmarks.getJawOutline();
-            if (!nose || !jaw) return;
+            if (!nose || nose.length < 3 || !jaw) return;
             
             const noseTip = nose[2];
             const faceCenterX = (jaw[0].x + jaw[jaw.length-1].x) / 2;
-            const offset = (noseTip.x - faceCenterX) / detection.detection.box.width;
+            const horizontalOffset = (noseTip.x - faceCenterX) / detection.detection.box.width;
             
-            if (offset < -0.08 && !headMovements.left) {
-                headMovements.left = true;
-                leftIndicator.className = 'direction-badge direction-completed';
-                document.getElementById('livenessStatus').innerHTML = '✅ تم كشف الحركة لليسار! حرك رأسك لليمين';
-            } else if (offset > 0.08 && headMovements.left && !headMovements.right) {
-                headMovements.right = true;
-                rightIndicator.className = 'direction-badge direction-completed';
-                document.getElementById('livenessStatus').innerHTML = '✅ تم كشف الحركة لليمين!';
-            }
+            const faceTop = detection.detection.box.y;
+            const faceBottom = detection.detection.box.y + detection.detection.box.height;
+            const verticalRatio = (noseTip.y - faceTop) / detection.detection.box.height;
+            const verticalOffset = verticalRatio - 0.5;
             
-            if (headMovements.left && headMovements.right) {
-                clearInterval(checkInterval);
-                livenessPassed = true;
-                livenessResult.innerHTML = '<span class="success">✅ اختبار الحيوية ناجح!</span>';
-                nextToRegisterBtn.style.display = 'block';
-                startLivenessBtn.style.display = 'none';
+            let currentDirection = null;
+            if (horizontalOffset < -0.08) currentDirection = 'left';
+            else if (horizontalOffset > 0.08) currentDirection = 'right';
+            else if (verticalOffset < -0.15) currentDirection = 'up';
+            else if (verticalOffset > 0.15) currentDirection = 'down';
+            
+            const currentTarget = directions[currentDirectionIndex];
+            
+            if (currentDirection === currentTarget && !headMovements[currentTarget]) {
+                headMovements[currentTarget] = true;
+                indicators[currentTarget].className = 'direction-badge direction-completed';
+                updateGuidance(`✅ تم كشف الحركة ${directionNames[currentTarget]}!`, 'good');
+                currentDirectionIndex++;
+                retryCount = 0;
                 
-                const faceDetection = await faceapi.detectSingleFace(camera).withFaceLandmarks().withFaceDescriptor();
-                if (faceDetection) faceDescriptor = Array.from(faceDetection.descriptor);
+                if (currentDirectionIndex < directions.length) {
+                    updateDirectionDisplay();
+                } else {
+                    clearInterval(checkInterval);
+                    livenessPassed = true;
+                    livenessResult.innerHTML = '<span class="success">✅ اختبار الحيوية ناجح!</span>';
+                    updateGuidance('🎉 تم اجتياز الاختبار بنجاح!', 'good');
+                    nextToRegisterBtn.style.display = 'block';
+                    startLivenessBtn.style.display = 'none';
+                    
+                    const faceDetection = await faceapi.detectSingleFace(camera).withFaceLandmarks().withFaceDescriptor();
+                    if (faceDetection) faceDescriptor = Array.from(faceDetection.descriptor);
+                }
             }
         }, 100);
         
-        setTimeout(() => {
-            if (!headMovements.left || !headMovements.right) {
-                clearInterval(checkInterval);
-                livenessResult.innerHTML = '<span class="error">❌ فشل اختبار الحيوية</span>';
-                startLivenessBtn.style.display = 'block';
-                nextToRegisterBtn.style.display = 'none';
+        function updateDirectionDisplay() {
+            if (currentDirectionIndex < directions.length) {
+                const current = directions[currentDirectionIndex];
+                updateGuidance(`👉 حرك رأسك إلى ${directionNames[current]}`, 'warning');
+                directionTimer.innerHTML = `الرجاء تحريك رأسك إلى ${directionNames[current]} (6 ثوانٍ)`;
+                
+                if (directionTimeout) clearTimeout(directionTimeout);
+                directionTimeout = setTimeout(() => {
+                    if (!headMovements[current] && retryCount < MAX_RETRIES_PER_DIRECTION) {
+                        retryCount++;
+                        updateGuidance(`⚠️ لم يتم كشف الحركة. حاول مرة أخرى ${directionNames[current]} (محاولة ${retryCount + 1}/${MAX_RETRIES_PER_DIRECTION + 1})`, 'bad');
+                        retryDirectionBtn.style.display = 'block';
+                    } else if (!headMovements[current] && retryCount >= MAX_RETRIES_PER_DIRECTION) {
+                        clearInterval(checkInterval);
+                        livenessResult.innerHTML = '<span class="error">❌ فشل اختبار الحيوية. يرجى إعادة المحاولة.</span>';
+                        startLivenessBtn.style.display = 'block';
+                        nextToRegisterBtn.style.display = 'none';
+                    }
+                }, 6000);
             }
-        }, 15000);
+        }
     }
+    
+    retryDirectionBtn.onclick = () => {
+        retryDirectionBtn.style.display = 'none';
+        const current = directions[currentDirectionIndex];
+        updateGuidance(`🔄 إعادة المحاولة: حرك رأسك إلى ${directionNames[current]}`, 'warning');
+        directionTimer.innerHTML = `الرجاء تحريك رأسك إلى ${directionNames[current]} (6 ثوانٍ)`;
+        
+        if (directionTimeout) clearTimeout(directionTimeout);
+        directionTimeout = setTimeout(() => {
+            if (!headMovements[current] && retryCount < MAX_RETRIES_PER_DIRECTION) {
+                retryCount++;
+                updateGuidance(`⚠️ لم يتم كشف الحركة. حاول مرة أخرى (محاولة ${retryCount + 1}/${MAX_RETRIES_PER_DIRECTION + 1})`, 'bad');
+                retryDirectionBtn.style.display = 'block';
+            }
+        }, 6000);
+    };
     
     startLivenessBtn.onclick = async () => {
         startLivenessBtn.disabled = true;
@@ -551,6 +670,7 @@
         startLivenessBtn.style.display = 'none';
     };
     
+    // ------------------- إرسال للشهود -------------------
     nextToRegisterBtn.onclick = async () => {
         if (!idDescriptor || !faceDescriptor) {
             livenessResult.innerHTML = '<span class="error">❌ بيانات الوجه غير مكتملة</span>';
@@ -593,16 +713,11 @@
             document.getElementById('step4Content').style.display = 'block';
             
             if (result.status === 'approved') {
-                verificationStatus = 'approved';
-                registerResult.innerHTML = `<div class="success">✅ تم التوثيق تلقائياً (AI Validator)!
-                    <br>رقم الكتلة: ${result.block_index}</div>`;
+                registerResult.innerHTML = `<div class="success">✅ تم التوثيق!<br>رقم الكتلة: ${result.block_index}</div>`;
                 goToProfileBtn.style.display = 'block';
             } else {
-                verificationStatus = 'pending';
                 blockIndex = result.block_index;
-                registerResult.innerHTML = `<div class="warning">⏳ تم إرسال طلب التوثيق للشهود.
-                    <br>رقم الكتلة: ${result.block_index}
-                    <br>الحالة: قيد المراجعة</div>`;
+                registerResult.innerHTML = `<div class="warning">⏳ تم الإرسال للشهود<br>رقم الكتلة: ${result.block_index}<br>قيد المراجعة</div>`;
                 statusDisplay.innerHTML = `<span class="status-badge status-pending">قيد المراجعة</span>`;
                 checkStatusBtn.style.display = 'block';
             }
@@ -622,26 +737,20 @@
             const data = await response.json();
             const found = data.chain.find(b => b.index === blockIndex);
             
-            if (found) {
-                if (found.status === 'approved') {
-                    verificationStatus = 'approved';
-                    registerResult.innerHTML = `<div class="success">✅ تم قبول التوثيق من قبل الشهود!
-                        <br>رقم الكتلة: ${found.index}</div>`;
-                    statusDisplay.innerHTML = `<span class="status-badge status-approved">تمت الموافقة</span>`;
-                    goToProfileBtn.style.display = 'block';
-                    checkStatusBtn.style.display = 'none';
-                } else if (found.status === 'rejected') {
-                    registerResult.innerHTML = `<div class="error">❌ تم رفض التوثيق من قبل الشهود.</div>`;
-                    statusDisplay.innerHTML = `<span class="status-badge status-rejected">مرفوض</span>`;
-                    checkStatusBtn.style.display = 'none';
-                } else {
-                    statusDisplay.innerHTML = `<span class="status-badge status-pending">قيد المراجعة (${found.witness_votes?.approve?.length || 0} موافقة)</span>`;
-                    checkStatusBtn.disabled = false;
-                    checkStatusBtn.innerHTML = "🔄 التحقق من الحالة";
-                }
+            if (found && found.status === 'approved') {
+                registerResult.innerHTML = `<div class="success">✅ تم قبول التوثيق!<br>رقم الكتلة: ${found.index}</div>`;
+                statusDisplay.innerHTML = `<span class="status-badge status-approved">تمت الموافقة</span>`;
+                goToProfileBtn.style.display = 'block';
+                checkStatusBtn.style.display = 'none';
+            } else if (found && found.status === 'rejected') {
+                registerResult.innerHTML = `<div class="error">❌ تم رفض التوثيق</div>`;
+                statusDisplay.innerHTML = `<span class="status-badge status-rejected">مرفوض</span>`;
+                checkStatusBtn.style.display = 'none';
+            } else {
+                checkStatusBtn.disabled = false;
+                checkStatusBtn.innerHTML = "🔄 التحقق مرة أخرى";
             }
         } catch(err) {
-            registerResult.innerHTML = `<div class="error">❌ خطأ: ${err.message}</div>`;
             checkStatusBtn.disabled = false;
             checkStatusBtn.innerHTML = "🔄 إعادة المحاولة";
         }
@@ -649,7 +758,6 @@
     
     goToProfileBtn.onclick = () => {
         sessionStorage.setItem('verifiedName', 'مستخدم موثق');
-        sessionStorage.setItem('verifiedDocType', 'secure_identity');
         sessionStorage.setItem('verifiedTimestamp', new Date().toLocaleString());
         window.location.href = '/profile';
     };
