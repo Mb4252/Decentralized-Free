@@ -8,7 +8,6 @@ import socket
 import math
 import secrets
 import string
-import re
 from flask import Flask, request, jsonify, send_from_directory, redirect, render_template
 from flask_cors import CORS
 
@@ -30,7 +29,7 @@ except PermissionError:
 LEDGER_FILE = os.path.join(DATA_DIR, 'ledger.json')
 PEERS_FILE = os.path.join(DATA_DIR, 'peers.json')
 INVITES_FILE = os.path.join(DATA_DIR, 'invites.json')
-BLACKLIST_FILE = os.path.join(DATA_DIR, 'blacklist.json')
+FREE_USERS_FILE = os.path.join(DATA_DIR, 'free_users_count.json')
 
 # ------------------- إعدادات الأمان -------------------
 MAX_FREE_USERS = 100
@@ -41,6 +40,24 @@ VERIFICATION_STATUS = {
     'APPROVED': 'approved', 
     'REJECTED': 'rejected'
 }
+
+# ------------------- دوال إدارة المستخدمين المجانيين -------------------
+def get_free_users_count():
+    try:
+        with open(FREE_USERS_FILE, 'r') as f:
+            data = json.load(f)
+            return data.get('count', 0)
+    except FileNotFoundError:
+        return 0
+
+def increment_free_users_count():
+    count = get_free_users_count() + 1
+    with open(FREE_USERS_FILE, 'w') as f:
+        json.dump({'count': count}, f)
+    return count
+
+def can_register_without_invite():
+    return get_free_users_count() < MAX_FREE_USERS
 
 # ------------------- تحميل البيانات -------------------
 PEERS = set()
@@ -75,17 +92,6 @@ def load_invites():
 def save_invites(invites):
     with open(INVITES_FILE, 'w') as f:
         json.dump(invites, f, indent=2)
-
-def load_blacklist():
-    try:
-        with open(BLACKLIST_FILE, 'r') as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return {}
-
-def save_blacklist(blacklist):
-    with open(BLACKLIST_FILE, 'w') as f:
-        json.dump(blacklist, f, indent=2)
 
 ledger_lock = threading.Lock()
 
@@ -276,6 +282,9 @@ class Blockchain:
     
     def get_approved_blocks(self):
         return [block for block in self.chain if block.status == 'approved']
+    
+    def get_total_users(self):
+        return len([b for b in self.chain if b.status == 'approved' and b.index > 0])
 
 blockchain = Blockchain()
 
@@ -333,6 +342,21 @@ def get_chain():
         })
     return jsonify({"chain": chain_data, "length": len(chain_data)}), 200
 
+@app.route('/system-status', methods=['GET'])
+def system_status():
+    """عرض حالة النظام وعدد المستخدمين المتبقيين"""
+    total_users = blockchain.get_total_users()
+    free_users_used = get_free_users_count()
+    remaining = MAX_FREE_USERS - free_users_used
+    
+    return jsonify({
+        "total_verified_users": total_users,
+        "free_registrations_used": free_users_used,
+        "free_registrations_remaining": max(0, remaining),
+        "invite_only_mode": remaining <= 0,
+        "max_free_users": MAX_FREE_USERS
+    }), 200
+
 @app.route('/add_block_peer', methods=['POST'])
 def add_block_peer():
     data = request.get_json()
@@ -364,6 +388,25 @@ def add_block_peer():
         blockchain.save_chain()
         return jsonify({"message": "تمت الإضافة"}), 201
 
+@app.route('/verify-invite', methods=['POST'])
+def verify_invite():
+    data = request.get_json()
+    invite_code = data.get('invite_code')
+    
+    invites = load_invites()
+    
+    if not invite_code or invite_code not in invites:
+        return jsonify({"valid": False, "error": "رمز دعوة غير صالح"}), 404
+    
+    if invites[invite_code].get('used', False):
+        return jsonify({"valid": False, "error": "رمز الدعوة مستخدم من قبل"}), 409
+    
+    return jsonify({
+        "valid": True,
+        "inviter": invites[invite_code].get('inviter', 'admin'),
+        "created_at": invites[invite_code].get('created_at', '')
+    }), 200
+
 @app.route('/propose-verification', methods=['POST'])
 def propose_verification():
     data = request.get_json()
@@ -373,15 +416,22 @@ def propose_verification():
         return jsonify({"error": "بيانات ناقصة"}), 400
     
     invite_code = data.get('invite_code')
+    free_users_count = get_free_users_count()
     
-    if invite_code:
+    # التحقق من رمز الدعوة أو المقاعد المجانية
+    if free_users_count >= MAX_FREE_USERS:
+        if not invite_code:
+            return jsonify({"error": "النظام في وضع الدعوات فقط، يلزم رمز دعوة"}), 403
+        
         invites = load_invites()
-        if invite_code not in invites or invites[invite_code]['used']:
-            return jsonify({"error": "رمز دعوة غير صالح"}), 403
+        if invite_code not in invites or invites[invite_code].get('used', False):
+            return jsonify({"error": "رمز دعوة غير صالح أو مستخدم"}), 403
         
         invites[invite_code]['used'] = True
         invites[invite_code]['used_by'] = data['name']
         save_invites(invites)
+    else:
+        increment_free_users_count()
     
     trust_score_required = 0 if not PEERS else MIN_TRUST_SCORE_TO_VOTE
     new_block = blockchain.add_pending_block(
@@ -414,7 +464,7 @@ def propose_verification():
     if len(PEERS) > 0:
         threading.Thread(target=broadcast_block, args=(block_dict,)).start()
         return jsonify({
-            "message": "Verification proposed. Waiting for witness approval.",
+            "message": "تم إرسال طلب التوثيق للشهود",
             "block_index": new_block.index,
             "status": "pending"
         }), 202
@@ -422,7 +472,7 @@ def propose_verification():
         new_block.status = 'approved'
         blockchain.save_chain()
         return jsonify({
-            "message": "Auto-verified (AI Validator). No witnesses available.",
+            "message": "تم التوثيق تلقائياً (لا يوجد شهود)",
             "block_index": new_block.index,
             "status": "approved"
         }), 201
@@ -436,13 +486,12 @@ def vote_on_verification():
         return jsonify({"error": "بيانات ناقصة"}), 400
     
     if data['trust_score'] < MIN_TRUST_SCORE_TO_VOTE:
-        return jsonify({"error": f"Insufficient trust score. Minimum required: {MIN_TRUST_SCORE_TO_VOTE}"}), 403
+        return jsonify({"error": f"درجة الثقة غير كافية. الحد الأدنى: {MIN_TRUST_SCORE_TO_VOTE}"}), 403
     
     result, status = blockchain.approve_block(data['block_index'], data['witness_id'], data['approved'])
     
     if status == 'approved':
-        is_correct = True
-        trust_manager.update_trust_score(data['witness_id'], is_correct)
+        trust_manager.update_trust_score(data['witness_id'], True)
         
         for block in blockchain.chain:
             if block.index == data['block_index']:
@@ -461,11 +510,11 @@ def vote_on_verification():
                 threading.Thread(target=broadcast_block, args=(final_block_dict,)).start()
                 break
         
-        return jsonify({"message": f"Verification {status}!", "status": status}), 200
+        return jsonify({"message": f"تم قبول التوثيق!", "status": "approved"}), 200
     elif status == 'rejected':
-        return jsonify({"message": f"Verification {status}!", "status": status}), 200
+        return jsonify({"message": f"تم رفض التوثيق!", "status": "rejected"}), 200
     else:
-        return jsonify({"message": "Vote recorded. Still pending.", "status": "pending"}), 200
+        return jsonify({"message": "تم تسجيل التصويت. لا يزال قيد المراجعة.", "status": "pending"}), 200
 
 @app.route('/pending-verifications', methods=['GET'])
 def get_pending_verifications():
@@ -492,7 +541,7 @@ def health():
     }), 200
 
 # ============================================================
-# ✅ مسارات الصفحات (ROUTES) - هذا هو الحل لمشكلتك ✅
+# ✅ مسارات الصفحات (ROUTES)
 # ============================================================
 
 @app.route('/')
@@ -528,15 +577,18 @@ if __name__ == '__main__':
     print("🔐 وثاق - نظام التوثيق اللامركزي")
     print("=" * 50)
     print(f"👥 عدد الشهود: {len(PEERS)}")
+    print(f"📊 المستخدمين المسجلين: {blockchain.get_total_users()}")
+    print(f"🎫 المقاعد المجانية المتبقية: {MAX_FREE_USERS - get_free_users_count()}")
     print(f"📁 مجلد البيانات: {DATA_DIR}")
     print(f"🌐 الخادم: http://localhost:{PORT}")
     print("-" * 50)
     print("📍 المسارات المتاحة:")
-    print(f"   ✅ http://localhost:{PORT}/         → الرئيسي")
-    print(f"   ✅ http://localhost:{PORT}/verify   → صفحة التوثيق")
-    print(f"   ✅ http://localhost:{PORT}/witness  → صفحة الشهود")
-    print(f"   ✅ http://localhost:{PORT}/profile  → الملف الشخصي")
-    print(f"   ✅ http://localhost:{PORT}/chain    → API سلسلة الكتل")
-    print(f"   ✅ http://localhost:{PORT}/health   → نقطة صحية")
+    print(f"   ✅ http://localhost:{PORT}/           → الرئيسي")
+    print(f"   ✅ http://localhost:{PORT}/verify     → صفحة التوثيق")
+    print(f"   ✅ http://localhost:{PORT}/witness    → صفحة الشهود")
+    print(f"   ✅ http://localhost:{PORT}/profile    → الملف الشخصي")
+    print(f"   ✅ http://localhost:{PORT}/chain      → API سلسلة الكتل")
+    print(f"   ✅ http://localhost:{PORT}/health     → نقطة صحية")
+    print(f"   ✅ http://localhost:{PORT}/system-status → حالة النظام")
     print("=" * 50)
     app.run(host='0.0.0.0', port=PORT, debug=False, threaded=True)
