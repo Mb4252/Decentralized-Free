@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>وثاق - التوثيق الذكي (بدون حركات)</title>
+    <title>وثاق - التوثيق الآمن</title>
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body { background: linear-gradient(135deg, #0a0a2a 0%, #1a1a3a 100%); margin: 0; padding: 20px; min-height: 100vh; }
@@ -15,8 +15,6 @@
         .btn-primary:disabled { background: #b0c4d9; cursor: not-allowed; }
         .btn-success { background: #28a745; color: white; }
         .btn-warning { background: #ffc107; color: #333; }
-        .btn-info { background: #17a2b8; color: white; }
-        video { width: 100%; border-radius: 20px; border: 2px solid #ddd; background: #000; margin: 10px 0; transform: scaleX(-1); }
         .result { margin: 15px 0; padding: 15px; border-radius: 20px; text-align: center; font-size: 0.9rem; }
         .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
         .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
@@ -30,35 +28,25 @@
         .step.completed { background: #28a745; color: white; }
         .spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid #2c7da0; border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .system-status-card { background: linear-gradient(135deg, #e8f4f8, #d1ecf1); border-radius: 20px; padding: 15px; margin-bottom: 20px; text-align: center; }
-        .remaining-slots { font-size: 1.2rem; font-weight: bold; color: #2c7da0; }
-        .sentence-box { background: #e7f3ff; border-radius: 60px; padding: 15px; text-align: center; margin: 15px 0; font-size: 1.1rem; font-weight: bold; }
-        .pulse-indicator { display: inline-block; width: 30px; height: 30px; border-radius: 50%; background: #dc3545; margin: 5px; animation: pulse-animation 1s infinite; }
-        @keyframes pulse-animation { 0% { transform: scale(0.8); opacity: 0.5; } 100% { transform: scale(1.2); opacity: 1; } }
-        .upload-buttons { display: flex; gap: 10px; margin: 10px 0; flex-wrap: wrap; }
-        .upload-buttons button { flex: 1; margin: 0; font-size: 0.9rem; padding: 12px; }
-        .camera-btn { background: #28a745; color: white; }
-        .gallery-btn { background: #17a2b8; color: white; }
-        .preview-img { max-width: 100%; max-height: 200px; border-radius: 16px; margin-top: 10px; border: 2px solid #28a745; }
-        .image-container { text-align: center; margin: 15px 0; padding: 10px; background: #f0f8ff; border-radius: 16px; display: none; }
-        .file-input { display: none; }
+        .camera-preview { width: 100%; border-radius: 20px; border: 2px solid #ddd; background: #000; margin: 10px 0; }
+        .guidance-text { font-size: 0.9rem; text-align: center; margin: 10px 0; padding: 8px; border-radius: 40px; }
+        .guidance-good { background: #d4edda; color: #155724; }
+        .guidance-warning { background: #fff3cd; color: #856404; }
+        .guidance-bad { background: #f8d7da; color: #721c24; }
+        .hidden { display: none; }
+        .flex-buttons { display: flex; gap: 10px; }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 </head>
 <body>
 <div class="container">
-    <h1>🔐 وثاق | التوثيق الذكي</h1>
-    
-    <div class="system-status-card" id="systemStatusCard">
-        <div id="statusSpinner" class="spinner" style="width:20px; height:20px;"></div>
-        <div id="statusText">جاري تحميل حالة النظام...</div>
-    </div>
+    <h1>🔐 وثاق | التوثيق الآمن</h1>
     
     <div class="step-indicator">
         <div class="step active" id="step1">1️⃣ الدعوة</div>
         <div class="step" id="step2">2️⃣ الهوية</div>
-        <div class="step" id="step3">3️⃣ التحقق الحيوي</div>
+        <div class="step" id="step3">3️⃣ الوجه</div>
         <div class="step" id="step4">4️⃣ التسجيل</div>
     </div>
 
@@ -70,60 +58,53 @@
             <input type="text" id="inviteCode" placeholder="XXXX-XXXX-XXXX" style="width:100%; padding:12px; border-radius:40px; border:1px solid #ddd; margin:10px 0; text-align:center;">
             <button id="verifyInviteBtn" class="btn-primary">🔍 التحقق</button>
             <div id="inviteResult" class="result"></div>
-            <button id="nextToIdentityBtn" class="btn-success" disabled>▶️ التالي: رفع الهوية</button>
+            <button id="nextToIdentityBtn" class="btn-success" disabled>▶️ التالي</button>
         </div>
     </div>
 
-    <!-- الخطوة 2: رفع الهوية -->
+    <!-- الخطوة 2: تصوير الهوية (Auto-Capture) -->
     <div id="step2Content" style="display:none;">
         <div class="card">
-            <h2>🆔 2. رفع صورة الهوية</h2>
-            <p style="font-size:0.85rem; color:#dc3545;">⚠️ بطاقة هوية، جواز سفر، رخصة قيادة</p>
+            <h2>🆔 2. تصوير الهوية</h2>
+            <p style="font-size:0.85rem; color:#666; text-align:center;">ضع المستند أمام الكاميرا - سيتم الالتقاط تلقائياً</p>
             
-            <div class="upload-buttons">
-                <button id="openCameraBtn" class="camera-btn">📸 تصوير</button>
-                <button id="openGalleryBtn" class="gallery-btn">🖼️ معرض</button>
-            </div>
+            <video id="docCamera" autoplay muted playsinline class="camera-preview"></video>
             
-            <input type="file" id="imageFileInput" accept="image/*" capture="environment" class="file-input">
-            <input type="file" id="galleryFileInput" accept="image/jpeg,image/png,image/jpg" class="file-input">
+            <div id="docGuidance" class="guidance-text guidance-info"></div>
+            <div id="docProgress" class="progress-bar hidden"><div class="progress-fill" id="docProgressFill"></div></div>
             
-            <div id="imagePreviewContainer" class="image-container">
-                <img id="previewImage" class="preview-img">
-                <p style="color:#28a745;">✅ تم التحميل</p>
-            </div>
+            <canvas id="docCanvas" style="display:none;"></canvas>
+            <img id="capturedImage" style="display:none;">
             
-            <button id="extractIdFaceBtn" class="btn-primary" disabled>🔍 استخراج بصمة الوجه</button>
-            <div id="idResult" class="result"></div>
-            <button id="nextToLivenessBtn" class="btn-success" disabled>▶️ التالي</button>
+            <div id="docResult" class="result hidden"></div>
+            <button id="nextToFaceBtn" class="btn-success" style="display:none;">▶️ التالي: تصوير الوجه</button>
+            <button id="retryDocBtn" class="btn-warning" style="display:none;">🔄 إعادة التصوير</button>
         </div>
     </div>
 
-    <!-- الخطوة 3: التحقق الحيوي الذكي (بدون حركات) -->
+    <!-- الخطوة 3: تصوير الوجه (Auto-Capture) -->
     <div id="step3Content" style="display:none;">
         <div class="card">
-            <h2>🧬 3. التحقق الحيوي الذكي</h2>
-            <p style="font-size:0.85rem; color:#666; text-align:center;">✨ فقط تحدث بالجملة التالية (سيتم التحليل تلقائياً)</p>
+            <h2>👤 3. تصوير الوجه</h2>
+            <p style="font-size:0.85rem; color:#666; text-align:center;">وجه الكاميرا نحو وجهك - سيتم الالتقاط تلقائياً</p>
             
-            <div class="sentence-box" id="sentenceBox">
-                📢 "أنا شخص حقيقي وأوافق على التوثيق"
-            </div>
+            <video id="faceCamera" autoplay muted playsinline class="camera-preview"></video>
             
-            <video id="camera" autoplay muted playsinline></video>
+            <div id="faceGuidance" class="guidance-text guidance-info"></div>
+            <div id="faceProgress" class="progress-bar hidden"><div class="progress-fill" id="faceProgressFill"></div></div>
             
-            <div id="livenessStatus" class="info" style="text-align:center;"></div>
-            <div id="pulseIndicator" style="text-align:center; margin:10px 0;"></div>
+            <canvas id="faceCanvas" style="display:none;"></canvas>
             
-            <button id="startStealthCheckBtn" class="btn-primary">🎙️ بدء التحقق الذكي</button>
-            <div id="livenessResult" class="result"></div>
-            <button id="nextToRegisterBtn" class="btn-success" style="display:none;">✅ المتابعة للتسجيل</button>
+            <div id="faceResult" class="result hidden"></div>
+            <button id="nextToRegisterBtn" class="btn-success" style="display:none;">▶️ التالي: التسجيل</button>
+            <button id="retryFaceBtn" class="btn-warning" style="display:none;">🔄 إعادة التصوير</button>
         </div>
     </div>
 
     <!-- الخطوة 4: التسجيل -->
     <div id="step4Content" style="display:none;">
         <div class="card">
-            <h2>✅ 4. التسجيل</h2>
+            <h2>✅ 4. تسجيل الهوية</h2>
             <div id="registerResult" class="result"></div>
             <button id="goToProfileBtn" class="btn-success" style="display:none;">📁 الملف الشخصي</button>
         </div>
@@ -132,73 +113,67 @@
 
 <script>
     // ============================================================
-    // نظام التوثيق الذكي - تحليل التنفس + نبضات الوجه + حركة الشفاه
-    // بدون أي حركات رأس مزعجة
+    // نظام التوثيق الآمن - Zero-Persistence
+    // جميع الصور تُعالج في الذاكرة فقط
     // ============================================================
     
     let modelsLoaded = false;
-    let cameraStream = null;
     let step = 1;
-    let idDescriptor = null;
-    let faceDescriptor = null;
-    let livenessPassed = false;
+    let sessionToken = null;
     let inviteCode = null;
-    let currentImageData = null;
+    let documentVerified = false;
+    let faceEmbedding = null;
+    let documentHash = null;
+    let capturedDocImage = null;
     
-    // متغيرات التحليل الذكي
-    let stealthCheckInterval = null;
-    let breathingSamples = [];
-    let pulseSamples = [];
-    let lipMovementSamples = [];
-    let lastLipDistance = 0;
-    let checkStartTime = 0;
-    let verificationResult = null;
+    // كاميرات
+    let docStream = null;
+    let faceStream = null;
+    let docCameraActive = false;
+    let faceCameraActive = false;
+    
+    // إعدادات Auto-Capture
+    let autoCaptureInterval = null;
+    let qualityCheckInterval = null;
+    let lastQualityScore = 0;
     
     // عناصر DOM
     const inviteCodeInput = document.getElementById('inviteCode');
     const verifyInviteBtn = document.getElementById('verifyInviteBtn');
     const inviteResult = document.getElementById('inviteResult');
-    const inviteMessage = document.getElementById('inviteMessage');
     const nextToIdentityBtn = document.getElementById('nextToIdentityBtn');
-    const openCameraBtn = document.getElementById('openCameraBtn');
-    const openGalleryBtn = document.getElementById('openGalleryBtn');
-    const imageFileInput = document.getElementById('imageFileInput');
-    const galleryFileInput = document.getElementById('galleryFileInput');
-    const imagePreviewContainer = document.getElementById('imagePreviewContainer');
-    const previewImage = document.getElementById('previewImage');
-    const extractIdFaceBtn = document.getElementById('extractIdFaceBtn');
-    const idResult = document.getElementById('idResult');
-    const nextToLivenessBtn = document.getElementById('nextToLivenessBtn');
-    const startStealthCheckBtn = document.getElementById('startStealthCheckBtn');
-    const livenessResult = document.getElementById('livenessResult');
+    const nextToFaceBtn = document.getElementById('nextToFaceBtn');
     const nextToRegisterBtn = document.getElementById('nextToRegisterBtn');
-    const registerResult = document.getElementById('registerResult');
     const goToProfileBtn = document.getElementById('goToProfileBtn');
-    const camera = document.getElementById('camera');
-    const statusText = document.getElementById('statusText');
-    const statusSpinner = document.getElementById('statusSpinner');
-    const livenessStatus = document.getElementById('livenessStatus');
-    const pulseIndicator = document.getElementById('pulseIndicator');
-    const sentenceBox = document.getElementById('sentenceBox');
+    const retryDocBtn = document.getElementById('retryDocBtn');
+    const retryFaceBtn = document.getElementById('retryFaceBtn');
     
-    // ------------------- تحميل حالة النظام -------------------
-    async function loadSystemStatus() {
+    const docCamera = document.getElementById('docCamera');
+    const faceCamera = document.getElementById('faceCamera');
+    const docCanvas = document.getElementById('docCanvas');
+    const faceCanvas = document.getElementById('faceCanvas');
+    const docGuidance = document.getElementById('docGuidance');
+    const faceGuidance = document.getElementById('faceGuidance');
+    const docProgress = document.getElementById('docProgress');
+    const faceProgress = document.getElementById('faceProgress');
+    const docProgressFill = document.getElementById('docProgressFill');
+    const faceProgressFill = document.getElementById('faceProgressFill');
+    const docResult = document.getElementById('docResult');
+    const faceResult = document.getElementById('faceResult');
+    const registerResult = document.getElementById('registerResult');
+    
+    // ------------------- تحميل النماذج وبدء الجلسة -------------------
+    async function initSession() {
         try {
-            const response = await fetch('/system-status');
+            const response = await fetch('/init-session', { method: 'POST' });
             const data = await response.json();
-            statusSpinner.style.display = 'none';
-            if (data.invite_only_mode) {
-                statusText.innerHTML = `<span style="color:#dc3545;">⚠️ وضع الدعوات فقط</span>`;
-                inviteMessage.innerHTML = 'أدخل رمز الدعوة';
-            } else {
-                statusText.innerHTML = `<span style="color:#28a745;">✅ التسجيل مفتوح - المتبقي: ${data.free_registrations_remaining}</span>`;
-            }
+            sessionToken = data.session_token;
+            console.log("✅ جلسة جديدة:", sessionToken);
         } catch(e) {
-            statusText.innerHTML = '<span style="color:#dc3545;">⚠️ لا يمكن الاتصال</span>';
+            console.error("فشل بدء الجلسة", e);
         }
     }
     
-    // ------------------- تحميل النماذج -------------------
     async function loadModels() {
         const MODEL_URL = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights';
         try {
@@ -211,199 +186,220 @@
         }
     }
     
-    // ------------------- تحليل نبضات الوجه (Pulse Detection) -------------------
-    function analyzePulse(rgbValues, width, height) {
-        // حساب متوسط شدة اللون الأحمر (مؤشر تدفق الدم)
-        let redSum = 0;
-        for (let i = 0; i < rgbValues.length; i += 4) {
-            redSum += rgbValues[i];
-        }
-        const redAvg = redSum / (rgbValues.length / 4);
-        return redAvg;
-    }
-    
-    // ------------------- تحليل حركة الشفاه (Lip Movement) -------------------
-    function analyzeLipMovement(landmarks) {
-        const mouth = landmarks.getMouth();
-        if (!mouth || mouth.length < 6) return 0;
+    // ------------------- التحقق من جودة الصورة (للـ Auto-Capture) -------------------
+    async function checkImageQuality(videoElement, type = 'document') {
+        const detection = await faceapi.detectSingleFace(videoElement).withFaceLandmarks();
         
-        // قياس المسافة بين الشفة العليا والسفلى
-        const upperLip = mouth[2];
-        const lowerLip = mouth[6];
-        const distance = Math.hypot(upperLip.x - lowerLip.x, upperLip.y - lowerLip.y);
-        return distance;
-    }
-    
-    // ------------------- التحقق الذكي (بدون حركات) -------------------
-    async function startStealthVerification() {
-        startStealthCheckBtn.disabled = true;
-        startStealthCheckBtn.innerHTML = '<span class="spinner"></span> جاري التحليل الذكي...';
-        livenessStatus.innerHTML = '🔍 جاري تحليل التنفس ونبضات الوجه وحركة الشفاه...';
-        
-        breathingSamples = [];
-        pulseSamples = [];
-        lipMovementSamples = [];
-        checkStartTime = Date.now();
-        
-        // مدة التحليل 5 ثوانٍ (كافية لجمع عينات كافية)
-        const analysisDuration = 5000;
-        
-        stealthCheckInterval = setInterval(async () => {
-            const detection = await faceapi.detectSingleFace(camera).withFaceLandmarks();
-            if (!detection) return;
-            
-            // استخراج بيانات الصورة لتحليل النبض
-            const canvas = document.createElement('canvas');
-            canvas.width = camera.videoWidth;
-            canvas.height = camera.videoHeight;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(camera, 0, 0);
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            
-            // 1. تحليل النبض (Pulse)
-            const pulseValue = analyzePulse(imageData.data, canvas.width, canvas.height);
-            pulseSamples.push(pulseValue);
-            
-            // 2. تحليل حركة الشفاه (Lip Movement)
-            const lipDistance = analyzeLipMovement(detection.landmarks);
-            lipMovementSamples.push(lipDistance);
-            
-            // عرض مؤشر نبض حي
-            const pulseVariation = Math.abs(pulseValue - (pulseSamples[pulseSamples.length-2] || pulseValue));
-            if (pulseVariation > 5) {
-                pulseIndicator.innerHTML = '<span class="pulse-indicator"></span> ❤️ نبض حي تم اكتشافه';
-            } else {
-                pulseIndicator.innerHTML = '<span class="spinner"></span> جاري تحليل النبض...';
-            }
-            
-            // تحديث حالة التحليل
-            const elapsed = Date.now() - checkStartTime;
-            livenessStatus.innerHTML = `⏳ جاري التحليل (${Math.floor(elapsed / 1000)}/${analysisDuration/1000} ثانية) - نبض: ${pulseSamples.length} عينة`;
-            
-        }, 100);
-        
-        // بعد انتهاء مدة التحليل
-        setTimeout(async () => {
-            clearInterval(stealthCheckInterval);
-            
-            // تحليل النتائج
-            const hasBreathing = analyzeBreathing();
-            const hasPulse = analyzePulseSamples();
-            const hasLipMovement = analyzeLipMovementSamples();
-            
-            // الحصول على بصمة الوجه النهائية
-            const finalDetection = await faceapi.detectSingleFace(camera).withFaceLandmarks().withFaceDescriptor();
-            if (finalDetection) {
-                faceDescriptor = Array.from(finalDetection.descriptor);
-            }
-            
-            // تقييم النتائج
-            const isHuman = hasBreathing && hasPulse && hasLipMovement;
-            
-            if (isHuman && faceDescriptor) {
-                livenessPassed = true;
-                livenessResult.innerHTML = `
-                    <div class="success">
-                        ✅ التحقق الحيوي ناجح!<br>
-                        🫁 تنفس طبيعي: ${hasBreathing ? 'نعم' : 'لا'}<br>
-                        ❤️ نبض حي: ${hasPulse ? 'نعم' : 'لا'}<br>
-                        👄 حركة شفاه: ${hasLipMovement ? 'نعم' : 'لا'}
-                    </div>
-                `;
-                nextToRegisterBtn.style.display = 'block';
-                startStealthCheckBtn.style.display = 'none';
-            } else {
-                livenessResult.innerHTML = `
-                    <div class="error">
-                        ❌ فشل التحقق الحيوي!<br>
-                        🫁 تنفس: ${hasBreathing ? '✅' : '❌'}<br>
-                        ❤️ نبض: ${hasPulse ? '✅' : '❌'}<br>
-                        👄 حركة شفاه: ${hasLipMovement ? '✅' : '❌'}<br>
-                        <small>يرجى التحدث بالجملة الظاهرة على الشاشة</small>
-                    </div>
-                `;
-                startStealthCheckBtn.disabled = false;
-                startStealthCheckBtn.innerHTML = "🎙️ إعادة المحاولة";
-            }
-            
-            pulseIndicator.innerHTML = '';
-        }, analysisDuration);
-        
-        // بدء تسجيل الصوت (اختياري - للتحقق من مطابقة حركة الشفاه مع الصوت)
-        startVoiceRecording();
-    }
-    
-    function analyzeBreathing() {
-        // تحليل تنفس المستخدم من خلال تغيرات الصدر/الكتفين
-        // في هذا الإصدار، نعتمد على وجود تغيرات في النبض كدليل غير مباشر
-        return pulseSamples.length > 10;
-    }
-    
-    function analyzePulseSamples() {
-        if (pulseSamples.length < 5) return false;
-        
-        // حساب التباين في النبض (يجب أن يكون هناك تغيرات طبيعية)
-        const mean = pulseSamples.reduce((a,b) => a + b, 0) / pulseSamples.length;
-        const variance = pulseSamples.map(v => Math.pow(v - mean, 2)).reduce((a,b) => a + b, 0) / pulseSamples.length;
-        const hasVariation = variance > 10;
-        
-        return hasVariation;
-    }
-    
-    function analyzeLipMovementSamples() {
-        if (lipMovementSamples.length < 5) return false;
-        
-        // حساب التغيرات في حركة الشفاه (يجب أن تكون هناك حركة أثناء التحدث)
-        const mean = lipMovementSamples.reduce((a,b) => a + b, 0) / lipMovementSamples.length;
-        const variance = lipMovementSamples.map(v => Math.pow(v - mean, 2)).reduce((a,b) => a + b, 0) / lipMovementSamples.length;
-        const hasLipMovement = variance > 5;
-        
-        return hasLipMovement;
-    }
-    
-    async function startVoiceRecording() {
-        // محاكاة - في الإنتاج الفعلي، يمكن استخدام Web Audio API
-        console.log("🎤 جاري تسجيل الصوت للتحقق من مطابقة حركة الشفاه...");
-    }
-    
-    // ------------------- معالجة الصورة -------------------
-    function handleImageFile(file) {
-        if (!file || !file.type.startsWith('image/')) {
-            idResult.innerHTML = '<span class="error">❌ يرجى اختيار صورة</span>';
-            return;
+        if (!detection) {
+            if (type === 'document') updateGuidance('doc', '⚠️ لم يتم اكتشاف وجه', 'bad');
+            else updateGuidance('face', '⚠️ لم يتم اكتشاف وجه', 'bad');
+            return { quality: 0, isPerfect: false };
         }
         
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            currentImageData = e.target.result;
-            previewImage.src = currentImageData;
-            imagePreviewContainer.style.display = 'block';
-            extractIdFaceBtn.disabled = false;
-            idResult.innerHTML = '<span class="success">✅ تم تحميل الصورة</span>';
-        };
-        reader.onerror = function() {
-            idResult.innerHTML = '<span class="error">❌ فشل القراءة</span>';
-        };
-        reader.readAsDataURL(file);
+        const box = detection.detection.box;
+        const videoWidth = videoElement.videoWidth;
+        const videoHeight = videoElement.videoHeight;
+        
+        // حساب تمركز الوجه
+        const centerX = box.x + box.width / 2;
+        const centerY = box.y + box.height / 2;
+        const isCentered = Math.abs(centerX - videoWidth / 2) < videoWidth * 0.15 &&
+                          Math.abs(centerY - videoHeight / 2) < videoHeight * 0.15;
+        
+        // حساب حجم الوجه
+        const faceSize = (box.width * box.height) / (videoWidth * videoHeight);
+        const isGoodSize = (type === 'document') ? 
+            (faceSize > 0.03 && faceSize < 0.2) : 
+            (faceSize > 0.1 && faceSize < 0.4);
+        
+        // تحليل الإضاءة
+        const canvas = document.createElement('canvas');
+        canvas.width = box.width;
+        canvas.height = box.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(videoElement, box.x, box.y, box.width, box.height, 0, 0, box.width, box.height);
+        const imageData = ctx.getImageData(0, 0, box.width, box.height);
+        const pixels = imageData.data;
+        let brightness = 0;
+        for (let i = 0; i < pixels.length; i += 4) {
+            brightness += (pixels[i] + pixels[i+1] + pixels[i+2]) / 3;
+        }
+        brightness /= (pixels.length / 4);
+        const isGoodLighting = brightness > 80 && brightness < 220;
+        
+        // إرشادات
+        if (!isCentered) {
+            if (centerX < videoWidth / 2 - videoWidth * 0.1) updateGuidance(type, '👉 اتجه قليلاً لليمين', 'warning');
+            else if (centerX > videoWidth / 2 + videoWidth * 0.1) updateGuidance(type, '👈 اتجه قليلاً لليسار', 'warning');
+            else if (centerY < videoHeight / 2 - videoHeight * 0.1) updateGuidance(type, '👇 اخفض وجهك قليلاً', 'warning');
+            else if (centerY > videoHeight / 2 + videoHeight * 0.1) updateGuidance(type, '👆 ارفع وجهك قليلاً', 'warning');
+        } else if (!isGoodSize) {
+            if (faceSize < (type === 'document' ? 0.03 : 0.1)) updateGuidance(type, '🔍 اقترب من الكاميرا', 'warning');
+            else updateGuidance(type, '🔍 ابتعد قليلاً عن الكاميرا', 'warning');
+        } else if (!isGoodLighting) {
+            updateGuidance(type, '💡 اضبط الإضاءة', 'warning');
+        } else {
+            updateGuidance(type, '✅ وضع ممتاز! جاري الالتقاط...', 'good');
+        }
+        
+        const qualityScore = (isCentered ? 40 : 0) + (isGoodSize ? 30 : 0) + (isGoodLighting ? 30 : 0);
+        const isPerfect = isCentered && isGoodSize && isGoodLighting;
+        
+        return { quality: qualityScore, isPerfect, detection };
     }
     
-    openCameraBtn.onclick = () => {
-        imageFileInput.setAttribute('capture', 'environment');
-        imageFileInput.click();
+    function updateGuidance(type, message, level) {
+        const element = type === 'doc' ? docGuidance : faceGuidance;
+        element.innerHTML = message;
+        element.className = `guidance-text guidance-${level}`;
+    }
+    
+    // ------------------- Auto-Capture للهوية -------------------
+    async function startDocAutoCapture() {
+        if (autoCaptureInterval) clearInterval(autoCaptureInterval);
+        if (qualityCheckInterval) clearInterval(qualityCheckInterval);
+        
+        let perfectFrames = 0;
+        const requiredPerfectFrames = 5;
+        
+        qualityCheckInterval = setInterval(async () => {
+            const { quality, isPerfect } = await checkImageQuality(docCamera, 'document');
+            docProgressFill.style.width = `${quality}%`;
+            
+            if (isPerfect) {
+                perfectFrames++;
+                if (perfectFrames >= requiredPerfectFrames) {
+                    clearInterval(qualityCheckInterval);
+                    captureDocumentImage();
+                }
+            } else {
+                perfectFrames = 0;
+            }
+        }, 200);
+    }
+    
+    async function captureDocumentImage() {
+        docProgress.classList.add('hidden');
+        docGuidance.innerHTML = '📸 جاري الالتقاط والمعالجة...';
+        
+        const canvas = docCanvas;
+        canvas.width = docCamera.videoWidth;
+        canvas.height = docCamera.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(docCamera, 0, 0);
+        
+        // تحويل إلى Blob (في الذاكرة فقط)
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9));
+        
+        // إرسال للخادم للتحقق
+        const formData = new FormData();
+        formData.append('document_image', blob, 'document.jpg');
+        
+        docResult.classList.remove('hidden');
+        docResult.innerHTML = '<span class="info">🔍 جاري التحقق من المستند...</span>';
+        
+        try {
+            const response = await fetch('/verify-document', {
+                method: 'POST',
+                headers: { 'X-Session-Token': sessionToken },
+                body: formData
+            });
+            const result = await response.json();
+            
+            if (result.is_authentic) {
+                documentVerified = true;
+                documentHash = result.document_hash || CryptoJS.SHA256(Math.random().toString()).toString();
+                docResult.innerHTML = `<span class="success">✅ المستند أصلي! (نسبة الثقة: ${result.total_score}%)</span>`;
+                nextToFaceBtn.style.display = 'block';
+                retryDocBtn.style.display = 'block';
+            } else {
+                docResult.innerHTML = `<span class="error">❌ المستند غير أصلي! (نسبة الثقة: ${result.total_score}%)</span>`;
+                retryDocBtn.style.display = 'block';
+            }
+        } catch(err) {
+            docResult.innerHTML = `<span class="error">❌ خطأ: ${err.message}</span>`;
+            retryDocBtn.style.display = 'block';
+        }
+        
+        // مسح الـ blob من الذاكرة
+        URL.revokeObjectURL(URL.createObjectURL(blob));
+    }
+    
+    // ------------------- Auto-Capture للوجه -------------------
+    async function startFaceAutoCapture() {
+        if (autoCaptureInterval) clearInterval(autoCaptureInterval);
+        if (qualityCheckInterval) clearInterval(qualityCheckInterval);
+        
+        let perfectFrames = 0;
+        const requiredPerfectFrames = 5;
+        
+        qualityCheckInterval = setInterval(async () => {
+            const { quality, isPerfect, detection } = await checkImageQuality(faceCamera, 'face');
+            faceProgressFill.style.width = `${quality}%`;
+            
+            if (isPerfect) {
+                perfectFrames++;
+                if (perfectFrames >= requiredPerfectFrames) {
+                    clearInterval(qualityCheckInterval);
+                    captureFaceImage(detection);
+                }
+            } else {
+                perfectFrames = 0;
+            }
+        }, 200);
+    }
+    
+    async function captureFaceImage(detection) {
+        faceProgress.classList.add('hidden');
+        faceGuidance.innerHTML = '📸 جاري الالتقاط واستخراج البصمة...';
+        
+        const canvas = faceCanvas;
+        canvas.width = faceCamera.videoWidth;
+        canvas.height = faceCamera.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(faceCamera, 0, 0);
+        
+        // استخراج بصمة الوجه من الصورة
+        const img = new Image();
+        img.src = canvas.toDataURL();
+        await new Promise(r => { img.onload = r; });
+        
+        const faceDetection = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
+        
+        if (faceDetection) {
+            faceEmbedding = Array.from(faceDetection.descriptor);
+        }
+        
+        faceResult.classList.remove('hidden');
+        
+        if (faceEmbedding) {
+            faceResult.innerHTML = '<span class="success">✅ تم استخراج بصمة الوجه بنجاح!</span>';
+            nextToRegisterBtn.style.display = 'block';
+            retryFaceBtn.style.display = 'block';
+        } else {
+            faceResult.innerHTML = '<span class="error">❌ فشل استخراج بصمة الوجه</span>';
+            retryFaceBtn.style.display = 'block';
+        }
+    }
+    
+    // ------------------- إعادة المحاولة -------------------
+    retryDocBtn.onclick = () => {
+        docResult.classList.add('hidden');
+        docResult.innerHTML = '';
+        retryDocBtn.style.display = 'none';
+        nextToFaceBtn.style.display = 'none';
+        startDocAutoCapture();
     };
     
-    openGalleryBtn.onclick = () => {
-        imageFileInput.removeAttribute('capture');
-        imageFileInput.click();
+    retryFaceBtn.onclick = () => {
+        faceResult.classList.add('hidden');
+        faceResult.innerHTML = '';
+        retryFaceBtn.style.display = 'none';
+        nextToRegisterBtn.style.display = 'none';
+        startFaceAutoCapture();
     };
     
-    imageFileInput.addEventListener('change', (event) => {
-        const file = event.target.files[0];
-        if (file) handleImageFile(file);
-        imageFileInput.value = '';
-    });
-    
-    // ------------------- التحقق من رمز الدعوة -------------------
+    // ------------------- التنقل بين الخطوات -------------------
     verifyInviteBtn.onclick = async () => {
         const code = inviteCodeInput.value.trim().toUpperCase();
         const statusRes = await fetch('/system-status');
@@ -411,7 +407,7 @@
         
         if (!status.invite_only_mode) {
             inviteCode = null;
-            inviteResult.innerHTML = `<span class="success">✅ مرحباً بك!</span>`;
+            inviteResult.innerHTML = '<span class="success">✅ مرحباً بك!</span>';
             nextToIdentityBtn.disabled = false;
             return;
         }
@@ -421,146 +417,70 @@
             return;
         }
         
-        verifyInviteBtn.disabled = true;
-        verifyInviteBtn.innerHTML = '<span class="spinner"></span> جاري...';
-        
-        try {
-            const response = await fetch('/verify-invite', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ invite_code: code })
-            });
-            const result = await response.json();
-            
-            if (result.valid) {
-                inviteCode = code;
-                inviteResult.innerHTML = `<span class="success">✅ رمز صالح!</span>`;
-                nextToIdentityBtn.disabled = false;
-            } else {
-                inviteResult.innerHTML = `<span class="error">❌ ${result.error}</span>`;
-            }
-        } catch(err) {
-            inviteResult.innerHTML = `<span class="error">❌ خطأ</span>`;
-        }
-        
-        verifyInviteBtn.disabled = false;
-        verifyInviteBtn.innerHTML = "🔍 تحقق";
+        inviteCode = code;
+        inviteResult.innerHTML = '<span class="success">✅ رمز صالح!</span>';
+        nextToIdentityBtn.disabled = false;
     };
     
-    nextToIdentityBtn.onclick = () => {
+    nextToIdentityBtn.onclick = async () => {
         step = 2;
         updateSteps();
         document.getElementById('step1Content').style.display = 'none';
         document.getElementById('step2Content').style.display = 'block';
+        
+        if (docStream) docStream.getTracks().forEach(t => t.stop());
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        docStream = stream;
+        docCamera.srcObject = stream;
+        await docCamera.play();
+        
+        docProgress.classList.remove('hidden');
+        startDocAutoCapture();
     };
     
-    // ------------------- استخراج بصمة الهوية -------------------
-    async function isRealIdentityDocument(imageElement) {
-        const faceDetection = await faceapi.detectSingleFace(imageElement).withFaceLandmarks();
-        if (!faceDetection) return { isValid: false, reason: "لم يتم العثور على وجه" };
-        
-        const box = faceDetection.detection.box;
-        const faceRatio = (box.width * box.height) / (imageElement.width * imageElement.height);
-        
-        if (faceRatio > 0.25) return { isValid: false, reason: "صورة شخصية وليست هوية" };
-        if (faceRatio < 0.02) return { isValid: false, reason: "الوجه صغير جداً" };
-        return { isValid: true, reason: "صالح" };
-    }
-    
-    extractIdFaceBtn.onclick = async () => {
-        if (!currentImageData) {
-            idResult.innerHTML = '<span class="error">❌ يرجى رفع الصورة أولاً</span>';
-            return;
-        }
-        
-        extractIdFaceBtn.disabled = true;
-        extractIdFaceBtn.innerHTML = '<span class="spinner"></span> جاري...';
-        
-        const img = new Image();
-        img.src = currentImageData;
-        await new Promise(r => { img.onload = r; });
-        
-        const identityCheck = await isRealIdentityDocument(img);
-        if (!identityCheck.isValid) {
-            idResult.innerHTML = `<span class="error">❌ ${identityCheck.reason}</span>`;
-            extractIdFaceBtn.disabled = false;
-            extractIdFaceBtn.innerHTML = "🔍 إعادة المحاولة";
-            return;
-        }
-        
-        const detection = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
-        if (!detection) {
-            idResult.innerHTML = '<span class="warning">⚠️ لم يتم العثور على وجه واضح</span>';
-            extractIdFaceBtn.disabled = false;
-            extractIdFaceBtn.innerHTML = "🔍 إعادة المحاولة";
-            return;
-        }
-        
-        idDescriptor = Array.from(detection.descriptor);
-        idResult.innerHTML = `<span class="success">✅ تم استخراج بصمة الهوية!</span>`;
-        nextToLivenessBtn.disabled = false;
-        extractIdFaceBtn.disabled = false;
-        extractIdFaceBtn.innerHTML = "🔍 إعادة الاستخراج";
-    };
-    
-    // ------------------- الانتقال للتحقق الحيوي -------------------
-    nextToLivenessBtn.onclick = async () => {
-        if (!idDescriptor) {
-            idResult.innerHTML = '<span class="error">❌ يجب استخراج بصمة الهوية أولاً!</span>';
-            return;
-        }
-        
+    nextToFaceBtn.onclick = async () => {
         step = 3;
         updateSteps();
         document.getElementById('step2Content').style.display = 'none';
         document.getElementById('step3Content').style.display = 'block';
         
-        if (cameraStream) cameraStream.getTracks().forEach(t => t.stop());
+        if (docStream) docStream.getTracks().forEach(t => t.stop());
+        if (faceStream) faceStream.getTracks().forEach(t => t.stop());
         
         const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        cameraStream = stream;
-        camera.srcObject = stream;
-        await camera.play();
+        faceStream = stream;
+        faceCamera.srcObject = stream;
+        await faceCamera.play();
         
-        livenessStatus.innerHTML = '✅ الكاميرا جاهزة. اضغط "بدء التحقق الذكي"';
-        startStealthCheckBtn.disabled = false;
+        faceProgress.classList.remove('hidden');
+        startFaceAutoCapture();
     };
     
-    startStealthCheckBtn.onclick = startStealthVerification;
-    
-    // ------------------- المتابعة للتسجيل -------------------
     nextToRegisterBtn.onclick = async () => {
-        if (!idDescriptor || !faceDescriptor) {
-            livenessResult.innerHTML = '<span class="error">❌ بيانات غير مكتملة</span>';
-            return;
-        }
-        
-        const distance = faceapi.euclideanDistance(faceDescriptor, idDescriptor);
-        const similarity = Math.round((1 - Math.min(distance, 1)) * 100);
-        
-        if (similarity < 85) {
-            livenessResult.innerHTML = `<div class="error">❌ التطابق ${similarity}% (مطلوب 85%)</div>`;
+        if (!faceEmbedding) {
+            faceResult.innerHTML = '<span class="error">❌ يرجى تصوير الوجه أولاً</span>';
             return;
         }
         
         nextToRegisterBtn.disabled = true;
-        nextToRegisterBtn.innerHTML = '<span class="spinner"></span> جاري الإرسال...';
-        
-        const faceHash = CryptoJS.SHA256(JSON.stringify(faceDescriptor)).toString();
-        const docHash = CryptoJS.SHA256(JSON.stringify(idDescriptor)).toString();
+        nextToRegisterBtn.innerHTML = '<span class="spinner"></span> جاري التسجيل...';
         
         const payload = {
             name: "مستخدم موثق",
-            face_hash: faceHash,
-            document_hash: docHash,
+            face_embedding: faceEmbedding,
+            document_hash: documentHash,
             document_type: "secure_identity",
-            invite_code: inviteCode
+            invite_code: inviteCode,
+            session_data: { document_verified: documentVerified }
         };
         
         try {
-            const response = await fetch('/propose-verification', {
+            const response = await fetch('/verify-identity', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-Session-Token': sessionToken
+                },
                 body: JSON.stringify(payload)
             });
             const result = await response.json();
@@ -570,12 +490,13 @@
             document.getElementById('step3Content').style.display = 'none';
             document.getElementById('step4Content').style.display = 'block';
             
-            if (result.status === 'approved') {
-                registerResult.innerHTML = `<div class="success">✅ تم التوثيق!<br>رقم الكتلة: ${result.block_index}</div>`;
+            if (response.ok) {
+                registerResult.innerHTML = `<div class="success">✅ ${result.message}<br>رقم الكتلة: ${result.block_index}</div>`;
                 goToProfileBtn.style.display = 'block';
             } else {
-                registerResult.innerHTML = `<div class="warning">⏳ تم الإرسال للشهود<br>رقم الكتلة: ${result.block_index}</div>`;
-                goToProfileBtn.style.display = 'block';
+                registerResult.innerHTML = `<div class="error">❌ ${result.error}</div>`;
+                nextToRegisterBtn.disabled = false;
+                nextToRegisterBtn.innerHTML = "▶️ إعادة المحاولة";
             }
         } catch(err) {
             registerResult.innerHTML = `<div class="error">❌ خطأ: ${err.message}</div>`;
@@ -585,8 +506,6 @@
     };
     
     goToProfileBtn.onclick = () => {
-        sessionStorage.setItem('verifiedName', 'مستخدم موثق');
-        sessionStorage.setItem('verifiedTimestamp', new Date().toLocaleString());
         window.location.href = '/profile';
     };
     
@@ -599,7 +518,8 @@
         }
     }
     
-    loadSystemStatus();
+    // ------------------- بدء التشغيل -------------------
+    initSession();
     loadModels();
     updateSteps();
 </script>
