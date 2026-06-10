@@ -9,17 +9,8 @@ import math
 import secrets
 import string
 import re
-import cv2
-import numpy as np
 from flask import Flask, request, jsonify, send_from_directory, redirect, render_template
 from flask_cors import CORS
-from PIL import Image, ImageFilter, ImageStat
-from scipy.spatial.distance import euclidean
-from skimage.feature import local_binary_pattern, graycomatrix, graycoprops
-from skimage.filters import sobel, gabor
-from skimage.transform import radon
-from datetime import datetime as dt
-from collections import Counter
 
 app = Flask(__name__, static_folder='static', static_url_path='/static', template_folder='templates')
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
@@ -40,15 +31,16 @@ LEDGER_FILE = os.path.join(DATA_DIR, 'ledger.json')
 PEERS_FILE = os.path.join(DATA_DIR, 'peers.json')
 INVITES_FILE = os.path.join(DATA_DIR, 'invites.json')
 BLACKLIST_FILE = os.path.join(DATA_DIR, 'blacklist.json')
-REFERENCE_PATTERNS_FILE = os.path.join(DATA_DIR, 'reference_patterns.json')
 
 # ------------------- إعدادات الأمان -------------------
 MAX_FREE_USERS = 100
 MIN_TRUST_SCORE_TO_VOTE = 50
 CONSENSUS_THRESHOLD = 0.6
-BIOMETRIC_THRESHOLD = 0.4  # المسافة الإقليدية القصوى (أقل = أشد)
-MATCH_PERCENTAGE_REQUIRED = 90  # نسبة التطابق المطلوبة 90%
-EUCILIDEAN_MAX_DISTANCE = 0.6  # الحد الأقصى للمسافة الإقليدية
+VERIFICATION_STATUS = {
+    'PENDING': 'pending',
+    'APPROVED': 'approved', 
+    'REJECTED': 'rejected'
+}
 
 # ------------------- تحميل البيانات -------------------
 PEERS = set()
@@ -58,6 +50,31 @@ if env_peers:
         peer = peer.strip()
         if peer:
             PEERS.add(peer)
+
+def load_peers():
+    global PEERS
+    try:
+        with open(PEERS_FILE, 'r') as f:
+            saved_peers = json.load(f)
+            PEERS.update(saved_peers)
+    except FileNotFoundError:
+        pass
+    save_peers()
+
+def save_peers():
+    with open(PEERS_FILE, 'w') as f:
+        json.dump(list(PEERS), f, indent=2)
+
+def load_invites():
+    try:
+        with open(INVITES_FILE, 'r') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {}
+
+def save_invites(invites):
+    with open(INVITES_FILE, 'w') as f:
+        json.dump(invites, f, indent=2)
 
 def load_blacklist():
     try:
@@ -70,446 +87,456 @@ def save_blacklist(blacklist):
     with open(BLACKLIST_FILE, 'w') as f:
         json.dump(blacklist, f, indent=2)
 
-def add_to_blacklist(document_number, reason):
-    blacklist = load_blacklist()
-    blacklist[document_number] = {
-        "reason": reason,
-        "timestamp": str(dt.now()),
-        "blacklisted": True
-    }
-    save_blacklist(blacklist)
-    return True
+ledger_lock = threading.Lock()
 
-def is_blacklisted(document_number):
-    blacklist = load_blacklist()
-    return document_number in blacklist
+# ------------------- دوال مساعدة -------------------
+def generate_invite_code():
+    return ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(12))
 
-def load_reference_patterns():
-    try:
-        with open(REFERENCE_PATTERNS_FILE, 'r') as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return {
-            "guilloche": [],  # أنماط Guilloché مرجعية
-            "fonts": {}       # أنماط الخطوط المرجعية
-        }
+def euclidean_distance(a, b):
+    if len(a) != len(b):
+        return float('inf')
+    return math.sqrt(sum((x - y) ** 2 for x, y in zip(a, b)))
 
-# ------------------- دوال كشف التزييف المتقدمة -------------------
-
-def detect_moire_pattern(image):
-    """
-    كشف نمط تداخل الخطوط الناتج عن تصوير الشاشات (Moiré Pattern)
-    """
-    try:
-        # تحويل الصورة إلى تدرج رمادي
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        
-        # تطبيق تحويل فورييه لكشف التكرارات العالية
-        f_transform = np.fft.fft2(gray)
-        f_shift = np.fft.fftshift(f_transform)
-        magnitude_spectrum = 20 * np.log(np.abs(f_shift) + 1)
-        
-        # حساب متوسط الترددات العالية
-        rows, cols = gray.shape
-        crow, ccol = rows//2, cols//2
-        
-        # أخذ منطقة الترددات العالية
-        high_freq_zone = magnitude_spectrum[crow-50:crow+50, ccol-50:ccol+50]
-        high_freq_mean = np.mean(high_freq_zone)
-        
-        # حساب التباين في الصورة
-        laplacian = cv2.Laplacian(gray, cv2.CV_64F)
-        laplacian_var = laplacian.var()
-        
-        # الكشف عن أنماط التكرار (Moiré)
-        # إذا كانت الترددات العالية غير طبيعية أو التباين منخفض جداً
-        is_moire = (high_freq_mean < 15) or (laplacian_var < 20)
-        
-        return {
-            "has_moire": is_moire,
-            "high_freq_mean": high_freq_mean,
-            "laplacian_var": laplacian_var
-        }
-    except Exception as e:
-        print(f"خطأ في كشف Moiré: {e}")
-        return {"has_moire": False, "error": str(e)}
-
-def detect_depth_and_shadows(image):
-    """
-    فحص العمق والظلال للتأكد من أن المستند مادي (وليس صورة مسطحة)
-    """
-    try:
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        
-        # استخدام كشف الحواف Canny
-        edges = cv2.Canny(gray, 50, 150)
-        
-        # تحليل توزيع الحواف (الصور المسطحة لها حواف حادة على الحواف)
-        h, w = edges.shape
-        border_edges = np.sum(edges[0:10, :]) + np.sum(edges[h-10:h, :]) + \
-                       np.sum(edges[:, 0:10]) + np.sum(edges[:, w-10:w])
-        total_edges = np.sum(edges)
-        border_ratio = border_edges / (total_edges + 1)
-        
-        # تحليل التباين لتقدير العمق
-        # الصور المسطحة (من الشاشة) لها تباين منخفض
-        laplacian_var = cv2.Laplacian(gray, cv2.CV_64F).var()
-        
-        # تحليل الظلال باستخدام معادلة الرسم البياني
-        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
-        equalized = clahe.apply(gray)
-        equalized_var = cv2.Laplacian(equalized, cv2.CV_64F).var()
-        
-        is_flat = (border_ratio > 0.3) or (laplacian_var < 25) or (equalized_var < 10)
-        
-        return {
-            "is_physical": not is_flat,
-            "border_ratio": border_ratio,
-            "laplacian_var": laplacian_var,
-            "equalized_var": equalized_var
-        }
-    except Exception as e:
-        print(f"خطأ في فحص العمق: {e}")
-        return {"is_physical": True, "error": str(e)}
-
-def detect_guilloche_pattern(image):
-    """
-    كشف نمط Guilloché (العلامات الأمنية) في المستند
-    """
-    try:
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        
-        # استخدام Local Binary Patterns لتحليل النسيج
-        radius = 3
-        n_points = 8 * radius
-        lbp = local_binary_pattern(gray, n_points, radius, method='uniform')
-        lbp_hist, _ = np.histogram(lbp.ravel(), bins=np.arange(0, n_points + 3), range=(0, n_points + 2))
-        lbp_hist = lbp_hist.astype("float")
-        lbp_hist /= (lbp_hist.sum() + 1e-6)
-        
-        # استخدام Gabor filters لكشف الأنماط الدقيقة
-        gabor_responses = []
-        for theta in [0, np.pi/4, np.pi/2, 3*np.pi/4]:
-            gabor_real, gabor_imag = gabor(gray, frequency=0.2, theta=theta)
-            gabor_responses.append(np.mean(np.abs(gabor_real)))
-        
-        # حساب إنتروبي الصورة (قياس التعقيد)
-        hist, _ = np.histogram(gray.flatten(), 256, [0,256])
-        hist = hist / (gray.size + 1e-6)
-        entropy = -np.sum(hist * np.log2(hist + 1e-6))
-        
-        # المستندات الحقيقية لها أنماط معقدة وإنتروبي مرتفع
-        has_guilloche = (entropy > 5.5) and (np.mean(gabor_responses) > 15)
-        
-        return {
-            "has_guilloche": has_guilloche,
-            "entropy": entropy,
-            "gabor_mean": np.mean(gabor_responses),
-            "lbp_variance": np.var(lbp_hist)
-        }
-    except Exception as e:
-        print(f"خطأ في كشف Guilloché: {e}")
-        return {"has_guilloche": True, "error": str(e)}
-
-def analyze_font_consistency(image, roi_coords=None):
-    """
-    تحليل اتساق الخطوط في المستند
-    """
-    try:
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        
-        # استخدام Local Binary Patterns لتحليل نسيج النص
-        radius = 1
-        n_points = 8 * radius
-        lbp = local_binary_pattern(gray, n_points, radius, method='uniform')
-        
-        # حساب توزيع الأنماط
-        lbp_hist, _ = np.histogram(lbp.ravel(), bins=np.arange(0, n_points + 3), range=(0, n_points + 2))
-        lbp_hist = lbp_hist.astype("float")
-        lbp_hist /= (lbp_hist.sum() + 1e-6)
-        
-        # حساب التباين في نسيج الصورة
-        sobel_x = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=3)
-        sobel_y = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=3)
-        gradient_magnitude = np.sqrt(sobel_x**2 + sobel_y**2)
-        
-        # قياس تجانس النسيج
-        uniformity = 1 - np.std(lbp_hist)
-        
-        return {
-            "is_consistent": uniformity > 0.5,
-            "uniformity": uniformity,
-            "gradient_mean": np.mean(gradient_magnitude)
-        }
-    except Exception as e:
-        print(f"خطأ في تحليل الخط: {e}")
-        return {"is_consistent": True, "error": str(e)}
-
-def extract_expiry_date(image):
-    """
-    استخراج تاريخ الانتهاء من المستند (OCR محاكى)
-    """
-    try:
-        # تحويل إلى صورة قابلة للقراءة
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        
-        # تحسين التباين
-        gray = cv2.equalizeHist(gray)
-        
-        # استخدام OCR بسيط باستخدام pytesseract (محاكى)
-        # في التطبيق الحقيقي، يجب تثبيت pytesseract
-        
-        # محاكاة استخراج التاريخ (للتجربة)
-        # في الإنتاج، استخدم pytesseract.image_to_string(gray)
-        
-        # مثال: استخراج تاريخ بصيغة DD/MM/YYYY
-        import re
-        # محاكاة: البحث عن نمط التاريخ في النص المستخرج
-        simulated_text = "Expiry Date: 31/12/2030"
-        match = re.search(r'(\d{2})[/\-](\d{2})[/\-](\d{4})', simulated_text)
-        
-        if match:
-            return {
-                "found": True,
-                "date": f"{match.group(1)}/{match.group(2)}/{match.group(3)}",
-                "day": int(match.group(1)),
-                "month": int(match.group(2)),
-                "year": int(match.group(3))
-            }
-        
-        return {"found": False}
-    except Exception as e:
-        print(f"خطأ في استخراج التاريخ: {e}")
-        return {"found": False}
-
-def validate_expiry_date(expiry_info):
-    """
-    التحقق من صلاحية التاريخ ومقارنته مع الوقت الحالي
-    """
-    if not expiry_info.get('found'):
-        return {"is_valid": False, "reason": "لم يتم العثور على تاريخ الانتهاء"}
+# ------------------- نظام الشهود والثقة -------------------
+class TrustScoreManager:
+    def __init__(self):
+        self.trust_scores = {}
+        self.load_trust_scores()
     
-    try:
-        current_date = dt.now()
-        expiry_date = dt(expiry_info['year'], expiry_info['month'], expiry_info['day'])
-        
-        if expiry_date < current_date:
-            return {
-                "is_valid": False,
-                "reason": "المستند منتهي الصلاحية",
-                "expiry_date": expiry_info['date'],
-                "current_date": current_date.strftime("%d/%m/%Y")
-            }
-        
-        return {
-            "is_valid": True,
-            "reason": "المستند ساري الصلاحية",
-            "expiry_date": expiry_info['date'],
-            "days_valid": (expiry_date - current_date).days
-        }
-    except Exception as e:
-        return {"is_valid": False, "reason": f"خطأ في التحقق من التاريخ: {e}"}
-
-def verify_document_integrity(image_path):
-    """
-    دالة التحقق الشاملة من سلامة المستند (Document Integrity Layer)
-    """
-    try:
-        image = cv2.imread(image_path)
-        if image is None:
-            return {"integrity_passed": False, "reason": "لا يمكن قراءة الصورة"}
-        
-        results = {
-            "integrity_passed": True,
-            "checks": {}
-        }
-        
-        # 1. كشف Moiré Pattern (الشاشات)
-        moire_result = detect_moire_pattern(image)
-        results["checks"]["moire"] = moire_result
-        if moire_result.get("has_moire"):
-            results["integrity_passed"] = False
-            results["reason"] = "تم كشف نمط تداخل شاشة (Moiré) - قد تكون الصورة من شاشة"
-            return results
-        
-        # 2. فحص العمق والظلال
-        depth_result = detect_depth_and_shadows(image)
-        results["checks"]["depth"] = depth_result
-        if not depth_result.get("is_physical"):
-            results["integrity_passed"] = False
-            results["reason"] = "المستند يبدو مسطحاً - قد يكون صورة وليست مستنداً مادياً"
-            return results
-        
-        # 3. كشف نمط Guilloché (العلامات الأمنية)
-        guilloche_result = detect_guilloche_pattern(image)
-        results["checks"]["guilloche"] = guilloche_result
-        if not guilloche_result.get("has_guilloche"):
-            results["integrity_passed"] = False
-            results["reason"] = "لم يتم كشف العلامات الأمنية (Guilloché) - المستند قد يكون مزوراً"
-            return results
-        
-        # 4. تحليل اتساق الخطوط
-        font_result = analyze_font_consistency(image)
-        results["checks"]["font"] = font_result
-        if not font_result.get("is_consistent"):
-            results["integrity_passed"] = False
-            results["reason"] = "عدم اتساق الخطوط في المستند - احتمال تلاعب"
-            return results
-        
-        # 5. استخراج تاريخ الانتهاء والتحقق منه
-        expiry_info = extract_expiry_date(image)
-        results["checks"]["expiry"] = expiry_info
-        
-        if expiry_info.get('found'):
-            expiry_validation = validate_expiry_date(expiry_info)
-            results["checks"]["expiry_validation"] = expiry_validation
-            
-            if not expiry_validation.get("is_valid"):
-                # إضافة الرقم التسلسلي إلى القائمة السوداء
-                # (في التطبيق الحقيقي، يتم استخراج الرقم التسلسلي من OCR)
-                passport_number = f"DOC_{expiry_info.get('year', 0)}_{expiry_info.get('month', 0)}"
-                add_to_blacklist(passport_number, expiry_validation.get("reason"))
-                results["integrity_passed"] = False
-                results["reason"] = expiry_validation.get("reason")
-                return results
-        
-        results["verified_at"] = str(dt.now())
-        return results
-        
-    except Exception as e:
-        return {"integrity_passed": False, "reason": f"خطأ في التحقق: {str(e)}"}
-
-def verify_biometric_match_enhanced(face_descriptor, doc_descriptor):
-    """
-    تعزيز منطق المطابقة البيومترية مع متطلبات 90% ومسافة إقليدية < 0.6
-    """
-    try:
-        # استخدام المسافة الإقليدية
-        distance = euclidean(face_descriptor, doc_descriptor)
-        
-        # حساب نسبة التشابه (1 - normalized_distance) * 100
-        similarity_percentage = max(0, min(100, (1 - min(distance, 1)) * 100))
-        
-        # التحقق من متطلبات الأمان
-        is_valid_distance = distance < EUCILIDEAN_MAX_DISTANCE
-        is_valid_percentage = similarity_percentage >= MATCH_PERCENTAGE_REQUIRED
-        
-        is_match = is_valid_distance and is_valid_percentage
-        
-        return {
-            "is_match": is_match,
-            "distance": round(distance, 4),
-            "max_allowed_distance": EUCILIDEAN_MAX_DISTANCE,
-            "similarity_percentage": round(similarity_percentage, 2),
-            "required_percentage": MATCH_PERCENTAGE_REQUIRED,
-            "pass_distance": is_valid_distance,
-            "pass_percentage": is_valid_percentage
-        }
-    except Exception as e:
-        return {
-            "is_match": False,
-            "error": str(e)
-        }
-
-# ------------------- باقي الكود (Blockchain، الشهود، المسارات) -------------------
-# ... [جميع الوظائف السابقة تبقى كما هي مع إضافة المسارات الجديدة] ...
-
-# ------------------- مسار جديد للتحقق من سلامة المستند -------------------
-@app.route('/verify-document-integrity', methods=['POST'])
-def verify_document_integrity_api():
-    """
-    API للتحقق من سلامة المستند (مقاومة التزييف)
-    """
-    if 'document_image' not in request.files:
-        return jsonify({"error": "لا يوجد صورة مرفوعة"}), 400
+    def load_trust_scores(self):
+        try:
+            with open(os.path.join(DATA_DIR, 'trust_scores.json'), 'r') as f:
+                self.trust_scores = json.load(f)
+        except FileNotFoundError:
+            self.trust_scores = {}
     
-    file = request.files['document_image']
-    if file.filename == '':
-        return jsonify({"error": "لم يتم اختيار ملف"}), 400
+    def save_trust_scores(self):
+        with open(os.path.join(DATA_DIR, 'trust_scores.json'), 'w') as f:
+            json.dump(self.trust_scores, f, indent=2)
     
-    # حفظ الملف مؤقتاً للتحليل
-    temp_path = os.path.join(DATA_DIR, 'temp_doc_' + str(secrets.token_hex(8)) + '.jpg')
-    file.save(temp_path)
+    def get_trust_score(self, user_id):
+        return self.trust_scores.get(user_id, {'score': 100, 'total_votes': 0, 'correct_votes': 0})
     
-    # التحقق من سلامة المستند
-    result = verify_document_integrity(temp_path)
+    def update_trust_score(self, user_id, is_correct_vote):
+        if user_id not in self.trust_scores:
+            self.trust_scores[user_id] = {'score': 100, 'total_votes': 0, 'correct_votes': 0}
+        
+        self.trust_scores[user_id]['total_votes'] += 1
+        if is_correct_vote:
+            self.trust_scores[user_id]['correct_votes'] += 1
+            self.trust_scores[user_id]['score'] = min(100, self.trust_scores[user_id]['score'] + 5)
+        else:
+            self.trust_scores[user_id]['score'] = max(0, self.trust_scores[user_id]['score'] - 10)
+        
+        self.save_trust_scores()
+        return self.trust_scores[user_id]['score']
     
-    # حذف الملف المؤقت
-    try:
-        os.remove(temp_path)
-    except:
-        pass
-    
-    return jsonify(result), 200
+    def can_vote(self, user_id):
+        score = self.get_trust_score(user_id)['score']
+        return score >= MIN_TRUST_SCORE_TO_VOTE
 
-# ------------------- مسار محسن للتحقق البيومتري -------------------
-@app.route('/verify-biometric-enhanced', methods=['POST'])
-def verify_biometric_enhanced():
-    """
-    API محسن للمطابقة البيومترية (90% + مسافة < 0.6)
-    """
+trust_manager = TrustScoreManager()
+
+# ------------------- Block و Blockchain -------------------
+class Block:
+    def __init__(self, index, name, face_hash, document_hash, document_type, timestamp, previous_hash, 
+                 node_id=None, status='pending', witness_votes=None, trust_score_required=0):
+        self.index = index
+        self.name = name
+        self.face_hash = face_hash
+        self.document_hash = document_hash
+        self.document_type = document_type
+        self.timestamp = timestamp
+        self.previous_hash = previous_hash
+        self.node_id = node_id or socket.gethostname()
+        self.status = status
+        self.witness_votes = witness_votes or {'approve': [], 'reject': []}
+        self.trust_score_required = trust_score_required
+        self.hash = self.compute_hash()
+
+    def compute_hash(self):
+        block_string = json.dumps({
+            "index": self.index,
+            "name": self.name,
+            "face_hash": self.face_hash,
+            "document_hash": self.document_hash,
+            "document_type": self.document_type,
+            "timestamp": self.timestamp,
+            "previous_hash": self.previous_hash,
+            "node_id": self.node_id,
+            "status": self.status,
+            "witness_votes": self.witness_votes,
+            "trust_score_required": self.trust_score_required
+        }, sort_keys=True).encode()
+        return hashlib.sha256(block_string).hexdigest()
+
+class Blockchain:
+    def __init__(self, ledger_file=LEDGER_FILE):
+        self.ledger_file = ledger_file
+        self.chain = []
+        self.load_chain()
+
+    def load_chain(self):
+        try:
+            with open(self.ledger_file, 'r') as f:
+                data = json.load(f)
+                self.chain = []
+                for block_data in data:
+                    block = Block(
+                        block_data['index'],
+                        block_data['name'],
+                        block_data['face_hash'],
+                        block_data['document_hash'],
+                        block_data.get('document_type', 'غير محدد'),
+                        block_data['timestamp'],
+                        block_data['previous_hash'],
+                        block_data.get('node_id', 'unknown'),
+                        block_data.get('status', 'approved'),
+                        block_data.get('witness_votes', {'approve': [], 'reject': []}),
+                        block_data.get('trust_score_required', 0)
+                    )
+                    block.hash = block_data['hash']
+                    self.chain.append(block)
+        except FileNotFoundError:
+            genesis = Block(0, "Genesis", "0", "0", "genesis", str(datetime.datetime.now()), "0", 
+                           "genesis", 'approved', {'approve': [], 'reject': []}, 0)
+            self.chain = [genesis]
+            self.save_chain()
+
+    def save_chain(self):
+        with ledger_lock:
+            data = []
+            for block in self.chain:
+                data.append({
+                    "index": block.index,
+                    "name": block.name,
+                    "face_hash": block.face_hash,
+                    "document_hash": block.document_hash,
+                    "document_type": block.document_type,
+                    "timestamp": block.timestamp,
+                    "previous_hash": block.previous_hash,
+                    "node_id": block.node_id,
+                    "status": block.status,
+                    "witness_votes": block.witness_votes,
+                    "trust_score_required": block.trust_score_required,
+                    "hash": block.hash
+                })
+            with open(self.ledger_file, 'w') as f:
+                json.dump(data, f, indent=2)
+
+    def get_last_block(self):
+        return self.chain[-1]
+
+    def add_pending_block(self, name, face_hash, document_hash, document_type, node_id, trust_score_required=0):
+        last_block = self.get_last_block()
+        new_block = Block(
+            last_block.index + 1,
+            name,
+            face_hash,
+            document_hash,
+            document_type,
+            str(datetime.datetime.now()),
+            last_block.hash,
+            node_id,
+            'pending',
+            {'approve': [], 'reject': []},
+            trust_score_required
+        )
+        return new_block
+    
+    def approve_block(self, block_index, witness_id, approved):
+        for block in self.chain:
+            if block.index == block_index:
+                if approved:
+                    if witness_id not in block.witness_votes['approve']:
+                        block.witness_votes['approve'].append(witness_id)
+                else:
+                    if witness_id not in block.witness_votes['reject']:
+                        block.witness_votes['reject'].append(witness_id)
+                
+                total_votes = len(block.witness_votes['approve']) + len(block.witness_votes['reject'])
+                if total_votes > 0:
+                    approval_rate = len(block.witness_votes['approve']) / total_votes
+                    if approval_rate >= CONSENSUS_THRESHOLD:
+                        block.status = 'approved'
+                        self.save_chain()
+                        return True, 'approved'
+                    elif len(block.witness_votes['reject']) > total_votes * 0.5:
+                        block.status = 'rejected'
+                        self.save_chain()
+                        return False, 'rejected'
+                
+                self.save_chain()
+                return None, 'pending'
+        return False, 'not_found'
+    
+    def get_pending_blocks(self):
+        return [block for block in self.chain if block.status == 'pending']
+    
+    def get_approved_blocks(self):
+        return [block for block in self.chain if block.status == 'approved']
+
+blockchain = Blockchain()
+
+# ------------------- وظائف المزامنة -------------------
+def sync_with_peers():
+    if not PEERS:
+        return
+    for peer in PEERS:
+        try:
+            resp = requests.get(f"{peer}/chain", timeout=3)
+            if resp.status_code == 200:
+                data = resp.json()
+                if data['length'] > len(blockchain.chain):
+                    peer_chain = []
+                    for bd in data['chain']:
+                        b = Block(
+                            bd['index'], bd['name'], bd['face_hash'], bd['document_hash'],
+                            bd.get('document_type', 'غير محدد'), bd['timestamp'], bd['previous_hash'],
+                            bd.get('node_id'), bd.get('status', 'approved'),
+                            bd.get('witness_votes', {'approve': [], 'reject': []}),
+                            bd.get('trust_score_required', 0)
+                        )
+                        b.hash = bd['hash']
+                        peer_chain.append(b)
+                    if len(peer_chain) > len(blockchain.chain):
+                        with ledger_lock:
+                            blockchain.chain = peer_chain
+                            blockchain.save_chain()
+        except Exception as e:
+            pass
+
+def broadcast_block(block_dict):
+    for peer in PEERS:
+        try:
+            requests.post(f"{peer}/add_block_peer", json=block_dict, timeout=3)
+        except Exception as e:
+            pass
+
+# ------------------- مسارات API -------------------
+@app.route('/chain', methods=['GET'])
+def get_chain():
+    chain_data = []
+    for block in blockchain.chain:
+        chain_data.append({
+            "index": block.index,
+            "name": block.name,
+            "face_hash": block.face_hash,
+            "document_hash": block.document_hash,
+            "document_type": block.document_type,
+            "timestamp": block.timestamp,
+            "previous_hash": block.previous_hash,
+            "node_id": block.node_id,
+            "status": block.status,
+            "hash": block.hash
+        })
+    return jsonify({"chain": chain_data, "length": len(chain_data)}), 200
+
+@app.route('/add_block_peer', methods=['POST'])
+def add_block_peer():
     data = request.get_json()
-    face_descriptor = data.get('face_descriptor')
-    doc_descriptor = data.get('doc_descriptor')
+    required = ['index', 'name', 'face_hash', 'document_hash', 'document_type',
+                'timestamp', 'previous_hash', 'hash', 'node_id', 'status']
     
-    if not face_descriptor or not doc_descriptor:
+    if not all(k in data for k in required):
+        return jsonify({"error": "بيانات ناقصة"}), 400
+
+    with ledger_lock:
+        for block in blockchain.chain:
+            if block.hash == data['hash']:
+                return jsonify({"message": "موجودة"}), 200
+
+        last = blockchain.get_last_block()
+        if data['previous_hash'] != last.hash:
+            return jsonify({"error": "غير متطابقة"}), 409
+
+        new_block = Block(
+            data['index'], data['name'], data['face_hash'], data['document_hash'],
+            data['document_type'], data['timestamp'], data['previous_hash'], 
+            data['node_id'], data.get('status', 'pending'),
+            data.get('witness_votes', {'approve': [], 'reject': []}),
+            data.get('trust_score_required', 0)
+        )
+        new_block.hash = data['hash']
+
+        blockchain.chain.append(new_block)
+        blockchain.save_chain()
+        return jsonify({"message": "تمت الإضافة"}), 201
+
+@app.route('/propose-verification', methods=['POST'])
+def propose_verification():
+    data = request.get_json()
+    required = ['name', 'face_hash', 'document_hash', 'document_type']
+    
+    if not all(k in data for k in required):
         return jsonify({"error": "بيانات ناقصة"}), 400
     
-    result = verify_biometric_match_enhanced(face_descriptor, doc_descriptor)
+    invite_code = data.get('invite_code')
     
-    return jsonify(result), 200 if result['is_match'] else 401
+    if invite_code:
+        invites = load_invites()
+        if invite_code not in invites or invites[invite_code]['used']:
+            return jsonify({"error": "رمز دعوة غير صالح"}), 403
+        
+        invites[invite_code]['used'] = True
+        invites[invite_code]['used_by'] = data['name']
+        save_invites(invites)
+    
+    trust_score_required = 0 if not PEERS else MIN_TRUST_SCORE_TO_VOTE
+    new_block = blockchain.add_pending_block(
+        data['name'],
+        data['face_hash'],
+        data['document_hash'],
+        data['document_type'],
+        request.remote_addr,
+        trust_score_required
+    )
+    
+    with ledger_lock:
+        blockchain.chain.append(new_block)
+        blockchain.save_chain()
+    
+    block_dict = {
+        "index": new_block.index,
+        "name": new_block.name,
+        "face_hash": new_block.face_hash,
+        "document_hash": new_block.document_hash,
+        "document_type": new_block.document_type,
+        "timestamp": new_block.timestamp,
+        "previous_hash": new_block.previous_hash,
+        "node_id": new_block.node_id,
+        "status": new_block.status,
+        "trust_score_required": new_block.trust_score_required,
+        "hash": new_block.hash
+    }
+    
+    if len(PEERS) > 0:
+        threading.Thread(target=broadcast_block, args=(block_dict,)).start()
+        return jsonify({
+            "message": "Verification proposed. Waiting for witness approval.",
+            "block_index": new_block.index,
+            "status": "pending"
+        }), 202
+    else:
+        new_block.status = 'approved'
+        blockchain.save_chain()
+        return jsonify({
+            "message": "Auto-verified (AI Validator). No witnesses available.",
+            "block_index": new_block.index,
+            "status": "approved"
+        }), 201
 
-# ------------------- مسار للتحقق من القائمة السوداء -------------------
-@app.route('/check-blacklist', methods=['POST'])
-def check_blacklist():
+@app.route('/vote', methods=['POST'])
+def vote_on_verification():
     data = request.get_json()
-    document_number = data.get('document_number')
+    required = ['block_index', 'approved', 'witness_id', 'trust_score']
     
-    if not document_number:
-        return jsonify({"error": "الرقم التسلسلي مطلوب"}), 400
+    if not all(k in data for k in required):
+        return jsonify({"error": "بيانات ناقصة"}), 400
     
-    is_blacklisted_flag = is_blacklisted(document_number)
+    if data['trust_score'] < MIN_TRUST_SCORE_TO_VOTE:
+        return jsonify({"error": f"Insufficient trust score. Minimum required: {MIN_TRUST_SCORE_TO_VOTE}"}), 403
     
+    result, status = blockchain.approve_block(data['block_index'], data['witness_id'], data['approved'])
+    
+    if status == 'approved':
+        is_correct = True
+        trust_manager.update_trust_score(data['witness_id'], is_correct)
+        
+        for block in blockchain.chain:
+            if block.index == data['block_index']:
+                final_block_dict = {
+                    "index": block.index,
+                    "name": block.name,
+                    "face_hash": block.face_hash,
+                    "document_hash": block.document_hash,
+                    "document_type": block.document_type,
+                    "timestamp": block.timestamp,
+                    "previous_hash": block.previous_hash,
+                    "node_id": block.node_id,
+                    "status": block.status,
+                    "hash": block.hash
+                }
+                threading.Thread(target=broadcast_block, args=(final_block_dict,)).start()
+                break
+        
+        return jsonify({"message": f"Verification {status}!", "status": status}), 200
+    elif status == 'rejected':
+        return jsonify({"message": f"Verification {status}!", "status": status}), 200
+    else:
+        return jsonify({"message": "Vote recorded. Still pending.", "status": "pending"}), 200
+
+@app.route('/pending-verifications', methods=['GET'])
+def get_pending_verifications():
+    pending = blockchain.get_pending_blocks()
+    result = []
+    for block in pending:
+        result.append({
+            "index": block.index,
+            "name": block.name,
+            "timestamp": block.timestamp,
+            "trust_score_required": block.trust_score_required,
+            "approve_count": len(block.witness_votes['approve']),
+            "reject_count": len(block.witness_votes['reject'])
+        })
+    return jsonify({"pending": result}), 200
+
+@app.route('/health', methods=['GET'])
+def health():
     return jsonify({
-        "is_blacklisted": is_blacklisted_flag,
-        "document_number": document_number
+        "status": "healthy",
+        "chain_length": len(blockchain.chain),
+        "peers_count": len(PEERS),
+        "pending_count": len(blockchain.get_pending_blocks())
     }), 200
 
-# ------------------- مسار لعرض حالة النظام الأمني -------------------
-@app.route('/security-status', methods=['GET'])
-def security_status():
-    blacklist = load_blacklist()
-    return jsonify({
-        "anti_forgery_active": True,
-        "biometric_threshold": MATCH_PERCENTAGE_REQUIRED,
-        "euclidean_max_distance": EUCILIDEAN_MAX_DISTANCE,
-        "blacklisted_count": len(blacklist),
-        "integrity_checks": [
-            "Moiré Pattern Detection",
-            "Depth & Shadow Analysis",
-            "Guilloché Pattern Detection",
-            "Font Consistency Analysis",
-            "Expiry Date Validation"
-        ]
-    }), 200
+# ============================================================
+# ✅ مسارات الصفحات (ROUTES) - هذا هو الحل لمشكلتك ✅
+# ============================================================
+
+@app.route('/')
+def index():
+    """الصفحة الرئيسية - إعادة توجيه إلى /verify"""
+    return redirect('/verify')
+
+@app.route('/verify')
+def verify_page():
+    """صفحة التوثيق الرئيسية"""
+    return render_template('verify.html')
+
+@app.route('/witness')
+def witness_page():
+    """صفحة الشهود والتصويت الجماعي"""
+    return render_template('witness.html')
+
+@app.route('/profile')
+def profile_page():
+    """الملف الشخصي ونظام السمعة"""
+    return render_template('profile.html')
+
+@app.route('/static/<path:filename>')
+def serve_static(filename):
+    """تقديم الملفات الثابتة"""
+    return send_from_directory('static', filename)
 
 # ------------------- بدء التشغيل -------------------
 if __name__ == '__main__':
     load_peers()
+    threading.Thread(target=sync_with_peers).start()
     print("=" * 50)
-    print("🔐 وثاق - Anti-Forgery Identity System")
+    print("🔐 وثاق - نظام التوثيق اللامركزي")
     print("=" * 50)
-    print(f"🎯 متطلبات المطابقة البيومترية:")
-    print(f"   - نسبة التطابق المطلوبة: {MATCH_PERCENTAGE_REQUIRED}%")
-    print(f"   - أقصى مسافة إقليدية: {EUCILIDEAN_MAX_DISTANCE}")
-    print(f"🛡️ طبقات مقاومة التزييف:")
-    print(f"   - Moiré Pattern Detection")
-    print(f"   - Depth & Shadow Analysis")
-    print(f"   - Guilloché Pattern Detection")
-    print(f"   - Font Consistency Analysis")
-    print(f"   - Expiry Date Validation")
-    print(f"   - Smart Blacklisting")
-    print(f"📊 عدد المستندات المدرجة في القائمة السوداء: {len(load_blacklist())}")
+    print(f"👥 عدد الشهود: {len(PEERS)}")
+    print(f"📁 مجلد البيانات: {DATA_DIR}")
     print(f"🌐 الخادم: http://localhost:{PORT}")
+    print("-" * 50)
+    print("📍 المسارات المتاحة:")
+    print(f"   ✅ http://localhost:{PORT}/         → الرئيسي")
+    print(f"   ✅ http://localhost:{PORT}/verify   → صفحة التوثيق")
+    print(f"   ✅ http://localhost:{PORT}/witness  → صفحة الشهود")
+    print(f"   ✅ http://localhost:{PORT}/profile  → الملف الشخصي")
+    print(f"   ✅ http://localhost:{PORT}/chain    → API سلسلة الكتل")
+    print(f"   ✅ http://localhost:{PORT}/health   → نقطة صحية")
     print("=" * 50)
     app.run(host='0.0.0.0', port=PORT, debug=False, threaded=True)
