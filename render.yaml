@@ -1,15 +1,31 @@
 services:
   - type: web
-    name: wethaq
-    runtime: python
-    buildCommand: pip install --upgrade pip setuptools wheel && pip install -r requirements.txt
-    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 120
+    name: crypto-investment-platform
+    runtime: node
+    plan: starter
+    buildCommand: npm install && npm run build
+    startCommand: npm start
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.11.11
-      - key: PIP_DEFAULT_TIMEOUT
-        value: 100
-    disk:
-      name: ledger-data
-      mountPath: /data
-      sizeGB: 1
+      - key: NEXTAUTH_URL
+        sync: false
+      - key: NEXTAUTH_SECRET
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: CRON_SECRET
+        sync: false
+    cronJobs:
+      - name: daily-profit
+        schedule: "0 0 * * *"  # كل يوم عند منتصف الليل
+        url: /api/profit/cron
+        headers:
+          - key: x-cron-secret
+            value: ${CRON_SECRET}
