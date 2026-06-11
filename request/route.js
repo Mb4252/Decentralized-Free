@@ -1,22 +1,25 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/app/api/auth/[...nextauth]/route'
-import { supabaseAdmin } from '@/lib/supabase/admin'
+import { authOptions } from "@/app/api/auth/[...nextauth]/route"
+import { supabaseAdmin } from "@/lib/supabase/admin"
 
 export async function POST(request) {
   try {
     const session = await getServerSession(authOptions)
+    
+    // التحقق من المصادقة - إذا لا يوجد session
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     
     const { amount, transactionHash } = await request.json()
     
+    // التحقق من صحة المبلغ
     if (!amount || amount < 10) {
       return NextResponse.json({ error: 'Minimum deposit is 10 USDT' }, { status: 400 })
     }
     
-    // جلب المستخدم
+    // جلب المستخدم من قاعدة البيانات
     const { data: user, error: userError } = await supabaseAdmin
       .from('users')
       .select('id')
@@ -40,13 +43,14 @@ export async function POST(request) {
       .single()
     
     if (depositError) {
+      console.error('Deposit request error:', depositError)
       return NextResponse.json({ error: 'Failed to create deposit request' }, { status: 500 })
     }
     
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       depositId: deposit.id,
-      message: 'Deposit request submitted successfully' 
+      message: 'Deposit request submitted successfully'
     })
     
   } catch (error) {
