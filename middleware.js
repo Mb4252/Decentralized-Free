@@ -4,7 +4,8 @@ import { NextResponse } from "next/server"
 export default withAuth(
   function middleware(req) {
     const token = req.nextauth.token
-    const isAdmin = token?.email && process.env.ADMIN_EMAILS?.split(',').includes(token.email)
+    const adminEmails = process.env.ADMIN_EMAILS?.split(',') || []
+    const isAdmin = token?.email && adminEmails.includes(token.email)
     const isAdminRoute = req.nextUrl.pathname.startsWith('/admin')
     
     if (isAdminRoute && !isAdmin) {
