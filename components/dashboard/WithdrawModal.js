@@ -73,4 +73,72 @@ export default function WithdrawModal({ onSuccess }) {
             <h2 className="text-2xl font-bold mb-4">سحب الأرباح</h2>
             
             <form onSubmit={handleSubmit}>
-              <div className
+              <div className="mb-4">
+                <label className="block text-gray-700 mb-2">المبلغ (USDT)</label>
+                <input
+                  type="number"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="أدخل المبلغ"
+                  required
+                  min="10"
+                  step="0.01"
+                />
+              </div>
+              
+              <div className="mb-4">
+                <label className="block text-gray-700 mb-2">عنوان المحفظة (BSC)</label>
+                <input
+                  type="text"
+                  value={walletAddress}
+                  onChange={(e) => setWalletAddress(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="0x..."
+                  required
+                />
+              </div>
+              
+              <div className="mb-4">
+                <label className="block text-gray-700 mb-2">PIN السحب (4 أرقام)</label>
+                <input
+                  type="password"
+                  value={pin}
+                  onChange={(e) => setPin(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="****"
+                  required
+                  maxLength="4"
+                  pattern="\d{4}"
+                />
+              </div>
+              
+              {message && (
+                <div className={`mb-4 p-3 rounded-lg ${message.includes('نجاح') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                  {message}
+                </div>
+              )}
+              
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsOpen(false)}
+                  className="flex-1 btn-secondary"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 btn-primary"
+                >
+                  {loading ? 'جاري المعالجة...' : 'طلب السحب'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
