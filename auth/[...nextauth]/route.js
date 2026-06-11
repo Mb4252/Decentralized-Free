@@ -17,7 +17,6 @@ export const authOptions = {
     callbacks: {
         async signIn({ user, account, profile }) {
             try {
-                // التحقق من وجود المستخدم
                 const { data: existingUser, error: fetchError } = await supabaseAdmin
                     .from('users')
                     .select('id, email')
@@ -25,7 +24,6 @@ export const authOptions = {
                     .single()
 
                 if (!existingUser && !fetchError) {
-                    // إنشاء مستخدم جديد
                     const defaultPin = Math.floor(1000 + Math.random() * 9000).toString()
                     const hashedPin = await bcrypt.hash(defaultPin, 10)
 
@@ -56,7 +54,6 @@ export const authOptions = {
         
         async session({ session, token }) {
             if (session?.user?.email) {
-                // جلب بيانات المستخدم من قاعدة البيانات
                 const { data: userData } = await supabaseAdmin
                     .from('users')
                     .select('id, referral_code, tier_id, available_balance, active_deposit')
