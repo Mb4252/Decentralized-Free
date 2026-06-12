@@ -1,26 +1,24 @@
-import { withAuth } from "next-auth/middleware"
-import { NextResponse } from "next/server"
+import { NextResponse } from 'next/server'
 
-export default withAuth(
-  function middleware(req) {
-    const token = req.nextauth.token
-    const adminEmails = process.env.ADMIN_EMAILS?.split(',') || []
-    const isAdmin = token?.email && adminEmails.includes(token.email)
-    const isAdminRoute = req.nextUrl.pathname.startsWith('/admin')
-    
-    if (isAdminRoute && !isAdmin) {
-      return NextResponse.redirect(new URL('/dashboard', req.url))
-    }
-    
+export function middleware(request) {
+  // التحقق من وجود جلسة Firebase مخزنة في localStorage (يتم التحقق على العميل)
+  // هذا middleware بسيط للصفحات المحمية
+  const url = request.nextUrl.pathname
+  
+  // الصفحات المحمية
+  const protectedPaths = ['/dashboard', '/admin']
+  const isProtectedPath = protectedPaths.some(path => url.startsWith(path))
+  
+  // ملاحظة: التحقق الفعلي سيتم على العميل
+  // هذا middleware يسمح بالمرور مؤقتاً
+  if (isProtectedPath) {
+    // يمكنك إضافة منطق إضافي هنا إذا أردت
     return NextResponse.next()
-  },
-  {
-    callbacks: {
-      authorized: ({ token }) => !!token
-    },
   }
-)
+  
+  return NextResponse.next()
+}
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/admin/:path*', '/api/deposit/:path*', '/api/withdraw/:path*']
+  matcher: ['/dashboard/:path*', '/admin/:path*']
 }
