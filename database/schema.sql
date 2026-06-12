@@ -22,7 +22,8 @@ CREATE TABLE users (
   tier_id INT REFERENCES tiers(id) ON DELETE SET NULL,
   available_balance DECIMAL(20,8) DEFAULT 0,
   active_deposit DECIMAL(20,8) DEFAULT 0,
-  withdraw_pin VARCHAR(255) NOT NULL, -- hashed
+  withdraw_pin VARCHAR(255) NOT NULL,
+  firebase_uid VARCHAR(255),
   total_withdrawn DECIMAL(20,8) DEFAULT 0,
   total_deposited DECIMAL(20,8) DEFAULT 0,
   created_at TIMESTAMP DEFAULT NOW(),
@@ -34,7 +35,7 @@ CREATE TABLE investments (
   id SERIAL PRIMARY KEY,
   user_id UUID REFERENCES users(id) ON DELETE CASCADE,
   amount DECIMAL(20,8) NOT NULL,
-  status VARCHAR(20) DEFAULT 'pending', -- pending, active, closed
+  status VARCHAR(20) DEFAULT 'pending',
   admin_note TEXT,
   created_at TIMESTAMP DEFAULT NOW(),
   activated_at TIMESTAMP,
@@ -45,9 +46,9 @@ CREATE TABLE investments (
 CREATE TABLE transactions (
   id SERIAL PRIMARY KEY,
   user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  type VARCHAR(20) NOT NULL, -- deposit, withdraw, profit, referral_bonus
+  type VARCHAR(20) NOT NULL,
   amount DECIMAL(20,8) NOT NULL,
-  status VARCHAR(20) DEFAULT 'pending', -- pending, approved, rejected
+  status VARCHAR(20) DEFAULT 'pending',
   reference_id INT,
   description TEXT,
   created_at TIMESTAMP DEFAULT NOW(),
@@ -72,7 +73,7 @@ CREATE TABLE withdrawals (
   user_id UUID REFERENCES users(id) ON DELETE CASCADE,
   amount DECIMAL(20,8) NOT NULL,
   wallet_address VARCHAR(255) NOT NULL,
-  status VARCHAR(20) DEFAULT 'pending', -- pending, approved, rejected
+  status VARCHAR(20) DEFAULT 'pending',
   pin_verified BOOLEAN DEFAULT FALSE,
   admin_note TEXT,
   created_at TIMESTAMP DEFAULT NOW(),
@@ -123,7 +124,7 @@ INSERT INTO tiers (name, min_deposit, roi_percentage) VALUES
 ('VIP', 500, 3.0),
 ('دياموند', 1000, 3.5);
 
--- إنشاء دوال مساعدة
+-- إنشاء دالة تحديث updated_at
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -132,6 +133,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Trigger لتحديث updated_at في جدول users
 CREATE TRIGGER update_users_updated_at
   BEFORE UPDATE ON users
   FOR EACH ROW
@@ -176,36 +178,19 @@ BEGIN
     ORDER BY min_deposit DESC 
     LIMIT 1
   )
-  WHERE id = NEW.user_id;
+  WHERE id = NEW.id;
   
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
+-- Trigger لتحديث مستوى المستخدم عند تغيير active_deposit
 CREATE TRIGGER update_tier_on_deposit
   AFTER UPDATE OF active_deposit ON users
   FOR EACH ROW
   EXECUTE FUNCTION update_user_tier();
 
--- تفعيل Row Level Security
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE investments ENABLE ROW LEVEL SECURITY;
-ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE withdrawals ENABLE ROW LEVEL SECURITY;
-ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
-
--- سياسات الأمان
-CREATE POLICY "Users can view own data" ON users
-  FOR SELECT USING (auth.uid() = id);
-
-CREATE POLICY "Users can view own investments" ON investments
-  FOR SELECT USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can view own transactions" ON transactions
-  FOR SELECT USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can view own withdrawals" ON withdrawals
-  FOR SELECT USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can view own notifications" ON notifications
-  FOR SELECT USING (auth.uid() = user_id);
+-- ============================================
+-- تم حذف جميع سياسات Row Level Security (RLS)
+-- لأن المشروع يستخدم Firebase Auth + Supabase Admin
+-- ============================================
