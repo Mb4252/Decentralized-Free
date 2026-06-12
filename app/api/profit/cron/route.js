@@ -11,24 +11,33 @@ export async function GET(request) {
   }
 
   try {
-    // حساب الأرباح اليومية
     const today = new Date().toISOString().split('T')[0]
     
-    // جلب جميع المستخدمين مع استثمار نشط
+    // جلب المستخدمين مع استثمار نشط ومستوياتهم
     const { data: users, error: usersError } = await supabaseAdmin
       .from('users')
-      .select('id, active_deposit, available_balance, tier_id, tiers(roi_percentage)')
+      .select(`
+        id,
+        active_deposit,
+        available_balance,
+        tier_id,
+        tiers (
+          roi_percentage
+        )
+      `)
       .gt('active_deposit', 0)
 
-    if (usersError) throw usersError
+    if (usersError) {
+      console.error('Error fetching users:', usersError)
+      return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 })
+    }
 
     let processed = 0
     let skipped = 0
-    let errors = 0
 
     for (const user of users) {
       try {
-        // التحقق من عدم تكرار الحساب لليوم
+        // التحقق من عدم حساب الأرباح لليوم
         const { data: existingLog } = await supabaseAdmin
           .from('daily_profit_log')
           .select('id')
@@ -49,14 +58,18 @@ export async function GET(request) {
           continue
         }
 
-        // تحديث رصيد المستخدم
-        await supabaseAdmin
+        // 1. تحديث رصيد المستخدم
+        const { error: updateError } = await supabaseAdmin
           .from('users')
-          .update({ available_balance: (user.available_balance || 0) + dailyProfit })
+          .update({ 
+            available_balance: (user.available_balance || 0) + dailyProfit 
+          })
           .eq('id', user.id)
 
-        // تسجيل الربح في daily_profit_log
-        await supabaseAdmin
+        if (updateError) throw updateError
+
+        // 2. تسجيل الربح في daily_profit_log
+        const { error: logError } = await supabaseAdmin
           .from('daily_profit_log')
           .insert({
             user_id: user.id,
@@ -65,8 +78,10 @@ export async function GET(request) {
             roi_percent: roiPercent
           })
 
-        // تسجيل المعاملة
-        await supabaseAdmin
+        if (logError) throw logError
+
+        // 3. تسجيل المعاملة
+        const { error: transactionError } = await supabaseAdmin
           .from('transactions')
           .insert({
             user_id: user.id,
@@ -76,9 +91,10 @@ export async function GET(request) {
             description: `Daily profit ${roiPercent}% on active deposit`
           })
 
+        if (transactionError) throw transactionError
+
         processed++
       } catch (userError) {
-        errors++
         console.error(`Error processing user ${user.id}:`, userError)
       }
     }
@@ -87,11 +103,14 @@ export async function GET(request) {
       success: true,
       processed,
       skipped,
-      errors,
+      date: today,
       timestamp: new Date().toISOString()
     })
   } catch (error) {
     console.error('Daily profit calculation error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ 
+      success: false, 
+      error: error.message 
+    }, { status: 500 })
   }
 }
