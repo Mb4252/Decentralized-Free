@@ -2,48 +2,42 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { auth } from '@/lib/firebase/client'
-import { onAuthStateChanged } from 'firebase/auth'
 import AdminDeposits from '@/components/admin/AdminDeposits'
 import AdminWithdrawals from '@/components/admin/AdminWithdrawals'
 import AdminUsers from '@/components/admin/AdminUsers'
 
 export default function AdminPage() {
-  const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [adminEmail, setAdminEmail] = useState('')
   const [activeTab, setActiveTab] = useState('deposits')
   const router = useRouter()
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (!firebaseUser) {
-        router.push('/login')
-        setLoading(false)
-        return
-      }
-
-      setUser(firebaseUser)
-      
-      // التحقق من صلاحيات المدير
-      const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',') || []
-      const isUserAdmin = adminEmails.includes(firebaseUser.email)
-      
-      if (!isUserAdmin) {
-        router.push('/dashboard')
-        return
-      }
-      
-      setIsAdmin(true)
-      setLoading(false)
-    })
-
-    return () => unsubscribe()
+    // التحقق من وجود جلسة مدير
+    const adminData = localStorage.getItem('admin')
+    const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',') || []
+    
+    if (adminData) {
+      try {
+        const data = JSON.parse(adminData)
+        if (data.email && adminEmails.includes(data.email)) {
+          setIsAdmin(true)
+          setAdminEmail(data.email)
+          setLoading(false)
+          return
+        }
+      } catch (e) {}
+    }
+    
+    // إذا لم يكن مديراً، اذهب للصفحة الرئيسية
+    router.push('/login')
+    setLoading(false)
   }, [router])
 
-  const handleLogout = async () => {
-    const { signOut } = await import('@/lib/firebase/client')
-    await signOut(auth)
+  const handleLogout = () => {
+    localStorage.removeItem('admin')
+    localStorage.removeItem('user')
     router.push('/login')
   }
 
@@ -72,7 +66,7 @@ export default function AdminPage() {
           </div>
           <div className="flex items-center gap-4">
             <span className="text-gray-600 hidden md:inline">
-              مرحباً {user?.displayName || user?.email?.split('@')[0]}
+              مرحباً {adminEmail}
             </span>
             <button
               onClick={handleLogout}
@@ -90,7 +84,7 @@ export default function AdminPage() {
           <h1 className="text-3xl font-bold text-gray-800">لوحة تحكم المدير</h1>
           <p className="text-gray-600">إدارة الإيداعات والسحوبات والمستخدمين</p>
           <p className="text-sm text-gray-500 mt-1">
-            البريد الإلكتروني: {user?.email}
+            البريد الإلكتروني: {adminEmail}
           </p>
         </div>
 
