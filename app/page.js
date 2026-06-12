@@ -1,15 +1,31 @@
 'use client'
 
-import { useSession } from "next-auth/react"
-import Link from "next/link"
-import { redirect } from "next/navigation"
+import { useEffect, useState } from 'react'
+import { auth } from '@/lib/firebase/client'
+import { onAuthStateChanged } from 'firebase/auth'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 export default function HomePage() {
-  const { data: session, status } = useSession()
+  const [loading, setLoading] = useState(true)
+  const router = useRouter()
 
-  // إذا كان المستخدم مسجل الدخول، حوله إلى لوحة التحكم
-  if (status === "authenticated") {
-    redirect("/dashboard")
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        router.push('/dashboard')
+      }
+      setLoading(false)
+    })
+    return () => unsubscribe()
+  }, [router])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">جاري التحميل...</div>
+      </div>
+    )
   }
 
   return (
