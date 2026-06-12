@@ -1,4 +1,3 @@
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
 import GoogleProvider from "next-auth/providers/google"
 import { supabaseAdmin } from "@/lib/supabase/admin"
