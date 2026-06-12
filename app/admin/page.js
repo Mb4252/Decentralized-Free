@@ -1,82 +1,141 @@
 'use client'
 
-import { useSession } from "next-auth/react"
-import { redirect } from "next/navigation"
-import { useEffect, useState } from "react"
-// استبدلنا @/ بالمسار النسبي ../../
-import { supabaseAdmin } from "../../lib/supabase/admin"
-import AdminDeposits from "../../components/admin/AdminDeposits"
-import AdminWithdrawals from "../../components/admin/AdminWithdrawals"
-import AdminUsers from "../../components/admin/AdminUsers"
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { auth } from '@/lib/firebase/client'
+import { onAuthStateChanged } from 'firebase/auth'
+import AdminDeposits from '@/components/admin/AdminDeposits'
+import AdminWithdrawals from '@/components/admin/AdminWithdrawals'
+import AdminUsers from '@/components/admin/AdminUsers'
 
 export default function AdminPage() {
-  // ... بقية الكود الخاص بك كما هو لا تغير فيه شيئاً
-  const { data: session, status } = useSession()
+  const [user, setUser] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [isAdmin, setIsAdmin] = useState(false)
   const [activeTab, setActiveTab] = useState('deposits')
-  
+  const router = useRouter()
+
   useEffect(() => {
-    if (status === 'authenticated') {
-      const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',') || []
-      if (!adminEmails.includes(session.user.email)) {
-        redirect('/dashboard')
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (!firebaseUser) {
+        router.push('/login')
+        setLoading(false)
+        return
       }
-    }
-  }, [session, status])
-  
-  if (status === 'loading') {
-    return <div className="min-h-screen flex items-center justify-center">جاري التحميل...</div>
+
+      setUser(firebaseUser)
+      
+      // التحقق من صلاحيات المدير
+      const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',') || []
+      const isUserAdmin = adminEmails.includes(firebaseUser.email)
+      
+      if (!isUserAdmin) {
+        router.push('/dashboard')
+        return
+      }
+      
+      setIsAdmin(true)
+      setLoading(false)
+    })
+
+    return () => unsubscribe()
+  }, [router])
+
+  const handleLogout = async () => {
+    const { signOut } = await import('@/lib/firebase/client')
+    await signOut(auth)
+    router.push('/login')
   }
-  
-  if (status === 'unauthenticated') {
-    redirect('/login')
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="text-2xl mb-4">⏳</div>
+          <p className="text-gray-600">جاري التحميل...</p>
+        </div>
+      </div>
+    )
   }
-  
+
+  if (!isAdmin) {
+    return null
+  }
+
   return (
-    <div className="min-h-screen bg-gray-100 py-8">
-      <div className="container mx-auto px-4 max-w-7xl">
+    <div className="min-h-screen bg-gray-100">
+      {/* Navbar */}
+      <nav className="bg-white shadow-sm border-b sticky top-0 z-10">
+        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+          <div className="text-2xl font-bold text-blue-600">
+            لوحة المدير
+          </div>
+          <div className="flex items-center gap-4">
+            <span className="text-gray-600 hidden md:inline">
+              مرحباً {user?.displayName || user?.email?.split('@')[0]}
+            </span>
+            <button
+              onClick={handleLogout}
+              className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition"
+            >
+              تسجيل خروج
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      <div className="container mx-auto px-4 py-8 max-w-7xl">
+        {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-800">لوحة تحكم المدير</h1>
           <p className="text-gray-600">إدارة الإيداعات والسحوبات والمستخدمين</p>
+          <p className="text-sm text-gray-500 mt-1">
+            البريد الإلكتروني: {user?.email}
+          </p>
         </div>
-        
-        <div className="mb-6 border-b border-gray-200">
-          <nav className="flex gap-4">
+
+        {/* Tabs */}
+        <div className="mb-6 border-b border-gray-200 bg-white rounded-t-lg">
+          <nav className="flex gap-4 px-4">
             <button
               onClick={() => setActiveTab('deposits')}
-              className={`px-4 py-2 font-medium transition-colors ${
+              className={`px-4 py-3 font-medium transition-colors ${
                 activeTab === 'deposits'
                   ? 'text-blue-600 border-b-2 border-blue-600'
                   : 'text-gray-600 hover:text-gray-800'
               }`}
             >
-              طلبات الإيداع
+              📥 طلبات الإيداع
             </button>
             <button
               onClick={() => setActiveTab('withdrawals')}
-              className={`px-4 py-2 font-medium transition-colors ${
+              className={`px-4 py-3 font-medium transition-colors ${
                 activeTab === 'withdrawals'
                   ? 'text-blue-600 border-b-2 border-blue-600'
                   : 'text-gray-600 hover:text-gray-800'
               }`}
             >
-              طلبات السحب
+              📤 طلبات السحب
             </button>
             <button
               onClick={() => setActiveTab('users')}
-              className={`px-4 py-2 font-medium transition-colors ${
+              className={`px-4 py-3 font-medium transition-colors ${
                 activeTab === 'users'
                   ? 'text-blue-600 border-b-2 border-blue-600'
                   : 'text-gray-600 hover:text-gray-800'
               }`}
             >
-              المستخدمين
+              👥 المستخدمين
             </button>
           </nav>
         </div>
-        
-        {activeTab === 'deposits' && <AdminDeposits />}
-        {activeTab === 'withdrawals' && <AdminWithdrawals />}
-        {activeTab === 'users' && <AdminUsers />}
+
+        {/* Tab Content */}
+        <div className="bg-white rounded-lg shadow">
+          {activeTab === 'deposits' && <AdminDeposits />}
+          {activeTab === 'withdrawals' && <AdminWithdrawals />}
+          {activeTab === 'users' && <AdminUsers />}
+        </div>
       </div>
     </div>
   )
