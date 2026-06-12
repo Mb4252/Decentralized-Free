@@ -1,8 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { useSession } from 'next-auth/react'
+import { useState, useEffect } from 'react'
+import { auth } from '@/lib/firebase/client'
 
 export default function WithdrawModal({ onSuccess }) {
   const [isOpen, setIsOpen] = useState(false)
@@ -11,8 +10,18 @@ export default function WithdrawModal({ onSuccess }) {
   const [walletAddress, setWalletAddress] = useState('')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
-  const { data: session } = useSession()
-  const supabase = createClient()
+  const [token, setToken] = useState(null)
+  
+  useEffect(() => {
+    const getToken = async () => {
+      const user = auth.currentUser
+      if (user) {
+        const idToken = await user.getIdToken()
+        setToken(idToken)
+      }
+    }
+    getToken()
+  }, [])
   
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -33,29 +42,45 @@ export default function WithdrawModal({ onSuccess }) {
       return
     }
     
-    const response = await fetch('/api/withdraw/request', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        amount: withdrawAmount,
-        pin,
-        walletAddress
-      })
-    })
-    
-    const data = await response.json()
-    
-    if (response.ok) {
-      setMessage('تم إرسال طلب السحب بنجاح، بانتظار موافقة المدير')
-      setTimeout(() => {
-        setIsOpen(false)
-        onSuccess()
-      }, 2000)
-    } else {
-      setMessage(data.error || 'حدث خطأ في طلب السحب')
+    if (!walletAddress || walletAddress.length < 10) {
+      setMessage('عنوان المحفظة غير صحيح')
+      setLoading(false)
+      return
     }
     
-    setLoading(false)
+    try {
+      const response = await fetch('/api/withdraw/request', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          amount: withdrawAmount,
+          pin,
+          walletAddress
+        })
+      })
+      
+      const data = await response.json()
+      
+      if (response.ok) {
+        setMessage('تم إرسال طلب السحب بنجاح، بانتظار موافقة المدير')
+        setAmount('')
+        setPin('')
+        setWalletAddress('')
+        setTimeout(() => {
+          setIsOpen(false)
+          if (onSuccess) onSuccess()
+        }, 2000)
+      } else {
+        setMessage(data.error || 'حدث خطأ في طلب السحب')
+      }
+    } catch (error) {
+      setMessage('حدث خطأ في الاتصال بالسيرفر')
+    } finally {
+      setLoading(false)
+    }
   }
   
   return (
