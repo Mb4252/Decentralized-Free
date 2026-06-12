@@ -2,40 +2,29 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { auth } from '@/lib/firebase/client'
-import { onAuthStateChanged } from 'firebase/auth'
-import { createClient } from '@/lib/supabase/client'
 
 export default function DashboardPage() {
-  const [user, setUser] = useState(null)
-  const [userData, setUserData] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [userEmail, setUserEmail] = useState(null)
   const router = useRouter()
-  const supabase = createClient()
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (!firebaseUser) {
+    const user = localStorage.getItem('user')
+    if (!user) {
+      router.push('/login')
+      return
+    }
+    try {
+      const userData = JSON.parse(user)
+      if (userData.email) {
+        setUserEmail(userData.email)
+        setLoading(false)
+      } else {
         router.push('/login')
-        return
       }
-
-      setUser(firebaseUser)
-
-      // جلب بيانات المستخدم من Supabase
-      const { data, error } = await supabase
-        .from('users')
-        .select('*, tiers(name, roi_percentage)')
-        .eq('email', firebaseUser.email)
-        .single()
-
-      if (!error && data) {
-        setUserData(data)
-      }
-      setLoading(false)
-    })
-
-    return () => unsubscribe()
+    } catch (e) {
+      router.push('/login')
+    }
   }, [router])
 
   if (loading) {
@@ -45,11 +34,17 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="container mx-auto px-4">
-        <h1 className="text-3xl font-bold mb-4">مرحباً {user?.displayName}</h1>
-        <p>بريدك: {user?.email}</p>
-        <p>الاستثمار النشط: {userData?.active_deposit || 0} USDT</p>
-        <p>الرصيد المتاح: {userData?.available_balance || 0} USDT</p>
-        <p>المستوى: {userData?.tiers?.name || 'مبتدئ'}</p>
+        <h1 className="text-3xl font-bold mb-4">لوحة التحكم</h1>
+        <p>مرحباً {userEmail}</p>
+        <button 
+          onClick={() => {
+            localStorage.removeItem('user')
+            router.push('/login')
+          }}
+          className="bg-red-600 text-white px-4 py-2 rounded"
+        >
+          تسجيل خروج
+        </button>
       </div>
     </div>
   )
