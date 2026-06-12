@@ -1,30 +1,18 @@
 import { NextResponse } from 'next/server'
-import { adminAuth } from '@/lib/firebase/admin'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 
 export async function POST(request) {
   try {
-    // الحصول على token من الـ headers
-    const authHeader = request.headers.get('authorization')
-    const token = authHeader?.split('Bearer ')[1]
+    const { amount, email } = await request.json()
     
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-    
-    // التحقق من صحة الـ token عبر Firebase Admin
-    let decodedToken
-    try {
-      decodedToken = await adminAuth.verifyIdToken(token)
-    } catch (error) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
-    }
-    
-    const email = decodedToken.email
-    const { amount, transactionHash } = await request.json()
-    
+    // التحقق من صحة المبلغ
     if (!amount || amount < 10) {
       return NextResponse.json({ error: 'Minimum deposit is 10 USDT' }, { status: 400 })
+    }
+    
+    // التحقق من وجود البريد الإلكتروني
+    if (!email) {
+      return NextResponse.json({ error: 'Email is required' }, { status: 400 })
     }
     
     // جلب المستخدم من قاعدة البيانات
@@ -43,8 +31,7 @@ export async function POST(request) {
       .from('deposit_requests')
       .insert({
         user_id: user.id,
-        amount,
-        transaction_hash: transactionHash || null,
+        amount: amount,
         status: 'pending'
       })
       .select()
