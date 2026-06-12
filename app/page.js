@@ -9,31 +9,18 @@ export default function HomePage() {
   const router = useRouter()
 
   useEffect(() => {
-    // استيراد ديناميكي لـ Firebase فقط عند الحاجة
-    const checkAuth = async () => {
+    // التحقق من وجود جلسة عبر localStorage (بدون Firebase)
+    const user = localStorage.getItem('user')
+    if (user) {
       try {
-        const { auth } = await import('@/lib/firebase/client')
-        const { onAuthStateChanged } = await import('firebase/auth')
-        
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
-          if (user) {
-            router.push('/dashboard')
-          }
-          setLoading(false)
-        })
-        
-        return unsubscribe
-      } catch (error) {
-        console.error('Firebase error:', error)
-        setLoading(false)
-        return () => {}
-      }
+        const userData = JSON.parse(user)
+        if (userData.email) {
+          router.push('/dashboard')
+          return
+        }
+      } catch (e) {}
     }
-    
-    const unsubscribePromise = checkAuth()
-    return () => {
-      unsubscribePromise.then(unsubscribe => unsubscribe && unsubscribe())
-    }
+    setLoading(false)
   }, [router])
 
   if (loading) {
@@ -46,7 +33,6 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
-      {/* بقية المحتوى كما هو */}
       <nav className="bg-white shadow-sm border-b">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div className="text-2xl font-bold text-blue-600">CryptoInvest</div>
@@ -56,7 +42,7 @@ export default function HomePage() {
           </div>
         </div>
       </nav>
-      
+
       <section className="container mx-auto px-4 py-20 text-center">
         <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6">
           استثمر في العملات الرقمية
