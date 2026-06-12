@@ -1,9 +1,10 @@
--- إنشاء قاعدة البيانات
-CREATE DATABASE crypto_investment;
-\c crypto_investment;
+-- =====================================================
+-- قاعدة بيانات منصة التعدين السحابي
+-- Cloud Mining Platform Database Schema
+-- =====================================================
 
--- جدول المستويات
-CREATE TABLE tiers (
+-- 1. جدول المستويات (Tiers)
+CREATE TABLE IF NOT EXISTS tiers (
   id SERIAL PRIMARY KEY,
   name VARCHAR(50) NOT NULL,
   min_deposit DECIMAL(20,8) NOT NULL,
@@ -11,18 +12,19 @@ CREATE TABLE tiers (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
--- جدول المستخدمين
-CREATE TABLE users (
+-- 2. جدول المستخدمين (Users)
+CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   email VARCHAR(255) UNIQUE NOT NULL,
   name VARCHAR(255),
+  password TEXT,
   wallet_address VARCHAR(255),
   referral_code VARCHAR(20) UNIQUE NOT NULL,
   referrer_id UUID REFERENCES users(id) ON DELETE SET NULL,
   tier_id INT REFERENCES tiers(id) ON DELETE SET NULL,
   available_balance DECIMAL(20,8) DEFAULT 0,
   active_deposit DECIMAL(20,8) DEFAULT 0,
-  withdraw_pin VARCHAR(255) NOT NULL,
+  withdraw_pin VARCHAR(255),
   firebase_uid VARCHAR(255),
   total_withdrawn DECIMAL(20,8) DEFAULT 0,
   total_deposited DECIMAL(20,8) DEFAULT 0,
@@ -30,8 +32,8 @@ CREATE TABLE users (
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
--- جدول الاستثمارات
-CREATE TABLE investments (
+-- 3. جدول الاستثمارات (Investments)
+CREATE TABLE IF NOT EXISTS investments (
   id SERIAL PRIMARY KEY,
   user_id UUID REFERENCES users(id) ON DELETE CASCADE,
   amount DECIMAL(20,8) NOT NULL,
@@ -42,8 +44,8 @@ CREATE TABLE investments (
   closed_at TIMESTAMP
 );
 
--- جدول المعاملات
-CREATE TABLE transactions (
+-- 4. جدول المعاملات (Transactions)
+CREATE TABLE IF NOT EXISTS transactions (
   id SERIAL PRIMARY KEY,
   user_id UUID REFERENCES users(id) ON DELETE CASCADE,
   type VARCHAR(20) NOT NULL,
@@ -56,8 +58,8 @@ CREATE TABLE transactions (
   approved_by UUID REFERENCES users(id)
 );
 
--- جدول سجل الأرباح اليومية
-CREATE TABLE daily_profit_log (
+-- 5. جدول سجل الأرباح اليومية (Daily Profit Log)
+CREATE TABLE IF NOT EXISTS daily_profit_log (
   id SERIAL PRIMARY KEY,
   user_id UUID REFERENCES users(id) ON DELETE CASCADE,
   profit_amount DECIMAL(20,8) NOT NULL,
@@ -67,8 +69,8 @@ CREATE TABLE daily_profit_log (
   UNIQUE(user_id, calculated_date)
 );
 
--- جدول طلبات السحب
-CREATE TABLE withdrawals (
+-- 6. جدول طلبات السحب (Withdrawals)
+CREATE TABLE IF NOT EXISTS withdrawals (
   id SERIAL PRIMARY KEY,
   user_id UUID REFERENCES users(id) ON DELETE CASCADE,
   amount DECIMAL(20,8) NOT NULL,
@@ -81,8 +83,8 @@ CREATE TABLE withdrawals (
   processed_by UUID REFERENCES users(id)
 );
 
--- جدول الإحالات
-CREATE TABLE referrals (
+-- 7. جدول الإحالات (Referrals)
+CREATE TABLE IF NOT EXISTS referrals (
   id SERIAL PRIMARY KEY,
   referrer_id UUID REFERENCES users(id) ON DELETE CASCADE,
   referred_id UUID REFERENCES users(id) ON DELETE CASCADE,
@@ -93,8 +95,8 @@ CREATE TABLE referrals (
   UNIQUE(referrer_id, referred_id)
 );
 
--- جدول سجل الإشعارات
-CREATE TABLE notifications (
+-- 8. جدول الإشعارات (Notifications)
+CREATE TABLE IF NOT EXISTS notifications (
   id SERIAL PRIMARY KEY,
   user_id UUID REFERENCES users(id) ON DELETE CASCADE,
   title VARCHAR(255) NOT NULL,
@@ -104,8 +106,8 @@ CREATE TABLE notifications (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
--- جدول سجل الإيداعات المؤقتة
-CREATE TABLE deposit_requests (
+-- 9. جدول طلبات الإيداع (Deposit Requests)
+CREATE TABLE IF NOT EXISTS deposit_requests (
   id SERIAL PRIMARY KEY,
   user_id UUID REFERENCES users(id) ON DELETE CASCADE,
   amount DECIMAL(20,8) NOT NULL,
@@ -117,14 +119,29 @@ CREATE TABLE deposit_requests (
   approved_by UUID REFERENCES users(id)
 );
 
--- إدخال المستويات الافتراضية
+-- =====================================================
+-- إدراج المستويات الافتراضية (Tiers)
+-- =====================================================
 INSERT INTO tiers (name, min_deposit, roi_percentage) VALUES
 ('مبتدئ', 10, 2.0),
 ('محترف', 100, 2.5),
 ('VIP', 500, 3.0),
-('دياموند', 1000, 3.5);
+('دياموند', 1000, 3.5)
+ON CONFLICT (id) DO UPDATE SET
+  roi_percentage = EXCLUDED.roi_percentage;
 
--- إنشاء دالة تحديث updated_at
+-- =====================================================
+-- تحديث رمز الإحالة للمستخدمين الحاليين (إذا كان فارغاً)
+-- =====================================================
+UPDATE users 
+SET referral_code = UPPER(SUBSTRING(MD5(random()::text), 1, 8)) 
+WHERE referral_code IS NULL OR referral_code = '';
+
+-- =====================================================
+-- دوال مساعدة (Helper Functions)
+-- =====================================================
+
+-- دالة تحديث updated_at تلقائياً
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -134,12 +151,15 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Trigger لتحديث updated_at في جدول users
+DROP TRIGGER IF EXISTS update_users_updated_at ON users;
 CREATE TRIGGER update_users_updated_at
   BEFORE UPDATE ON users
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
 
--- دالة إضافة أرباح يومية
+-- =====================================================
+-- دالة إضافة الأرباح اليومية (Daily Profit Function)
+-- =====================================================
 CREATE OR REPLACE FUNCTION add_daily_profit(
   p_user_id UUID,
   p_profit DECIMAL,
@@ -147,27 +167,26 @@ CREATE OR REPLACE FUNCTION add_daily_profit(
   p_roi_percent DECIMAL
 )
 RETURNS VOID AS $$
-DECLARE
-  v_current_balance DECIMAL;
 BEGIN
   -- إدراج سجل الربح اليومي
   INSERT INTO daily_profit_log (user_id, profit_amount, calculated_date, roi_percent)
   VALUES (p_user_id, p_profit, p_date, p_roi_percent);
   
-  -- تحديث الرصيد المتاح
+  -- تحديث الرصيد المتاح للمستخدم
   UPDATE users
   SET available_balance = available_balance + p_profit
-  WHERE id = p_user_id
-  RETURNING available_balance INTO v_current_balance;
+  WHERE id = p_user_id;
   
-  -- تسجيل حركة الربح
+  -- تسجيل حركة الربح في المعاملات
   INSERT INTO transactions (user_id, type, amount, status, description)
   VALUES (p_user_id, 'profit', p_profit, 'approved', 
           CONCAT('Daily profit ', p_roi_percent, '% on active deposit'));
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- دالة تحديث مستوى المستخدم
+-- =====================================================
+-- دالة تحديث مستوى المستخدم تلقائياً
+-- =====================================================
 CREATE OR REPLACE FUNCTION update_user_tier()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -184,13 +203,46 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Trigger لتحديث مستوى المستخدم عند تغيير active_deposit
+-- Trigger لتحديث المستوى عند تغيير active_deposit
+DROP TRIGGER IF EXISTS update_tier_on_deposit ON users;
 CREATE TRIGGER update_tier_on_deposit
   AFTER UPDATE OF active_deposit ON users
   FOR EACH ROW
   EXECUTE FUNCTION update_user_tier();
 
--- ============================================
--- تم حذف جميع سياسات Row Level Security (RLS)
--- لأن المشروع يستخدم Firebase Auth + Supabase Admin
--- ============================================
+-- =====================================================
+-- سياسات الأمان (RLS) - معطلة حالياً
+-- =====================================================
+-- تعطيل RLS على جميع الجداول (لأننا نستخدم service_role)
+ALTER TABLE users DISABLE ROW LEVEL SECURITY;
+ALTER TABLE investments DISABLE ROW LEVEL SECURITY;
+ALTER TABLE transactions DISABLE ROW LEVEL SECURITY;
+ALTER TABLE withdrawals DISABLE ROW LEVEL SECURITY;
+ALTER TABLE notifications DISABLE ROW LEVEL SECURITY;
+ALTER TABLE deposit_requests DISABLE ROW LEVEL SECURITY;
+ALTER TABLE daily_profit_log DISABLE ROW LEVEL SECURITY;
+ALTER TABLE referrals DISABLE ROW LEVEL SECURITY;
+
+-- =====================================================
+-- إنشاء فهارس (Indexes) لتحسين الأداء
+-- =====================================================
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_referral_code ON users(referral_code);
+CREATE INDEX IF NOT EXISTS idx_deposit_requests_user_id ON deposit_requests(user_id);
+CREATE INDEX IF NOT EXISTS idx_deposit_requests_status ON deposit_requests(status);
+CREATE INDEX IF NOT EXISTS idx_withdrawals_user_id ON withdrawals(user_id);
+CREATE INDEX IF NOT EXISTS idx_withdrawals_status ON withdrawals(status);
+CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_type ON transactions(type);
+CREATE INDEX IF NOT EXISTS idx_investments_user_id ON investments(user_id);
+CREATE INDEX IF NOT EXISTS idx_daily_profit_log_user_id ON daily_profit_log(user_id);
+CREATE INDEX IF NOT EXISTS idx_daily_profit_log_date ON daily_profit_log(calculated_date);
+CREATE INDEX IF NOT EXISTS idx_referrals_referrer_id ON referrals(referrer_id);
+
+-- =====================================================
+-- عرض جميع الجداول للتأكد
+-- =====================================================
+SELECT table_name 
+FROM information_schema.tables 
+WHERE table_schema = 'public' 
+ORDER BY table_name;
