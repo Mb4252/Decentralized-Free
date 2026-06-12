@@ -6,11 +6,11 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 export default function AdminDeposits() {
   const [deposits, setDeposits] = useState([])
   const [loading, setLoading] = useState(true)
-  
+
   useEffect(() => {
     fetchDeposits()
   }, [])
-  
+
   const fetchDeposits = async () => {
     const { data, error } = await supabaseAdmin
       .from('deposit_requests')
@@ -19,14 +19,15 @@ export default function AdminDeposits() {
         users (email, name)
       `)
       .order('created_at', { ascending: false })
-    
+
     if (!error) {
-      setDeposits(data)
+      setDeposits(data || [])
     }
     setLoading(false)
   }
-  
+
   const handleApprove = async (depositId, userId, amount) => {
+    // الموافقة على الإيداع
     const { error: updateError } = await supabaseAdmin
       .from('deposit_requests')
       .update({ 
@@ -34,27 +35,27 @@ export default function AdminDeposits() {
         approved_at: new Date().toISOString()
       })
       .eq('id', depositId)
-    
+
     if (updateError) {
       alert('خطأ في الموافقة على الإيداع')
       return
     }
-    
-    // تحديث رصيد المستخدم وتفعيل الاستثمار
+
+    // تحديث رصيد المستخدم
     const { data: user } = await supabaseAdmin
       .from('users')
       .select('active_deposit, total_deposited')
       .eq('id', userId)
       .single()
-    
+
     await supabaseAdmin
       .from('users')
       .update({
-        active_deposit: (user.active_deposit || 0) + amount,
-        total_deposited: (user.total_deposited || 0) + amount
+        active_deposit: (user?.active_deposit || 0) + amount,
+        total_deposited: (user?.total_deposited || 0) + amount
       })
       .eq('id', userId)
-    
+
     // تسجيل الاستثمار
     await supabaseAdmin
       .from('investments')
@@ -64,34 +65,29 @@ export default function AdminDeposits() {
         status: 'active',
         activated_at: new Date().toISOString()
       })
-    
-    // تسجيل المعاملة
-    await supabaseAdmin
-      .from('transactions')
-      .insert({
-        user_id: userId,
-        type: 'deposit',
-        amount: amount,
-        status: 'approved',
-        description: 'Deposit approved by admin'
-      })
-    
+
     fetchDeposits()
   }
-  
+
   const handleReject = async (depositId) => {
     await supabaseAdmin
       .from('deposit_requests')
       .update({ status: 'rejected' })
       .eq('id', depositId)
-    
+
     fetchDeposits()
   }
-  
-  if (loading) return <div>جاري التحميل...</div>
-  
+
+  if (loading) {
+    return <div className="p-4 text-center">جاري التحميل...</div>
+  }
+
+  if (deposits.length === 0) {
+    return <div className="p-4 text-center text-gray-500">لا توجد طلبات إيداع</div>
+  }
+
   return (
-    <div className="bg-white rounded-xl shadow overflow-hidden">
+    <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200">
         <thead className="bg-gray-50">
           <tr>
@@ -106,7 +102,7 @@ export default function AdminDeposits() {
           {deposits.map((deposit) => (
             <tr key={deposit.id}>
               <td className="px-6 py-4">
-                <div>{deposit.users?.name || deposit.users?.email}</div>
+                <div>{deposit.users?.name || deposit.users?.email || 'غير معروف'}</div>
                 <div className="text-sm text-gray-500">{deposit.users?.email}</div>
               </td>
               <td className="px-6 py-4">{deposit.amount} USDT</td>
