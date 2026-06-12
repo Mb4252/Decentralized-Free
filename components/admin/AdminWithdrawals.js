@@ -6,11 +6,11 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 export default function AdminWithdrawals() {
   const [withdrawals, setWithdrawals] = useState([])
   const [loading, setLoading] = useState(true)
-  
+
   useEffect(() => {
     fetchWithdrawals()
   }, [])
-  
+
   const fetchWithdrawals = async () => {
     const { data, error } = await supabaseAdmin
       .from('withdrawals')
@@ -19,27 +19,14 @@ export default function AdminWithdrawals() {
         users (email, name, available_balance)
       `)
       .order('created_at', { ascending: false })
-    
+
     if (!error) {
-      setWithdrawals(data)
+      setWithdrawals(data || [])
     }
     setLoading(false)
   }
-  
+
   const handleApprove = async (withdrawalId, userId, amount) => {
-    // التحقق من الرصيد مرة أخرى
-    const { data: user } = await supabaseAdmin
-      .from('users')
-      .select('available_balance')
-      .eq('id', userId)
-      .single()
-    
-    if (user.available_balance < amount) {
-      alert('الرصيد غير كافٍ لهذا السحب')
-      return
-    }
-    
-    // تحديث حالة السحب
     const { error: updateError } = await supabaseAdmin
       .from('withdrawals')
       .update({ 
@@ -47,63 +34,60 @@ export default function AdminWithdrawals() {
         processed_at: new Date().toISOString()
       })
       .eq('id', withdrawalId)
-    
+
     if (updateError) {
       alert('خطأ في الموافقة على السحب')
       return
     }
-    
-    // تحديث رصيد المستخدم (تم تجميده مسبقاً، الآن يتم خصمه نهائياً)
+
+    // تحديث إجمالي المسحوبات
+    const { data: user } = await supabaseAdmin
+      .from('users')
+      .select('total_withdrawn')
+      .eq('id', userId)
+      .single()
+
     await supabaseAdmin
       .from('users')
       .update({
-        total_withdrawn: user.total_withdrawn + amount
+        total_withdrawn: (user?.total_withdrawn || 0) + amount
       })
       .eq('id', userId)
-    
-    // تحديث حالة المعاملة
-    await supabaseAdmin
-      .from('transactions')
-      .update({ status: 'approved' })
-      .eq('reference_id', withdrawalId)
-      .eq('type', 'withdraw')
-    
+
     fetchWithdrawals()
   }
-  
+
   const handleReject = async (withdrawalId, userId, amount) => {
-    // رد الرصيد المجمد للمستخدم
+    // رد الرصيد المجمد
     const { data: user } = await supabaseAdmin
       .from('users')
       .select('available_balance')
       .eq('id', userId)
       .single()
-    
+
     await supabaseAdmin
       .from('users')
-      .update({ available_balance: user.available_balance + amount })
+      .update({ available_balance: (user?.available_balance || 0) + amount })
       .eq('id', userId)
-    
-    // تحديث حالة السحب
+
     await supabaseAdmin
       .from('withdrawals')
       .update({ status: 'rejected' })
       .eq('id', withdrawalId)
-    
-    // تحديث حالة المعاملة
-    await supabaseAdmin
-      .from('transactions')
-      .update({ status: 'rejected' })
-      .eq('reference_id', withdrawalId)
-      .eq('type', 'withdraw')
-    
+
     fetchWithdrawals()
   }
-  
-  if (loading) return <div>جاري التحميل...</div>
-  
+
+  if (loading) {
+    return <div className="p-4 text-center">جاري التحميل...</div>
+  }
+
+  if (withdrawals.length === 0) {
+    return <div className="p-4 text-center text-gray-500">لا توجد طلبات سحب</div>
+  }
+
   return (
-    <div className="bg-white rounded-xl shadow overflow-hidden">
+    <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200">
         <thead className="bg-gray-50">
           <tr>
@@ -119,8 +103,8 @@ export default function AdminWithdrawals() {
           {withdrawals.map((withdrawal) => (
             <tr key={withdrawal.id}>
               <td className="px-6 py-4">
-                <div>{withdrawal.users?.name || withdrawal.users?.email}</div>
-                <div className="text-sm text-gray-500">الرصيد: {withdrawal.users?.available_balance} USDT</div>
+                <div>{withdrawal.users?.name || withdrawal.users?.email || 'غير معروف'}</div>
+                <div className="text-sm text-gray-500">الرصيد: {withdrawal.users?.available_balance || 0} USDT</div>
               </td>
               <td className="px-6 py-4">{withdrawal.amount} USDT</td>
               <td className="px-6 py-4">
