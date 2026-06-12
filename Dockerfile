@@ -1,22 +1,30 @@
 FROM node:20-alpine
 
-# تعيين مجلد العمل
 WORKDIR /app
 
 # نسخ ملفات الحزم
 COPY package*.json ./
-
-# تثبيت الحزم (بدون الحاجة إلى package-lock.json)
 RUN npm install
 
-# نسخ جميع ملفات المشروع
+# نسخ باقي الملفات
 COPY . .
 
-# بناء مشروع Next.js
+# تمرير متغيرات البيئة المطلوبة للبناء
+ARG NEXT_PUBLIC_SUPABASE_URL
+ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
+ARG SUPABASE_SERVICE_ROLE_KEY
+ARG NEXT_PUBLIC_ADMIN_EMAILS
+ARG CRON_SECRET
+
+ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
+ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
+ENV SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY
+ENV NEXT_PUBLIC_ADMIN_EMAILS=$NEXT_PUBLIC_ADMIN_EMAILS
+ENV CRON_SECRET=$CRON_SECRET
+
+# بناء المشروع
 RUN npm run build
 
-# تشغيل التطبيق على المنفذ 10000 (منفذ Render الافتراضي)
+# تشغيل التطبيق
 EXPOSE 10000
-
-# تشغيل الخادم
 CMD ["npm", "start"]
