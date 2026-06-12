@@ -2,42 +2,63 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import AdminDeposits from '@/components/admin/AdminDeposits'
-import AdminWithdrawals from '@/components/admin/AdminWithdrawals'
-import AdminUsers from '@/components/admin/AdminUsers'
+import dynamic from 'next/dynamic'
+
+// استيراد ديناميكي لتجنب أخطاء التحميل
+const AdminDeposits = dynamic(() => import('@/components/admin/AdminDeposits'), { 
+  ssr: false,
+  loading: () => <div className="p-4 text-center">جاري تحميل طلبات الإيداع...</div>
+})
+const AdminWithdrawals = dynamic(() => import('@/components/admin/AdminWithdrawals'), { 
+  ssr: false,
+  loading: () => <div className="p-4 text-center">جاري تحميل طلبات السحب...</div>
+})
+const AdminUsers = dynamic(() => import('@/components/admin/AdminUsers'), { 
+  ssr: false,
+  loading: () => <div className="p-4 text-center">جاري تحميل المستخدمين...</div>
+})
 
 export default function AdminPage() {
-  const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState('deposits')
   const [isAdmin, setIsAdmin] = useState(false)
   const [adminEmail, setAdminEmail] = useState('')
-  const [activeTab, setActiveTab] = useState('deposits')
+  const [loading, setLoading] = useState(true)
   const router = useRouter()
 
   useEffect(() => {
-    // التحقق من وجود جلسة مدير
+    // التحقق من صلاحيات المدير
     const adminData = localStorage.getItem('admin')
-    const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',') || []
+    const userData = localStorage.getItem('user')
     
-    if (adminData) {
-      try {
-        const data = JSON.parse(adminData)
-        if (data.email && adminEmails.includes(data.email)) {
-          setIsAdmin(true)
-          setAdminEmail(data.email)
-          setLoading(false)
-          return
-        }
-      } catch (e) {}
+    if (!adminData && !userData) {
+      router.push('/login')
+      return
     }
     
-    // إذا لم يكن مديراً، اذهب للصفحة الرئيسية
-    router.push('/login')
-    setLoading(false)
+    try {
+      const data = adminData ? JSON.parse(adminData) : JSON.parse(userData)
+      const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',') || []
+      
+      if (adminEmails.includes(data.email)) {
+        setIsAdmin(true)
+        setAdminEmail(data.email)
+        // تأكد من وجود admin في localStorage
+        if (!adminData) {
+          localStorage.setItem('admin', JSON.stringify({ email: data.email }))
+        }
+      } else {
+        router.push('/dashboard')
+      }
+    } catch (error) {
+      router.push('/login')
+    } finally {
+      setLoading(false)
+    }
   }, [router])
 
   const handleLogout = () => {
-    localStorage.removeItem('admin')
     localStorage.removeItem('user')
+    localStorage.removeItem('admin')
     router.push('/login')
   }
 
