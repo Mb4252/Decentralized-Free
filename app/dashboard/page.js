@@ -3,15 +3,19 @@
 import { useSession } from "next-auth/react"
 import { redirect } from "next/navigation"
 import { useEffect, useState } from "react"
-import { createClient } from "@/lib/supabase/client"
-import BalanceCard from "@/components/dashboard/BalanceCard"
-import DepositModal from "@/components/dashboard/DepositModal"
-import WithdrawModal from "@/components/dashboard/WithdrawModal"
-import ReferralSection from "@/components/dashboard/ReferralSection"
-import TransactionHistory from "@/components/dashboard/TransactionHistory"
+
+// المسارات المصححة أدناه
+import { createClient } from "../../lib/supabase/client"
+import BalanceCard from "../components/dashboard/BalanceCard"
+import DepositModal from "../components/dashboard/DepositModal"
+import WithdrawModal from "../components/dashboard/WithdrawModal"
+import ReferralSection from "../components/dashboard/ReferralSection"
+import TransactionHistory from "../components/dashboard/TransactionHistory"
 
 export default function DashboardPage() {
   const { data: session, status } = useSession()
+  // ... (بقية الكود الخاص بك كما هو)
+
   const [userData, setUserData] = useState(null)
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
