@@ -1,30 +1,10 @@
 import { NextResponse } from 'next/server'
-import { getAuth } from 'firebase-admin/auth'
-import { adminAuth } from '@/lib/firebase/admin'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import bcrypt from 'bcryptjs'
 
 export async function POST(request) {
   try {
-    // الحصول على token من الـ headers
-    const authHeader = request.headers.get('authorization')
-    const token = authHeader?.split('Bearer ')[1]
-    
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-    
-    // التحقق من صحة الـ token عبر Firebase Admin
-    let decodedToken
-    try {
-      decodedToken = await adminAuth.verifyIdToken(token)
-    } catch (error) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
-    }
-    
-    const email = decodedToken.email
-    
-    const { amount, pin, walletAddress } = await request.json()
+    const { amount, pin, walletAddress, email } = await request.json()
     
     // التحقق من صحة البيانات
     if (!amount || amount < 10) {
@@ -32,14 +12,18 @@ export async function POST(request) {
     }
     
     if (!pin || pin.length !== 4) {
-      return NextResponse.json({ error: 'Invalid PIN' }, { status: 400 })
+      return NextResponse.json({ error: 'PIN must be 4 digits' }, { status: 400 })
     }
     
     if (!walletAddress || walletAddress.length < 10) {
       return NextResponse.json({ error: 'Invalid wallet address' }, { status: 400 })
     }
     
-    // جلب بيانات المستخدم من Supabase
+    if (!email) {
+      return NextResponse.json({ error: 'Email is required' }, { status: 400 })
+    }
+    
+    // جلب بيانات المستخدم
     const { data: user, error: userError } = await supabaseAdmin
       .from('users')
       .select('id, available_balance, active_deposit, withdraw_pin')
@@ -80,6 +64,7 @@ export async function POST(request) {
       .single()
     
     if (withdrawalError) {
+      console.error('Withdrawal error:', withdrawalError)
       return NextResponse.json({ error: 'Failed to create withdrawal request' }, { status: 500 })
     }
     
