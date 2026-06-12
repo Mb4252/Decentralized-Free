@@ -2,8 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { auth, signOut } from '@/lib/firebase/client'
-import { onAuthStateChanged } from 'firebase/auth'
 import { createClient } from '@/lib/supabase/client'
 import BalanceCard from '@/components/dashboard/BalanceCard'
 import DepositModal from '@/components/dashboard/DepositModal'
@@ -15,41 +13,44 @@ export default function DashboardPage() {
   const [user, setUser] = useState(null)
   const [userData, setUserData] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [firebaseToken, setFirebaseToken] = useState(null)
   const router = useRouter()
   const supabase = createClient()
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (!firebaseUser) {
-        router.push('/login')
-        return
-      }
+    // التحقق من وجود مستخدم في localStorage
+    const storedUser = localStorage.getItem('user')
+    if (!storedUser) {
+      router.push('/login')
+      return
+    }
 
-      setUser(firebaseUser)
+    try {
+      const userObj = JSON.parse(storedUser)
+      setUser(userObj)
       
-      // الحصول على token من Firebase
-      const token = await firebaseUser.getIdToken()
-      setFirebaseToken(token)
-
       // جلب بيانات المستخدم من Supabase
-      const { data, error } = await supabase
-        .from('users')
-        .select('*, tiers(name, roi_percentage)')
-        .eq('email', firebaseUser.email)
-        .single()
+      const fetchUserData = async () => {
+        const { data, error } = await supabase
+          .from('users')
+          .select('*, tiers(name, roi_percentage)')
+          .eq('email', userObj.email)
+          .single()
 
-      if (!error && data) {
-        setUserData(data)
+        if (!error && data) {
+          setUserData(data)
+        }
+        setLoading(false)
       }
-      setLoading(false)
-    })
-
-    return () => unsubscribe()
+      
+      fetchUserData()
+    } catch (error) {
+      router.push('/login')
+    }
   }, [router, supabase])
 
-  const handleLogout = async () => {
-    await signOut(auth)
+  const handleLogout = () => {
+    localStorage.removeItem('user')
+    localStorage.removeItem('admin')
     router.push('/login')
   }
 
@@ -64,6 +65,10 @@ export default function DashboardPage() {
     )
   }
 
+  if (!user) {
+    return null
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Navbar */}
@@ -74,7 +79,7 @@ export default function DashboardPage() {
           </div>
           <div className="flex items-center gap-4">
             <span className="text-gray-600 hidden md:inline">
-              مرحباً {user?.displayName || user?.email?.split('@')[0]}
+              مرحباً {user?.name || user?.email?.split('@')[0]}
             </span>
             <button
               onClick={handleLogout}
@@ -90,7 +95,7 @@ export default function DashboardPage() {
         {/* Welcome Section */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-800">لوحة التحكم</h1>
-          <p className="text-gray-600">مرحباً بعودتك {user?.displayName || ''}</p>
+          <p className="text-gray-600">مرحباً بعودتك {user?.name || ''}</p>
           <p className="text-sm text-gray-500 mt-1">بريدك الإلكتروني: {user?.email}</p>
         </div>
 
@@ -134,10 +139,10 @@ export default function DashboardPage() {
         {/* Referral & Transactions */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <ReferralSection userData={userData} />
-          <TransactionHistory userId={user?.uid || userData?.id} />
+          <TransactionHistory userId={userData?.id} />
         </div>
 
-        {/* PIN Notice (إذا لم يغير PIN بعد) */}
+        {/* PIN Notice */}
         {userData?.withdraw_pin === '0000' && (
           <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
             <p className="text-yellow-800 text-sm">
