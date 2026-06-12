@@ -5,12 +5,15 @@ import { redirect } from "next/navigation"
 import { useEffect, useState } from "react"
 
 // المسارات المصححة أدناه
-import { createClient } from "../../lib/supabase/client"
-import BalanceCard from "../components/dashboard/BalanceCard"
-import DepositModal from "../components/dashboard/DepositModal"
-import WithdrawModal from "../components/dashboard/WithdrawModal"
-import ReferralSection from "../components/dashboard/ReferralSection"
-import TransactionHistory from "../components/dashboard/TransactionHistory"
+// التعديل هنا: إضافة نقطة ثالثة لكل مسار
+import BalanceCard from "../../components/dashboard/BalanceCard";
+import DepositModal from "../../components/dashboard/DepositModal";
+import WithdrawModal from "../../components/dashboard/WithdrawModal";
+import ReferralSection from "../../components/dashboard/ReferralSection";
+import TransactionHistory from "../../components/dashboard/TransactionHistory";
+
+// أما مسار Supabase فهو صحيح (لأنه بالفعل يحتوي على 3 نقاط)
+import { createClient } from "../../lib/supabase/client";
 
 export default function DashboardPage() {
   const { data: session, status } = useSession()
