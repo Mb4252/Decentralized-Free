@@ -3,12 +3,14 @@
 import { useSession } from "next-auth/react"
 import { redirect } from "next/navigation"
 import { useEffect, useState } from "react"
-import { supabaseAdmin } from "@/lib/supabase/admin"
-import AdminDeposits from "@/components/admin/AdminDeposits"
-import AdminWithdrawals from "@/components/admin/AdminWithdrawals"
-import AdminUsers from "@/components/admin/AdminUsers"
+// استبدلنا @/ بالمسار النسبي ../../
+import { supabaseAdmin } from "../../lib/supabase/admin"
+import AdminDeposits from "../../components/admin/AdminDeposits"
+import AdminWithdrawals from "../../components/admin/AdminWithdrawals"
+import AdminUsers from "../../components/admin/AdminUsers"
 
 export default function AdminPage() {
+  // ... بقية الكود الخاص بك كما هو لا تغير فيه شيئاً
   const { data: session, status } = useSession()
   const [activeTab, setActiveTab] = useState('deposits')
   
