@@ -33,7 +33,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // ========================================
-// API: تسجيل الدخول (بدون Auth)
+// API: تسجيل الدخول
 // ========================================
 app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
@@ -42,12 +42,11 @@ app.post('/api/login', async (req, res) => {
     return res.status(400).json({ error: 'البريد الإلكتروني وكلمة المرور مطلوبة' });
   }
   
-  // البحث عن المستخدم في جدول users مباشرة
   const { data: user, error } = await supabaseAdmin
     .from('users')
     .select('*')
     .eq('email', email)
-    .eq('password', password)  // مقارنة مباشرة (بدون تشفير)
+    .eq('password', password)
     .single();
   
   if (error || !user) {
@@ -62,7 +61,7 @@ app.post('/api/login', async (req, res) => {
 });
 
 // ========================================
-// API: إنشاء حساب جديد (بدون Auth ولا بريد)
+// API: إنشاء حساب جديد (أول مستخدم يصبح مديراً)
 // ========================================
 app.post('/api/register', async (req, res) => {
   const { email, password, name, referralCode } = req.body;
@@ -86,6 +85,11 @@ app.post('/api/register', async (req, res) => {
     return res.status(400).json({ error: 'هذا البريد مسجل بالفعل' });
   }
   
+  // التحقق من عدد المستخدمين في النظام
+  const { count, error: countError } = await supabaseAdmin
+    .from('users')
+    .select('*', { count: 'exact', head: true });
+  
   // توليد رمز دعوة فريد
   const newReferralCode = Math.random().toString(36).substring(2, 10).toUpperCase();
   
@@ -100,20 +104,19 @@ app.post('/api/register', async (req, res) => {
     if (referrer) referrerId = referrer.id;
   }
   
-  // تحديد صلاحية المدير
-  const ADMIN_EMAIL = 'mb425262@gmail.com';
-  let isAdmin = (email === ADMIN_EMAIL);
+  // **المفتاح: أول مستخدم في النظام يصبح مديراً تلقائياً**
+  const isAdmin = (count === 0 || countError);
   
   // إنشاء معرف فريد للمستخدم
   const userId = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString();
   
-  // إضافة المستخدم مباشرة إلى جدول users (بدون Supabase Auth)
+  // إضافة المستخدم مباشرة إلى جدول users
   const { error: insertError } = await supabaseAdmin
     .from('users')
     .insert({
       id: userId,
       email: email,
-      password: password,  // تخزين كلمة المرور كما هي (بدون تشفير)
+      password: password,
       name: name,
       referral_code: newReferralCode,
       referrer_id: referrerId,
@@ -216,7 +219,6 @@ app.post('/api/withdraw', async (req, res) => {
     return res.status(400).json({ error: 'عنوان المحفظة مطلوب' });
   }
   
-  // التحقق من الرصيد
   const { data: user } = await supabaseAdmin
     .from('users')
     .select('available_balance')
@@ -265,7 +267,6 @@ app.post('/api/referrals', async (req, res) => {
 // ========== ADMIN APIs ==================
 // ========================================
 
-// التحقق من صلاحية المدير
 const checkAdmin = async (req, res, next) => {
   const { userId } = req.body;
   if (!userId) {
@@ -285,7 +286,6 @@ const checkAdmin = async (req, res, next) => {
   next();
 };
 
-// جلب جميع طلبات الإيداع
 app.post('/api/admin/deposits', checkAdmin, async (req, res) => {
   const { data } = await supabaseAdmin
     .from('deposit_requests')
@@ -295,7 +295,6 @@ app.post('/api/admin/deposits', checkAdmin, async (req, res) => {
   res.json(data || []);
 });
 
-// جلب جميع طلبات السحب
 app.post('/api/admin/withdrawals', checkAdmin, async (req, res) => {
   const { data } = await supabaseAdmin
     .from('withdrawals')
@@ -305,7 +304,6 @@ app.post('/api/admin/withdrawals', checkAdmin, async (req, res) => {
   res.json(data || []);
 });
 
-// جلب جميع المستخدمين
 app.post('/api/admin/users', checkAdmin, async (req, res) => {
   const { data } = await supabaseAdmin
     .from('users')
@@ -315,7 +313,6 @@ app.post('/api/admin/users', checkAdmin, async (req, res) => {
   res.json(data || []);
 });
 
-// الموافقة على إيداع
 app.post('/api/admin/approve-deposit', checkAdmin, async (req, res) => {
   const { depositId, userId, amount } = req.body;
   
@@ -341,7 +338,6 @@ app.post('/api/admin/approve-deposit', checkAdmin, async (req, res) => {
   res.json({ success: true });
 });
 
-// رفض إيداع
 app.post('/api/admin/reject-deposit', checkAdmin, async (req, res) => {
   const { depositId } = req.body;
   
@@ -353,7 +349,6 @@ app.post('/api/admin/reject-deposit', checkAdmin, async (req, res) => {
   res.json({ success: true });
 });
 
-// الموافقة على سحب
 app.post('/api/admin/approve-withdraw', checkAdmin, async (req, res) => {
   const { withdrawalId, userId, amount } = req.body;
   
@@ -379,7 +374,6 @@ app.post('/api/admin/approve-withdraw', checkAdmin, async (req, res) => {
   res.json({ success: true });
 });
 
-// رفض سحب (رد الرصيد)
 app.post('/api/admin/reject-withdraw', checkAdmin, async (req, res) => {
   const { withdrawalId, userId, amount } = req.body;
   
