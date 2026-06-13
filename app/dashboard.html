@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>منصة الاستثمار | لوحة التحكم</title>
+  <title>لوحة التحكم</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -19,23 +19,14 @@
       justify-content: space-between;
       align-items: center;
       border-bottom: 1px solid #2d3748;
-      flex-wrap: wrap;
-      gap: 16px;
     }
     .logo { font-size: 24px; font-weight: bold; color: #e94560; }
-    .user-info { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
-    .user-email { color: #a0aec0; }
-    .user-name { color: #e94560; font-weight: bold; }
     .logout-btn { background: transparent; border: 1px solid #ef4444; color: #ef4444; padding: 8px 16px; border-radius: 8px; cursor: pointer; }
     .content { max-width: 1200px; margin: 0 auto; padding: 32px; }
     .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 24px; margin-bottom: 32px; }
-    .stat-card { background: #1a1a2e; border-radius: 16px; padding: 24px; display: flex; align-items: center; gap: 16px; border: 1px solid #2d3748; }
-    .stat-icon { font-size: 40px; }
-    .stat-label { color: #a0aec0; font-size: 14px; }
-    .stat-value { color: white; font-size: 24px; font-weight: bold; }
-    .stat-sub { color: #e94560; font-size: 12px; }
-    .two-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 24px; margin-bottom: 32px; }
-    .card { background: #1a1a2e; border-radius: 16px; padding: 24px; border: 1px solid #2d3748; }
+    .stat-card { background: #1a1a2e; border-radius: 16px; padding: 24px; border: 1px solid #2d3748; color: white; }
+    .stat-value { font-size: 32px; font-weight: bold; color: #e94560; }
+    .card { background: #1a1a2e; border-radius: 16px; padding: 24px; border: 1px solid #2d3748; margin-bottom: 24px; }
     .card-title { color: white; font-size: 20px; margin-bottom: 16px; }
     input {
       width: 100%;
@@ -46,92 +37,68 @@
       background: #0f0f1a;
       color: white;
     }
-    .deposit-btn { width: 100%; padding: 12px; background: #22c55e; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
-    .withdraw-btn { width: 100%; padding: 12px; background: #ef4444; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
-    .wallet-address { background: #0f0f1a; padding: 12px; border-radius: 8px; margin-bottom: 16px; color: #a0aec0; font-size: 12px; }
-    .address-code { display: block; word-break: break-all; color: #e94560; margin: 8px 0; }
-    .copy-btn { background: #2d3748; border: none; color: white; padding: 4px 12px; border-radius: 6px; cursor: pointer; margin-top: 8px; }
+    button {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .deposit-btn { background: #22c55e; color: white; width: 100%; }
+    .withdraw-btn { background: #ef4444; color: white; width: 100%; }
     .message { padding: 12px; border-radius: 8px; margin-bottom: 24px; text-align: center; }
     .success { background: #22c55e20; border: 1px solid #22c55e; color: #22c55e; }
     .error { background: #ef444420; border: 1px solid #ef4444; color: #ef4444; }
-    .referral-box { background: #0f0f1a; padding: 16px; border-radius: 12px; text-align: center; margin-top: 16px; }
-    .referral-code-text { font-size: 20px; font-weight: bold; color: #e94560; letter-spacing: 2px; margin: 8px 0; }
-    .plans-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-top: 16px; }
-    .plan-card { background: #1a1a2e; border-radius: 12px; padding: 20px; text-align: center; border: 1px solid #2d3748; }
-    .plan-name { color: #e94560; font-size: 18px; font-weight: bold; }
-    .plan-roi { color: white; font-size: 28px; font-weight: bold; }
   </style>
 </head>
 <body>
   <div class="navbar">
     <h1 class="logo">💰 منصة الاستثمار</h1>
-    <div class="user-info">
-      <span class="user-name" id="userName">مرحباً</span>
-      <span class="user-email" id="userEmail"></span>
-      <button class="logout-btn" id="logoutBtn">تسجيل خروج</button>
-    </div>
+    <button class="logout-btn" id="logoutBtn">تسجيل خروج</button>
   </div>
 
   <div class="content">
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-icon">💰</div>
-        <div>
-          <p class="stat-label">الاستثمار النشط</p>
-          <p class="stat-value" id="activeDeposit">0 USDT</p>
-          <p class="stat-sub">العائد: 2% يومياً</p>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon">💎</div>
-        <div>
-          <p class="stat-label">الرصيد المتاح</p>
-          <p class="stat-value" id="availableBalance">0 USDT</p>
-          <p class="stat-sub">قابل للسحب</p>
-        </div>
-      </div>
-    </div>
-
     <div id="messageDiv"></div>
 
-    <div class="two-columns">
-      <div class="card">
-        <h2 class="card-title">📥 إيداع USDT</h2>
-        <div class="wallet-address">
-          <strong>محفظة الإيداع (شبكة BSC):</strong><br />
-          <code class="address-code">0x987cfde723a87b5ed33329eebe0595a4416b848f</code>
-          <button class="copy-btn" onclick="copyToClipboard('0x987cfde723a87b5ed33329eebe0595a4416b848f')">📋 نسخ</button>
-        </div>
-        <input type="number" id="depositAmount" placeholder="المبلغ (USDT) - الحد الأدنى 10">
-        <button class="deposit-btn" id="depositBtn">تقديم طلب إيداع</button>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <p>💰 الاستثمار النشط</p>
+        <p class="stat-value" id="activeDeposit">0 USDT</p>
+        <p style="font-size: 12px; color: #a0aec0;">العائد: 2% يومياً</p>
       </div>
-
-      <div class="card">
-        <h2 class="card-title">📤 سحب الأرباح</h2>
-        <p class="stat-label" id="balanceInfo">الرصيد المتاح: 0 USDT</p>
-        <input type="number" id="withdrawAmount" placeholder="المبلغ (USDT) - الحد الأدنى 0.5">
-        <input type="text" id="walletAddress" placeholder="عنوان محفظة BSC">
-        <button class="withdraw-btn" id="withdrawBtn">طلب سحب</button>
+      <div class="stat-card">
+        <p>💎 الرصيد المتاح</p>
+        <p class="stat-value" id="availableBalance">0 USDT</p>
+        <p style="font-size: 12px; color: #a0aec0;">قابل للسحب</p>
       </div>
     </div>
 
     <div class="card">
-      <h2 class="card-title">👥 نظام الإحالات</h2>
-      <div class="referral-box">
-        <p>رمز الدعوة الخاص بك:</p>
-        <div class="referral-code-text" id="referralCodeText">تحميل...</div>
-        <button class="copy-btn" onclick="copyReferralCode()">📋 نسخ رمز الدعوة</button>
-        <p style="margin-top: 12px; font-size: 12px; color: #a0aec0;">عند دعوة أصدقائك، ستحصل على عمولة 10% من استثماراتهم</p>
+      <h2 class="card-title">📥 إيداع USDT</h2>
+      <div style="background: #0f0f1a; padding: 12px; border-radius: 8px; margin-bottom: 16px;">
+        <p style="color: #a0aec0; font-size: 12px;">محفظة الإيداع (شبكة BSC):</p>
+        <code style="color: #e94560; word-break: break-all;">0x987cfde723a87b5ed33329eebe0595a4416b848f</code>
+        <button onclick="navigator.clipboard.writeText('0x987cfde723a87b5ed33329eebe0595a4416b848f')" style="margin-top: 8px; padding: 6px 12px; background: #2d3748; color: white; font-size: 12px;">📋 نسخ</button>
       </div>
+      <input type="number" id="depositAmount" placeholder="المبلغ (USDT) - الحد الأدنى 10">
+      <button class="deposit-btn" id="depositBtn">تقديم طلب إيداع</button>
     </div>
 
-    <div class="card" style="margin-top: 24px;">
+    <div class="card">
+      <h2 class="card-title">📤 سحب الأرباح</h2>
+      <p id="balanceInfo" style="color: #a0aec0; margin-bottom: 16px;">الرصيد المتاح: 0 USDT</p>
+      <input type="number" id="withdrawAmount" placeholder="المبلغ (USDT) - الحد الأدنى 0.5">
+      <input type="text" id="walletAddress" placeholder="عنوان محفظة BSC">
+      <button class="withdraw-btn" id="withdrawBtn">طلب سحب</button>
+    </div>
+
+    <div class="card">
       <h2 class="card-title">📊 خطط الاستثمار</h2>
-      <div class="plans-grid">
-        <div class="plan-card"><h3 class="plan-name">مبتدئ</h3><p class="plan-roi">2%</p><p class="stat-label">من 10 USDT</p></div>
-        <div class="plan-card"><h3 class="plan-name">محترف</h3><p class="plan-roi">2.5%</p><p class="stat-label">من 100 USDT</p></div>
-        <div class="plan-card"><h3 class="plan-name">VIP</h3><p class="plan-roi">3%</p><p class="stat-label">من 500 USDT</p></div>
-        <div class="plan-card"><h3 class="plan-name">دياموند</h3><p class="plan-roi">3.5%</p><p class="stat-label">من 1000 USDT</p></div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px;">
+        <div style="background: #0f0f1a; padding: 16px; border-radius: 12px; text-align: center;"><h3 style="color: #e94560;">مبتدئ</h3><p style="font-size: 24px; font-weight: bold;">2%</p><p>من 10 USDT</p></div>
+        <div style="background: #0f0f1a; padding: 16px; border-radius: 12px; text-align: center;"><h3 style="color: #e94560;">محترف</h3><p style="font-size: 24px; font-weight: bold;">2.5%</p><p>من 100 USDT</p></div>
+        <div style="background: #0f0f1a; padding: 16px; border-radius: 12px; text-align: center;"><h3 style="color: #e94560;">VIP</h3><p style="font-size: 24px; font-weight: bold;">3%</p><p>من 500 USDT</p></div>
+        <div style="background: #0f0f1a; padding: 16px; border-radius: 12px; text-align: center;"><h3 style="color: #e94560;">دياموند</h3><p style="font-size: 24px; font-weight: bold;">3.5%</p><p>من 1000 USDT</p></div>
       </div>
     </div>
   </div>
@@ -141,19 +108,7 @@
     const SUPABASE_ANON_KEY = 'sb_publishable_b2QCsdG8mtoRKVyLdhqAdw_UbxR3OI9';
     const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    let currentUser = null;
     let userData = null;
-    let referralCode = '';
-
-    function copyToClipboard(text) {
-      navigator.clipboard.writeText(text);
-      showMessage('✅ تم نسخ العنوان!', 'success');
-    }
-
-    function copyReferralCode() {
-      navigator.clipboard.writeText(referralCode);
-      showMessage('✅ تم نسخ رمز الدعوة: ' + referralCode, 'success');
-    }
 
     function showMessage(msg, type) {
       const div = document.getElementById('messageDiv');
@@ -161,36 +116,24 @@
       setTimeout(() => div.innerHTML = '', 5000);
     }
 
-    async function loadUserData() {
+    async function loadData() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        window.location.href = '/index.html';
+        window.location.href = '/';
         return;
       }
-      currentUser = user;
-      document.getElementById('userEmail').innerText = user.email;
 
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('email', user.email)
-        .single();
+      const { data } = await supabase.from('users').select('*').eq('id', user.id).single();
+      userData = data;
       
-      if (data) {
-        userData = data;
-        referralCode = data.referral_code;
-        document.getElementById('userName').innerHTML = `مرحباً ${data.name || data.email.split('@')[0]}`;
-        document.getElementById('referralCodeText').innerText = data.referral_code;
-      }
-      
-      document.getElementById('activeDeposit').innerText = (userData?.active_deposit || 0) + ' USDT';
-      document.getElementById('availableBalance').innerText = (userData?.available_balance || 0) + ' USDT';
-      document.getElementById('balanceInfo').innerHTML = `الرصيد المتاح: <strong>${(userData?.available_balance || 0)} USDT</strong>`;
+      document.getElementById('activeDeposit').innerHTML = (data?.active_deposit || 0) + ' USDT';
+      document.getElementById('availableBalance').innerHTML = (data?.available_balance || 0) + ' USDT';
+      document.getElementById('balanceInfo').innerHTML = `الرصيد المتاح: ${(data?.available_balance || 0)} USDT`;
     }
 
     document.getElementById('logoutBtn').onclick = async () => {
       await supabase.auth.signOut();
-      window.location.href = '/index.html';
+      window.location.href = '/';
     };
 
     document.getElementById('depositBtn').onclick = async () => {
@@ -207,9 +150,9 @@
       });
       
       if (error) {
-        showMessage('❌ حدث خطأ، حاول مرة أخرى', 'error');
+        showMessage('❌ ' + error.message, 'error');
       } else {
-        showMessage(`✅ تم تقديم طلب إيداع بقيمة ${amount} USDT. يرجى إرسال المبلغ إلى المحفظة: 0x987cfde723a87b5ed33329eebe0595a4416b848f`, 'success');
+        showMessage(`✅ تم تقديم طلب إيداع بقيمة ${amount} USDT`, 'success');
         document.getElementById('depositAmount').value = '';
       }
     };
@@ -239,20 +182,15 @@
       });
       
       if (error) {
-        showMessage('❌ حدث خطأ، حاول مرة أخرى', 'error');
+        showMessage('❌ ' + error.message, 'error');
       } else {
-        showMessage(`✅ تم استلام طلب سحب ${amount} USDT. سيتم معالجته خلال 24 ساعة.`, 'success');
+        showMessage(`✅ تم استلام طلب سحب ${amount} USDT`, 'success');
         document.getElementById('withdrawAmount').value = '';
         document.getElementById('walletAddress').value = '';
-        loadUserData();
       }
     };
 
-    loadUserData();
-
-    supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_OUT') window.location.href = '/index.html';
-    });
+    loadData();
   </script>
 </body>
 </html>
