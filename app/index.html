@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>تسجيل الدخول</title>
+  <title>منصة الاستثمار | تسجيل الدخول</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -15,7 +15,13 @@
       justify-content: center;
       padding: 16px;
     }
-    .card { background: #0f3460; border-radius: 24px; padding: 40px; max-width: 400px; width: 100%; }
+    .card {
+      background: #0f3460;
+      border-radius: 24px;
+      padding: 40px;
+      max-width: 450px;
+      width: 100%;
+    }
     h1 { font-size: 32px; color: #e94560; text-align: center; margin-bottom: 32px; }
     input {
       width: 100%;
@@ -38,36 +44,64 @@
       font-weight: bold;
       cursor: pointer;
     }
-    .error { color: #ef4444; text-align: center; margin-top: 16px; font-size: 14px; }
-    .success { color: #22c55e; text-align: center; margin-top: 16px; font-size: 14px; }
+    .link-btn {
+      background: transparent;
+      color: #e94560;
+      margin-top: 12px;
+      border: 1px solid #e94560;
+    }
+    .message { margin-top: 16px; padding: 12px; border-radius: 8px; text-align: center; font-size: 14px; }
+    .error { background: #ef444420; border: 1px solid #ef4444; color: #ef4444; }
+    .success { background: #22c55e20; border: 1px solid #22c55e; color: #22c55e; }
+    .hidden { display: none; }
   </style>
 </head>
 <body>
   <div class="card">
     <h1>💰 منصة الاستثمار</h1>
     
-    <input type="email" id="email" placeholder="البريد الإلكتروني">
-    <input type="password" id="password" placeholder="كلمة المرور">
-    <button id="loginBtn">تسجيل الدخول</button>
-    <button id="registerBtn" style="margin-top: 12px; background: #1a1a2e; border: 1px solid #e94560;">إنشاء حساب</button>
-    
+    <div id="loginForm">
+      <input type="email" id="loginEmail" placeholder="البريد الإلكتروني">
+      <input type="password" id="loginPassword" placeholder="كلمة المرور">
+      <button id="doLoginBtn">تسجيل الدخول</button>
+      <button id="showRegisterBtn" class="link-btn">إنشاء حساب جديد</button>
+    </div>
+
+    <div id="registerForm" class="hidden">
+      <input type="text" id="regName" placeholder="اسم المستخدم">
+      <input type="email" id="regEmail" placeholder="البريد الإلكتروني">
+      <input type="password" id="regPassword" placeholder="كلمة المرور">
+      <input type="password" id="regConfirmPassword" placeholder="تأكيد كلمة المرور">
+      <input type="text" id="regReferral" placeholder="رمز الدعوة (اختياري)">
+      <button id="doRegisterBtn">إنشاء حساب</button>
+      <button id="showLoginBtn" class="link-btn">لديك حساب؟ تسجيل الدخول</button>
+    </div>
+
     <div id="message"></div>
   </div>
 
   <script>
-    // بيانات المستخدمين المخزنة محلياً
     let users = JSON.parse(localStorage.getItem('users') || '[]');
 
     function showMessage(msg, type) {
       const div = document.getElementById('message');
-      div.innerHTML = `<div class="${type}">${msg}</div>`;
-      setTimeout(() => div.innerHTML = '', 3000);
+      div.innerHTML = `<div class="message ${type}">${msg}</div>`;
+      setTimeout(() => div.innerHTML = '', 5000);
     }
 
-    // تسجيل الدخول
-    document.getElementById('loginBtn').onclick = () => {
-      const email = document.getElementById('email').value;
-      const password = document.getElementById('password').value;
+    document.getElementById('showRegisterBtn').onclick = () => {
+      document.getElementById('loginForm').classList.add('hidden');
+      document.getElementById('registerForm').classList.remove('hidden');
+    };
+
+    document.getElementById('showLoginBtn').onclick = () => {
+      document.getElementById('registerForm').classList.add('hidden');
+      document.getElementById('loginForm').classList.remove('hidden');
+    };
+
+    document.getElementById('doLoginBtn').onclick = () => {
+      const email = document.getElementById('loginEmail').value;
+      const password = document.getElementById('loginPassword').value;
 
       if (!email || !password) {
         showMessage('⚠️ يرجى إدخال البريد الإلكتروني وكلمة المرور', 'error');
@@ -85,18 +119,25 @@
       }
     };
 
-    // إنشاء حساب
-    document.getElementById('registerBtn').onclick = () => {
-      const email = document.getElementById('email').value;
-      const password = document.getElementById('password').value;
+    document.getElementById('doRegisterBtn').onclick = () => {
+      const name = document.getElementById('regName').value;
+      const email = document.getElementById('regEmail').value;
+      const password = document.getElementById('regPassword').value;
+      const confirmPassword = document.getElementById('regConfirmPassword').value;
+      const referralCode = document.getElementById('regReferral').value;
 
-      if (!email || !password) {
-        showMessage('⚠️ يرجى إدخال البريد الإلكتروني وكلمة المرور', 'error');
+      if (!name || !email || !password || !confirmPassword) {
+        showMessage('⚠️ يرجى ملء جميع الحقول المطلوبة', 'error');
         return;
       }
 
-      if (password.length < 4) {
-        showMessage('⚠️ كلمة المرور يجب أن تكون 4 أحرف على الأقل', 'error');
+      if (password !== confirmPassword) {
+        showMessage('⚠️ كلمة المرور وتأكيدها غير متطابقين', 'error');
+        return;
+      }
+
+      if (password.length < 6) {
+        showMessage('⚠️ كلمة المرور يجب أن تكون 6 أحرف على الأقل', 'error');
         return;
       }
 
@@ -105,14 +146,31 @@
         return;
       }
 
+      let referrerId = null;
+      if (referralCode) {
+        const referrer = users.find(u => u.referral_code === referralCode);
+        if (referrer) {
+          referrerId = referrer.id;
+        } else {
+          showMessage('⚠️ رمز الدعوة غير صحيح', 'error');
+          return;
+        }
+      }
+
       const newUser = {
         id: Date.now(),
+        name: name,
         email: email,
         password: password,
-        name: email.split('@')[0],
-        referral_code: Math.random().toString(36).substring(2, 8).toUpperCase(),
+        referral_code: Math.random().toString(36).substring(2, 10).toUpperCase(),
+        referrer_id: referrerId,
+        package: 'basic',
         available_balance: 0,
-        active_deposit: 0
+        active_deposit: 0,
+        total_withdrawn: 0,
+        total_deposited: 0,
+        daily_withdraw_limit: 10,
+        created_at: new Date().toISOString()
       };
 
       users.push(newUser);
