@@ -3,419 +3,189 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-  <title>منصة الاستثمار | تسجيل الدخول</title>
+  <title>لوحة المدير | منصة الاستثمار</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    
     body {
       min-height: 100vh;
       background: #0a0a0f;
-      background-image: 
-        linear-gradient(rgba(0, 255, 100, 0.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(0, 255, 100, 0.03) 1px, transparent 1px);
+      background-image: linear-gradient(rgba(0,255,100,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,255,100,0.03) 1px, transparent 1px);
       background-size: 40px 40px;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      padding-bottom: 80px;
+    }
+    .navbar {
+      background: rgba(10,10,20,0.8);
+      backdrop-filter: blur(12px);
+      padding: 16px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(0,255,100,0.2);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .logo { font-size: 22px; font-weight: bold; background: linear-gradient(135deg, #00ff66, #00ccff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .admin-email { color: #8899aa; font-size: 12px; }
+    .logout-btn { background: transparent; border: 1px solid #ff4444; color: #ff4444; padding: 6px 12px; border-radius: 20px; cursor: pointer; }
+    .content { max-width: 1200px; margin: 0 auto; padding: 20px; }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .stat-card { background: rgba(20,20,35,0.6); backdrop-filter: blur(12px); border-radius: 20px; padding: 16px; text-align: center; border: 1px solid rgba(0,255,100,0.15); }
+    .stat-value { font-size: 24px; font-weight: bold; color: #00ff66; }
+    .stat-label { color: #8899aa; font-size: 12px; }
+    .card { background: rgba(20,20,35,0.6); backdrop-filter: blur(12px); border-radius: 24px; padding: 20px; border: 1px solid rgba(0,255,100,0.15); margin-bottom: 24px; }
+    .card-title { color: white; font-size: 18px; margin-bottom: 16px; border-right: 3px solid #00ff66; padding-right: 12px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 12px; text-align: right; border-bottom: 1px solid rgba(0,255,100,0.1); color: #8899aa; }
+    th { color: #00ff66; }
+    .approve-btn { background: #00ff66; color: #0a0a0f; border: none; padding: 6px 12px; border-radius: 20px; cursor: pointer; margin-left: 8px; }
+    .reject-btn { background: #ff4444; color: white; border: none; padding: 6px 12px; border-radius: 20px; cursor: pointer; }
+    .nav-links { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+    .nav-link { background: transparent; border: none; color: #8899aa; padding: 8px 20px; cursor: pointer; border-radius: 30px; }
+    .nav-link.active { background: rgba(0,255,102,0.15); color: #00ff66; }
+    .support-fab {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: linear-gradient(135deg, #00ff66, #00ccff);
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 16px;
-    }
-
-    /* Glassmorphism Card */
-    .card {
-      background: rgba(20, 20, 35, 0.6);
-      backdrop-filter: blur(12px);
-      border-radius: 32px;
-      padding: 32px 28px;
-      max-width: 500px;
-      width: 100%;
-      border: 1px solid rgba(0, 255, 100, 0.2);
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 255, 100, 0.1);
-      animation: fadeInUp 0.6s ease-out;
-    }
-
-    @keyframes fadeInUp {
-      from { opacity: 0; transform: translateY(30px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    .logo {
-      text-align: center;
-      margin-bottom: 32px;
-    }
-    .logo-icon {
-      font-size: 56px;
-      margin-bottom: 8px;
-    }
-    .logo h1 {
-      font-size: 28px;
-      background: linear-gradient(135deg, #00ff66, #00ccff);
-      -webkit-background-clip: text;
-      background-clip: text;
-      color: transparent;
-      margin-bottom: 6px;
-    }
-    .logo p {
-      color: #8899aa;
-      font-size: 13px;
-    }
-
-    /* Tabs */
-    .tabs {
-      display: flex;
-      gap: 12px;
-      margin-bottom: 28px;
-      background: rgba(10, 10, 20, 0.8);
-      padding: 5px;
-      border-radius: 60px;
-    }
-    .tab {
-      flex: 1;
-      padding: 12px;
-      text-align: center;
-      background: transparent;
-      border: none;
-      border-radius: 50px;
-      color: #8899aa;
       cursor: pointer;
-      font-size: 15px;
-      font-weight: 600;
-      transition: all 0.3s;
+      font-size: 24px;
+      z-index: 98;
     }
-    .tab.active {
-      background: linear-gradient(135deg, #00ff66, #00ccff);
-      color: #0a0a0f;
-      box-shadow: 0 4px 15px rgba(0, 255, 102, 0.3);
-    }
-
-    /* Input Groups */
-    .input-group {
-      margin-bottom: 18px;
-      position: relative;
-    }
-    .input-group label {
-      display: block;
-      color: #8899aa;
-      margin-bottom: 6px;
-      font-size: 13px;
-      font-weight: 500;
-    }
-    .input-wrapper {
-      position: relative;
-      display: flex;
-      align-items: center;
-    }
-    .input-wrapper input {
-      width: 100%;
-      padding: 14px 16px;
-      padding-right: 45px;
-      border-radius: 16px;
-      border: 1px solid rgba(0, 255, 100, 0.3);
-      background: rgba(10, 10, 20, 0.8);
-      color: white;
-      font-size: 14px;
-      transition: all 0.3s;
-    }
-    .input-wrapper input:focus {
-      outline: none;
-      border-color: #00ff66;
-      box-shadow: 0 0 0 3px rgba(0, 255, 102, 0.2);
-    }
-    .input-icon {
-      position: absolute;
-      right: 16px;
-      top: 50%;
-      transform: translateY(-50%);
-      font-size: 16px;
-    }
-    .toggle-password {
-      position: absolute;
-      left: 16px;
-      top: 50%;
-      transform: translateY(-50%);
-      cursor: pointer;
-      color: #8899aa;
-      font-size: 16px;
-      transition: color 0.3s;
-      z-index: 2;
-    }
-    .toggle-password:hover { color: #00ff66; }
-
-    /* Password Strength */
-    .password-strength {
-      margin-top: 8px;
-      height: 4px;
-      background: #2d3748;
-      border-radius: 4px;
-      overflow: hidden;
-    }
-    .strength-bar { width: 0%; height: 100%; transition: width 0.3s, background 0.3s; }
-    .strength-text { font-size: 10px; margin-top: 5px; color: #8899aa; }
-
-    /* Buttons */
-    .btn-primary {
-      width: 100%;
-      padding: 14px;
-      background: linear-gradient(135deg, #00ff66, #00ccff);
-      color: #0a0a0f;
-      border: none;
-      border-radius: 60px;
-      font-size: 15px;
-      font-weight: bold;
-      cursor: pointer;
-      transition: all 0.3s;
-      margin-top: 8px;
-    }
-    .btn-primary:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 10px 25px -5px rgba(0, 255, 102, 0.4);
-    }
-    .link-btn {
-      width: 100%;
-      background: transparent;
-      border: 1px solid rgba(0, 255, 102, 0.5);
-      color: #00ff66;
-      padding: 12px;
-      border-radius: 60px;
-      font-size: 13px;
-      cursor: pointer;
-      transition: all 0.3s;
-      margin-top: 12px;
-    }
-    .link-btn:hover {
-      background: rgba(0, 255, 102, 0.1);
-      border-color: #00ff66;
-    }
-
-    /* Message */
-    .message {
-      margin-top: 18px;
-      padding: 12px;
-      border-radius: 16px;
-      text-align: center;
-      font-size: 13px;
-      animation: fadeIn 0.3s;
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(-10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    .success { background: rgba(0, 255, 102, 0.15); border: 1px solid #00ff66; color: #00ff66; }
-    .error { background: rgba(255, 68, 68, 0.15); border: 1px solid #ff4444; color: #ff4444; }
-    .info { background: rgba(0, 204, 255, 0.15); border: 1px solid #00ccff; color: #00ccff; }
-
-    /* Stats */
-    .stats {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 14px;
-      margin-top: 28px;
-    }
-    .stat-box {
-      background: rgba(10, 10, 20, 0.8);
-      backdrop-filter: blur(10px);
-      padding: 14px;
-      border-radius: 20px;
-      text-align: center;
-      border: 1px solid rgba(0, 255, 102, 0.2);
-      transition: transform 0.3s;
-    }
-    .stat-box:hover { transform: translateY(-2px); border-color: rgba(0, 255, 102, 0.5); }
-    .stat-number { display: block; font-size: 22px; font-weight: bold; color: #00ff66; }
-    .stat-label { font-size: 11px; color: #8899aa; }
-
-    .hidden { display: none; }
-
-    @media (max-width: 480px) {
-      .card { padding: 24px 20px; }
-      .logo h1 { font-size: 24px; }
-      .tab { font-size: 13px; padding: 10px; }
-      .btn-primary { padding: 12px; }
-    }
+    @media (max-width: 768px) { th, td { font-size: 11px; padding: 8px; } .content { padding: 12px; } }
   </style>
 </head>
 <body>
-  <div class="card">
-    <div class="logo">
-      <div class="logo-icon">💰</div>
-      <h1>CryptoInvest</h1>
-      <p>استثمر بأمان | أرباح يومية تصل إلى 3.5%</p>
-    </div>
+  <div class="navbar">
+    <div class="logo">👑 Admin Panel</div>
+    <div><span class="admin-email" id="adminEmail"></span> <button class="logout-btn" id="logoutBtn">تسجيل خروج</button></div>
+  </div>
 
-    <div class="tabs">
-      <button class="tab active" id="loginTab">تسجيل الدخول</button>
-      <button class="tab" id="registerTab">إنشاء حساب</button>
-    </div>
+  <div class="support-fab" id="supportFab">💬</div>
 
-    <!-- Login Form -->
-    <div id="loginForm">
-      <div class="input-group">
-        <label>📧 البريد الإلكتروني</label>
-        <div class="input-wrapper">
-          <span class="input-icon">📧</span>
-          <input type="email" id="loginEmail" placeholder="example@email.com">
-        </div>
-      </div>
-      <div class="input-group">
-        <label>🔒 كلمة المرور</label>
-        <div class="input-wrapper">
-          <span class="input-icon">🔒</span>
-          <input type="password" id="loginPassword" placeholder="********">
-          <span class="toggle-password" onclick="togglePassword('loginPassword', this)">👁️</span>
-        </div>
-      </div>
-      <button class="btn-primary" id="doLoginBtn">تسجيل الدخول</button>
+  <div class="content">
+    <div class="nav-links">
+      <button class="nav-link active" data-tab="deposits">📥 طلبات الإيداع</button>
+      <button class="nav-link" data-tab="withdrawals">📤 طلبات السحب</button>
+      <button class="nav-link" data-tab="users">👥 المستخدمين</button>
     </div>
-
-    <!-- Register Form -->
-    <div id="registerForm" class="hidden">
-      <div class="input-group">
-        <label>👤 اسم المستخدم</label>
-        <div class="input-wrapper">
-          <span class="input-icon">👤</span>
-          <input type="text" id="regName" placeholder="أدخل اسمك">
-        </div>
-      </div>
-      <div class="input-group">
-        <label>📧 البريد الإلكتروني</label>
-        <div class="input-wrapper">
-          <span class="input-icon">📧</span>
-          <input type="email" id="regEmail" placeholder="example@email.com">
-        </div>
-      </div>
-      <div class="input-group">
-        <label>🔒 كلمة المرور</label>
-        <div class="input-wrapper">
-          <span class="input-icon">🔒</span>
-          <input type="password" id="regPassword" placeholder="********" onkeyup="checkPasswordStrength()">
-          <span class="toggle-password" onclick="togglePassword('regPassword', this)">👁️</span>
-        </div>
-        <div class="password-strength"><div class="strength-bar" id="strengthBar"></div></div>
-        <div class="strength-text" id="strengthText"></div>
-      </div>
-      <div class="input-group">
-        <label>✔️ تأكيد كلمة المرور</label>
-        <div class="input-wrapper">
-          <span class="input-icon">✔️</span>
-          <input type="password" id="regConfirmPassword" placeholder="********">
-          <span class="toggle-password" onclick="togglePassword('regConfirmPassword', this)">👁️</span>
-        </div>
-      </div>
-      <div class="input-group">
-        <label>🎁 رمز الدعوة (اختياري)</label>
-        <div class="input-wrapper">
-          <span class="input-icon">🎁</span>
-          <input type="text" id="regReferral" placeholder="XXXXXX">
-        </div>
-      </div>
-      <button class="btn-primary" id="doRegisterBtn">إنشاء حساب</button>
-      <div id="generatedReferral" class="info hidden" style="margin-top: 14px; padding: 10px; text-align: center; border-radius: 14px;">
-        ✨ رمز الدعوة الخاص بك: <strong id="userReferralCode"></strong>
-      </div>
-    </div>
-
-    <div id="message"></div>
-
-    <div class="stats">
-      <div class="stat-box"><span class="stat-number">5,941+</span><span class="stat-label">مستخدم نشط</span></div>
-      <div class="stat-box"><span class="stat-number">$64K+</span><span class="stat-label">إجمالي الأرباح</span></div>
-    </div>
+    <div id="mainContent">⏳ جاري التحميل...</div>
   </div>
 
   <script>
     const API_URL = window.location.origin;
+    let userId = localStorage.getItem('userId');
 
-    function togglePassword(inputId, element) {
-      const input = document.getElementById(inputId);
-      if (input.type === 'password') { input.type = 'text'; element.innerHTML = '🙈'; }
-      else { input.type = 'password'; element.innerHTML = '👁️'; }
+    async function checkAdmin() {
+      if (!userId) { window.location.href = '/'; return false; }
+      const response = await fetch(`${API_URL}/api/user`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId }) });
+      const user = await response.json();
+      if (!user.is_admin) { alert('ليس لديك صلاحية'); window.location.href = '/'; return false; }
+      document.getElementById('adminEmail').innerHTML = user.email;
+      return true;
     }
 
-    function checkPasswordStrength() {
-      const password = document.getElementById('regPassword').value;
-      const strengthBar = document.getElementById('strengthBar');
-      const strengthText = document.getElementById('strengthText');
-      let strength = 0, message = '', color = '#ff4444';
-      if (password.length >= 4) strength++;
-      if (password.length >= 8) strength++;
-      if (/[A-Z]/.test(password)) strength++;
-      if (/[0-9]/.test(password)) strength++;
-      if (/[^A-Za-z0-9]/.test(password)) strength++;
-      const percent = (strength / 5) * 100;
-      strengthBar.style.width = percent + '%';
-      if (strength === 0 || strength === 1) { message = 'ضعيف'; color = '#ff4444'; }
-      else if (strength === 2) { message = 'متوسط'; color = '#ffaa00'; }
-      else if (strength === 3) { message = 'جيد'; color = '#00ccff'; }
-      else { message = 'قوي'; color = '#00ff66'; }
-      strengthBar.style.background = color;
-      strengthText.innerHTML = `قوة كلمة المرور: ${message}`;
-      strengthText.style.color = color;
+    async function fetchData(endpoint) {
+      const response = await fetch(`${API_URL}/api/admin/${endpoint}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId }) });
+      return response.json();
     }
 
-    function showMessage(msg, type) {
-      const div = document.getElementById('message');
-      div.innerHTML = `<div class="message ${type}">${msg}</div>`;
-      setTimeout(() => div.innerHTML = '', 5000);
+    async function callAdminAPI(endpoint, data) {
+      await fetch(`${API_URL}/api/admin/${endpoint}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId, ...data }) });
     }
 
-    document.getElementById('loginTab').onclick = () => {
-      document.getElementById('loginTab').classList.add('active');
-      document.getElementById('registerTab').classList.remove('active');
-      document.getElementById('loginForm').classList.remove('hidden');
-      document.getElementById('registerForm').classList.add('hidden');
-      document.getElementById('message').innerHTML = '';
-    };
+    async function renderDeposits() {
+      const deposits = await fetchData('deposits');
+      const pending = deposits.filter(d => d.status === 'pending');
+      const total = deposits.reduce((s, d) => s + d.amount, 0);
+      document.getElementById('mainContent').innerHTML = `
+        <div class="stats-grid"><div class="stat-card"><div class="stat-value">${pending.length}</div><div class="stat-label">⏳ قيد الانتظار</div></div><div class="stat-card"><div class="stat-value">${total.toFixed(2)} USDT</div><div class="stat-label">💰 إجمالي الإيداعات</div></div></div>
+        <div class="card"><h2 class="card-title">⏳ طلبات الإيداع قيد الانتظار</h2><div id="pendingDeposits"></div></div>
+        <div class="card"><h2 class="card-title">📋 سجل الإيداعات</h2><div id="depositHistory"></div></div>
+      `;
+      const pendingDiv = document.getElementById('pendingDeposits');
+      if (pending.length === 0) pendingDiv.innerHTML = '<p style="color:#8899aa;">لا توجد طلبات</p>';
+      else pendingDiv.innerHTML = `<div style="overflow-x:auto;"><table><thead><tr><th>المستخدم</th><th>المبلغ</th><th>التاريخ</th><th>إجراءات</th></tr></thead><tbody>${pending.map(d => `<tr><td>${d.users?.name || d.users?.email}</td><td>${d.amount} USDT</td><td>${new Date(d.created_at).toLocaleDateString('ar')}</td><td><button class="approve-btn" data-id="${d.id}" data-type="deposit" data-action="approve" data-user="${d.user_id}" data-amount="${d.amount}">✅ موافقة</button><button class="reject-btn" data-id="${d.id}" data-type="deposit" data-action="reject">❌ رفض</button></td></tr>`).join('')}</tbody></table></div>`;
+      
+      const history = deposits.filter(d => d.status !== 'pending');
+      const historyDiv = document.getElementById('depositHistory');
+      if (history.length === 0) historyDiv.innerHTML = '<p style="color:#8899aa;">لا يوجد سجل</p>';
+      else historyDiv.innerHTML = `<div style="overflow-x:auto;"><tr><thead><tr><th>المستخدم</th><th>المبلغ</th><th>التاريخ</th><th>الحالة</th></tr></thead><tbody>${history.map(d => `<tr><td>${d.users?.name || d.users?.email}</td><td>${d.amount} USDT</td><td>${new Date(d.created_at).toLocaleDateString('ar')}</td><td style="color:${d.status === 'approved' ? '#00ff66' : '#ff4444'}">${d.status === 'approved' ? 'تمت الموافقة' : 'مرفوض'}</td></tr>`).join('')}</tbody></table></div>`;
+      attachEvents();
+    }
 
-    document.getElementById('registerTab').onclick = () => {
-      document.getElementById('registerTab').classList.add('active');
-      document.getElementById('loginTab').classList.remove('active');
-      document.getElementById('loginForm').classList.add('hidden');
-      document.getElementById('registerForm').classList.remove('hidden');
-      document.getElementById('message').innerHTML = '';
-    };
+    async function renderWithdrawals() {
+      const withdrawals = await fetchData('withdrawals');
+      const pending = withdrawals.filter(w => w.status === 'pending');
+      const total = withdrawals.reduce((s, w) => s + w.amount, 0);
+      document.getElementById('mainContent').innerHTML = `
+        <div class="stats-grid"><div class="stat-card"><div class="stat-value">${pending.length}</div><div class="stat-label">⏳ قيد الانتظار</div></div><div class="stat-card"><div class="stat-value">${total.toFixed(2)} USDT</div><div class="stat-label">📤 إجمالي السحوبات</div></div></div>
+        <div class="card"><h2 class="card-title">⏳ طلبات السحب قيد الانتظار</h2><div id="pendingWithdrawals"></div></div>
+        <div class="card"><h2 class="card-title">📋 سجل السحوبات</h2><div id="withdrawHistory"></div></div>
+      `;
+      const pendingDiv = document.getElementById('pendingWithdrawals');
+      if (pending.length === 0) pendingDiv.innerHTML = '<p style="color:#8899aa;">لا توجد طلبات</p>';
+      else pendingDiv.innerHTML = `<div style="overflow-x:auto;"><table><thead><tr><th>المستخدم</th><th>المبلغ</th><th>المحفظة</th><th>التاريخ</th><th>إجراءات</th></tr></thead><tbody>${pending.map(w => `<tr><td>${w.users?.name || w.users?.email}</td><td>${w.amount} USDT</td><td>${w.wallet_address?.substring(0,15)}...</td><td>${new Date(w.created_at).toLocaleDateString('ar')}</td><td><button class="approve-btn" data-id="${w.id}" data-type="withdraw" data-action="approve" data-user="${w.user_id}" data-amount="${w.amount}">✅ صرف</button><button class="reject-btn" data-id="${w.id}" data-type="withdraw" data-action="reject" data-user="${w.user_id}" data-amount="${w.amount}">❌ رفض</button></td></tr>`).join('')}</tbody></table></div>`;
+      
+      const history = withdrawals.filter(w => w.status !== 'pending');
+      const historyDiv = document.getElementById('withdrawHistory');
+      if (history.length === 0) historyDiv.innerHTML = '<p style="color:#8899aa;">لا يوجد سجل</p>';
+      else historyDiv.innerHTML = `<div style="overflow-x:auto;"><table><thead><tr><th>المستخدم</th><th>المبلغ</th><th>التاريخ</th><th>الحالة</th></tr></thead><tbody>${history.map(w => `<tr><td>${w.users?.name || w.users?.email}</td><td>${w.amount} USDT</td><td>${new Date(w.created_at).toLocaleDateString('ar')}</td><td style="color:${w.status === 'approved' ? '#00ff66' : '#ff4444'}">${w.status === 'approved' ? 'تم الصرف' : 'مرفوض'}</td></tr>`).join('')}</tbody></table></div>`;
+      attachEvents();
+    }
 
-    document.getElementById('doLoginBtn').onclick = async () => {
-      const email = document.getElementById('loginEmail').value;
-      const password = document.getElementById('loginPassword').value;
-      if (!email || !password) { showMessage('⚠️ يرجى إدخال البريد الإلكتروني وكلمة المرور', 'error'); return; }
-      try {
-        const response = await fetch(`${API_URL}/api/login`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password })
-        });
-        const data = await response.json();
-        if (data.success) {
-          localStorage.setItem('userId', data.user.id);
-          showMessage('✅ تم تسجيل الدخول بنجاح! جاري التحويل...', 'success');
-          setTimeout(() => { window.location.href = '/dashboard.html'; }, 1500);
-        } else { showMessage('❌ ' + (data.error || 'فشل تسجيل الدخول'), 'error'); }
-      } catch (error) { showMessage('❌ خطأ في الاتصال بالخادم', 'error'); }
-    };
+    async function renderUsers() {
+      const users = await fetchData('users');
+      document.getElementById('mainContent').innerHTML = `
+        <div class="stats-grid"><div class="stat-card"><div class="stat-value">${users.length}</div><div class="stat-label">👥 إجمالي المستخدمين</div></div></div>
+        <div class="card"><h2 class="card-title">📋 قائمة المستخدمين</h2><div id="usersList"></div></div>
+      `;
+      document.getElementById('usersList').innerHTML = `<div style="overflow-x:auto;"><table><thead><tr><th>الاسم</th><th>البريد</th><th>المستوى</th><th>الاستثمار</th><th>الرصيد</th><th>مدير</th></tr></thead><tbody>${users.map(u => `<tr><td>${u.name || '-'}</td><td>${u.email}</td><td>VIP ${u.vip_level || 0</td><td>${u.active_deposit || 0} USDT</td><td>${u.available_balance || 0} USDT</td><td>${u.is_admin ? '✅' : '❌'}</td></tr>`).join('')}</tbody></table></div>`;
+    }
 
-    document.getElementById('doRegisterBtn').onclick = async () => {
-      const name = document.getElementById('regName').value;
-      const email = document.getElementById('regEmail').value;
-      const password = document.getElementById('regPassword').value;
-      const confirmPassword = document.getElementById('regConfirmPassword').value;
-      const referralCode = document.getElementById('regReferral').value;
-      if (!name || !email || !password || !confirmPassword) { showMessage('⚠️ يرجى ملء جميع الحقول المطلوبة', 'error'); return; }
-      if (password !== confirmPassword) { showMessage('⚠️ كلمة المرور وتأكيدها غير متطابقين', 'error'); return; }
-      if (password.length < 4) { showMessage('⚠️ كلمة المرور يجب أن تكون 4 أحرف على الأقل', 'error'); return; }
-      try {
-        const response = await fetch(`${API_URL}/api/register`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, email, password, referralCode })
-        });
-        const data = await response.json();
-        if (data.success) {
-          localStorage.setItem('userId', data.user.id);
-          document.getElementById('userReferralCode').innerText = data.referral_code;
-          document.getElementById('generatedReferral').classList.remove('hidden');
-          showMessage(`✅ تم إنشاء الحساب بنجاح! رمز الدعوة: ${data.referral_code}`, 'success');
-          setTimeout(() => { window.location.href = '/dashboard.html'; }, 2000);
-        } else { showMessage('❌ ' + (data.error || 'فشل إنشاء الحساب'), 'error'); }
-      } catch (error) { showMessage('❌ خطأ في الاتصال بالخادم', 'error'); }
-    };
+    function attachEvents() {
+      document.querySelectorAll('.approve-btn, .reject-btn').forEach(btn => {
+        btn.onclick = async () => {
+          const id = parseInt(btn.getAttribute('data-id'));
+          const type = btn.getAttribute('data-type');
+          const action = btn.getAttribute('data-action');
+          const targetUserId = btn.getAttribute('data-user');
+          const amount = parseFloat(btn.getAttribute('data-amount'));
+          if (type === 'deposit') {
+            if (action === 'approve') await callAdminAPI('approve-deposit', { depositId: id, userId: targetUserId, amount });
+            else await callAdminAPI('reject-deposit', { depositId: id });
+          } else {
+            if (action === 'approve') await callAdminAPI('approve-withdraw', { withdrawalId: id, userId: targetUserId, amount });
+            else await callAdminAPI('reject-withdraw', { withdrawalId: id, userId: targetUserId, amount });
+          }
+          const activeTab = document.querySelector('.nav-link.active').getAttribute('data-tab');
+          if (activeTab === 'deposits') await renderDeposits();
+          else if (activeTab === 'withdrawals') await renderWithdrawals();
+        };
+      });
+    }
+
+    document.getElementById('logoutBtn').onclick = () => { localStorage.clear(); window.location.href = '/'; };
+    document.getElementById('supportFab').onclick = () => { window.open('https://t.me/+fPunvn_76Q45NDg8', '_blank'); };
+    document.querySelectorAll('.nav-link').forEach(link => {
+      link.onclick = async () => {
+        document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+        link.classList.add('active');
+        const tab = link.getAttribute('data-tab');
+        if (tab === 'deposits') await renderDeposits();
+        else if (tab === 'withdrawals') await renderWithdrawals();
+        else if (tab === 'users') await renderUsers();
+      };
+    });
+
+    (async () => { if (await checkAdmin()) await renderDeposits(); })();
   </script>
 </body>
 </html>
