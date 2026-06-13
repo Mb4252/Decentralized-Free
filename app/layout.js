@@ -1,8 +1,8 @@
 import './globals.css'
 
 export const metadata = {
-  title: 'Crypto Investment Platform',
-  description: 'تعدين سحابي - أرباح يومية',
+  title: 'Crypto Platform',
+  description: 'Investment Platform',
 }
 
 export default function RootLayout({ children }) {
