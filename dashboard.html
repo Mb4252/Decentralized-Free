@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>منصة الاستثمار | لوحة التحكم</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      min-height: 100vh;
+      background: #0f0f1a;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    .navbar {
+      background: #1a1a2e;
+      padding: 16px 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #2d3748;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    .logo { font-size: 24px; font-weight: bold; color: #e94560; }
+    .user-info { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+    .user-email { color: #a0aec0; }
+    .user-name { color: #e94560; font-weight: bold; }
+    .logout-btn { background: transparent; border: 1px solid #ef4444; color: #ef4444; padding: 8px 16px; border-radius: 8px; cursor: pointer; }
+    .content { max-width: 1200px; margin: 0 auto; padding: 32px; }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 24px; margin-bottom: 32px; }
+    .stat-card { background: #1a1a2e; border-radius: 16px; padding: 24px; display: flex; align-items: center; gap: 16px; border: 1px solid #2d3748; }
+    .stat-icon { font-size: 40px; }
+    .stat-label { color: #a0aec0; font-size: 14px; }
+    .stat-value { color: white; font-size: 24px; font-weight: bold; }
+    .stat-sub { color: #e94560; font-size: 12px; }
+    .two-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 24px; margin-bottom: 32px; }
+    .card { background: #1a1a2e; border-radius: 16px; padding: 24px; border: 1px solid #2d3748; }
+    .card-title { color: white; font-size: 20px; margin-bottom: 16px; }
+    input {
+      width: 100%;
+      padding: 12px;
+      margin-bottom: 12px;
+      border-radius: 8px;
+      border: 1px solid #2d3748;
+      background: #0f0f1a;
+      color: white;
+    }
+    .deposit-btn { width: 100%; padding: 12px; background: #22c55e; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+    .withdraw-btn { width: 100%; padding: 12px; background: #ef4444; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+    .wallet-address { background: #0f0f1a; padding: 12px; border-radius: 8px; margin-bottom: 16px; color: #a0aec0; font-size: 12px; }
+    .address-code { display: block; word-break: break-all; color: #e94560; margin: 8px 0; }
+    .copy-btn { background: #2d3748; border: none; color: white; padding: 4px 12px; border-radius: 6px; cursor: pointer; margin-top: 8px; }
+    .message { padding: 12px; border-radius: 8px; margin-bottom: 24px; text-align: center; }
+    .success { background: #22c55e20; border: 1px solid #22c55e; color: #22c55e; }
+    .error { background: #ef444420; border: 1px solid #ef4444; color: #ef4444; }
+    .info { background: #e9456020; border: 1px solid #e94560; color: #e94560; }
+    .referral-box { background: #0f0f1a; padding: 16px; border-radius: 12px; text-align: center; margin-top: 16px; }
+    .referral-code-text { font-size: 20px; font-weight: bold; color: #e94560; letter-spacing: 2px; margin: 8px 0; }
+  </style>
+</head>
+<body>
+  <div class="navbar">
+    <h1 class="logo">💰 منصة الاستثمار</h1>
+    <div class="user-info">
+      <span class="user-name" id="userName">مرحباً</span>
+      <span class="user-email" id="userEmail"></span>
+      <button class="logout-btn" id="logoutBtn">تسجيل خروج</button>
+    </div>
+  </div>
+
+  <div class="content" id="appContent">
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon">💰</div>
+        <div>
+          <p class="stat-label">الاستثمار النشط</p>
+          <p class="stat-value" id="activeDeposit">0 USDT</p>
+          <p class="stat-sub">العائد: 2% يومياً</p>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">💎</div>
+        <div>
+          <p class="stat-label">الرصيد المتاح</p>
+          <p class="stat-value" id="availableBalance">0 USDT</p>
+          <p class="stat-sub">قابل للسحب</p>
+        </div>
+      </div>
+    </div>
+
+    <div id="messageDiv"></div>
+
+    <div class="two-columns">
+      <div class="card">
+        <h2 class="card-title">📥 إيداع USDT</h2>
+        <div class="wallet-address">
+          <strong>محفظة الإيداع (شبكة BSC):</strong><br />
+          <code class="address-code">0x987cfde723a87b5ed33329eebe0595a4416b848f</code>
+          <button class="copy-btn" onclick="copyToClipboard('0x987cfde723a87b5ed33329eebe0595a4416b848f')">📋 نسخ</button>
+        </div>
+        <input type="number" id="depositAmount" placeholder="المبلغ (USDT) - الحد الأدنى 10">
+        <button class="deposit-btn" id="depositBtn">تقديم طلب إيداع</button>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">📤 سحب الأرباح</h2>
+        <p class="stat-label" id="balanceInfo">الرصيد المتاح: 0 USDT</p>
+        <input type="number" id="withdrawAmount" placeholder="المبلغ (USDT) - الحد الأدنى 0.5">
+        <input type="text" id="walletAddress" placeholder="عنوان محفظة BSC">
+        <button class="withdraw-btn" id="withdrawBtn">طلب سحب</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 class="card-title">👥 نظام الإحالات</h2>
+      <div class="referral-box">
+        <p>رمز الدعوة الخاص بك:</p>
+        <div class="referral-code-text" id="referralCodeText">تحميل...</div>
+        <button class="copy-btn" onclick="copyReferralCode()">📋 نسخ رمز الدعوة</button>
+        <p style="margin-top: 12px; font-size: 12px; color: #a0aec0;">عند دعوة أصدقائك، ستحصل على عمولة 10% من استثماراتهم</p>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top: 24px;">
+      <h2 class="card-title">📊 خطط الاستثمار</h2>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+        <div class="stat-card" style="flex-direction: column; text-align: center;"><h3 style="color: #e94560;">مبتدئ</h3><p style="font-size: 28px; font-weight: bold; color: white;">2%</p><p>من 10 USDT</p></div>
+        <div class="stat-card" style="flex-direction: column; text-align: center;"><h3 style="color: #e94560;">محترف</h3><p style="font-size: 28px; font-weight: bold; color: white;">2.5%</p><p>من 100 USDT</p></div>
+        <div class="stat-card" style="flex-direction: column; text-align: center;"><h3 style="color: #e94560;">VIP</h3><p style="font-size: 28px; font-weight: bold; color: white;">3%</p><p>من 500 USDT</p></div>
+        <div class="stat-card" style="flex-direction: column; text-align: center;"><h3 style="color: #e94560;">دياموند</h3><p style="font-size: 28px; font-weight: bold; color: white;">3.5%</p><p>من 1000 USDT</p></div>
+      </div>
+    </div>
+
+    <button class="deposit-btn" id="profitBtn" style="margin-top: 24px; background: #e94560;">🎁 احصل على أرباح اليوم</button>
+  </div>
+
+  <script>
+    const SUPABASE_URL = 'https://ixnjzzhxmxjtcnbqaomq.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_b2QCsdG8mtoRKVyLdhqAdw_UbxR3OI9';
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    let currentUser = null;
+    let userData = null;
+    let referralCode = '';
+
+    function copyToClipboard(text) {
+      navigator.clipboard.writeText(text);
+      showMessage('✅ تم نسخ العنوان!', 'success');
+    }
+
+    function copyReferralCode() {
+      navigator.clipboard.writeText(referralCode);
+      showMessage('✅ تم نسخ رمز الدعوة: ' + referralCode, 'success');
+    }
+
+    function showMessage(msg, type) {
+      const div = document.getElementById('messageDiv');
+      div.innerHTML = `<div class="message ${type}">${msg}</div>`;
+      setTimeout(() => div.innerHTML = '', 5000);
+    }
+
+    async function loadUserData() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        window.location.href = '/index.html';
+        return;
+      }
+      currentUser = user;
+      document.getElementById('userEmail').innerText = user.email;
+
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', user.email)
+        .single();
+      
+      if (data) {
+        userData = data;
+        referralCode = data.referral_code;
+        document.getElementById('userName').innerHTML = `مرحباً ${data.name || data.email.split('@')[0]}`;
+        document.getElementById('referralCodeText').innerText = data.referral_code;
+      } else {
+        showMessage('⚠️ لم يتم العثور على بيانات المستخدم', 'error');
+      }
+      
+      document.getElementById('activeDeposit').innerText = (userData?.active_deposit || 0) + ' USDT';
+      document.getElementById('availableBalance').innerText = (userData?.available_balance || 0) + ' USDT';
+      document.getElementById('balanceInfo').innerHTML = `الرصيد المتاح: <strong>${(userData?.available_balance || 0)} USDT</strong>`;
+    }
+
+    document.getElementById('logoutBtn').onclick = async () => {
+      await supabase.auth.signOut();
+      window.location.href = '/index.html';
+    };
+
+    document.getElementById('depositBtn').onclick = async () => {
+      const amount = parseFloat(document.getElementById('depositAmount').value);
+      if (!amount || amount < 10) {
+        showMessage('⚠️ الحد الأدنى للإيداع 10 USDT', 'error');
+        return;
+      }
+      
+      const { error } = await supabase.from('deposit_requests').insert({
+        user_id: userData.id,
+        amount: amount,
+        status: 'pending'
+      });
+      
+      if (error) {
+        showMessage('❌ حدث خطأ، حاول مرة أخرى', 'error');
+      } else {
+        showMessage(`✅ تم تقديم طلب إيداع بقيمة ${amount} USDT. يرجى إرسال المبلغ إلى المحفظة: 0x987cfde723a87b5ed33329eebe0595a4416b848f`, 'success');
+        document.getElementById('depositAmount').value = '';
+      }
+    };
+
+    document.getElementById('withdrawBtn').onclick = async () => {
+      const amount = parseFloat(document.getElementById('withdrawAmount').value);
+      const address = document.getElementById('walletAddress').value;
+      
+      if (!amount || amount < 0.5) {
+        showMessage('⚠️ الحد الأدنى للسحب 0.5 USDT', 'error');
+        return;
+      }
+      if (!address) {
+        showMessage('⚠️ يرجى إدخال عنوان محفظة BSC', 'error');
+        return;
+      }
+      if (amount > (userData?.available_balance || 0)) {
+        showMessage('⚠️ الرصيد غير كافٍ', 'error');
+        return;
+      }
+      
+      const { error } = await supabase.from('withdrawals').insert({
+        user_id: userData.id,
+        amount: amount,
+        wallet_address: address,
+        status: 'pending'
+      });
+      
+      if (error) {
+        showMessage('❌ حدث خطأ، حاول مرة أخرى', 'error');
+      } else {
+        const newBalance = (userData?.available_balance || 0) - amount;
+        await supabase.from('users').update({ available_balance: newBalance }).eq('id', userData.id);
+        showMessage(`✅ تم استلام طلب سحب ${amount} USDT. سيتم معالجته خلال 24 ساعة.`, 'success');
+        document.getElementById('withdrawAmount').value = '';
+        document.getElementById('walletAddress').value = '';
+        loadUserData();
+      }
+    };
+
+    document.getElementById('profitBtn').onclick = async () => {
+      const profit = (userData?.active_deposit || 0) * 0.02;
+      
+      if (profit <= 0) {
+        showMessage('⚠️ لا يوجد استثمار نشط لحساب الأرباح', 'error');
+        return;
+      }
+      
+      const newBalance = (userData?.available_balance || 0) + profit;
+      await supabase.from('users').update({ available_balance: newBalance }).eq('id', userData.id);
+      showMessage(`✅ تم إضافة ${profit.toFixed(2)} USDT كأرباح يومية!`, 'success');
+      loadUserData();
+    };
+
+    loadUserData();
+
+    supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') window.location.href = '/index.html';
+    });
+  </script>
+</body>
+</html>
