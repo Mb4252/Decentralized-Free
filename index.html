@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>منصة الاستثمار | تسجيل الدخول</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .card {
+      background: #0f3460;
+      border-radius: 24px;
+      padding: 40px;
+      max-width: 500px;
+      width: 100%;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    }
+    h1 { font-size: 32px; color: #e94560; text-align: center; margin-bottom: 8px; }
+    .subtitle { color: #a0aec0; text-align: center; margin-bottom: 32px; }
+    .tabs { display: flex; gap: 16px; margin-bottom: 24px; }
+    .tab { flex: 1; padding: 12px; text-align: center; background: #1a1a2e; border: none; border-radius: 12px; color: #a0aec0; cursor: pointer; font-size: 16px; }
+    .tab.active { background: #e94560; color: white; }
+    input {
+      width: 100%;
+      padding: 14px;
+      margin-bottom: 16px;
+      border-radius: 12px;
+      border: none;
+      background: #1a1a2e;
+      color: white;
+      font-size: 16px;
+    }
+    button {
+      width: 100%;
+      padding: 14px;
+      background: #e94560;
+      color: white;
+      border: none;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .message { margin-top: 16px; padding: 12px; border-radius: 8px; text-align: center; font-size: 14px; }
+    .success { background: #22c55e20; border: 1px solid #22c55e; color: #22c55e; }
+    .error { background: #ef444420; border: 1px solid #ef4444; color: #ef4444; }
+    .referral-code {
+      background: #1a1a2e;
+      padding: 10px;
+      border-radius: 8px;
+      text-align: center;
+      margin-bottom: 16px;
+      font-size: 14px;
+      color: #e94560;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>💰 منصة الاستثمار</h1>
+    <p class="subtitle">استثمر بأمان | أرباح يومية</p>
+    
+    <div class="tabs">
+      <button class="tab active" id="loginTab">تسجيل الدخول</button>
+      <button class="tab" id="registerTab">إنشاء حساب</button>
+    </div>
+
+    <!-- نموذج تسجيل الدخول -->
+    <div id="loginForm">
+      <input type="email" id="loginEmail" placeholder="البريد الإلكتروني">
+      <input type="password" id="loginPassword" placeholder="كلمة المرور">
+      <button id="doLoginBtn">تسجيل الدخول</button>
+    </div>
+
+    <!-- نموذج إنشاء حساب -->
+    <div id="registerForm" style="display: none;">
+      <input type="text" id="regName" placeholder="اسم المستخدم">
+      <input type="email" id="regEmail" placeholder="البريد الإلكتروني">
+      <input type="password" id="regPassword" placeholder="كلمة المرور">
+      <input type="text" id="regReferral" placeholder="رمز الدعوة (اختياري)">
+      <button id="doRegisterBtn">إنشاء حساب</button>
+      <div class="referral-code" id="generatedReferral" style="display: none;">
+        ✨ رمز الدعوة الخاص بك: <span id="userReferralCode"></span>
+      </div>
+    </div>
+
+    <div id="message"></div>
+  </div>
+
+  <script>
+    // إعداد Supabase
+    const SUPABASE_URL = 'https://ixnjzzhxmxjtcnbqaomq.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_b2QCsdG8mtoRKVyLdhqAdw_UbxR3OI9';
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // توليد رمز دعوة عشوائي
+    function generateReferralCode() {
+      return Math.random().toString(36).substring(2, 10).toUpperCase();
+    }
+
+    // التبديل بين التبويبات
+    document.getElementById('loginTab').onclick = () => {
+      document.getElementById('loginTab').classList.add('active');
+      document.getElementById('registerTab').classList.remove('active');
+      document.getElementById('loginForm').style.display = 'block';
+      document.getElementById('registerForm').style.display = 'none';
+    };
+
+    document.getElementById('registerTab').onclick = () => {
+      document.getElementById('registerTab').classList.add('active');
+      document.getElementById('loginTab').classList.remove('active');
+      document.getElementById('loginForm').style.display = 'none';
+      document.getElementById('registerForm').style.display = 'block';
+    };
+
+    function showMessage(msg, type) {
+      const div = document.getElementById('message');
+      div.innerHTML = `<div class="message ${type}">${msg}</div>`;
+      setTimeout(() => div.innerHTML = '', 5000);
+    }
+
+    // تسجيل الدخول
+    document.getElementById('doLoginBtn').onclick = async () => {
+      const email = document.getElementById('loginEmail').value;
+      const password = document.getElementById('loginPassword').value;
+
+      if (!email || !password) {
+        showMessage('⚠️ يرجى إدخال البريد الإلكتروني وكلمة المرور', 'error');
+        return;
+      }
+
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+      if (error) {
+        showMessage('❌ ' + error.message, 'error');
+      } else {
+        showMessage('✅ تم تسجيل الدخول بنجاح! جاري التحويل...', 'success');
+        localStorage.setItem('user', JSON.stringify(data.user));
+        setTimeout(() => { window.location.href = '/dashboard.html'; }, 1500);
+      }
+    };
+
+    // إنشاء حساب جديد
+    document.getElementById('doRegisterBtn').onclick = async () => {
+      const name = document.getElementById('regName').value;
+      const email = document.getElementById('regEmail').value;
+      const password = document.getElementById('regPassword').value;
+      const referralCode = document.getElementById('regReferral').value;
+
+      if (!name || !email || !password) {
+        showMessage('⚠️ يرجى ملء جميع الحقول المطلوبة', 'error');
+        return;
+      }
+
+      if (password.length < 6) {
+        showMessage('⚠️ كلمة المرور يجب أن تكون 6 أحرف على الأقل', 'error');
+        return;
+      }
+
+      // التحقق من رمز الدعوة (إذا وجد)
+      let referrerId = null;
+      if (referralCode) {
+        const { data: referrer } = await supabase
+          .from('users')
+          .select('id')
+          .eq('referral_code', referralCode.toUpperCase())
+          .single();
+        
+        if (referrer) {
+          referrerId = referrer.id;
+        } else {
+          showMessage('⚠️ رمز الدعوة غير صحيح', 'error');
+          return;
+        }
+      }
+
+      // إنشاء المستخدم في Supabase Auth
+      const { data, error } = await supabase.auth.signUp({
+        email: email,
+        password: password,
+      });
+
+      if (error) {
+        showMessage('❌ ' + error.message, 'error');
+        return;
+      }
+
+      // إضافة المستخدم إلى جدول users
+      const newReferralCode = generateReferralCode();
+      const { error: insertError } = await supabase
+        .from('users')
+        .insert({
+          id: data.user.id,
+          email: email,
+          name: name,
+          referral_code: newReferralCode,
+          referrer_id: referrerId,
+          available_balance: 0,
+          active_deposit: 0
+        });
+
+      if (insertError) {
+        showMessage('❌ حدث خطأ في إنشاء الحساب', 'error');
+      } else {
+        document.getElementById('userReferralCode').innerText = newReferralCode;
+        document.getElementById('generatedReferral').style.display = 'block';
+        showMessage(`✅ تم إنشاء الحساب بنجاح! رمز الدعوة الخاص بك: ${newReferralCode}`, 'success');
+        
+        // تفريغ الحقول
+        document.getElementById('regName').value = '';
+        document.getElementById('regEmail').value = '';
+        document.getElementById('regPassword').value = '';
+        document.getElementById('regReferral').value = '';
+        
+        // التحول إلى نموذج تسجيل الدخول بعد 3 ثواني
+        setTimeout(() => {
+          document.getElementById('loginTab').click();
+        }, 3000);
+      }
+    };
+  </script>
+</body>
+</html>
