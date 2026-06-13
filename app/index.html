@@ -5,49 +5,43 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
   <title>منصة الاستثمار | تسجيل الدخول</title>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
     body {
       min-height: 100vh;
-      background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%);
-      font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0a0a0f;
+      background-image: 
+        linear-gradient(rgba(0, 255, 100, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 255, 100, 0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       display: flex;
       align-items: center;
       justify-content: center;
       padding: 16px;
     }
 
-    /* Main Card */
+    /* Glassmorphism Card */
     .card {
-      background: rgba(26, 26, 46, 0.95);
-      backdrop-filter: blur(20px);
+      background: rgba(20, 20, 35, 0.6);
+      backdrop-filter: blur(12px);
       border-radius: 32px;
       padding: 32px 28px;
       max-width: 500px;
       width: 100%;
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(233, 69, 96, 0.2);
+      border: 1px solid rgba(0, 255, 100, 0.2);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 255, 100, 0.1);
       animation: fadeInUp 0.6s ease-out;
     }
 
     @keyframes fadeInUp {
-      from {
-        opacity: 0;
-        transform: translateY(30px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
     }
 
-    /* Logo Section */
     .logo {
       text-align: center;
-      margin-bottom: 28px;
+      margin-bottom: 32px;
     }
     .logo-icon {
       font-size: 56px;
@@ -55,15 +49,14 @@
     }
     .logo h1 {
       font-size: 28px;
-      color: #e94560;
-      background: linear-gradient(135deg, #e94560, #ff6b6b);
+      background: linear-gradient(135deg, #00ff66, #00ccff);
       -webkit-background-clip: text;
       background-clip: text;
       color: transparent;
       margin-bottom: 6px;
     }
     .logo p {
-      color: #a0aec0;
+      color: #8899aa;
       font-size: 13px;
     }
 
@@ -72,27 +65,27 @@
       display: flex;
       gap: 12px;
       margin-bottom: 28px;
-      background: #0f0f1a;
+      background: rgba(10, 10, 20, 0.8);
       padding: 5px;
       border-radius: 60px;
     }
     .tab {
       flex: 1;
-      padding: 10px;
+      padding: 12px;
       text-align: center;
       background: transparent;
       border: none;
       border-radius: 50px;
-      color: #a0aec0;
+      color: #8899aa;
       cursor: pointer;
       font-size: 15px;
       font-weight: 600;
       transition: all 0.3s;
     }
     .tab.active {
-      background: linear-gradient(135deg, #e94560, #ff6b6b);
-      color: white;
-      box-shadow: 0 4px 15px rgba(233, 69, 96, 0.3);
+      background: linear-gradient(135deg, #00ff66, #00ccff);
+      color: #0a0a0f;
+      box-shadow: 0 4px 15px rgba(0, 255, 102, 0.3);
     }
 
     /* Input Groups */
@@ -102,7 +95,7 @@
     }
     .input-group label {
       display: block;
-      color: #a0aec0;
+      color: #8899aa;
       margin-bottom: 6px;
       font-size: 13px;
       font-weight: 500;
@@ -114,41 +107,39 @@
     }
     .input-wrapper input {
       width: 100%;
-      padding: 12px 16px;
-      padding-right: 42px;
-      border-radius: 14px;
-      border: 1px solid #2d3748;
-      background: #0f0f1a;
+      padding: 14px 16px;
+      padding-right: 45px;
+      border-radius: 16px;
+      border: 1px solid rgba(0, 255, 100, 0.3);
+      background: rgba(10, 10, 20, 0.8);
       color: white;
       font-size: 14px;
       transition: all 0.3s;
     }
     .input-wrapper input:focus {
       outline: none;
-      border-color: #e94560;
-      box-shadow: 0 0 0 3px rgba(233, 69, 96, 0.2);
+      border-color: #00ff66;
+      box-shadow: 0 0 0 3px rgba(0, 255, 102, 0.2);
     }
     .input-icon {
       position: absolute;
-      right: 14px;
+      right: 16px;
       top: 50%;
       transform: translateY(-50%);
       font-size: 16px;
     }
     .toggle-password {
       position: absolute;
-      left: 14px;
+      left: 16px;
       top: 50%;
       transform: translateY(-50%);
       cursor: pointer;
-      color: #a0aec0;
+      color: #8899aa;
       font-size: 16px;
       transition: color 0.3s;
       z-index: 2;
     }
-    .toggle-password:hover {
-      color: #e94560;
-    }
+    .toggle-password:hover { color: #00ff66; }
 
     /* Password Strength */
     .password-strength {
@@ -158,23 +149,15 @@
       border-radius: 4px;
       overflow: hidden;
     }
-    .strength-bar {
-      width: 0%;
-      height: 100%;
-      transition: width 0.3s, background 0.3s;
-    }
-    .strength-text {
-      font-size: 10px;
-      margin-top: 5px;
-      color: #a0aec0;
-    }
+    .strength-bar { width: 0%; height: 100%; transition: width 0.3s, background 0.3s; }
+    .strength-text { font-size: 10px; margin-top: 5px; color: #8899aa; }
 
     /* Buttons */
     .btn-primary {
       width: 100%;
-      padding: 12px;
-      background: linear-gradient(135deg, #e94560, #ff6b6b);
-      color: white;
+      padding: 14px;
+      background: linear-gradient(135deg, #00ff66, #00ccff);
+      color: #0a0a0f;
       border: none;
       border-radius: 60px;
       font-size: 15px;
@@ -185,17 +168,13 @@
     }
     .btn-primary:hover {
       transform: translateY(-2px);
-      box-shadow: 0 10px 25px -5px rgba(233, 69, 96, 0.4);
-    }
-    .btn-primary:disabled {
-      opacity: 0.6;
-      transform: none;
+      box-shadow: 0 10px 25px -5px rgba(0, 255, 102, 0.4);
     }
     .link-btn {
       width: 100%;
       background: transparent;
-      border: 1px solid rgba(233, 69, 96, 0.5);
-      color: #e94560;
+      border: 1px solid rgba(0, 255, 102, 0.5);
+      color: #00ff66;
       padding: 12px;
       border-radius: 60px;
       font-size: 13px;
@@ -204,15 +183,15 @@
       margin-top: 12px;
     }
     .link-btn:hover {
-      background: rgba(233, 69, 96, 0.1);
-      border-color: #e94560;
+      background: rgba(0, 255, 102, 0.1);
+      border-color: #00ff66;
     }
 
     /* Message */
     .message {
       margin-top: 18px;
-      padding: 10px;
-      border-radius: 14px;
+      padding: 12px;
+      border-radius: 16px;
       text-align: center;
       font-size: 13px;
       animation: fadeIn 0.3s;
@@ -221,23 +200,11 @@
       from { opacity: 0; transform: translateY(-10px); }
       to { opacity: 1; transform: translateY(0); }
     }
-    .success {
-      background: rgba(34, 197, 94, 0.15);
-      border: 1px solid #22c55e;
-      color: #22c55e;
-    }
-    .error {
-      background: rgba(239, 68, 68, 0.15);
-      border: 1px solid #ef4444;
-      color: #ef4444;
-    }
-    .info {
-      background: rgba(59, 130, 246, 0.15);
-      border: 1px solid #3b82f6;
-      color: #3b82f6;
-    }
+    .success { background: rgba(0, 255, 102, 0.15); border: 1px solid #00ff66; color: #00ff66; }
+    .error { background: rgba(255, 68, 68, 0.15); border: 1px solid #ff4444; color: #ff4444; }
+    .info { background: rgba(0, 204, 255, 0.15); border: 1px solid #00ccff; color: #00ccff; }
 
-    /* Stats Cards */
+    /* Stats */
     .stats {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -245,57 +212,36 @@
       margin-top: 28px;
     }
     .stat-box {
-      background: rgba(15, 15, 26, 0.8);
-      padding: 14px;
-      border-radius: 18px;
-      text-align: center;
+      background: rgba(10, 10, 20, 0.8);
       backdrop-filter: blur(10px);
-      border: 1px solid rgba(233, 69, 96, 0.2);
+      padding: 14px;
+      border-radius: 20px;
+      text-align: center;
+      border: 1px solid rgba(0, 255, 102, 0.2);
       transition: transform 0.3s;
     }
-    .stat-box:hover {
-      transform: translateY(-2px);
-      border-color: rgba(233, 69, 96, 0.5);
-    }
-    .stat-number {
-      display: block;
-      font-size: 22px;
-      font-weight: bold;
-      color: #e94560;
-    }
-    .stat-label {
-      font-size: 11px;
-      color: #a0aec0;
-    }
+    .stat-box:hover { transform: translateY(-2px); border-color: rgba(0, 255, 102, 0.5); }
+    .stat-number { display: block; font-size: 22px; font-weight: bold; color: #00ff66; }
+    .stat-label { font-size: 11px; color: #8899aa; }
 
-    /* Hidden Class */
-    .hidden {
-      display: none;
-    }
+    .hidden { display: none; }
 
-    /* Responsive */
     @media (max-width: 480px) {
       .card { padding: 24px 20px; }
       .logo h1 { font-size: 24px; }
-      .logo-icon { font-size: 48px; }
-      .tab { font-size: 13px; padding: 8px; }
-      .input-wrapper input { padding: 10px 14px; padding-right: 38px; font-size: 13px; }
-      .btn-primary { padding: 10px; font-size: 14px; }
-      .stat-number { font-size: 18px; }
+      .tab { font-size: 13px; padding: 10px; }
+      .btn-primary { padding: 12px; }
     }
   </style>
 </head>
 <body>
-
   <div class="card">
-    <!-- Logo -->
     <div class="logo">
       <div class="logo-icon">💰</div>
-      <h1>منصة الاستثمار</h1>
+      <h1>CryptoInvest</h1>
       <p>استثمر بأمان | أرباح يومية تصل إلى 3.5%</p>
     </div>
 
-    <!-- Tabs -->
     <div class="tabs">
       <button class="tab active" id="loginTab">تسجيل الدخول</button>
       <button class="tab" id="registerTab">إنشاء حساب</button>
@@ -344,9 +290,7 @@
           <input type="password" id="regPassword" placeholder="********" onkeyup="checkPasswordStrength()">
           <span class="toggle-password" onclick="togglePassword('regPassword', this)">👁️</span>
         </div>
-        <div class="password-strength">
-          <div class="strength-bar" id="strengthBar"></div>
-        </div>
+        <div class="password-strength"><div class="strength-bar" id="strengthBar"></div></div>
         <div class="strength-text" id="strengthText"></div>
       </div>
       <div class="input-group">
@@ -365,65 +309,44 @@
         </div>
       </div>
       <button class="btn-primary" id="doRegisterBtn">إنشاء حساب</button>
-      <div id="generatedReferral" class="info hidden" style="margin-top: 14px; padding: 10px; text-align: center; border-radius: 14px; font-size: 13px;">
+      <div id="generatedReferral" class="info hidden" style="margin-top: 14px; padding: 10px; text-align: center; border-radius: 14px;">
         ✨ رمز الدعوة الخاص بك: <strong id="userReferralCode"></strong>
       </div>
     </div>
 
     <div id="message"></div>
 
-    <!-- Stats -->
     <div class="stats">
-      <div class="stat-box">
-        <span class="stat-number">5,941+</span>
-        <span class="stat-label">مستخدم نشط</span>
-      </div>
-      <div class="stat-box">
-        <span class="stat-number">$64K+</span>
-        <span class="stat-label">إجمالي الأرباح</span>
-      </div>
+      <div class="stat-box"><span class="stat-number">5,941+</span><span class="stat-label">مستخدم نشط</span></div>
+      <div class="stat-box"><span class="stat-number">$64K+</span><span class="stat-label">إجمالي الأرباح</span></div>
     </div>
   </div>
 
   <script>
     const API_URL = window.location.origin;
 
-    // ========== Password Toggle Function ==========
     function togglePassword(inputId, element) {
       const input = document.getElementById(inputId);
-      if (input.type === 'password') {
-        input.type = 'text';
-        element.innerHTML = '🙈';
-      } else {
-        input.type = 'password';
-        element.innerHTML = '👁️';
-      }
+      if (input.type === 'password') { input.type = 'text'; element.innerHTML = '🙈'; }
+      else { input.type = 'password'; element.innerHTML = '👁️'; }
     }
 
-    // ========== Password Strength Checker ==========
     function checkPasswordStrength() {
       const password = document.getElementById('regPassword').value;
       const strengthBar = document.getElementById('strengthBar');
       const strengthText = document.getElementById('strengthText');
-      
-      let strength = 0;
-      let message = '';
-      let color = '#ef4444';
-      
+      let strength = 0, message = '', color = '#ff4444';
       if (password.length >= 4) strength++;
       if (password.length >= 8) strength++;
       if (/[A-Z]/.test(password)) strength++;
       if (/[0-9]/.test(password)) strength++;
       if (/[^A-Za-z0-9]/.test(password)) strength++;
-      
       const percent = (strength / 5) * 100;
       strengthBar.style.width = percent + '%';
-      
-      if (strength === 0 || strength === 1) { message = 'ضعيف'; color = '#ef4444'; }
-      else if (strength === 2) { message = 'متوسط'; color = '#f97316'; }
-      else if (strength === 3) { message = 'جيد'; color = '#eab308'; }
-      else { message = 'قوي'; color = '#22c55e'; }
-      
+      if (strength === 0 || strength === 1) { message = 'ضعيف'; color = '#ff4444'; }
+      else if (strength === 2) { message = 'متوسط'; color = '#ffaa00'; }
+      else if (strength === 3) { message = 'جيد'; color = '#00ccff'; }
+      else { message = 'قوي'; color = '#00ff66'; }
       strengthBar.style.background = color;
       strengthText.innerHTML = `قوة كلمة المرور: ${message}`;
       strengthText.style.color = color;
@@ -435,7 +358,6 @@
       setTimeout(() => div.innerHTML = '', 5000);
     }
 
-    // ========== Tabs ==========
     document.getElementById('loginTab').onclick = () => {
       document.getElementById('loginTab').classList.add('active');
       document.getElementById('registerTab').classList.remove('active');
@@ -452,83 +374,47 @@
       document.getElementById('message').innerHTML = '';
     };
 
-    // ========== Login ==========
     document.getElementById('doLoginBtn').onclick = async () => {
       const email = document.getElementById('loginEmail').value;
       const password = document.getElementById('loginPassword').value;
-
-      if (!email || !password) {
-        showMessage('⚠️ يرجى إدخال البريد الإلكتروني وكلمة المرور', 'error');
-        return;
-      }
-
+      if (!email || !password) { showMessage('⚠️ يرجى إدخال البريد الإلكتروني وكلمة المرور', 'error'); return; }
       try {
         const response = await fetch(`${API_URL}/api/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, password })
         });
-        
         const data = await response.json();
-        
         if (data.success) {
           localStorage.setItem('userId', data.user.id);
           showMessage('✅ تم تسجيل الدخول بنجاح! جاري التحويل...', 'success');
           setTimeout(() => { window.location.href = '/dashboard.html'; }, 1500);
-        } else {
-          showMessage('❌ ' + (data.error || 'فشل تسجيل الدخول'), 'error');
-        }
-      } catch (error) {
-        showMessage('❌ خطأ في الاتصال بالخادم', 'error');
-      }
+        } else { showMessage('❌ ' + (data.error || 'فشل تسجيل الدخول'), 'error'); }
+      } catch (error) { showMessage('❌ خطأ في الاتصال بالخادم', 'error'); }
     };
 
-    // ========== Register ==========
     document.getElementById('doRegisterBtn').onclick = async () => {
       const name = document.getElementById('regName').value;
       const email = document.getElementById('regEmail').value;
       const password = document.getElementById('regPassword').value;
       const confirmPassword = document.getElementById('regConfirmPassword').value;
       const referralCode = document.getElementById('regReferral').value;
-
-      if (!name || !email || !password || !confirmPassword) {
-        showMessage('⚠️ يرجى ملء جميع الحقول المطلوبة', 'error');
-        return;
-      }
-
-      if (password !== confirmPassword) {
-        showMessage('⚠️ كلمة المرور وتأكيدها غير متطابقين', 'error');
-        return;
-      }
-
-      if (password.length < 4) {
-        showMessage('⚠️ كلمة المرور يجب أن تكون 4 أحرف على الأقل', 'error');
-        return;
-      }
-
+      if (!name || !email || !password || !confirmPassword) { showMessage('⚠️ يرجى ملء جميع الحقول المطلوبة', 'error'); return; }
+      if (password !== confirmPassword) { showMessage('⚠️ كلمة المرور وتأكيدها غير متطابقين', 'error'); return; }
+      if (password.length < 4) { showMessage('⚠️ كلمة المرور يجب أن تكون 4 أحرف على الأقل', 'error'); return; }
       try {
         const response = await fetch(`${API_URL}/api/register`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name, email, password, referralCode })
         });
-        
         const data = await response.json();
-        
         if (data.success) {
           localStorage.setItem('userId', data.user.id);
           document.getElementById('userReferralCode').innerText = data.referral_code;
           document.getElementById('generatedReferral').classList.remove('hidden');
           showMessage(`✅ تم إنشاء الحساب بنجاح! رمز الدعوة: ${data.referral_code}`, 'success');
-          setTimeout(() => { 
-            window.location.href = '/dashboard.html';
-          }, 2000);
-        } else {
-          showMessage('❌ ' + (data.error || 'فشل إنشاء الحساب'), 'error');
-        }
-      } catch (error) {
-        showMessage('❌ خطأ في الاتصال بالخادم', 'error');
-      }
+          setTimeout(() => { window.location.href = '/dashboard.html'; }, 2000);
+        } else { showMessage('❌ ' + (data.error || 'فشل إنشاء الحساب'), 'error'); }
+      } catch (error) { showMessage('❌ خطأ في الاتصال بالخادم', 'error'); }
     };
   </script>
 </body>
