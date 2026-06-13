@@ -18,16 +18,22 @@
       justify-content: space-between;
       align-items: center;
       border-bottom: 1px solid #2d3748;
+      flex-wrap: wrap;
+      gap: 16px;
     }
     .logo { font-size: 24px; font-weight: bold; color: #e94560; }
+    .user-info { display: flex; align-items: center; gap: 16px; }
     .logout-btn { background: transparent; border: 1px solid #ef4444; color: #ef4444; padding: 8px 16px; border-radius: 8px; cursor: pointer; }
+    .nav-links { display: flex; gap: 8px; background: #1a1a2e; padding: 8px 32px; border-bottom: 1px solid #2d3748; flex-wrap: wrap; }
+    .nav-link { background: transparent; border: none; color: #a0aec0; padding: 8px 20px; cursor: pointer; font-size: 14px; }
+    .nav-link.active { color: #e94560; border-bottom: 2px solid #e94560; }
     .content { max-width: 1200px; margin: 0 auto; padding: 32px; }
     .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 24px; margin-bottom: 32px; }
     .stat-card { background: #1a1a2e; border-radius: 16px; padding: 24px; border: 1px solid #2d3748; color: white; }
-    .stat-value { font-size: 32px; font-weight: bold; color: #e94560; }
+    .stat-value { font-size: 28px; font-weight: bold; color: #e94560; }
     .card { background: #1a1a2e; border-radius: 16px; padding: 24px; border: 1px solid #2d3748; margin-bottom: 24px; }
-    .card-title { color: white; font-size: 20px; margin-bottom: 16px; }
-    input {
+    .card-title { color: white; font-size: 20px; margin-bottom: 16px; border-right: 3px solid #e94560; padding-right: 12px; }
+    input, select {
       width: 100%;
       padding: 12px;
       margin-bottom: 12px;
@@ -45,73 +51,96 @@
     }
     .deposit-btn { background: #22c55e; color: white; width: 100%; }
     .withdraw-btn { background: #ef4444; color: white; width: 100%; }
+    .package-btn { background: #e94560; color: white; margin-top: 12px; width: 100%; }
     .message { padding: 12px; border-radius: 8px; margin-bottom: 24px; text-align: center; }
     .success { background: #22c55e20; border: 1px solid #22c55e; color: #22c55e; }
     .error { background: #ef444420; border: 1px solid #ef4444; color: #ef4444; }
+    .warning { background: #fbbf2420; border: 1px solid #fbbf24; color: #fbbf24; }
+    .packages-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-top: 16px; }
+    .package-card { background: #0f0f1a; border-radius: 12px; padding: 20px; text-align: center; border: 1px solid #2d3748; cursor: pointer; transition: all 0.3s; }
+    .package-card:hover { border-color: #e94560; transform: translateY(-2px); }
+    .package-card.selected { border-color: #e94560; background: #e9456010; }
+    .package-name { color: #e94560; font-size: 18px; font-weight: bold; }
+    .package-price { font-size: 24px; font-weight: bold; color: white; margin: 10px 0; }
+    .package-roi { color: #22c55e; font-size: 14px; }
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .modal-content {
+      background: #1a1a2e;
+      border-radius: 24px;
+      padding: 32px;
+      max-width: 500px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    .modal-content h3 { color: #e94560; margin-bottom: 16px; }
+    .modal-content p { color: #a0aec0; margin-bottom: 12px; line-height: 1.6; }
+    .close-modal { background: #e94560; margin-top: 20px; width: 100%; }
+    .hidden { display: none; }
   </style>
 </head>
 <body>
   <div class="navbar">
     <h1 class="logo">💰 منصة الاستثمار</h1>
-    <button class="logout-btn" id="logoutBtn">تسجيل خروج</button>
+    <div class="user-info">
+      <span id="userName" style="color: #a0aec0;"></span>
+      <button class="logout-btn" id="logoutBtn">تسجيل خروج</button>
+    </div>
   </div>
 
-  <div class="content">
-    <div id="messageDiv"></div>
+  <div class="nav-links">
+    <button class="nav-link active" data-page="dashboard">🏠 الرئيسية</button>
+    <button class="nav-link" data-page="deposit">📥 الإيداع</button>
+    <button class="nav-link" data-page="withdraw">📤 السحب</button>
+    <button class="nav-link" data-page="referrals">👥 الإحالات</button>
+    <button class="nav-link" data-page="packages">💎 الباقات</button>
+    <button class="nav-link" data-page="instructions">📖 التعليمات</button>
+  </div>
 
-    <div class="stats-grid">
-      <div class="stat-card">
-        <p>💰 الاستثمار النشط</p>
-        <p class="stat-value" id="activeDeposit">0 USDT</p>
-        <p style="font-size: 12px; color: #a0aec0;">العائد: 2% يومياً</p>
-      </div>
-      <div class="stat-card">
-        <p>💎 الرصيد المتاح</p>
-        <p class="stat-value" id="availableBalance">0 USDT</p>
-        <p style="font-size: 12px; color: #a0aec0;">قابل للسحب</p>
-      </div>
+  <div class="content" id="mainContent"></div>
+
+  <div id="instructionsModal" class="modal hidden">
+    <div class="modal-content">
+      <h3>📖 تعليمات المنصة</h3>
+      <p>1. الحد الأدنى للإيداع: 10 USDT</p>
+      <p>2. الحد الأدنى للسحب: 0.5 USDT</p>
+      <p>3. نسبة الربح اليومي: 2% - 3.5% حسب الباقة</p>
+      <p>4. يتم حساب الأرباح يومياً في منتصف الليل</p>
+      <p>5. طلبات الإيداع والسحب تحتاج موافقة المدير</p>
+      <p>6. الحد الأقصى للسحب اليومي: 50 USDT</p>
+      <p>7. عمولة الإحالة: 10% من استثمار المدعو</p>
+      <br>
+      <h3>⚠️ إخلاء المسؤولية</h3>
+      <p>الاستثمار في العملات الرقمية يحمل مخاطر عالية. هذه منصة تجريبية لأغراض تعليمية. لا نضمن أي أرباح، والمشاركة تتم على مسؤوليتك الشخصية.</p>
+      <button class="close-modal" id="closeInstructions">موافق</button>
     </div>
-
-    <div class="card">
-      <h2 class="card-title">📥 إيداع USDT</h2>
-      <div style="background: #0f0f1a; padding: 12px; border-radius: 8px; margin-bottom: 16px;">
-        <p style="color: #a0aec0; font-size: 12px;">محفظة الإيداع (شبكة BSC):</p>
-        <code style="color: #e94560; word-break: break-all;">0x987cfde723a87b5ed33329eebe0595a4416b848f</code>
-        <button onclick="navigator.clipboard.writeText('0x987cfde723a87b5ed33329eebe0595a4416b848f')" style="margin-top: 8px; padding: 6px 12px; background: #2d3748; color: white; font-size: 12px;">📋 نسخ</button>
-      </div>
-      <input type="number" id="depositAmount" placeholder="المبلغ (USDT) - الحد الأدنى 10">
-      <button class="deposit-btn" id="depositBtn">تقديم طلب إيداع</button>
-    </div>
-
-    <div class="card">
-      <h2 class="card-title">📤 سحب الأرباح</h2>
-      <p id="balanceInfo" style="color: #a0aec0; margin-bottom: 16px;">الرصيد المتاح: 0 USDT</p>
-      <input type="number" id="withdrawAmount" placeholder="المبلغ (USDT) - الحد الأدنى 0.5">
-      <input type="text" id="walletAddress" placeholder="عنوان محفظة BSC">
-      <button class="withdraw-btn" id="withdrawBtn">طلب سحب</button>
-    </div>
-
-    <div class="card">
-      <h2 class="card-title">👥 رمز الدعوة الخاص بك</h2>
-      <p id="referralCode" style="text-align: center; font-size: 24px; font-weight: bold; color: #e94560;"></p>
-      <button onclick="navigator.clipboard.writeText(document.getElementById('referralCode').innerText)" style="width: 100%; background: #2d3748; color: white;">📋 نسخ رمز الدعوة</button>
-    </div>
-
-    <div class="card">
-      <h2 class="card-title">📊 خطط الاستثمار</h2>
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px;">
-        <div style="background: #0f0f1a; padding: 16px; border-radius: 12px; text-align: center;"><h3 style="color: #e94560;">مبتدئ</h3><p style="font-size: 24px; font-weight: bold;">2%</p><p>من 10 USDT</p></div>
-        <div style="background: #0f0f1a; padding: 16px; border-radius: 12px; text-align: center;"><h3 style="color: #e94560;">محترف</h3><p style="font-size: 24px; font-weight: bold;">2.5%</p><p>من 100 USDT</p></div>
-        <div style="background: #0f0f1a; padding: 16px; border-radius: 12px; text-align: center;"><h3 style="color: #e94560;">VIP</h3><p style="font-size: 24px; font-weight: bold;">3%</p><p>من 500 USDT</p></div>
-        <div style="background: #0f0f1a; padding: 16px; border-radius: 12px; text-align: center;"><h3 style="color: #e94560;">دياموند</h3><p style="font-size: 24px; font-weight: bold;">3.5%</p><p>من 1000 USDT</p></div>
-      </div>
-    </div>
-
-    <button id="profitBtn" style="width: 100%; background: #e94560; color: white; margin-top: 24px;">🎁 احصل على أرباح اليوم</button>
   </div>
 
   <script>
     let currentUser = null;
+    let users = JSON.parse(localStorage.getItem('users') || '[]');
+    let depositRequests = JSON.parse(localStorage.getItem('depositRequests') || '[]');
+    let withdrawRequests = JSON.parse(localStorage.getItem('withdrawRequests') || '[]');
+
+    const packages = {
+      basic: { name: 'عادي', price: 0, roi: 2, daily_limit: 10, withdraw_limit: 50 },
+      silver: { name: 'فضي', price: 50, roi: 2.2, daily_limit: 20, withdraw_limit: 100 },
+      gold: { name: 'ذهبي', price: 100, roi: 2.5, daily_limit: 50, withdraw_limit: 200 },
+      platinum: { name: 'بلاتيني', price: 250, roi: 2.8, daily_limit: 100, withdraw_limit: 400 },
+      diamond: { name: 'ماسي', price: 500, roi: 3.2, daily_limit: 200, withdraw_limit: 800 },
+      vip: { name: 'VIP', price: 1000, roi: 3.5, daily_limit: 500, withdraw_limit: 2000 }
+    };
 
     function loadUser() {
       const user = localStorage.getItem('currentUser');
@@ -120,90 +149,311 @@
         return;
       }
       currentUser = JSON.parse(user);
+      document.getElementById('userName').innerHTML = `مرحباً ${currentUser.name}`;
       
-      document.getElementById('activeDeposit').innerHTML = (currentUser.active_deposit || 0) + ' USDT';
-      document.getElementById('availableBalance').innerHTML = (currentUser.available_balance || 0) + ' USDT';
-      document.getElementById('balanceInfo').innerHTML = `الرصيد المتاح: ${(currentUser.available_balance || 0)} USDT`;
-      document.getElementById('referralCode').innerHTML = currentUser.referral_code || 'XXXXXX';
+      // تحديث المستخدم في localStorage
+      const index = users.findIndex(u => u.id === currentUser.id);
+      if (index !== -1) users[index] = currentUser;
+      localStorage.setItem('users', JSON.stringify(users));
+      
+      checkFirstTime();
     }
 
-    function saveUser() {
-      let users = JSON.parse(localStorage.getItem('users') || '[]');
-      const index = users.findIndex(u => u.id === currentUser.id);
-      if (index !== -1) {
-        users[index] = currentUser;
-        localStorage.setItem('users', JSON.stringify(users));
-        localStorage.setItem('currentUser', JSON.stringify(currentUser));
+    function checkFirstTime() {
+      if (!localStorage.getItem('instructionsShown')) {
+        document.getElementById('instructionsModal').classList.remove('hidden');
       }
     }
 
-    function showMessage(msg, type) {
-      const div = document.getElementById('messageDiv');
-      div.innerHTML = `<div class="message ${type}">${msg}</div>`;
-      setTimeout(() => div.innerHTML = '', 5000);
+    document.getElementById('closeInstructions').onclick = () => {
+      document.getElementById('instructionsModal').classList.add('hidden');
+      localStorage.setItem('instructionsShown', 'true');
+    };
+
+    function saveUser() {
+      const index = users.findIndex(u => u.id === currentUser.id);
+      if (index !== -1) users[index] = currentUser;
+      localStorage.setItem('users', JSON.stringify(users));
+      localStorage.setItem('currentUser', JSON.stringify(currentUser));
     }
+
+    function showMessage(msg, type) {
+      const container = document.getElementById('mainContent');
+      const msgDiv = document.createElement('div');
+      msgDiv.className = `message ${type}`;
+      msgDiv.innerHTML = msg;
+      container.insertBefore(msgDiv, container.firstChild);
+      setTimeout(() => msgDiv.remove(), 5000);
+    }
+
+    function renderDashboard() {
+      const referredUsers = users.filter(u => u.referrer_id === currentUser.id);
+      const groupBalance = referredUsers.reduce((sum, u) => sum + (u.active_deposit || 0), 0);
+      
+      document.getElementById('mainContent').innerHTML = `
+        <div class="stats-grid">
+          <div class="stat-card"><p>💰 الاستثمار النشط</p><p class="stat-value" id="activeDeposit">${(currentUser.active_deposit || 0)} USDT</p><p style="font-size:12px;">العائد: ${packages[currentUser.package].roi}% يومياً</p></div>
+          <div class="stat-card"><p>💎 الرصيد المتاح</p><p class="stat-value" id="availableBalance">${(currentUser.available_balance || 0)} USDT</p><p style="font-size:12px;">قابل للسحب</p></div>
+          <div class="stat-card"><p>📊 إجمالي الإيداعات</p><p class="stat-value">${(currentUser.total_deposited || 0)} USDT</p></div>
+          <div class="stat-card"><p>📤 إجمالي السحوبات</p><p class="stat-value">${(currentUser.total_withdrawn || 0)} USDT</p></div>
+        </div>
+        
+        <div class="card">
+          <h2 class="card-title">📊 إحصائيات الإحالات</h2>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+            <div style="text-align: center;"><p style="color:#a0aec0;">عدد المحالين</p><p style="font-size:28px; font-weight:bold; color:#e94560;">${referredUsers.length}</p></div>
+            <div style="text-align: center;"><p style="color:#a0aec0;">رصيد المجموعة</p><p style="font-size:28px; font-weight:bold; color:#e94560;">${groupBalance} USDT</p></div>
+          </div>
+        </div>
+        
+        <div class="card">
+          <h2 class="card-title">💳 معلومات الحساب</h2>
+          <p><strong>الباقة الحالية:</strong> ${packages[currentUser.package].name}</p>
+          <p><strong>نسبة الربح:</strong> ${packages[currentUser.package].roi}% يومياً</p>
+          <p><strong>حد السحب اليومي:</strong> ${packages[currentUser.package].daily_limit} USDT</p>
+          <p><strong>الحد الأقصى للسحب:</strong> ${packages[currentUser.package].withdraw_limit} USDT</p>
+          <p><strong>رمز الدعوة:</strong> <code style="background:#0f0f1a; padding:4px 8px; border-radius:6px;">${currentUser.referral_code}</code></p>
+        </div>
+      `;
+    }
+
+    function renderDeposit() {
+      document.getElementById('mainContent').innerHTML = `
+        <div class="card">
+          <h2 class="card-title">📥 إيداع USDT</h2>
+          <div style="background: #0f0f1a; padding: 12px; border-radius: 8px; margin-bottom: 16px;">
+            <p style="color: #a0aec0; font-size: 12px;">محفظة الإيداع (شبكة BSC):</p>
+            <code style="color: #e94560; word-break: break-all;">0x987cfde723a87b5ed33329eebe0595a4416b848f</code>
+            <button onclick="navigator.clipboard.writeText('0x987cfde723a87b5ed33329eebe0595a4416b848f')" style="margin-top: 8px; padding: 6px 12px; background: #2d3748; color: white; font-size: 12px;">📋 نسخ</button>
+          </div>
+          <input type="number" id="depositAmount" placeholder="المبلغ (USDT) - الحد الأدنى 10">
+          <button class="deposit-btn" id="doDepositBtn">تقديم طلب إيداع</button>
+          <p style="font-size: 12px; color: #a0aec0; margin-top: 12px;">⚠️ سيتم تفعيل الإيداع بعد موافقة المدير</p>
+        </div>
+        <div class="card">
+          <h2 class="card-title">📋 طلبات الإيداع السابقة</h2>
+          <div id="depositHistory"></div>
+        </div>
+      `;
+      
+      const userDeposits = depositRequests.filter(d => d.user_id === currentUser.id);
+      const historyDiv = document.getElementById('depositHistory');
+      if (userDeposits.length === 0) {
+        historyDiv.innerHTML = '<p style="color:#a0aec0;">لا توجد طلبات</p>';
+      } else {
+        historyDiv.innerHTML = userDeposits.map(d => `
+          <div style="background:#0f0f1a; padding:12px; border-radius:8px; margin-bottom:8px; display:flex; justify-content:space-between;">
+            <span>${d.amount} USDT</span>
+            <span class="${d.status === 'pending' ? 'warning' : d.status === 'approved' ? 'success' : 'error'}" style="padding:2px 8px; border-radius:20px; font-size:12px;">${d.status === 'pending' ? 'قيد الانتظار' : d.status === 'approved' ? 'تم الموافقة' : 'مرفوض'}</span>
+          </div>
+        `).join('');
+      }
+      
+      document.getElementById('doDepositBtn').onclick = () => {
+        const amount = parseFloat(document.getElementById('depositAmount').value);
+        if (!amount || amount < 10) {
+          showMessage('⚠️ الحد الأدنى للإيداع 10 USDT', 'error');
+          return;
+        }
+        
+        depositRequests.push({
+          id: Date.now(),
+          user_id: currentUser.id,
+          amount: amount,
+          status: 'pending',
+          created_at: new Date().toISOString()
+        });
+        localStorage.setItem('depositRequests', JSON.stringify(depositRequests));
+        
+        showMessage(`✅ تم تقديم طلب إيداع بقيمة ${amount} USDT. بانتظار موافقة المدير`, 'success');
+        document.getElementById('depositAmount').value = '';
+        renderDeposit();
+      };
+    }
+
+    function renderWithdraw() {
+      const today = new Date().toISOString().split('T')[0];
+      const todayWithdrawals = withdrawRequests.filter(w => 
+        w.user_id === currentUser.id && 
+        w.created_at?.startsWith(today) && 
+        w.status === 'approved'
+      );
+      const todayWithdrawn = todayWithdrawals.reduce((sum, w) => sum + w.amount, 0);
+      const dailyLimit = packages[currentUser.package].daily_limit;
+      const remainingLimit = dailyLimit - todayWithdrawn;
+      
+      document.getElementById('mainContent').innerHTML = `
+        <div class="card">
+          <h2 class="card-title">📤 سحب الأرباح</h2>
+          <div style="background:#0f0f1a; padding:12px; border-radius:8px; margin-bottom:16px;">
+            <p>💰 الرصيد المتاح: <strong>${(currentUser.available_balance || 0)} USDT</strong></p>
+            <p>📊 حد السحب اليومي المتبقي: <strong>${remainingLimit > 0 ? remainingLimit : 0} USDT</strong></p>
+          </div>
+          <input type="number" id="withdrawAmount" placeholder="المبلغ (USDT) - الحد الأدنى 0.5">
+          <input type="text" id="walletAddress" placeholder="عنوان محفظة BSC">
+          <button class="withdraw-btn" id="doWithdrawBtn">تقديم طلب سحب</button>
+          <p style="font-size: 12px; color: #a0aec0; margin-top: 12px;">⚠️ سيتم صرف السحب بعد موافقة المدير</p>
+        </div>
+        <div class="card">
+          <h2 class="card-title">📋 طلبات السحب السابقة</h2>
+          <div id="withdrawHistory"></div>
+        </div>
+      `;
+      
+      const userWithdrawals = withdrawRequests.filter(w => w.user_id === currentUser.id).reverse();
+      const historyDiv = document.getElementById('withdrawHistory');
+      if (userWithdrawals.length === 0) {
+        historyDiv.innerHTML = '<p style="color:#a0aec0;">لا توجد طلبات</p>';
+      } else {
+        historyDiv.innerHTML = userWithdrawals.map(w => `
+          <div style="background:#0f0f1a; padding:12px; border-radius:8px; margin-bottom:8px; display:flex; justify-content:space-between;">
+            <span>${w.amount} USDT</span>
+            <span class="${w.status === 'pending' ? 'warning' : w.status === 'approved' ? 'success' : 'error'}" style="padding:2px 8px; border-radius:20px; font-size:12px;">${w.status === 'pending' ? 'قيد الانتظار' : w.status === 'approved' ? 'تم الصرف' : 'مرفوض'}</span>
+          </div>
+        `).join('');
+      }
+      
+      document.getElementById('doWithdrawBtn').onclick = () => {
+        const amount = parseFloat(document.getElementById('withdrawAmount').value);
+        const address = document.getElementById('walletAddress').value;
+        
+        if (!amount || amount < 0.5) {
+          showMessage('⚠️ الحد الأدنى للسحب 0.5 USDT', 'error');
+          return;
+        }
+        if (!address) {
+          showMessage('⚠️ يرجى إدخال عنوان محفظة BSC', 'error');
+          return;
+        }
+        if (amount > (currentUser.available_balance || 0)) {
+          showMessage('⚠️ الرصيد غير كافٍ', 'error');
+          return;
+        }
+        if (amount > remainingLimit) {
+          showMessage(`⚠️ تجاوزت حد السحب اليومي (المتبقي: ${remainingLimit} USDT)`, 'error');
+          return;
+        }
+        
+        withdrawRequests.push({
+          id: Date.now(),
+          user_id: currentUser.id,
+          amount: amount,
+          wallet_address: address,
+          status: 'pending',
+          created_at: new Date().toISOString()
+        });
+        localStorage.setItem('withdrawRequests', JSON.stringify(withdrawRequests));
+        
+        showMessage(`✅ تم تقديم طلب سحب بقيمة ${amount} USDT. بانتظار موافقة المدير`, 'success');
+        document.getElementById('withdrawAmount').value = '';
+        document.getElementById('walletAddress').value = '';
+        renderWithdraw();
+      };
+    }
+
+    function renderReferrals() {
+      const referredUsers = users.filter(u => u.referrer_id === currentUser.id);
+      const groupBalance = referredUsers.reduce((sum, u) => sum + (u.active_deposit || 0), 0);
+      
+      document.getElementById('mainContent').innerHTML = `
+        <div class="card">
+          <h2 class="card-title">👥 نظام الإحالات</h2>
+          <div style="background:#0f0f1a; padding:16px; border-radius:12px; text-align:center; margin-bottom:16px;">
+            <p>🔗 رابط الدعوة الخاص بك</p>
+            <code style="display:block; background:#1a1a2e; padding:12px; border-radius:8px; margin:12px 0; word-break:break-all;">${window.location.origin}/register.html?ref=${currentUser.referral_code}</code>
+            <button onclick="navigator.clipboard.writeText('${window.location.origin}/register.html?ref=${currentUser.referral_code}')" style="background:#e94560; color:white;">📋 نسخ الرابط</button>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;">
+            <div style="text-align:center;"><p style="color:#a0aec0;">عدد المحالين</p><p style="font-size:28px; font-weight:bold; color:#e94560;">${referredUsers.length}</p></div>
+            <div style="text-align:center;"><p style="color:#a0aec0;">رصيد المجموعة</p><p style="font-size:28px; font-weight:bold; color:#e94560;">${groupBalance} USDT</p></div>
+          </div>
+          <h3 style="color:white; margin-bottom:12px;">قائمة المحالين</h3>
+          <div id="referredList"></div>
+        </div>
+      `;
+      
+      const listDiv = document.getElementById('referredList');
+      if (referredUsers.length === 0) {
+        listDiv.innerHTML = '<p style="color:#a0aec0;">لا يوجد محالين حتى الآن</p>';
+      } else {
+        listDiv.innerHTML = referredUsers.map(u => `
+          <div style="background:#0f0f1a; padding:12px; border-radius:8px; margin-bottom:8px; display:flex; justify-content:space-between;">
+            <span>${u.name}</span>
+            <span>${u.email}</span>
+            <span>استثمر: ${u.active_deposit || 0} USDT</span>
+          </div>
+        `).join('');
+      }
+    }
+
+    function renderPackages() {
+      document.getElementById('mainContent').innerHTML = `
+        <div class="card">
+          <h2 class="card-title">💎 باقات الاشتراك</h2>
+          <p style="color:#a0aec0; margin-bottom:16px;">كلما ارتفعت الباقة، زادت نسبة الربح وحد السحب اليومي</p>
+          <div class="packages-grid" id="packagesGrid"></div>
+        </div>
+      `;
+      
+      const grid = document.getElementById('packagesGrid');
+      grid.innerHTML = Object.entries(packages).map(([key, pkg]) => `
+        <div class="package-card ${currentUser.package === key ? 'selected' : ''}" data-package="${key}">
+          <div class="package-name">${pkg.name}</div>
+          <div class="package-price">${pkg.price === 0 ? 'مجاني' : pkg.price + ' USDT'}</div>
+          <div class="package-roi">💰 ربح: ${pkg.roi}% يومياً</div>
+          <div class="package-roi">📤 سحب يومي: ${pkg.daily_limit} USDT</div>
+          <div class="package-roi">📤 حد أقصى: ${pkg.withdraw_limit} USDT</div>
+          ${currentUser.package !== key ? `<button class="package-btn" data-package="${key}">ترقية (${pkg.price} USDT)</button>` : '<button disabled style="background:#2d3748; margin-top:12px;">✅ مستخدم حالياً</button>'}
+        </div>
+      `).join('');
+      
+      document.querySelectorAll('.package-btn').forEach(btn => {
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          const pkgKey = btn.getAttribute('data-package');
+          const pkg = packages[pkgKey];
+          if (currentUser.available_balance >= pkg.price) {
+            currentUser.available_balance -= pkg.price;
+            currentUser.package = pkgKey;
+            saveUser();
+            showMessage(`✅ تم الترقية إلى باقة ${pkg.name} بنجاح!`, 'success');
+            renderPackages();
+          } else {
+            showMessage(`⚠️ رصيدك غير كافٍ للترقية إلى ${pkg.name} (تحتاج ${pkg.price} USDT)`, 'error');
+          }
+        };
+      });
+    }
+
+    function renderInstructions() {
+      document.getElementById('instructionsModal').classList.remove('hidden');
+    }
+
+    const pages = {
+      dashboard: renderDashboard,
+      deposit: renderDeposit,
+      withdraw: renderWithdraw,
+      referrals: renderReferrals,
+      packages: renderPackages,
+      instructions: renderInstructions
+    };
+
+    document.querySelectorAll('.nav-link').forEach(link => {
+      link.onclick = () => {
+        document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+        link.classList.add('active');
+        const page = link.getAttribute('data-page');
+        if (pages[page]) pages[page]();
+      };
+    });
 
     document.getElementById('logoutBtn').onclick = () => {
       localStorage.removeItem('currentUser');
       window.location.href = '/';
     };
 
-    document.getElementById('depositBtn').onclick = () => {
-      const amount = parseFloat(document.getElementById('depositAmount').value);
-      if (!amount || amount < 10) {
-        showMessage('⚠️ الحد الأدنى للإيداع 10 USDT', 'error');
-        return;
-      }
-      
-      currentUser.active_deposit = (currentUser.active_deposit || 0) + amount;
-      saveUser();
-      
-      showMessage(`✅ تم تقديم طلب إيداع بقيمة ${amount} USDT. يرجى إرسال المبلغ إلى المحفظة: 0x987cfde723a87b5ed33329eebe0595a4416b848f`, 'success');
-      document.getElementById('depositAmount').value = '';
-      loadUser();
-    };
-
-    document.getElementById('withdrawBtn').onclick = () => {
-      const amount = parseFloat(document.getElementById('withdrawAmount').value);
-      const address = document.getElementById('walletAddress').value;
-      
-      if (!amount || amount < 0.5) {
-        showMessage('⚠️ الحد الأدنى للسحب 0.5 USDT', 'error');
-        return;
-      }
-      if (!address) {
-        showMessage('⚠️ يرجى إدخال عنوان محفظة BSC', 'error');
-        return;
-      }
-      if (amount > (currentUser.available_balance || 0)) {
-        showMessage('⚠️ الرصيد غير كافٍ', 'error');
-        return;
-      }
-      
-      currentUser.available_balance = (currentUser.available_balance || 0) - amount;
-      saveUser();
-      
-      showMessage(`✅ تم استلام طلب سحب ${amount} USDT إلى المحفظة: ${address.substring(0, 10)}...`, 'success');
-      document.getElementById('withdrawAmount').value = '';
-      document.getElementById('walletAddress').value = '';
-      loadUser();
-    };
-
-    document.getElementById('profitBtn').onclick = () => {
-      const profit = (currentUser.active_deposit || 0) * 0.02;
-      if (profit <= 0) {
-        showMessage('⚠️ لا يوجد استثمار نشط لحساب الأرباح', 'error');
-        return;
-      }
-      
-      currentUser.available_balance = (currentUser.available_balance || 0) + profit;
-      saveUser();
-      
-      showMessage(`✅ تم إضافة ${profit.toFixed(2)} USDT كأرباح يومية!`, 'success');
-      loadUser();
-    };
-
     loadUser();
+    renderDashboard();
   </script>
 </body>
 </html>
