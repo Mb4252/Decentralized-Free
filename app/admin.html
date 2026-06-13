@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>لوحة المدير</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      min-height: 100vh;
+      background: #0f0f1a;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    .navbar {
+      background: #1a1a2e;
+      padding: 16px 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #2d3748;
+    }
+    .logo { font-size: 24px; font-weight: bold; color: #e94560; }
+    .logout-btn { background: transparent; border: 1px solid #ef4444; color: #ef4444; padding: 8px 16px; border-radius: 8px; cursor: pointer; }
+    .nav-links { display: flex; gap: 8px; background: #1a1a2e; padding: 8px 32px; border-bottom: 1px solid #2d3748; }
+    .nav-link { background: transparent; border: none; color: #a0aec0; padding: 8px 20px; cursor: pointer; }
+    .nav-link.active { color: #e94560; border-bottom: 2px solid #e94560; }
+    .content { max-width: 1400px; margin: 0 auto; padding: 32px; }
+    table { width: 100%; border-collapse: collapse; background: #1a1a2e; border-radius: 12px; overflow: hidden; }
+    th, td { padding: 12px; text-align: right; border-bottom: 1px solid #2d3748; }
+    th { background: #0f0f1a; color: #e94560; }
+    td { color: #a0aec0; }
+    button { padding: 6px 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+    .approve-btn { background: #22c55e; color: white; margin-left: 8px; }
+    .reject-btn { background: #ef4444; color: white; }
+    .status-pending { color: #fbbf24; }
+    .status-approved { color: #22c55e; }
+    .status-rejected { color: #ef4444; }
+    .card { background: #1a1a2e; border-radius: 16px; padding: 24px; border: 1px solid #2d3748; margin-bottom: 24px; }
+    .card-title { color: white; font-size: 20px; margin-bottom: 16px; }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .stat-card { background: #0f0f1a; border-radius: 12px; padding: 16px; text-align: center; }
+    .stat-value { font-size: 28px; font-weight: bold; color: #e94560; }
+  </style>
+</head>
+<body>
+  <div class="navbar">
+    <h1 class="logo">👑 لوحة تحكم المدير</h1>
+    <button class="logout-btn" id="logoutBtn">تسجيل خروج</button>
+  </div>
+
+  <div class="nav-links">
+    <button class="nav-link active" data-tab="deposits">📥 طلبات الإيداع</button>
+    <button class="nav-link" data-tab="withdrawals">📤 طلبات السحب</button>
+    <button class="nav-link" data-tab="users">👥 المستخدمين</button>
+  </div>
+
+  <div class="content" id="mainContent"></div>
+
+  <script>
+    let users = JSON.parse(localStorage.getItem('users') || '[]');
+    let depositRequests = JSON.parse(localStorage.getItem('depositRequests') || '[]');
+    let withdrawRequests = JSON.parse(localStorage.getItem('withdrawRequests') || '[]');
+    
+    const adminEmail = 'admin@example.com';
+    const adminPassword = 'admin123';
+
+    function checkAdmin() {
+      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      if (currentUser.email !== adminEmail) {
+        window.location.href = '/';
+      }
+    }
+
+    function saveData() {
+      localStorage.setItem('users', JSON.stringify(users));
+      localStorage.setItem('depositRequests', JSON.stringify(depositRequests));
+      localStorage.setItem('withdrawRequests', JSON.stringify(withdrawRequests));
+    }
+
+    function renderDeposits() {
+      const pending = depositRequests.filter(d => d.status === 'pending');
+      const history = depositRequests.filter(d => d.status !== 'pending');
+      
+      document.getElementById('mainContent').innerHTML = `
+        <div class="stats-grid">
+          <div class="stat-card"><p>⏳ قيد الانتظار</p><p class="stat-value">${pending.length}</p></div>
+          <div class="stat-card"><p>💰 إجمالي الإيداعات</p><p class="stat-value">${depositRequests.reduce((s,d) => s + d.amount, 0)} USDT</p></div>
+        </div>
+        
+        <div class="card">
+          <h2 class="card-title">⏳ طلبات الإيداع قيد الانتظار</h2>
+          <div id="pendingDeposits"></div>
+        </div>
+        
+        <div class="card">
+          <h2 class="card-title">📋 سجل الإيداعات</h2>
+          <div id="depositHistory"></div>
+        </div>
+      `;
+      
+      const pendingDiv = document.getElementById('pendingDeposits');
+      if (pending.length === 0) {
+        pendingDiv.innerHTML = '<p style="color:#a0aec0;">لا توجد طلبات</p>';
+      } else {
+        pendingDiv.innerHTML = `
+          <table>
+            <thead><tr><th>المستخدم</th><th>المبلغ</th><th>التاريخ</th><th>إجراءات</th></tr></thead>
+            <tbody>
+              ${pending.map(d => {
+                const user = users.find(u => u.id === d.user_id);
+                return `
+                  <tr>
+                    <td>${user?.name || user?.email || 'غير معروف'}</td>
+                    <td>${d.amount} USDT</td>
+                    <td>${new Date(d.created_at).toLocaleDateString('ar')}</td>
+                    <td><button class="approve-btn" data-id="${d.id}" data-type="deposit" data-action="approve">موافقة</button><button class="reject-btn" data-id="${d.id}" data-type="deposit" data-action="reject">رفض</button></td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        `;
+      }
+      
+      const historyDiv = document.getElementById('depositHistory');
+      if (history.length === 0) {
+        historyDiv.innerHTML = '<p style="color:#a0aec0;">لا يوجد سجل</p>';
+      } else {
+        historyDiv.innerHTML = `
+          <table>
+            <thead><tr><th>المستخدم</th><th>المبلغ</th><th>التاريخ</th><th>الحالة</th></tr></thead>
+            <tbody>
+              ${history.map(d => {
+                const user = users.find(u => u.id === d.user_id);
+                return `
+                  <tr>
+                    <td>${user?.name || user?.email || 'غير معروف'}</td>
+                    <td>${d.amount} USDT</td>
+                    <td>${new Date(d.created_at).toLocaleDateString('ar')}</td>
+                    <td class="status-${d.status}">${d.status === 'approved' ? 'تمت الموافقة' : 'مرفوض'}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        `;
+      }
+      
+      document.querySelectorAll('.approve-btn, .reject-btn').forEach(btn => {
+        btn.onclick = () => {
+          const id = parseInt(btn.getAttribute('data-id'));
+          const type = btn.getAttribute('data-type');
+          const action = btn.getAttribute('data-action');
+          
+          if (type === 'deposit') {
+            const request = depositRequests.find(r => r.id === id);
+            if (action === 'approve') {
+              request.status = 'approved';
+              const user = users.find(u => u.id === request.user_id);
+              if (user) {
+                user.active_deposit = (user.active_deposit || 0) + request.amount;
+                user.total_deposited = (user.total_deposited || 0) + request.amount;
+              }
+            } else {
+              request.status = 'rejected';
+            }
+          } else if (type === 'withdraw') {
+            const request = withdrawRequests.find(r => r.id === id);
+            if (action === 'approve') {
+              request.status = 'approved';
+              const user = users.find(u => u.id === request.user_id);
+              if (user) {
+                user.available_balance = (user.available_balance || 0) - request.amount;
+                user.total_withdrawn = (user.total_withdrawn || 0) + request.amount;
+              }
+            } else {
+              request.status = 'rejected';
+              const user = users.find(u => u.id === request.user_id);
+              if (user) {
+                user.available_balance = (user.available_balance || 0) + request.amount;
+              }
+            }
+          }
+          
+          saveData();
+          renderDeposits();
+        };
+      });
+    }
+
+    function renderWithdrawals() {
+      const pending = withdrawRequests.filter(w => w.status === 'pending');
+      const history = withdrawRequests.filter(w => w.status !== 'pending');
+      
+      document.getElementById('mainContent').innerHTML = `
+        <div class="stats-grid">
+          <div class="stat-card"><p>⏳ قيد الانتظار</p><p class="stat-value">${pending.length}</p></div>
+          <div class="stat-card"><p>📤 إجمالي السحوبات</p><p class="stat-value">${withdrawRequests.reduce((s,w) => s + w.amount, 0)} USDT</p></div>
+        </div>
+        
+        <div class="card">
+          <h2 class="card-title">⏳ طلبات السحب قيد الانتظار</h2>
+          <div id="pendingWithdrawals"></div>
+        </div>
+        
+        <div class="card">
+          <h2 class="card-title">📋 سجل السحوبات</h2>
+          <div id="withdrawHistory"></div>
+        </div>
+      `;
+      
+      const pendingDiv = document.getElementById('pendingWithdrawals');
+      if (pending.length === 0) {
+        pendingDiv.innerHTML = '<p style="color:#a0aec0;">لا توجد طلبات</p>';
+      } else {
+        pendingDiv.innerHTML = `
+          <table>
+            <thead><tr><th>المستخدم</th><th>المبلغ</th><th>المحفظة</th><th>التاريخ</th><th>إجراءات</th></tr></thead>
+            <tbody>
+              ${pending.map(w => {
+                const user = users.find(u => u.id === w.user_id);
+                return `
+                  <tr>
+                    <td>${user?.name || user?.email || 'غير معروف'}</td>
+                    <td>${w.amount} USDT</td>
+                    <td>${w.wallet_address?.substring(0, 15)}...</td>
+                    <td>${new Date(w.created_at).toLocaleDateString('ar')}</td>
+                    <td><button class="approve-btn" data-id="${w.id}" data-type="withdraw" data-action="approve">صرف</button><button class="reject-btn" data-id="${w.id}" data-type="withdraw" data-action="reject">رفض</button></td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        `;
+      }
+      
+      const historyDiv = document.getElementById('withdrawHistory');
+      if (history.length === 0) {
+        historyDiv.innerHTML = '<p style="color:#a0aec0;">لا يوجد سجل</p>';
+      } else {
+        historyDiv.innerHTML = `
+          <table>
+            <thead><tr><th>المستخدم</th><th>المبلغ</th><th>التاريخ</th><th>الحالة</th></tr></thead>
+            <tbody>
+              ${history.map(w => {
+                const user = users.find(u => u.id === w.user_id);
+                return `
+                  <tr>
+                    <td>${user?.name || user?.email || 'غير معروف'}</td>
+                    <td>${w.amount} USDT</td>
+                    <td>${new Date(w.created_at).toLocaleDateString('ar')}</td>
+                    <td class="status-${w.status}">${w.status === 'approved' ? 'تم الصرف' : 'مرفوض'}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        `;
+      }
+    }
+
+    function renderUsers() {
+      document.getElementById('mainContent').innerHTML = `
+        <div class="stats-grid">
+          <div class="stat-card"><p>👥 إجمالي المستخدمين</p><p class="stat-value">${users.length}</p></div>
+          <div class="stat-card"><p>💰 إجمالي الاستثمارات</p><p class="stat-value">${users.reduce((s,u) => s + (u.active_deposit || 0), 0)} USDT</p></div>
+        </div>
+        
+        <div class="card">
+          <h2 class="card-title">📋 قائمة المستخدمين</h2>
+          <div id="usersList"></div>
+        </div>
+      `;
+      
+      const usersDiv = document.getElementById('usersList');
+      usersDiv.innerHTML = `
+        <table>
+          <thead>
+            <tr><th>الاسم</th><th>البريد</th><th>الباقة</th><th>الاستثمار</th><th>الرصيد</th><th>كود الدعوة</th><th>تاريخ التسجيل</th></tr>
+          </thead>
+          <tbody>
+            ${users.map(u => `
+              <tr>
+                <td>${u.name || '-'}</td>
+                <td>${u.email}</td>
+                <td>${u.package || 'basic'}</td>
+                <td>${u.active_deposit || 0} USDT</td>
+                <td>${u.available_balance || 0} USDT</td>
+                <td>${u.referral_code}</td>
+                <td>${new Date(u.created_at).toLocaleDateString('ar')}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    document.getElementById('logoutBtn').onclick = () => {
+      localStorage.removeItem('currentUser');
+      window.location.href = '/';
+    };
+
+    document.querySelectorAll('.nav-link').forEach(link => {
+      link.onclick = () => {
+        document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+        link.classList.add('active');
+        const tab = link.getAttribute('data-tab');
+        if (tab === 'deposits') renderDeposits();
+        else if (tab === 'withdrawals') renderWithdrawals();
+        else if (tab === 'users') renderUsers();
+      };
+    });
+
+    checkAdmin();
+    renderDeposits();
+  </script>
+</body>
+</html>
