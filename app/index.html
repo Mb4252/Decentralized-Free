@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>تسجيل الدخول</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -16,7 +15,7 @@
       justify-content: center;
       padding: 16px;
     }
-    .card { background: #0f3460; border-radius: 24px; padding: 40px; max-width: 450px; width: 100%; }
+    .card { background: #0f3460; border-radius: 24px; padding: 40px; max-width: 400px; width: 100%; }
     h1 { font-size: 32px; color: #e94560; text-align: center; margin-bottom: 32px; }
     input {
       width: 100%;
@@ -39,9 +38,8 @@
       font-weight: bold;
       cursor: pointer;
     }
-    .message { margin-top: 16px; padding: 12px; border-radius: 8px; text-align: center; font-size: 14px; }
-    .error { background: #ef444420; border: 1px solid #ef4444; color: #ef4444; }
-    .success { background: #22c55e20; border: 1px solid #22c55e; color: #22c55e; }
+    .error { color: #ef4444; text-align: center; margin-top: 16px; font-size: 14px; }
+    .success { color: #22c55e; text-align: center; margin-top: 16px; font-size: 14px; }
   </style>
 </head>
 <body>
@@ -51,22 +49,23 @@
     <input type="email" id="email" placeholder="البريد الإلكتروني">
     <input type="password" id="password" placeholder="كلمة المرور">
     <button id="loginBtn">تسجيل الدخول</button>
+    <button id="registerBtn" style="margin-top: 12px; background: #1a1a2e; border: 1px solid #e94560;">إنشاء حساب</button>
     
     <div id="message"></div>
   </div>
 
   <script>
-    const SUPABASE_URL = 'https://ixnjzzhxmxjtcnbqaomq.supabase.co';
-    const SUPABASE_ANON_KEY = 'sb_publishable_b2QCsdG8mtoRKVyLdhqAdw_UbxR3OI9';
-    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    // بيانات المستخدمين المخزنة محلياً
+    let users = JSON.parse(localStorage.getItem('users') || '[]');
 
     function showMessage(msg, type) {
       const div = document.getElementById('message');
-      div.innerHTML = `<div class="message ${type}">${msg}</div>`;
-      setTimeout(() => div.innerHTML = '', 5000);
+      div.innerHTML = `<div class="${type}">${msg}</div>`;
+      setTimeout(() => div.innerHTML = '', 3000);
     }
 
-    document.getElementById('loginBtn').onclick = async () => {
+    // تسجيل الدخول
+    document.getElementById('loginBtn').onclick = () => {
       const email = document.getElementById('email').value;
       const password = document.getElementById('password').value;
 
@@ -75,14 +74,53 @@
         return;
       }
 
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-
-      if (error) {
-        showMessage('❌ ' + error.message, 'error');
-      } else {
+      const user = users.find(u => u.email === email && u.password === password);
+      
+      if (user) {
+        localStorage.setItem('currentUser', JSON.stringify(user));
         showMessage('✅ تم تسجيل الدخول بنجاح!', 'success');
-        setTimeout(() => { window.location.href = '/dashboard.html'; }, 1500);
+        setTimeout(() => { window.location.href = '/dashboard.html'; }, 1000);
+      } else {
+        showMessage('❌ البريد الإلكتروني أو كلمة المرور غير صحيحة', 'error');
       }
+    };
+
+    // إنشاء حساب
+    document.getElementById('registerBtn').onclick = () => {
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+
+      if (!email || !password) {
+        showMessage('⚠️ يرجى إدخال البريد الإلكتروني وكلمة المرور', 'error');
+        return;
+      }
+
+      if (password.length < 4) {
+        showMessage('⚠️ كلمة المرور يجب أن تكون 4 أحرف على الأقل', 'error');
+        return;
+      }
+
+      if (users.find(u => u.email === email)) {
+        showMessage('❌ هذا البريد مسجل بالفعل', 'error');
+        return;
+      }
+
+      const newUser = {
+        id: Date.now(),
+        email: email,
+        password: password,
+        name: email.split('@')[0],
+        referral_code: Math.random().toString(36).substring(2, 8).toUpperCase(),
+        available_balance: 0,
+        active_deposit: 0
+      };
+
+      users.push(newUser);
+      localStorage.setItem('users', JSON.stringify(users));
+      localStorage.setItem('currentUser', JSON.stringify(newUser));
+      
+      showMessage(`✅ تم إنشاء الحساب بنجاح! رمز الدعوة: ${newUser.referral_code}`, 'success');
+      setTimeout(() => { window.location.href = '/dashboard.html'; }, 1500);
     };
   </script>
 </body>
