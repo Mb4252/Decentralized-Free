@@ -9,7 +9,7 @@ const app = express();
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use(express.static('app')); // خدمة الملفات الثابتة (HTML, CSS, JS)
+app.use(express.static('app'));
 
 // ========================================
 // تهيئة Supabase
@@ -99,13 +99,16 @@ app.post('/api/register', async (req, res) => {
     if (referrer) referrerId = referrer.id;
   }
   
-  // تحديد صلاحية المدير (أول مستخدم أو بريد معين)
+  // تحديد صلاحية المدير (البريد المحدد)
+  const ADMIN_EMAIL = 'mb425262@gmail.com';
   let isAdmin = false;
+  
+  // التحقق من عدد المستخدمين أو البريد المحدد
   const { count } = await supabaseAdmin
     .from('users')
     .select('*', { count: 'exact', head: true });
   
-  if (count === 0 || email === 'admin@example.com') {
+  if (count === 0 || email === ADMIN_EMAIL) {
     isAdmin = true;
   }
   
@@ -278,9 +281,11 @@ app.post('/api/referrals', async (req, res) => {
     .select('*')
     .eq('referrer_id', userId);
   
-  const groupBalance = data.reduce((sum, u) => sum + (u.active_deposit || 0), 0);
+  // التحقق من أن data مصفوفة وليست null
+  const referrals = data || [];
+  const groupBalance = referrals.reduce((sum, u) => sum + (u.active_deposit || 0), 0);
   
-  res.json({ referrals: data, count: data.length, groupBalance });
+  res.json({ referrals: referrals, count: referrals.length, groupBalance });
 });
 
 // ========================================
