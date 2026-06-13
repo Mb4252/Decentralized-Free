@@ -3,200 +3,411 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>لوحة التحكم</title>
+  <title>لوحة التحكم | منصة الاستثمار</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       min-height: 100vh;
-      background: #0f0f1a;
+      background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%);
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      padding-bottom: 80px;
     }
+
+    /* ========== Navbar ========== */
     .navbar {
-      background: #1a1a2e;
-      padding: 16px 32px;
+      background: rgba(26, 26, 46, 0.95);
+      backdrop-filter: blur(10px);
+      padding: 16px 24px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      border-bottom: 1px solid #2d3748;
+      border-bottom: 1px solid rgba(233, 69, 96, 0.3);
+      position: sticky;
+      top: 0;
+      z-index: 100;
       flex-wrap: wrap;
       gap: 16px;
     }
-    .logo { font-size: 24px; font-weight: bold; color: #e94560; }
+    .logo { font-size: 24px; font-weight: bold; color: #e94560; display: flex; align-items: center; gap: 8px; }
+    .lang-btn { background: transparent; border: 1px solid #e94560; color: #e94560; padding: 6px 12px; border-radius: 20px; cursor: pointer; font-size: 12px; }
     .user-info { display: flex; align-items: center; gap: 16px; }
-    .logout-btn { background: transparent; border: 1px solid #ef4444; color: #ef4444; padding: 8px 16px; border-radius: 8px; cursor: pointer; }
-    .nav-links { display: flex; gap: 8px; background: #1a1a2e; padding: 8px 32px; border-bottom: 1px solid #2d3748; flex-wrap: wrap; }
-    .nav-link { background: transparent; border: none; color: #a0aec0; padding: 8px 20px; cursor: pointer; font-size: 14px; }
-    .nav-link.active { color: #e94560; border-bottom: 2px solid #e94560; }
-    .content { max-width: 1200px; margin: 0 auto; padding: 32px; }
-    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 24px; margin-bottom: 32px; }
-    .stat-card { background: #1a1a2e; border-radius: 16px; padding: 24px; border: 1px solid #2d3748; color: white; }
-    .stat-value { font-size: 28px; font-weight: bold; color: #e94560; }
-    .card { background: #1a1a2e; border-radius: 16px; padding: 24px; border: 1px solid #2d3748; margin-bottom: 24px; }
+    .user-name { color: #e94560; font-weight: bold; }
+    .logout-btn { background: transparent; border: 1px solid #ef4444; color: #ef4444; padding: 8px 16px; border-radius: 8px; cursor: pointer; transition: all 0.3s; }
+    .logout-btn:hover { background: #ef4444; color: white; }
+
+    /* ========== Slider Section ========== */
+    .slider-container {
+      position: relative;
+      max-width: 100%;
+      margin: 20px auto;
+      overflow: hidden;
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+    .slider {
+      display: flex;
+      transition: transform 0.5s ease-in-out;
+    }
+    .slide {
+      min-width: 100%;
+      position: relative;
+    }
+    .slide img {
+      width: 100%;
+      height: 200px;
+      object-fit: cover;
+    }
+    .slide-caption {
+      position: absolute;
+      bottom: 20px;
+      left: 0;
+      right: 0;
+      background: rgba(0,0,0,0.6);
+      color: white;
+      padding: 12px;
+      text-align: center;
+    }
+    .slider-btn {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(0,0,0,0.5);
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      cursor: pointer;
+      border-radius: 50%;
+      font-size: 18px;
+      z-index: 10;
+    }
+    .slider-btn.prev { left: 10px; }
+    .slider-btn.next { right: 10px; }
+    .dots {
+      text-align: center;
+      padding: 10px;
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+    }
+    .dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      margin: 0 5px;
+      background: #bbb;
+      border-radius: 50%;
+      cursor: pointer;
+    }
+    .dot.active { background: #e94560; }
+
+    /* ========== Content ========== */
+    .content { max-width: 1200px; margin: 0 auto; padding: 24px; }
+
+    /* ========== Wallet Section ========== */
+    .wallet-section {
+      background: linear-gradient(135deg, #1a1a2e, #16213e);
+      border-radius: 24px;
+      padding: 24px;
+      margin-bottom: 32px;
+      border: 1px solid rgba(233, 69, 96, 0.3);
+    }
+    .wallet-title { color: white; font-size: 20px; margin-bottom: 20px; border-right: 3px solid #e94560; padding-right: 12px; }
+    .wallet-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+    }
+    .wallet-card {
+      background: rgba(15, 15, 26, 0.8);
+      border-radius: 16px;
+      padding: 20px;
+      text-align: center;
+      transition: transform 0.3s;
+    }
+    .wallet-card:hover { transform: translateY(-5px); }
+    .wallet-icon { font-size: 32px; margin-bottom: 10px; }
+    .wallet-label { color: #a0aec0; font-size: 14px; margin-bottom: 8px; }
+    .wallet-amount { color: #e94560; font-size: 24px; font-weight: bold; }
+
+    /* ========== Cards ========== */
+    .card {
+      background: #1a1a2e;
+      border-radius: 20px;
+      padding: 24px;
+      border: 1px solid rgba(233, 69, 96, 0.2);
+      margin-bottom: 24px;
+    }
     .card-title { color: white; font-size: 20px; margin-bottom: 16px; border-right: 3px solid #e94560; padding-right: 12px; }
+
+    /* ========== Forms ========== */
     input, select {
       width: 100%;
-      padding: 12px;
+      padding: 12px 16px;
       margin-bottom: 12px;
-      border-radius: 8px;
+      border-radius: 12px;
       border: 1px solid #2d3748;
       background: #0f0f1a;
       color: white;
+      font-size: 14px;
     }
-    button {
-      padding: 12px 24px;
-      border: none;
-      border-radius: 8px;
-      font-weight: bold;
-      cursor: pointer;
-    }
-    .deposit-btn { background: #22c55e; color: white; width: 100%; }
-    .withdraw-btn { background: #ef4444; color: white; width: 100%; }
-    .message { padding: 12px; border-radius: 8px; margin-bottom: 24px; text-align: center; }
+    input:focus { outline: none; border-color: #e94560; }
+
+    /* ========== Buttons ========== */
+    .deposit-btn { background: #22c55e; color: white; width: 100%; padding: 12px; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; transition: all 0.3s; }
+    .withdraw-btn { background: #ef4444; color: white; width: 100%; padding: 12px; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; transition: all 0.3s; }
+    .profit-btn { background: #e94560; color: white; width: 100%; padding: 12px; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; margin-top: 16px; }
+
+    /* ========== Message ========== */
+    .message { padding: 12px; border-radius: 12px; margin-bottom: 24px; text-align: center; }
     .success { background: #22c55e20; border: 1px solid #22c55e; color: #22c55e; }
     .error { background: #ef444420; border: 1px solid #ef4444; color: #ef4444; }
-    .warning { background: #fbbf2420; border: 1px solid #fbbf24; color: #fbbf24; }
-    .packages-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-top: 16px; }
-    .package-card { background: #0f0f1a; border-radius: 12px; padding: 20px; text-align: center; border: 1px solid #2d3748; cursor: pointer; transition: all 0.3s; }
-    .package-card:hover { border-color: #e94560; transform: translateY(-2px); }
-    .package-card.selected { border-color: #e94560; background: #e9456010; }
-    .package-name { color: #e94560; font-size: 18px; font-weight: bold; }
-    .package-price { font-size: 24px; font-weight: bold; color: white; margin: 10px 0; }
-    .package-roi { color: #22c55e; font-size: 14px; }
-    .modal {
+
+    /* ========== Footer Navigation ========== */
+    .footer-nav {
       position: fixed;
-      top: 0;
+      bottom: 0;
       left: 0;
       right: 0;
-      bottom: 0;
-      background: rgba(0,0,0,0.8);
+      background: rgba(26, 26, 46, 0.95);
+      backdrop-filter: blur(10px);
       display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
+      justify-content: space-around;
+      padding: 12px 16px;
+      border-top: 1px solid rgba(233, 69, 96, 0.3);
+      z-index: 99;
     }
-    .modal-content {
-      background: #1a1a2e;
-      border-radius: 24px;
-      padding: 32px;
-      max-width: 500px;
-      width: 90%;
-      max-height: 80vh;
+    .footer-nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      background: none;
+      border: none;
+      color: #a0aec0;
+      cursor: pointer;
+      padding: 8px 16px;
+      border-radius: 12px;
+      transition: all 0.3s;
+    }
+    .footer-nav-item.active { color: #e94560; background: rgba(233, 69, 96, 0.1); }
+    .footer-nav-item:hover { color: #e94560; }
+    .footer-icon { font-size: 20px; }
+    .footer-label { font-size: 11px; }
+
+    /* ========== Withdrawals List ========== */
+    .withdrawals-list {
+      max-height: 300px;
       overflow-y: auto;
     }
-    .modal-content h3 { color: #e94560; margin-bottom: 16px; }
-    .modal-content p { color: #a0aec0; margin-bottom: 12px; line-height: 1.6; }
-    .close-modal { background: #e94560; margin-top: 20px; width: 100%; }
+    .withdrawal-item {
+      background: #0f0f1a;
+      padding: 12px;
+      border-radius: 12px;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* ========== Responsive ========== */
+    @media (max-width: 768px) {
+      .wallet-stats { grid-template-columns: repeat(2, 1fr); }
+      .card { padding: 16px; }
+      .footer-label { font-size: 10px; }
+      .footer-nav-item { padding: 6px 12px; }
+    }
+
+    /* ========== Hidden ========== */
     .hidden { display: none; }
   </style>
 </head>
 <body>
+
+  <!-- Navbar -->
   <div class="navbar">
-    <h1 class="logo">💰 منصة الاستثمار</h1>
+    <div class="logo">
+      <span>💰</span>
+      <span id="siteTitle">منصة الاستثمار</span>
+    </div>
     <div class="user-info">
-      <span id="userName" style="color: #a0aec0;"></span>
-      <button class="logout-btn" id="logoutBtn">تسجيل خروج</button>
+      <button class="lang-btn" id="langToggle">🇬🇧 English</button>
+      <span class="user-name" id="userName"></span>
+      <button class="logout-btn" id="logoutBtn">🚪 تسجيل خروج</button>
     </div>
   </div>
 
-  <div class="nav-links">
-    <button class="nav-link active" data-page="dashboard">🏠 الرئيسية</button>
-    <button class="nav-link" data-page="deposit">📥 الإيداع</button>
-    <button class="nav-link" data-page="withdraw">📤 السحب</button>
-    <button class="nav-link" data-page="referrals">👥 الإحالات</button>
-    <button class="nav-link" data-page="packages">💎 الباقات</button>
-    <button class="nav-link" data-page="instructions">📖 التعليمات</button>
+  <!-- Slider Section -->
+  <div class="slider-container">
+    <div class="slider" id="slider">
+      <div class="slide">
+        <img src="https://picsum.photos/1200/400?random=1" alt="Slide 1">
+        <div class="slide-caption">🚀 استثمر بحكمة مع منصة الاستثمار</div>
+      </div>
+      <div class="slide">
+        <img src="https://picsum.photos/1200/400?random=2" alt="Slide 2">
+        <div class="slide-caption">📈 أرباح يومية تصل إلى 3.5%</div>
+      </div>
+      <div class="slide">
+        <img src="https://picsum.photos/1200/400?random=3" alt="Slide 3">
+        <div class="slide-caption">🔒 أمان تام وحماية لاستثماراتك</div>
+      </div>
+    </div>
+    <button class="slider-btn prev" id="prevBtn">❮</button>
+    <button class="slider-btn next" id="nextBtn">❯</button>
+    <div class="dots" id="dots"></div>
   </div>
 
+  <!-- Main Content -->
   <div class="content" id="mainContent"></div>
 
-  <div id="instructionsModal" class="modal hidden">
-    <div class="modal-content">
-      <h3>📖 تعليمات المنصة</h3>
-      <p>1. الحد الأدنى للإيداع: 10 USDT</p>
-      <p>2. الحد الأدنى للسحب: 0.5 USDT</p>
-      <p>3. نسبة الربح اليومي: 2% - 3.5% حسب الباقة</p>
-      <p>4. يتم حساب الأرباح يومياً في منتصف الليل</p>
-      <p>5. طلبات الإيداع والسحب تحتاج موافقة المدير</p>
-      <p>6. الحد الأقصى للسحب اليومي: حسب الباقة</p>
-      <p>7. عمولة الإحالة: 10% من استثمار المدعو</p>
-      <br>
-      <h3>⚠️ إخلاء المسؤولية</h3>
-      <p>الاستثمار في العملات الرقمية يحمل مخاطر عالية. هذه منصة تجريبية لأغراض تعليمية. لا نضمن أي أرباح، والمشاركة تتم على مسؤوليتك الشخصية.</p>
-      <button class="close-modal" id="closeInstructions">موافق</button>
-    </div>
+  <!-- Footer Navigation -->
+  <div class="footer-nav">
+    <button class="footer-nav-item active" data-page="dashboard">
+      <span class="footer-icon">🏠</span>
+      <span class="footer-label" data-key="home">الرئيسية</span>
+    </button>
+    <button class="footer-nav-item" data-page="deposit">
+      <span class="footer-icon">📥</span>
+      <span class="footer-label" data-key="deposit">إيداع</span>
+    </button>
+    <button class="footer-nav-item" data-page="withdraw">
+      <span class="footer-icon">📤</span>
+      <span class="footer-label" data-key="withdraw">سحب</span>
+    </button>
+    <button class="footer-nav-item" data-page="withdrawals-list">
+      <span class="footer-icon">📋</span>
+      <span class="footer-label" data-key="withdrawals">سحوباتي</span>
+    </button>
+    <button class="footer-nav-item" data-page="packages">
+      <span class="footer-icon">💎</span>
+      <span class="footer-label" data-key="packages">الباقات</span>
+    </button>
+    <button class="footer-nav-item" data-page="referrals">
+      <span class="footer-icon">👥</span>
+      <span class="footer-label" data-key="referrals">الإحالات</span>
+    </button>
   </div>
 
   <script>
     const API_URL = window.location.origin;
     let userId = null;
     let userData = null;
+    let currentLang = 'ar';
+    let currentSlide = 0;
+    let slideInterval;
 
-    const packages = {
-      basic: { name: 'عادي', price: 0, roi: 2, daily_limit: 10, withdraw_limit: 50 },
-      silver: { name: 'فضي', price: 50, roi: 2.2, daily_limit: 20, withdraw_limit: 100 },
-      gold: { name: 'ذهبي', price: 100, roi: 2.5, daily_limit: 50, withdraw_limit: 200 },
-      platinum: { name: 'بلاتيني', price: 250, roi: 2.8, daily_limit: 100, withdraw_limit: 400 },
-      diamond: { name: 'ماسي', price: 500, roi: 3.2, daily_limit: 200, withdraw_limit: 800 },
-      vip: { name: 'VIP', price: 1000, roi: 3.5, daily_limit: 500, withdraw_limit: 2000 }
+    // ========== Language Translations ==========
+    const translations = {
+      ar: {
+        home: 'الرئيسية', deposit: 'إيداع', withdraw: 'سحب', withdrawals: 'سحوباتي',
+        packages: 'الباقات', referrals: 'الإحالات', instructions: 'التعليمات',
+        walletTitle: 'محفظتي', activeInvest: 'الاستثمار النشط', availableBalance: 'الرصيد المتاح',
+        totalDeposit: 'إجمالي الإيداع', totalWithdraw: 'إجمالي السحب', investmentPlans: 'خطط الاستثمار',
+        referralCode: 'رمز الدعوة', copyLink: 'نسخ الرابط', upgrade: 'ترقية',
+        depositWallet: 'محفظة الإيداع (شبكة BSC)', copy: 'نسخ', minDeposit: 'الحد الأدنى للإيداع 10 USDT',
+        minWithdraw: 'الحد الأدنى للسحب 0.5 USDT', pendingApproval: 'بانتظار موافقة المدير',
+        dailyProfit: 'احصل على أرباح اليوم'
+      },
+      en: {
+        home: 'Home', deposit: 'Deposit', withdraw: 'Withdraw', withdrawals: 'My Withdrawals',
+        packages: 'Packages', referrals: 'Referrals', instructions: 'Instructions',
+        walletTitle: 'My Wallet', activeInvest: 'Active Investment', availableBalance: 'Available Balance',
+        totalDeposit: 'Total Deposit', totalWithdraw: 'Total Withdraw', investmentPlans: 'Investment Plans',
+        referralCode: 'Referral Code', copyLink: 'Copy Link', upgrade: 'Upgrade',
+        depositWallet: 'Deposit Wallet (BSC Network)', copy: 'Copy', minDeposit: 'Minimum deposit 10 USDT',
+        minWithdraw: 'Minimum withdrawal 0.5 USDT', pendingApproval: 'Pending admin approval',
+        dailyProfit: 'Get Daily Profit'
+      }
     };
 
+    function t(key) { return translations[currentLang][key] || key; }
+
+    function updateLanguage() {
+      document.querySelectorAll('[data-key]').forEach(el => {
+        el.textContent = t(el.getAttribute('data-key'));
+      });
+      document.getElementById('siteTitle').textContent = currentLang === 'ar' ? 'منصة الاستثمار' : 'Investment Platform';
+      document.getElementById('langToggle').textContent = currentLang === 'ar' ? '🇬🇧 English' : '🇸🇦 العربية';
+    }
+
+    document.getElementById('langToggle').onclick = () => {
+      currentLang = currentLang === 'ar' ? 'en' : 'ar';
+      updateLanguage();
+      const activePage = document.querySelector('.footer-nav-item.active').getAttribute('data-page');
+      if (pages[activePage]) pages[activePage]();
+    };
+
+    // ========== Slider Functions ==========
+    function updateSlider() {
+      const slider = document.getElementById('slider');
+      const slides = document.querySelectorAll('.slide');
+      if (slides.length === 0) return;
+      slider.style.transform = `translateX(-${currentSlide * 100}%)`;
+      document.querySelectorAll('.dot').forEach((dot, i) => {
+        dot.classList.toggle('active', i === currentSlide);
+      });
+    }
+
+    function nextSlide() {
+      const slides = document.querySelectorAll('.slide');
+      if (slides.length === 0) return;
+      currentSlide = (currentSlide + 1) % slides.length;
+      updateSlider();
+    }
+
+    function prevSlide() {
+      const slides = document.querySelectorAll('.slide');
+      if (slides.length === 0) return;
+      currentSlide = (currentSlide - 1 + slides.length) % slides.length;
+      updateSlider();
+    }
+
+    function startAutoSlide() {
+      if (slideInterval) clearInterval(slideInterval);
+      slideInterval = setInterval(nextSlide, 5000);
+    }
+
+    function initSlider() {
+      const slides = document.querySelectorAll('.slide');
+      if (slides.length === 0) return;
+      const dotsContainer = document.getElementById('dots');
+      dotsContainer.innerHTML = '';
+      slides.forEach((_, i) => {
+        const dot = document.createElement('span');
+        dot.classList.add('dot');
+        dot.onclick = () => { currentSlide = i; updateSlider(); startAutoSlide(); };
+        dotsContainer.appendChild(dot);
+      });
+      document.getElementById('prevBtn').onclick = () => { prevSlide(); startAutoSlide(); };
+      document.getElementById('nextBtn').onclick = () => { nextSlide(); startAutoSlide(); };
+      updateSlider();
+      startAutoSlide();
+    }
+
+    // ========== API Functions ==========
     async function testConnection() {
       try {
         const response = await fetch(`${API_URL}/api/health`);
-        const data = await response.json();
-        console.log('✅ Server connected:', data);
-        return true;
-      } catch (error) {
-        console.error('❌ Server connection failed:', error);
-        return false;
-      }
+        return response.ok;
+      } catch (error) { return false; }
     }
 
     async function loadUserData() {
       userId = localStorage.getItem('userId');
-      
-      if (!userId) {
-        console.log('No userId found');
-        window.location.href = '/';
-        return false;
-      }
-      
+      if (!userId) { window.location.href = '/'; return false; }
       try {
         const response = await fetch(`${API_URL}/api/user`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId })
         });
-        
         const data = await response.json();
-        
-        if (data.error) {
-          console.log('User not found:', data.error);
-          localStorage.removeItem('userId');
-          window.location.href = '/';
-          return false;
-        }
-        
+        if (data.error) { localStorage.removeItem('userId'); window.location.href = '/'; return false; }
         userData = data;
-        document.getElementById('userName').innerHTML = `مرحباً ${userData.name}`;
+        document.getElementById('userName').innerHTML = `👋 ${userData.name}`;
         return true;
-      } catch (error) {
-        console.error('Error loading user:', error);
-        window.location.href = '/';
-        return false;
-      }
+      } catch (error) { window.location.href = '/'; return false; }
     }
-
-    function checkFirstTime() {
-      if (!localStorage.getItem('instructionsShown')) {
-        document.getElementById('instructionsModal').classList.remove('hidden');
-      }
-    }
-
-    document.getElementById('closeInstructions').onclick = () => {
-      document.getElementById('instructionsModal').classList.add('hidden');
-      localStorage.setItem('instructionsShown', 'true');
-    };
 
     function showMessage(msg, type) {
       const container = document.getElementById('mainContent');
@@ -207,252 +418,237 @@
       setTimeout(() => msgDiv.remove(), 5000);
     }
 
-    async function renderDashboard() {
-      const referralsRes = await fetch(`${API_URL}/api/referrals`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId })
-      });
-      const referralsData = await referralsRes.json();
-      
-      document.getElementById('mainContent').innerHTML = `
-        <div class="stats-grid">
-          <div class="stat-card"><p>💰 الاستثمار النشط</p><p class="stat-value">${(userData.active_deposit || 0)} USDT</p><p style="font-size:12px;">العائد: ${packages[userData.package]?.roi || 2}% يومياً</p></div>
-          <div class="stat-card"><p>💎 الرصيد المتاح</p><p class="stat-value">${(userData.available_balance || 0)} USDT</p><p style="font-size:12px;">قابل للسحب</p></div>
-          <div class="stat-card"><p>📊 إجمالي الإيداعات</p><p class="stat-value">${(userData.total_deposited || 0)} USDT</p></div>
-          <div class="stat-card"><p>📤 إجمالي السحوبات</p><p class="stat-value">${(userData.total_withdrawn || 0)} USDT</p></div>
-        </div>
-        
-        <div class="card">
-          <h2 class="card-title">📊 إحصائيات الإحالات</h2>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-            <div style="text-align: center;"><p style="color:#a0aec0;">عدد المحالين</p><p style="font-size:28px; font-weight:bold; color:#e94560;">${referralsData.count || 0}</p></div>
-            <div style="text-align: center;"><p style="color:#a0aec0;">رصيد المجموعة</p><p style="font-size:28px; font-weight:bold; color:#e94560;">${referralsData.groupBalance || 0} USDT</p></div>
+    // ========== Wallet Section ==========
+    function renderWalletSection() {
+      return `
+        <div class="wallet-section">
+          <h2 class="wallet-title">💰 ${t('walletTitle')}</h2>
+          <div class="wallet-stats">
+            <div class="wallet-card"><div class="wallet-icon">📈</div><div class="wallet-label">${t('activeInvest')}</div><div class="wallet-amount" id="walletActiveDeposit">${(userData?.active_deposit || 0)} USDT</div></div>
+            <div class="wallet-card"><div class="wallet-icon">💎</div><div class="wallet-label">${t('availableBalance')}</div><div class="wallet-amount" id="walletAvailableBalance">${(userData?.available_balance || 0)} USDT</div></div>
+            <div class="wallet-card"><div class="wallet-icon">💰</div><div class="wallet-label">${t('totalDeposit')}</div><div class="wallet-amount" id="walletTotalDeposit">${(userData?.total_deposited || 0)} USDT</div></div>
+            <div class="wallet-card"><div class="wallet-icon">📤</div><div class="wallet-label">${t('totalWithdraw')}</div><div class="wallet-amount" id="walletTotalWithdraw">${(userData?.total_withdrawn || 0)} USDT</div></div>
           </div>
-        </div>
-        
-        <div class="card">
-          <h2 class="card-title">💳 معلومات الحساب</h2>
-          <p><strong>الباقة الحالية:</strong> ${packages[userData.package]?.name || 'عادي'}</p>
-          <p><strong>نسبة الربح:</strong> ${packages[userData.package]?.roi || 2}% يومياً</p>
-          <p><strong>حد السحب اليومي:</strong> ${packages[userData.package]?.daily_limit || 10} USDT</p>
-          <p><strong>الحد الأقصى للسحب:</strong> ${packages[userData.package]?.withdraw_limit || 50} USDT</p>
-          <p><strong>رمز الدعوة:</strong> <code style="background:#0f0f1a; padding:4px 8px; border-radius:6px;">${userData.referral_code}</code></p>
         </div>
       `;
     }
 
+    // ========== Pages ==========
+    async function renderDashboard() {
+      const referralsRes = await fetch(`${API_URL}/api/referrals`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId })
+      });
+      const referralsData = await referralsRes.json();
+
+      document.getElementById('mainContent').innerHTML = `
+        ${renderWalletSection()}
+        <div class="card">
+          <h2 class="card-title">📊 ${t('investmentPlans')}</h2>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px;">
+            <div style="background:#0f0f1a; padding:16px; border-radius:12px; text-align:center;"><h3 style="color:#e94560;">مبتدئ</h3><p style="font-size:24px; font-weight:bold;">2%</p><p>من 10 USDT</p></div>
+            <div style="background:#0f0f1a; padding:16px; border-radius:12px; text-align:center;"><h3 style="color:#e94560;">محترف</h3><p style="font-size:24px; font-weight:bold;">2.5%</p><p>من 100 USDT</p></div>
+            <div style="background:#0f0f1a; padding:16px; border-radius:12px; text-align:center;"><h3 style="color:#e94560;">VIP</h3><p style="font-size:24px; font-weight:bold;">3%</p><p>من 500 USDT</p></div>
+            <div style="background:#0f0f1a; padding:16px; border-radius:12px; text-align:center;"><h3 style="color:#e94560;">دياموند</h3><p style="font-size:24px; font-weight:bold;">3.5%</p><p>من 1000 USDT</p></div>
+          </div>
+        </div>
+        <div class="card">
+          <h2 class="card-title">👥 ${t('referrals')}</h2>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+            <div style="text-align:center;"><p style="color:#a0aec0;">عدد المحالين</p><p style="font-size:28px; font-weight:bold; color:#e94560;">${referralsData.count || 0}</p></div>
+            <div style="text-align:center;"><p style="color:#a0aec0;">رصيد المجموعة</p><p style="font-size:28px; font-weight:bold; color:#e94560;">${referralsData.groupBalance || 0} USDT</p></div>
+          </div>
+          <div style="background:#0f0f1a; padding:16px; border-radius:12px; text-align:center; margin-top:16px;">
+            <p style="color:#a0aec0;">${t('referralCode')}</p>
+            <code style="font-size:18px; color:#e94560;">${userData.referral_code}</code>
+            <button onclick="navigator.clipboard.writeText('${window.location.origin}?ref=${userData.referral_code}')" style="margin-top:8px; background:#e94560; border:none; padding:8px 16px; border-radius:8px; color:white; cursor:pointer;">📋 ${t('copyLink')}</button>
+          </div>
+        </div>
+        <button class="profit-btn" id="profitBtn">🎁 ${t('dailyProfit')}</button>
+      `;
+      document.getElementById('profitBtn').onclick = async () => {
+        const profit = (userData.active_deposit || 0) * 0.02;
+        if (profit <= 0) { showMessage('⚠️ لا يوجد استثمار نشط', 'error'); return; }
+        await fetch(`${API_URL}/api/update-user`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, updates: { available_balance: (userData.available_balance || 0) + profit } })
+        });
+        userData.available_balance += profit;
+        showMessage(`✅ تم إضافة ${profit.toFixed(2)} USDT كأرباح يومية!`, 'success');
+        renderDashboard();
+      };
+    }
+
     async function renderDeposit() {
       document.getElementById('mainContent').innerHTML = `
+        ${renderWalletSection()}
         <div class="card">
-          <h2 class="card-title">📥 إيداع USDT</h2>
-          <div style="background: #0f0f1a; padding: 12px; border-radius: 8px; margin-bottom: 16px;">
-            <p style="color: #a0aec0; font-size: 12px;">محفظة الإيداع (شبكة BSC):</p>
-            <code style="color: #e94560; word-break: break-all;">0x987cfde723a87b5ed33329eebe0595a4416b848f</code>
-            <button onclick="navigator.clipboard.writeText('0x987cfde723a87b5ed33329eebe0595a4416b848f')" style="margin-top: 8px; padding: 6px 12px; background: #2d3748; color: white; font-size: 12px;">📋 نسخ</button>
+          <h2 class="card-title">📥 ${t('deposit')} USDT</h2>
+          <div style="background:#0f0f1a; padding:16px; border-radius:12px; margin-bottom:16px;">
+            <p style="color:#a0aec0;">${t('depositWallet')}:</p>
+            <code style="color:#e94560; word-break:break-all;">0x987cfde723a87b5ed33329eebe0595a4416b848f</code>
+            <button onclick="navigator.clipboard.writeText('0x987cfde723a87b5ed33329eebe0595a4416b848f')" style="margin-top:8px; background:#2d3748; border:none; padding:6px 12px; border-radius:6px; color:white; cursor:pointer;">📋 ${t('copy')}</button>
           </div>
-          <input type="number" id="depositAmount" placeholder="المبلغ (USDT) - الحد الأدنى 10">
-          <button class="deposit-btn" id="doDepositBtn">تقديم طلب إيداع</button>
-          <p style="font-size: 12px; color: #a0aec0; margin-top: 12px;">⚠️ سيتم تفعيل الإيداع بعد موافقة المدير</p>
+          <input type="number" id="depositAmount" placeholder="${t('minDeposit')}">
+          <button class="deposit-btn" id="doDepositBtn">${t('deposit')}</button>
+          <p style="font-size:12px; color:#a0aec0; margin-top:12px;">⚠️ ${t('pendingApproval')}</p>
         </div>
       `;
-      
       document.getElementById('doDepositBtn').onclick = async () => {
         const amount = parseFloat(document.getElementById('depositAmount').value);
-        if (!amount || amount < 10) {
-          showMessage('⚠️ الحد الأدنى للإيداع 10 USDT', 'error');
-          return;
-        }
-        
+        if (!amount || amount < 10) { showMessage('⚠️ الحد الأدنى للإيداع 10 USDT', 'error'); return; }
         const response = await fetch(`${API_URL}/api/deposit`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId, amount })
         });
-        
         const data = await response.json();
-        if (data.success) {
-          showMessage(`✅ تم تقديم طلب إيداع بقيمة ${amount} USDT. بانتظار موافقة المدير`, 'success');
-          document.getElementById('depositAmount').value = '';
-        } else {
-          showMessage('❌ ' + (data.error || 'حدث خطأ'), 'error');
-        }
+        if (data.success) { showMessage(`✅ تم تقديم طلب إيداع ${amount} USDT`, 'success'); document.getElementById('depositAmount').value = ''; }
+        else showMessage('❌ ' + (data.error || 'حدث خطأ'), 'error');
       };
     }
 
     async function renderWithdraw() {
       document.getElementById('mainContent').innerHTML = `
+        ${renderWalletSection()}
         <div class="card">
-          <h2 class="card-title">📤 سحب الأرباح</h2>
+          <h2 class="card-title">📤 ${t('withdraw')} USDT</h2>
           <div style="background:#0f0f1a; padding:12px; border-radius:8px; margin-bottom:16px;">
-            <p>💰 الرصيد المتاح: <strong>${(userData.available_balance || 0)} USDT</strong></p>
-            <p>📊 حد السحب اليومي: <strong>${packages[userData.package]?.daily_limit || 10} USDT</strong></p>
+            <p>💰 ${t('availableBalance')}: <strong>${(userData.available_balance || 0)} USDT</strong></p>
           </div>
-          <input type="number" id="withdrawAmount" placeholder="المبلغ (USDT) - الحد الأدنى 0.5">
+          <input type="number" id="withdrawAmount" placeholder="${t('minWithdraw')}">
           <input type="text" id="walletAddress" placeholder="عنوان محفظة BSC">
-          <button class="withdraw-btn" id="doWithdrawBtn">تقديم طلب سحب</button>
-          <p style="font-size: 12px; color: #a0aec0; margin-top: 12px;">⚠️ سيتم صرف السحب بعد موافقة المدير</p>
+          <button class="withdraw-btn" id="doWithdrawBtn">${t('withdraw')}</button>
+          <p style="font-size:12px; color:#a0aec0; margin-top:12px;">⚠️ ${t('pendingApproval')}</p>
         </div>
       `;
-      
       document.getElementById('doWithdrawBtn').onclick = async () => {
         const amount = parseFloat(document.getElementById('withdrawAmount').value);
-        const walletAddress = document.getElementById('walletAddress').value;
-        
-        if (!amount || amount < 0.5) {
-          showMessage('⚠️ الحد الأدنى للسحب 0.5 USDT', 'error');
-          return;
-        }
-        if (!walletAddress) {
-          showMessage('⚠️ يرجى إدخال عنوان محفظة BSC', 'error');
-          return;
-        }
-        if (amount > (userData.available_balance || 0)) {
-          showMessage('⚠️ الرصيد غير كافٍ', 'error');
-          return;
-        }
-        
+        const address = document.getElementById('walletAddress').value;
+        if (!amount || amount < 0.5) { showMessage('⚠️ الحد الأدنى للسحب 0.5 USDT', 'error'); return; }
+        if (!address) { showMessage('⚠️ يرجى إدخال عنوان محفظة BSC', 'error'); return; }
+        if (amount > (userData.available_balance || 0)) { showMessage('⚠️ الرصيد غير كافٍ', 'error'); return; }
         const response = await fetch(`${API_URL}/api/withdraw`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId, amount, walletAddress })
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, amount, walletAddress: address })
         });
-        
         const data = await response.json();
-        if (data.success) {
-          showMessage(`✅ تم تقديم طلب سحب بقيمة ${amount} USDT. بانتظار موافقة المدير`, 'success');
-          document.getElementById('withdrawAmount').value = '';
-          document.getElementById('walletAddress').value = '';
-        } else {
-          showMessage('❌ ' + (data.error || 'حدث خطأ'), 'error');
-        }
+        if (data.success) { showMessage(`✅ تم تقديم طلب سحب ${amount} USDT`, 'success'); document.getElementById('withdrawAmount').value = ''; document.getElementById('walletAddress').value = ''; }
+        else showMessage('❌ ' + (data.error || 'حدث خطأ'), 'error');
       };
+    }
+
+    async function renderWithdrawalsList() {
+      const response = await fetch(`${API_URL}/api/admin/withdrawals`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId })
+      });
+      const withdrawals = await response.json();
+      const userWithdrawals = withdrawals.filter(w => w.user_id === userId) || [];
+
+      document.getElementById('mainContent').innerHTML = `
+        ${renderWalletSection()}
+        <div class="card">
+          <h2 class="card-title">📋 ${t('withdrawals')}</h2>
+          <div class="withdrawals-list">
+            ${userWithdrawals.length === 0 ? '<p style="color:#a0aec0; text-align:center;">لا توجد طلبات سحب</p>' : userWithdrawals.map(w => `
+              <div class="withdrawal-item">
+                <span>💰 ${w.amount} USDT</span>
+                <span class="${w.status === 'pending' ? 'warning' : w.status === 'approved' ? 'success' : 'error'}">${w.status === 'pending' ? 'قيد الانتظار' : w.status === 'approved' ? 'تم الصرف' : 'مرفوض'}</span>
+                <span>📅 ${new Date(w.created_at).toLocaleDateString('ar')}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
     }
 
     async function renderReferrals() {
       const response = await fetch(`${API_URL}/api/referrals`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId })
       });
       const data = await response.json();
-      
       document.getElementById('mainContent').innerHTML = `
+        ${renderWalletSection()}
         <div class="card">
-          <h2 class="card-title">👥 نظام الإحالات</h2>
+          <h2 class="card-title">👥 ${t('referrals')}</h2>
           <div style="background:#0f0f1a; padding:16px; border-radius:12px; text-align:center; margin-bottom:16px;">
-            <p>🔗 رابط الدعوة الخاص بك</p>
-            <code style="display:block; background:#1a1a2e; padding:12px; border-radius:8px; margin:12px 0; word-break:break-all;">${window.location.origin}?ref=${userData.referral_code}</code>
-            <button onclick="navigator.clipboard.writeText('${window.location.origin}?ref=${userData.referral_code}')" style="background:#e94560; color:white;">📋 نسخ الرابط</button>
+            <p>🔗 ${t('referralCode')}</p>
+            <code style="font-size:20px; color:#e94560;">${userData.referral_code}</code>
+            <button onclick="navigator.clipboard.writeText('${window.location.origin}?ref=${userData.referral_code}')" style="margin-top:8px; background:#e94560; border:none; padding:8px 16px; border-radius:8px; color:white; cursor:pointer;">📋 ${t('copyLink')}</button>
           </div>
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;">
             <div style="text-align:center;"><p style="color:#a0aec0;">عدد المحالين</p><p style="font-size:28px; font-weight:bold; color:#e94560;">${data.count || 0}</p></div>
             <div style="text-align:center;"><p style="color:#a0aec0;">رصيد المجموعة</p><p style="font-size:28px; font-weight:bold; color:#e94560;">${data.groupBalance || 0} USDT</p></div>
           </div>
-          <h3 style="color:white; margin-bottom:12px;">قائمة المحالين</h3>
+          <h3 style="color:white;">قائمة المحالين</h3>
           <div id="referredList"></div>
         </div>
       `;
-      
       const listDiv = document.getElementById('referredList');
-      if (!data.referrals || data.referrals.length === 0) {
-        listDiv.innerHTML = '<p style="color:#a0aec0;">لا يوجد محالين حتى الآن</p>';
-      } else {
-        listDiv.innerHTML = data.referrals.map(u => `
-          <div style="background:#0f0f1a; padding:12px; border-radius:8px; margin-bottom:8px; display:flex; justify-content:space-between;">
-            <span>${u.name}</span>
-            <span>${u.email}</span>
-            <span>استثمر: ${u.active_deposit || 0} USDT</span>
-          </div>
-        `).join('');
-      }
+      if (!data.referrals || data.referrals.length === 0) listDiv.innerHTML = '<p style="color:#a0aec0;">لا يوجد محالين</p>';
+      else listDiv.innerHTML = data.referrals.map(u => `<div class="withdrawal-item"><span>${u.name}</span><span>${u.email}</span><span>استثمر: ${u.active_deposit || 0} USDT</span></div>`).join('');
     }
 
     function renderPackages() {
+      const packages = {
+        basic: { name: 'عادي', price: 0, roi: 2 }, silver: { name: 'فضي', price: 50, roi: 2.2 },
+        gold: { name: 'ذهبي', price: 100, roi: 2.5 }, platinum: { name: 'بلاتيني', price: 250, roi: 2.8 },
+        diamond: { name: 'ماسي', price: 500, roi: 3.2 }, vip: { name: 'VIP', price: 1000, roi: 3.5 }
+      };
       document.getElementById('mainContent').innerHTML = `
+        ${renderWalletSection()}
         <div class="card">
-          <h2 class="card-title">💎 باقات الاشتراك</h2>
-          <p style="color:#a0aec0; margin-bottom:16px;">كلما ارتفعت الباقة، زادت نسبة الربح وحد السحب اليومي</p>
-          <div class="packages-grid" id="packagesGrid"></div>
+          <h2 class="card-title">💎 ${t('packages')}</h2>
+          <div class="packages-grid" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:16px;">
+            ${Object.entries(packages).map(([key, pkg]) => `
+              <div class="package-card" style="background:#0f0f1a; padding:20px; border-radius:16px; text-align:center; border:1px solid ${userData.package === key ? '#e94560' : '#2d3748'}">
+                <h3 style="color:#e94560;">${pkg.name}</h3>
+                <p style="font-size:28px; font-weight:bold; color:white;">${pkg.price === 0 ? 'مجاني' : pkg.price + ' USDT'}</p>
+                <p style="color:#22c55e;">💰 ربح: ${pkg.roi}% يومياً</p>
+                ${userData.package !== key ? `<button class="package-btn" data-package="${key}" style="margin-top:12px; background:#e94560; border:none; padding:8px; border-radius:8px; color:white; cursor:pointer;">${t('upgrade')}</button>` : '<button disabled style="margin-top:12px; background:#2d3748; border:none; padding:8px; border-radius:8px; color:#a0aec0;">✅ مستخدم حالياً</button>'}
+              </div>
+            `).join('')}
+          </div>
         </div>
       `;
-      
-      const grid = document.getElementById('packagesGrid');
-      grid.innerHTML = Object.entries(packages).map(([key, pkg]) => `
-        <div class="package-card ${userData.package === key ? 'selected' : ''}" data-package="${key}">
-          <div class="package-name">${pkg.name}</div>
-          <div class="package-price">${pkg.price === 0 ? 'مجاني' : pkg.price + ' USDT'}</div>
-          <div class="package-roi">💰 ربح: ${pkg.roi}% يومياً</div>
-          <div class="package-roi">📤 سحب يومي: ${pkg.daily_limit} USDT</div>
-          <div class="package-roi">📤 حد أقصى: ${pkg.withdraw_limit} USDT</div>
-          ${userData.package !== key ? `<button class="package-btn" data-package="${key}">ترقية (${pkg.price} USDT)</button>` : '<button disabled style="background:#2d3748; margin-top:12px;">✅ مستخدم حالياً</button>'}
-        </div>
-      `).join('');
-      
       document.querySelectorAll('.package-btn').forEach(btn => {
         btn.onclick = async (e) => {
-          e.stopPropagation();
           const pkgKey = btn.getAttribute('data-package');
           const pkg = packages[pkgKey];
-          
           if (userData.available_balance >= pkg.price) {
-            const newBalance = userData.available_balance - pkg.price;
             await fetch(`${API_URL}/api/update-user`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ userId, updates: { package: pkgKey, available_balance: newBalance } })
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ userId, updates: { package: pkgKey, available_balance: userData.available_balance - pkg.price } })
             });
             userData.package = pkgKey;
-            userData.available_balance = newBalance;
-            showMessage(`✅ تم الترقية إلى باقة ${pkg.name} بنجاح!`, 'success');
+            userData.available_balance -= pkg.price;
+            showMessage(`✅ تم الترقية إلى ${pkg.name}`, 'success');
             renderPackages();
-          } else {
-            showMessage(`⚠️ رصيدك غير كافٍ للترقية إلى ${pkg.name} (تحتاج ${pkg.price} USDT)`, 'error');
-          }
+          } else showMessage(`⚠️ تحتاج ${pkg.price} USDT للترقية`, 'error');
         };
       });
     }
 
-    function renderInstructions() {
-      document.getElementById('instructionsModal').classList.remove('hidden');
-    }
+    const pages = { dashboard: renderDashboard, deposit: renderDeposit, withdraw: renderWithdraw, 'withdrawals-list': renderWithdrawalsList, referrals: renderReferrals, packages: renderPackages };
 
-    const pages = {
-      dashboard: renderDashboard,
-      deposit: renderDeposit,
-      withdraw: renderWithdraw,
-      referrals: renderReferrals,
-      packages: renderPackages,
-      instructions: renderInstructions
-    };
-
-    document.querySelectorAll('.nav-link').forEach(link => {
-      link.onclick = async () => {
-        document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-        link.classList.add('active');
-        const page = link.getAttribute('data-page');
-        await loadUserData();
-        if (pages[page]) pages[page]();
+    document.querySelectorAll('.footer-nav-item').forEach(btn => {
+      btn.onclick = async () => {
+        document.querySelectorAll('.footer-nav-item').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const page = btn.getAttribute('data-page');
+        if (pages[page]) await pages[page]();
       };
     });
 
-    document.getElementById('logoutBtn').onclick = () => {
-      localStorage.removeItem('userId');
-      localStorage.removeItem('user');
-      window.location.href = '/';
-    };
+    document.getElementById('logoutBtn').onclick = () => { localStorage.clear(); window.location.href = '/'; };
 
     (async () => {
-      const connected = await testConnection();
-      if (!connected) {
-        document.getElementById('mainContent').innerHTML = '<div class="message error">❌ لا يمكن الاتصال بالخادم. يرجى المحاولة لاحقاً.</div>';
-        return;
-      }
-      const loaded = await loadUserData();
-      if (loaded) {
-        checkFirstTime();
-        renderDashboard();
-      }
+      if (!await testConnection()) { document.getElementById('mainContent').innerHTML = '<div class="message error">❌ لا يمكن الاتصال بالخادم</div>'; return; }
+      if (!await loadUserData()) return;
+      initSlider();
+      updateLanguage();
+      await renderDashboard();
     })();
   </script>
 </body>
