@@ -63,6 +63,7 @@
       color: #e94560;
       font-weight: bold;
     }
+    .hidden { display: none; }
   </style>
 </head>
 <body>
@@ -83,13 +84,13 @@
     </div>
 
     <!-- نموذج إنشاء حساب -->
-    <div id="registerForm" style="display: none;">
+    <div id="registerForm" class="hidden">
       <input type="text" id="regName" placeholder="اسم المستخدم">
       <input type="email" id="regEmail" placeholder="البريد الإلكتروني">
       <input type="password" id="regPassword" placeholder="كلمة المرور">
       <input type="text" id="regReferral" placeholder="رمز الدعوة (اختياري)">
       <button id="doRegisterBtn">إنشاء حساب</button>
-      <div class="referral-code" id="generatedReferral" style="display: none;">
+      <div class="referral-code hidden" id="generatedReferral">
         ✨ رمز الدعوة الخاص بك: <span id="userReferralCode"></span>
       </div>
     </div>
@@ -98,14 +99,18 @@
   </div>
 
   <script>
-    // إعداد Supabase
     const SUPABASE_URL = 'https://ixnjzzhxmxjtcnbqaomq.supabase.co';
     const SUPABASE_ANON_KEY = 'sb_publishable_b2QCsdG8mtoRKVyLdhqAdw_UbxR3OI9';
     const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // توليد رمز دعوة عشوائي
     function generateReferralCode() {
       return Math.random().toString(36).substring(2, 10).toUpperCase();
+    }
+
+    function showMessage(msg, type) {
+      const div = document.getElementById('message');
+      div.innerHTML = `<div class="message ${type}">${msg}</div>`;
+      setTimeout(() => div.innerHTML = '', 5000);
     }
 
     // التبديل بين التبويبات
@@ -113,21 +118,15 @@
       document.getElementById('loginTab').classList.add('active');
       document.getElementById('registerTab').classList.remove('active');
       document.getElementById('loginForm').style.display = 'block';
-      document.getElementById('registerForm').style.display = 'none';
+      document.getElementById('registerForm').classList.add('hidden');
     };
 
     document.getElementById('registerTab').onclick = () => {
       document.getElementById('registerTab').classList.add('active');
       document.getElementById('loginTab').classList.remove('active');
       document.getElementById('loginForm').style.display = 'none';
-      document.getElementById('registerForm').style.display = 'block';
+      document.getElementById('registerForm').classList.remove('hidden');
     };
-
-    function showMessage(msg, type) {
-      const div = document.getElementById('message');
-      div.innerHTML = `<div class="message ${type}">${msg}</div>`;
-      setTimeout(() => div.innerHTML = '', 5000);
-    }
 
     // تسجيل الدخول
     document.getElementById('doLoginBtn').onclick = async () => {
@@ -150,7 +149,7 @@
       }
     };
 
-    // إنشاء حساب جديد
+    // إنشاء حساب
     document.getElementById('doRegisterBtn').onclick = async () => {
       const name = document.getElementById('regName').value;
       const email = document.getElementById('regEmail').value;
@@ -167,7 +166,6 @@
         return;
       }
 
-      // التحقق من رمز الدعوة (إذا وجد)
       let referrerId = null;
       if (referralCode) {
         const { data: referrer } = await supabase
@@ -184,7 +182,6 @@
         }
       }
 
-      // إنشاء المستخدم في Supabase Auth
       const { data, error } = await supabase.auth.signUp({
         email: email,
         password: password,
@@ -195,7 +192,6 @@
         return;
       }
 
-      // إضافة المستخدم إلى جدول users
       const newReferralCode = generateReferralCode();
       const { error: insertError } = await supabase
         .from('users')
@@ -213,16 +209,14 @@
         showMessage('❌ حدث خطأ في إنشاء الحساب', 'error');
       } else {
         document.getElementById('userReferralCode').innerText = newReferralCode;
-        document.getElementById('generatedReferral').style.display = 'block';
+        document.getElementById('generatedReferral').classList.remove('hidden');
         showMessage(`✅ تم إنشاء الحساب بنجاح! رمز الدعوة الخاص بك: ${newReferralCode}`, 'success');
         
-        // تفريغ الحقول
         document.getElementById('regName').value = '';
         document.getElementById('regEmail').value = '';
         document.getElementById('regPassword').value = '';
         document.getElementById('regReferral').value = '';
         
-        // التحول إلى نموذج تسجيل الدخول بعد 3 ثواني
         setTimeout(() => {
           document.getElementById('loginTab').click();
         }, 3000);
