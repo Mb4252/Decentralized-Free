@@ -5,83 +5,471 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>منصة الاستثمار | تسجيل الدخول</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
     body {
       min-height: 100vh;
-      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%);
+      font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       display: flex;
       align-items: center;
       justify-content: center;
       padding: 16px;
+      position: relative;
+      overflow-x: hidden;
     }
+
+    /* Animated Background */
+    body::before {
+      content: '';
+      position: absolute;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle at 20% 50%, rgba(233, 69, 96, 0.1) 0%, transparent 50%);
+      animation: rotate 20s linear infinite;
+      z-index: 0;
+    }
+
+    @keyframes rotate {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* Floating Bubbles */
+    .bubble {
+      position: absolute;
+      background: rgba(233, 69, 96, 0.15);
+      border-radius: 50%;
+      pointer-events: none;
+      animation: float 8s infinite ease-in-out;
+      z-index: 0;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0) scale(1); }
+      50% { transform: translateY(-20px) scale(1.05); }
+    }
+
+    /* Main Card */
     .card {
-      background: #0f3460;
-      border-radius: 24px;
+      position: relative;
+      z-index: 1;
+      background: rgba(26, 26, 46, 0.95);
+      backdrop-filter: blur(20px);
+      border-radius: 32px;
       padding: 40px;
-      max-width: 450px;
+      max-width: 500px;
       width: 100%;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(233, 69, 96, 0.2);
+      animation: fadeInUp 0.6s ease-out;
     }
-    h1 { font-size: 32px; color: #e94560; text-align: center; margin-bottom: 32px; }
-    input {
-      width: 100%;
-      padding: 14px;
-      margin-bottom: 16px;
-      border-radius: 12px;
+
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* Logo Section */
+    .logo {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    .logo-icon {
+      font-size: 64px;
+      margin-bottom: 8px;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+    .logo h1 {
+      font-size: 32px;
+      color: #e94560;
+      background: linear-gradient(135deg, #e94560, #ff6b6b);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      margin-bottom: 8px;
+    }
+    .logo p {
+      color: #a0aec0;
+      font-size: 14px;
+    }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 32px;
+      background: #0f0f1a;
+      padding: 6px;
+      border-radius: 60px;
+    }
+    .tab {
+      flex: 1;
+      padding: 12px;
+      text-align: center;
+      background: transparent;
       border: none;
-      background: #1a1a2e;
-      color: white;
+      border-radius: 50px;
+      color: #a0aec0;
+      cursor: pointer;
       font-size: 16px;
+      font-weight: 600;
+      transition: all 0.3s;
     }
-    button {
+    .tab.active {
+      background: linear-gradient(135deg, #e94560, #ff6b6b);
+      color: white;
+      box-shadow: 0 4px 15px rgba(233, 69, 96, 0.3);
+    }
+
+    /* Input Groups */
+    .input-group {
+      margin-bottom: 20px;
+      position: relative;
+    }
+    .input-group label {
+      display: block;
+      color: #a0aec0;
+      margin-bottom: 8px;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .input-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+    .input-wrapper input {
+      width: 100%;
+      padding: 14px 16px;
+      padding-right: 45px;
+      border-radius: 16px;
+      border: 1px solid #2d3748;
+      background: #0f0f1a;
+      color: white;
+      font-size: 14px;
+      transition: all 0.3s;
+    }
+    .input-wrapper input:focus {
+      outline: none;
+      border-color: #e94560;
+      box-shadow: 0 0 0 3px rgba(233, 69, 96, 0.2);
+    }
+    .input-icon {
+      position: absolute;
+      right: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 18px;
+    }
+    .toggle-password {
+      position: absolute;
+      left: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      cursor: pointer;
+      color: #a0aec0;
+      font-size: 18px;
+      transition: color 0.3s;
+      z-index: 2;
+    }
+    .toggle-password:hover {
+      color: #e94560;
+    }
+
+    /* Password Strength */
+    .password-strength {
+      margin-top: 8px;
+      height: 4px;
+      background: #2d3748;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .strength-bar {
+      width: 0%;
+      height: 100%;
+      transition: width 0.3s, background 0.3s;
+    }
+    .strength-text {
+      font-size: 11px;
+      margin-top: 6px;
+      color: #a0aec0;
+    }
+
+    /* Buttons */
+    .btn-primary {
       width: 100%;
       padding: 14px;
-      background: #e94560;
+      background: linear-gradient(135deg, #e94560, #ff6b6b);
       color: white;
       border: none;
-      border-radius: 12px;
+      border-radius: 60px;
       font-size: 16px;
       font-weight: bold;
       cursor: pointer;
+      transition: all 0.3s;
+      margin-top: 8px;
+    }
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px -5px rgba(233, 69, 96, 0.4);
+    }
+    .btn-primary:disabled {
+      opacity: 0.6;
+      transform: none;
     }
     .link-btn {
+      width: 100%;
       background: transparent;
+      border: 1px solid rgba(233, 69, 96, 0.5);
       color: #e94560;
+      padding: 14px;
+      border-radius: 60px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.3s;
       margin-top: 12px;
-      border: 1px solid #e94560;
     }
-    .message { margin-top: 16px; padding: 12px; border-radius: 8px; text-align: center; font-size: 14px; }
-    .error { background: #ef444420; border: 1px solid #ef4444; color: #ef4444; }
-    .success { background: #22c55e20; border: 1px solid #22c55e; color: #22c55e; }
-    .hidden { display: none; }
+    .link-btn:hover {
+      background: rgba(233, 69, 96, 0.1);
+      border-color: #e94560;
+    }
+
+    /* Message */
+    .message {
+      margin-top: 20px;
+      padding: 12px;
+      border-radius: 16px;
+      text-align: center;
+      font-size: 14px;
+      animation: fadeIn 0.3s;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .success {
+      background: rgba(34, 197, 94, 0.15);
+      border: 1px solid #22c55e;
+      color: #22c55e;
+    }
+    .error {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid #ef4444;
+      color: #ef4444;
+    }
+    .info {
+      background: rgba(59, 130, 246, 0.15);
+      border: 1px solid #3b82f6;
+      color: #3b82f6;
+    }
+
+    /* Stats Cards */
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 32px;
+    }
+    .stat-box {
+      background: rgba(15, 15, 26, 0.8);
+      padding: 16px;
+      border-radius: 20px;
+      text-align: center;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(233, 69, 96, 0.2);
+      transition: transform 0.3s;
+    }
+    .stat-box:hover {
+      transform: translateY(-3px);
+      border-color: rgba(233, 69, 96, 0.5);
+    }
+    .stat-number {
+      display: block;
+      font-size: 24px;
+      font-weight: bold;
+      color: #e94560;
+    }
+    .stat-label {
+      font-size: 12px;
+      color: #a0aec0;
+    }
+
+    /* Hidden Class */
+    .hidden {
+      display: none;
+    }
+
+    /* Responsive */
+    @media (max-width: 480px) {
+      .card { padding: 24px; }
+      .logo h1 { font-size: 28px; }
+    }
   </style>
 </head>
 <body>
+
+  <!-- Floating Bubbles -->
+  <div class="bubble" style="width: 150px; height: 150px; top: 10%; left: -50px;"></div>
+  <div class="bubble" style="width: 100px; height: 100px; bottom: 20%; right: -30px; animation-delay: 2s;"></div>
+  <div class="bubble" style="width: 80px; height: 80px; top: 50%; right: 10%; animation-delay: 4s;"></div>
+  <div class="bubble" style="width: 200px; height: 200px; bottom: -50px; left: 20%; animation-delay: 1s;"></div>
+
   <div class="card">
-    <h1>💰 منصة الاستثمار</h1>
-    
-    <div id="loginForm">
-      <input type="email" id="loginEmail" placeholder="البريد الإلكتروني">
-      <input type="password" id="loginPassword" placeholder="كلمة المرور">
-      <button id="doLoginBtn">تسجيل الدخول</button>
-      <button id="showRegisterBtn" class="link-btn">إنشاء حساب جديد</button>
+    <!-- Logo -->
+    <div class="logo">
+      <div class="logo-icon">💰</div>
+      <h1>منصة الاستثمار</h1>
+      <p>استثمر بأمان | أرباح يومية تصل إلى 3.5%</p>
     </div>
 
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" id="loginTab">تسجيل الدخول</button>
+      <button class="tab" id="registerTab">إنشاء حساب</button>
+    </div>
+
+    <!-- Login Form -->
+    <div id="loginForm">
+      <div class="input-group">
+        <label>📧 البريد الإلكتروني</label>
+        <div class="input-wrapper">
+          <span class="input-icon">📧</span>
+          <input type="email" id="loginEmail" placeholder="example@email.com">
+        </div>
+      </div>
+      <div class="input-group">
+        <label>🔒 كلمة المرور</label>
+        <div class="input-wrapper">
+          <span class="input-icon">🔒</span>
+          <input type="password" id="loginPassword" placeholder="********">
+          <span class="toggle-password" onclick="togglePassword('loginPassword', this)">👁️</span>
+        </div>
+      </div>
+      <button class="btn-primary" id="doLoginBtn">تسجيل الدخول</button>
+    </div>
+
+    <!-- Register Form -->
     <div id="registerForm" class="hidden">
-      <input type="text" id="regName" placeholder="اسم المستخدم">
-      <input type="email" id="regEmail" placeholder="البريد الإلكتروني">
-      <input type="password" id="regPassword" placeholder="كلمة المرور">
-      <input type="password" id="regConfirmPassword" placeholder="تأكيد كلمة المرور">
-      <input type="text" id="regReferral" placeholder="رمز الدعوة (اختياري)">
-      <button id="doRegisterBtn">إنشاء حساب</button>
-      <button id="showLoginBtn" class="link-btn">لديك حساب؟ تسجيل الدخول</button>
+      <div class="input-group">
+        <label>👤 اسم المستخدم</label>
+        <div class="input-wrapper">
+          <span class="input-icon">👤</span>
+          <input type="text" id="regName" placeholder="أدخل اسمك">
+        </div>
+      </div>
+      <div class="input-group">
+        <label>📧 البريد الإلكتروني</label>
+        <div class="input-wrapper">
+          <span class="input-icon">📧</span>
+          <input type="email" id="regEmail" placeholder="example@email.com">
+        </div>
+      </div>
+      <div class="input-group">
+        <label>🔒 كلمة المرور</label>
+        <div class="input-wrapper">
+          <span class="input-icon">🔒</span>
+          <input type="password" id="regPassword" placeholder="********" onkeyup="checkPasswordStrength()">
+          <span class="toggle-password" onclick="togglePassword('regPassword', this)">👁️</span>
+        </div>
+        <div class="password-strength">
+          <div class="strength-bar" id="strengthBar"></div>
+        </div>
+        <div class="strength-text" id="strengthText"></div>
+      </div>
+      <div class="input-group">
+        <label>✔️ تأكيد كلمة المرور</label>
+        <div class="input-wrapper">
+          <span class="input-icon">✔️</span>
+          <input type="password" id="regConfirmPassword" placeholder="********">
+          <span class="toggle-password" onclick="togglePassword('regConfirmPassword', this)">👁️</span>
+        </div>
+      </div>
+      <div class="input-group">
+        <label>🎁 رمز الدعوة (اختياري)</label>
+        <div class="input-wrapper">
+          <span class="input-icon">🎁</span>
+          <input type="text" id="regReferral" placeholder="XXXXXX">
+        </div>
+      </div>
+      <button class="btn-primary" id="doRegisterBtn">إنشاء حساب</button>
+      <div id="generatedReferral" class="info hidden" style="margin-top: 16px; padding: 12px; text-align: center; border-radius: 16px;">
+        ✨ رمز الدعوة الخاص بك: <strong id="userReferralCode"></strong>
+      </div>
     </div>
 
     <div id="message"></div>
+
+    <!-- Stats -->
+    <div class="stats">
+      <div class="stat-box">
+        <span class="stat-number">5,941+</span>
+        <span class="stat-label">مستخدم نشط</span>
+      </div>
+      <div class="stat-box">
+        <span class="stat-number">$64K+</span>
+        <span class="stat-label">إجمالي الأرباح</span>
+      </div>
+    </div>
   </div>
 
   <script>
     const API_URL = window.location.origin;
+
+    // ========== Password Toggle Function ==========
+    function togglePassword(inputId, element) {
+      const input = document.getElementById(inputId);
+      if (input.type === 'password') {
+        input.type = 'text';
+        element.innerHTML = '🙈';
+      } else {
+        input.type = 'password';
+        element.innerHTML = '👁️';
+      }
+    }
+
+    // ========== Password Strength Checker ==========
+    function checkPasswordStrength() {
+      const password = document.getElementById('regPassword').value;
+      const strengthBar = document.getElementById('strengthBar');
+      const strengthText = document.getElementById('strengthText');
+      
+      let strength = 0;
+      let message = '';
+      let color = '#ef4444';
+      
+      if (password.length >= 6) strength++;
+      if (password.length >= 10) strength++;
+      if (/[A-Z]/.test(password)) strength++;
+      if (/[0-9]/.test(password)) strength++;
+      if (/[^A-Za-z0-9]/.test(password)) strength++;
+      
+      const percent = (strength / 5) * 100;
+      strengthBar.style.width = percent + '%';
+      
+      if (strength === 0) { message = 'ضعيف جداً'; color = '#ef4444'; }
+      else if (strength === 1) { message = 'ضعيف'; color = '#f97316'; }
+      else if (strength === 2) { message = 'متوسط'; color = '#eab308'; }
+      else if (strength === 3) { message = 'جيد'; color = '#22c55e'; }
+      else { message = 'قوي جداً'; color = '#22c55e'; }
+      
+      strengthBar.style.background = color;
+      strengthText.innerHTML = `قوة كلمة المرور: ${message}`;
+      strengthText.style.color = color;
+    }
 
     function showMessage(msg, type) {
       const div = document.getElementById('message');
@@ -89,16 +477,24 @@
       setTimeout(() => div.innerHTML = '', 5000);
     }
 
-    document.getElementById('showRegisterBtn').onclick = () => {
+    // ========== Tabs ==========
+    document.getElementById('loginTab').onclick = () => {
+      document.getElementById('loginTab').classList.add('active');
+      document.getElementById('registerTab').classList.remove('active');
+      document.getElementById('loginForm').classList.remove('hidden');
+      document.getElementById('registerForm').classList.add('hidden');
+      document.getElementById('message').innerHTML = '';
+    };
+
+    document.getElementById('registerTab').onclick = () => {
+      document.getElementById('registerTab').classList.add('active');
+      document.getElementById('loginTab').classList.remove('active');
       document.getElementById('loginForm').classList.add('hidden');
       document.getElementById('registerForm').classList.remove('hidden');
+      document.getElementById('message').innerHTML = '';
     };
 
-    document.getElementById('showLoginBtn').onclick = () => {
-      document.getElementById('registerForm').classList.add('hidden');
-      document.getElementById('loginForm').classList.remove('hidden');
-    };
-
+    // ========== Login ==========
     document.getElementById('doLoginBtn').onclick = async () => {
       const email = document.getElementById('loginEmail').value;
       const password = document.getElementById('loginPassword').value;
@@ -117,17 +513,10 @@
         
         const data = await response.json();
         
-        if (data.user) {
+        if (data.success) {
           localStorage.setItem('userId', data.user.id);
-          localStorage.setItem('user', JSON.stringify(data.user));
-          if (data.profile?.is_admin) {
-            localStorage.setItem('isAdmin', 'true');
-            showMessage('✅ مرحباً أيها المدير! جاري التحويل...', 'success');
-            setTimeout(() => { window.location.href = '/admin.html'; }, 1000);
-          } else {
-            showMessage('✅ تم تسجيل الدخول بنجاح!', 'success');
-            setTimeout(() => { window.location.href = '/dashboard.html'; }, 1000);
-          }
+          showMessage('✅ تم تسجيل الدخول بنجاح! جاري التحويل...', 'success');
+          setTimeout(() => { window.location.href = '/dashboard.html'; }, 1500);
         } else {
           showMessage('❌ ' + (data.error || 'فشل تسجيل الدخول'), 'error');
         }
@@ -136,6 +525,7 @@
       }
     };
 
+    // ========== Register ==========
     document.getElementById('doRegisterBtn').onclick = async () => {
       const name = document.getElementById('regName').value;
       const email = document.getElementById('regEmail').value;
@@ -153,8 +543,8 @@
         return;
       }
 
-      if (password.length < 6) {
-        showMessage('⚠️ كلمة المرور يجب أن تكون 6 أحرف على الأقل', 'error');
+      if (password.length < 4) {
+        showMessage('⚠️ كلمة المرور يجب أن تكون 4 أحرف على الأقل', 'error');
         return;
       }
 
@@ -169,15 +559,11 @@
         
         if (data.success) {
           localStorage.setItem('userId', data.user.id);
-          localStorage.setItem('user', JSON.stringify(data.user));
-          if (data.is_admin) localStorage.setItem('isAdmin', 'true');
+          document.getElementById('userReferralCode').innerText = data.referral_code;
+          document.getElementById('generatedReferral').classList.remove('hidden');
           showMessage(`✅ تم إنشاء الحساب بنجاح! رمز الدعوة: ${data.referral_code}`, 'success');
           setTimeout(() => { 
-            if (data.is_admin) {
-              window.location.href = '/admin.html';
-            } else {
-              window.location.href = '/dashboard.html';
-            }
+            window.location.href = '/dashboard.html';
           }, 2000);
         } else {
           showMessage('❌ ' + (data.error || 'فشل إنشاء الحساب'), 'error');
