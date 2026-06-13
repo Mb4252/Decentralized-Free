@@ -57,34 +57,46 @@
   <div class="content" id="mainContent"></div>
 
   <script>
-    let users = JSON.parse(localStorage.getItem('users') || '[]');
-    let depositRequests = JSON.parse(localStorage.getItem('depositRequests') || '[]');
-    let withdrawRequests = JSON.parse(localStorage.getItem('withdrawRequests') || '[]');
+    const API_URL = window.location.origin;
+    let userId = localStorage.getItem('userId');
     
-    const adminEmail = 'admin@example.com';
-    const adminPassword = 'admin123';
-
-    function checkAdmin() {
-      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-      if (currentUser.email !== adminEmail) {
+    async function checkAdmin() {
+      if (!userId) {
+        window.location.href = '/';
+        return;
+      }
+      
+      const response = await fetch(`${API_URL}/api/user`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId })
+      });
+      const user = await response.json();
+      
+      if (!user.is_admin) {
+        alert('ليس لديك صلاحية الدخول إلى لوحة التحكم');
         window.location.href = '/';
       }
     }
 
-    function saveData() {
-      localStorage.setItem('users', JSON.stringify(users));
-      localStorage.setItem('depositRequests', JSON.stringify(depositRequests));
-      localStorage.setItem('withdrawRequests', JSON.stringify(withdrawRequests));
+    async function fetchData(endpoint) {
+      const response = await fetch(`${API_URL}/api/admin/${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId })
+      });
+      return response.json();
     }
 
-    function renderDeposits() {
-      const pending = depositRequests.filter(d => d.status === 'pending');
-      const history = depositRequests.filter(d => d.status !== 'pending');
+    async function renderDeposits() {
+      const deposits = await fetchData('deposits');
+      const pending = deposits.filter(d => d.status === 'pending');
+      const history = deposits.filter(d => d.status !== 'pending');
       
       document.getElementById('mainContent').innerHTML = `
         <div class="stats-grid">
           <div class="stat-card"><p>⏳ قيد الانتظار</p><p class="stat-value">${pending.length}</p></div>
-          <div class="stat-card"><p>💰 إجمالي الإيداعات</p><p class="stat-value">${depositRequests.reduce((s,d) => s + d.amount, 0)} USDT</p></div>
+          <div class="stat-card"><p>💰 إجمالي الإيداعات</p><p class="stat-value">${deposits.reduce((s,d) => s + d.amount, 0)} USDT</p></div>
         </div>
         
         <div class="card">
@@ -106,17 +118,14 @@
           <table>
             <thead><tr><th>المستخدم</th><th>المبلغ</th><th>التاريخ</th><th>إجراءات</th></tr></thead>
             <tbody>
-              ${pending.map(d => {
-                const user = users.find(u => u.id === d.user_id);
-                return `
-                  <tr>
-                    <td>${user?.name || user?.email || 'غير معروف'}</td>
-                    <td>${d.amount} USDT</td>
-                    <td>${new Date(d.created_at).toLocaleDateString('ar')}</td>
-                    <td><button class="approve-btn" data-id="${d.id}" data-type="deposit" data-action="approve">موافقة</button><button class="reject-btn" data-id="${d.id}" data-type="deposit" data-action="reject">رفض</button></td>
-                  </tr>
-                `;
-              }).join('')}
+              ${pending.map(d => `
+                <tr>
+                  <td>${d.users?.name || d.users?.email || 'غير معروف'}</td>
+                  <td>${d.amount} USDT</td>
+                  <td>${new Date(d.created_at).toLocaleDateString('ar')}</td>
+                  <td><button class="approve-btn" data-id="${d.id}" data-type="deposit" data-action="approve" data-user="${d.user_id}" data-amount="${d.amount}">موافقة</button><button class="reject-btn" data-id="${d.id}" data-type="deposit" data-action="reject">رفض</button></td>
+                </tr>
+              `).join('')}
             </tbody>
           </table>
         `;
@@ -130,72 +139,31 @@
           <table>
             <thead><tr><th>المستخدم</th><th>المبلغ</th><th>التاريخ</th><th>الحالة</th></tr></thead>
             <tbody>
-              ${history.map(d => {
-                const user = users.find(u => u.id === d.user_id);
-                return `
-                  <tr>
-                    <td>${user?.name || user?.email || 'غير معروف'}</td>
-                    <td>${d.amount} USDT</td>
-                    <td>${new Date(d.created_at).toLocaleDateString('ar')}</td>
-                    <td class="status-${d.status}">${d.status === 'approved' ? 'تمت الموافقة' : 'مرفوض'}</td>
-                  </tr>
-                `;
-              }).join('')}
+              ${history.map(d => `
+                <tr>
+                  <td>${d.users?.name || d.users?.email || 'غير معروف'}</td>
+                  <td>${d.amount} USDT</td>
+                  <td>${new Date(d.created_at).toLocaleDateString('ar')}</td>
+                  <td class="status-${d.status}">${d.status === 'approved' ? 'تمت الموافقة' : 'مرفوض'}</td>
+                </tr>
+              `).join('')}
             </tbody>
           </table>
         `;
       }
       
-      document.querySelectorAll('.approve-btn, .reject-btn').forEach(btn => {
-        btn.onclick = () => {
-          const id = parseInt(btn.getAttribute('data-id'));
-          const type = btn.getAttribute('data-type');
-          const action = btn.getAttribute('data-action');
-          
-          if (type === 'deposit') {
-            const request = depositRequests.find(r => r.id === id);
-            if (action === 'approve') {
-              request.status = 'approved';
-              const user = users.find(u => u.id === request.user_id);
-              if (user) {
-                user.active_deposit = (user.active_deposit || 0) + request.amount;
-                user.total_deposited = (user.total_deposited || 0) + request.amount;
-              }
-            } else {
-              request.status = 'rejected';
-            }
-          } else if (type === 'withdraw') {
-            const request = withdrawRequests.find(r => r.id === id);
-            if (action === 'approve') {
-              request.status = 'approved';
-              const user = users.find(u => u.id === request.user_id);
-              if (user) {
-                user.available_balance = (user.available_balance || 0) - request.amount;
-                user.total_withdrawn = (user.total_withdrawn || 0) + request.amount;
-              }
-            } else {
-              request.status = 'rejected';
-              const user = users.find(u => u.id === request.user_id);
-              if (user) {
-                user.available_balance = (user.available_balance || 0) + request.amount;
-              }
-            }
-          }
-          
-          saveData();
-          renderDeposits();
-        };
-      });
+      attachEvents();
     }
 
-    function renderWithdrawals() {
-      const pending = withdrawRequests.filter(w => w.status === 'pending');
-      const history = withdrawRequests.filter(w => w.status !== 'pending');
+    async function renderWithdrawals() {
+      const withdrawals = await fetchData('withdrawals');
+      const pending = withdrawals.filter(w => w.status === 'pending');
+      const history = withdrawals.filter(w => w.status !== 'pending');
       
       document.getElementById('mainContent').innerHTML = `
         <div class="stats-grid">
           <div class="stat-card"><p>⏳ قيد الانتظار</p><p class="stat-value">${pending.length}</p></div>
-          <div class="stat-card"><p>📤 إجمالي السحوبات</p><p class="stat-value">${withdrawRequests.reduce((s,w) => s + w.amount, 0)} USDT</p></div>
+          <div class="stat-card"><p>📤 إجمالي السحوبات</p><p class="stat-value">${withdrawals.reduce((s,w) => s + w.amount, 0)} USDT</p></div>
         </div>
         
         <div class="card">
@@ -217,18 +185,15 @@
           <table>
             <thead><tr><th>المستخدم</th><th>المبلغ</th><th>المحفظة</th><th>التاريخ</th><th>إجراءات</th></tr></thead>
             <tbody>
-              ${pending.map(w => {
-                const user = users.find(u => u.id === w.user_id);
-                return `
-                  <tr>
-                    <td>${user?.name || user?.email || 'غير معروف'}</td>
-                    <td>${w.amount} USDT</td>
-                    <td>${w.wallet_address?.substring(0, 15)}...</td>
-                    <td>${new Date(w.created_at).toLocaleDateString('ar')}</td>
-                    <td><button class="approve-btn" data-id="${w.id}" data-type="withdraw" data-action="approve">صرف</button><button class="reject-btn" data-id="${w.id}" data-type="withdraw" data-action="reject">رفض</button></td>
-                  </tr>
-                `;
-              }).join('')}
+              ${pending.map(w => `
+                <tr>
+                  <td>${w.users?.name || w.users?.email || 'غير معروف'}</td>
+                  <td>${w.amount} USDT</td>
+                  <td>${w.wallet_address?.substring(0, 15)}...</td>
+                  <td>${new Date(w.created_at).toLocaleDateString('ar')}</td>
+                  <td><button class="approve-btn" data-id="${w.id}" data-type="withdraw" data-action="approve" data-user="${w.user_id}" data-amount="${w.amount}">صرف</button><button class="reject-btn" data-id="${w.id}" data-type="withdraw" data-action="reject" data-user="${w.user_id}" data-amount="${w.amount}">رفض</button></td>
+                </tr>
+              `).join('')}
             </tbody>
           </table>
         `;
@@ -242,24 +207,25 @@
           <table>
             <thead><tr><th>المستخدم</th><th>المبلغ</th><th>التاريخ</th><th>الحالة</th></tr></thead>
             <tbody>
-              ${history.map(w => {
-                const user = users.find(u => u.id === w.user_id);
-                return `
-                  <tr>
-                    <td>${user?.name || user?.email || 'غير معروف'}</td>
-                    <td>${w.amount} USDT</td>
-                    <td>${new Date(w.created_at).toLocaleDateString('ar')}</td>
-                    <td class="status-${w.status}">${w.status === 'approved' ? 'تم الصرف' : 'مرفوض'}</td>
-                  </tr>
-                `;
-              }).join('')}
+              ${history.map(w => `
+                <tr>
+                  <td>${w.users?.name || w.users?.email || 'غير معروف'}</td>
+                  <td>${w.amount} USDT</td>
+                  <td>${new Date(w.created_at).toLocaleDateString('ar')}</td>
+                  <td class="status-${w.status}">${w.status === 'approved' ? 'تم الصرف' : 'مرفوض'}</td>
+                </tr>
+              `).join('')}
             </tbody>
           </table>
         `;
       }
+      
+      attachEvents();
     }
 
-    function renderUsers() {
+    async function renderUsers() {
+      const users = await fetchData('users');
+      
       document.getElementById('mainContent').innerHTML = `
         <div class="stats-grid">
           <div class="stat-card"><p>👥 إجمالي المستخدمين</p><p class="stat-value">${users.length}</p></div>
@@ -276,7 +242,7 @@
       usersDiv.innerHTML = `
         <table>
           <thead>
-            <tr><th>الاسم</th><th>البريد</th><th>الباقة</th><th>الاستثمار</th><th>الرصيد</th><th>كود الدعوة</th><th>تاريخ التسجيل</th></tr>
+            <tr><th>الاسم</th><th>البريد</th><th>الباقة</th><th>الاستثمار</th><th>الرصيد</th><th>كود الدعوة</th><th>مدير</th></tr>
           </thead>
           <tbody>
             ${users.map(u => `
@@ -287,7 +253,7 @@
                 <td>${u.active_deposit || 0} USDT</td>
                 <td>${u.available_balance || 0} USDT</td>
                 <td>${u.referral_code}</td>
-                <td>${new Date(u.created_at).toLocaleDateString('ar')}</td>
+                <td>${u.is_admin ? '✅' : '❌'}</td>
               </tr>
             `).join('')}
           </tbody>
@@ -295,24 +261,68 @@
       `;
     }
 
+    async function callAdminAPI(endpoint, data) {
+      const response = await fetch(`${API_URL}/api/admin/${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, ...data })
+      });
+      return response.json();
+    }
+
+    function attachEvents() {
+      document.querySelectorAll('.approve-btn, .reject-btn').forEach(btn => {
+        btn.onclick = async () => {
+          const id = parseInt(btn.getAttribute('data-id'));
+          const type = btn.getAttribute('data-type');
+          const action = btn.getAttribute('data-action');
+          const targetUserId = btn.getAttribute('data-user');
+          const amount = parseFloat(btn.getAttribute('data-amount'));
+          
+          if (type === 'deposit') {
+            if (action === 'approve') {
+              await callAdminAPI('approve-deposit', { depositId: id, userId: targetUserId, amount });
+            } else {
+              await callAdminAPI('reject-deposit', { depositId: id });
+            }
+          } else if (type === 'withdraw') {
+            if (action === 'approve') {
+              await callAdminAPI('approve-withdraw', { withdrawalId: id, userId: targetUserId, amount });
+            } else {
+              await callAdminAPI('reject-withdraw', { withdrawalId: id, userId: targetUserId, amount });
+            }
+          }
+          
+          // إعادة تحميل البيانات
+          const activeTab = document.querySelector('.nav-link.active').getAttribute('data-tab');
+          if (activeTab === 'deposits') await renderDeposits();
+          else if (activeTab === 'withdrawals') await renderWithdrawals();
+        };
+      });
+    }
+
     document.getElementById('logoutBtn').onclick = () => {
-      localStorage.removeItem('currentUser');
+      localStorage.removeItem('userId');
+      localStorage.removeItem('user');
+      localStorage.removeItem('isAdmin');
       window.location.href = '/';
     };
 
     document.querySelectorAll('.nav-link').forEach(link => {
-      link.onclick = () => {
+      link.onclick = async () => {
         document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
         link.classList.add('active');
         const tab = link.getAttribute('data-tab');
-        if (tab === 'deposits') renderDeposits();
-        else if (tab === 'withdrawals') renderWithdrawals();
-        else if (tab === 'users') renderUsers();
+        if (tab === 'deposits') await renderDeposits();
+        else if (tab === 'withdrawals') await renderWithdrawals();
+        else if (tab === 'users') await renderUsers();
       };
     });
 
-    checkAdmin();
-    renderDeposits();
+    (async () => {
+      await checkAdmin();
+      await renderDeposits();
+    })();
   </script>
 </body>
 </html>
