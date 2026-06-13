@@ -128,7 +128,7 @@
 
   <script>
     const API_URL = window.location.origin;
-    let userId = localStorage.getItem('userId');
+    let userId = null;
     let userData = null;
 
     const packages = {
@@ -140,26 +140,51 @@
       vip: { name: 'VIP', price: 1000, roi: 3.5, daily_limit: 500, withdraw_limit: 2000 }
     };
 
+    async function testConnection() {
+      try {
+        const response = await fetch(`${API_URL}/api/health`);
+        const data = await response.json();
+        console.log('✅ Server connected:', data);
+        return true;
+      } catch (error) {
+        console.error('❌ Server connection failed:', error);
+        return false;
+      }
+    }
+
     async function loadUserData() {
+      userId = localStorage.getItem('userId');
+      
       if (!userId) {
+        console.log('No userId found');
         window.location.href = '/';
-        return;
+        return false;
       }
       
-      const response = await fetch(`${API_URL}/api/user`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId })
-      });
-      
-      const data = await response.json();
-      if (data.error) {
+      try {
+        const response = await fetch(`${API_URL}/api/user`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId })
+        });
+        
+        const data = await response.json();
+        
+        if (data.error) {
+          console.log('User not found:', data.error);
+          localStorage.removeItem('userId');
+          window.location.href = '/';
+          return false;
+        }
+        
+        userData = data;
+        document.getElementById('userName').innerHTML = `مرحباً ${userData.name}`;
+        return true;
+      } catch (error) {
+        console.error('Error loading user:', error);
         window.location.href = '/';
-        return;
+        return false;
       }
-      
-      userData = data;
-      document.getElementById('userName').innerHTML = `مرحباً ${userData.name}`;
     }
 
     function checkFirstTime() {
@@ -183,7 +208,6 @@
     }
 
     async function renderDashboard() {
-      // جلب بيانات الإحالات
       const referralsRes = await fetch(`${API_URL}/api/referrals`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -415,14 +439,20 @@
     document.getElementById('logoutBtn').onclick = () => {
       localStorage.removeItem('userId');
       localStorage.removeItem('user');
-      localStorage.removeItem('isAdmin');
       window.location.href = '/';
     };
 
     (async () => {
-      await loadUserData();
-      checkFirstTime();
-      renderDashboard();
+      const connected = await testConnection();
+      if (!connected) {
+        document.getElementById('mainContent').innerHTML = '<div class="message error">❌ لا يمكن الاتصال بالخادم. يرجى المحاولة لاحقاً.</div>';
+        return;
+      }
+      const loaded = await loadUserData();
+      if (loaded) {
+        checkFirstTime();
+        renderDashboard();
+      }
     })();
   </script>
 </body>
