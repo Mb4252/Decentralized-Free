@@ -76,14 +76,12 @@
       <button class="tab" id="registerTab">إنشاء حساب</button>
     </div>
 
-    <!-- نموذج تسجيل الدخول -->
     <div id="loginForm">
       <input type="email" id="loginEmail" placeholder="البريد الإلكتروني">
       <input type="password" id="loginPassword" placeholder="كلمة المرور">
       <button id="doLoginBtn">تسجيل الدخول</button>
     </div>
 
-    <!-- نموذج إنشاء حساب -->
     <div id="registerForm" class="hidden">
       <input type="text" id="regName" placeholder="اسم المستخدم">
       <input type="email" id="regEmail" placeholder="البريد الإلكتروني">
@@ -99,6 +97,7 @@
   </div>
 
   <script>
+    // ⚠️ هذه المفاتيح معروفة ولكن RLS تحمي البيانات
     const SUPABASE_URL = 'https://ixnjzzhxmxjtcnbqaomq.supabase.co';
     const SUPABASE_ANON_KEY = 'sb_publishable_b2QCsdG8mtoRKVyLdhqAdw_UbxR3OI9';
     const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -113,7 +112,6 @@
       setTimeout(() => div.innerHTML = '', 5000);
     }
 
-    // التبديل بين التبويبات
     document.getElementById('loginTab').onclick = () => {
       document.getElementById('loginTab').classList.add('active');
       document.getElementById('registerTab').classList.remove('active');
@@ -128,7 +126,6 @@
       document.getElementById('registerForm').classList.remove('hidden');
     };
 
-    // تسجيل الدخول
     document.getElementById('doLoginBtn').onclick = async () => {
       const email = document.getElementById('loginEmail').value;
       const password = document.getElementById('loginPassword').value;
@@ -143,13 +140,12 @@
       if (error) {
         showMessage('❌ ' + error.message, 'error');
       } else {
-        showMessage('✅ تم تسجيل الدخول بنجاح! جاري التحويل...', 'success');
+        showMessage('✅ تم تسجيل الدخول بنجاح!', 'success');
         localStorage.setItem('user', JSON.stringify(data.user));
         setTimeout(() => { window.location.href = '/dashboard.html'; }, 1500);
       }
     };
 
-    // إنشاء حساب
     document.getElementById('doRegisterBtn').onclick = async () => {
       const name = document.getElementById('regName').value;
       const email = document.getElementById('regEmail').value;
