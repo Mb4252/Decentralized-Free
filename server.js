@@ -26,6 +26,11 @@ const supabaseAdmin = createClient(
 );
 
 // ========================================
+// البريد الإلكتروني للمدير (ثابت)
+// ========================================
+const ADMIN_EMAIL = 'mb425262@gmail.com';
+
+// ========================================
 // API: صحّة الخادم
 // ========================================
 app.get('/api/health', (req, res) => {
@@ -61,7 +66,7 @@ app.post('/api/login', async (req, res) => {
 });
 
 // ========================================
-// API: إنشاء حساب جديد (أول مستخدم يصبح مديراً)
+// API: إنشاء حساب جديد
 // ========================================
 app.post('/api/register', async (req, res) => {
   const { email, password, name, referralCode } = req.body;
@@ -85,11 +90,6 @@ app.post('/api/register', async (req, res) => {
     return res.status(400).json({ error: 'هذا البريد مسجل بالفعل' });
   }
   
-  // التحقق من عدد المستخدمين في النظام
-  const { count, error: countError } = await supabaseAdmin
-    .from('users')
-    .select('*', { count: 'exact', head: true });
-  
   // توليد رمز دعوة فريد
   const newReferralCode = Math.random().toString(36).substring(2, 10).toUpperCase();
   
@@ -104,8 +104,8 @@ app.post('/api/register', async (req, res) => {
     if (referrer) referrerId = referrer.id;
   }
   
-  // **المفتاح: أول مستخدم في النظام يصبح مديراً تلقائياً**
-  const isAdmin = (count === 0 || countError);
+  // **تحديد صلاحية المدير (البريد المحدد فقط)**
+  const isAdmin = (email === ADMIN_EMAIL);
   
   // إنشاء معرف فريد للمستخدم
   const userId = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString();
@@ -275,7 +275,7 @@ const checkAdmin = async (req, res, next) => {
   
   const { data: user } = await supabaseAdmin
     .from('users')
-    .select('is_admin')
+    .select('is_admin, email')
     .eq('id', userId)
     .single();
   
