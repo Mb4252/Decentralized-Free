@@ -1,19 +1,20 @@
--- =====================================================
--- قاعدة بيانات منصة الاستثمار
--- =====================================================
-
--- إنشاء الجداول
+-- إنشاء جدول المستخدمين
 CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY,
   email VARCHAR(255) UNIQUE NOT NULL,
   name VARCHAR(255),
   referral_code VARCHAR(20) UNIQUE NOT NULL,
   referrer_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  is_admin BOOLEAN DEFAULT FALSE,
+  package VARCHAR(50) DEFAULT 'basic',
   available_balance DECIMAL(20,8) DEFAULT 0,
   active_deposit DECIMAL(20,8) DEFAULT 0,
+  total_withdrawn DECIMAL(20,8) DEFAULT 0,
+  total_deposited DECIMAL(20,8) DEFAULT 0,
   created_at TIMESTAMP DEFAULT NOW()
 );
 
+-- إنشاء جدول طلبات الإيداع
 CREATE TABLE IF NOT EXISTS deposit_requests (
   id SERIAL PRIMARY KEY,
   user_id UUID REFERENCES users(id) ON DELETE CASCADE,
@@ -22,6 +23,7 @@ CREATE TABLE IF NOT EXISTS deposit_requests (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
+-- إنشاء جدول طلبات السحب
 CREATE TABLE IF NOT EXISTS withdrawals (
   id SERIAL PRIMARY KEY,
   user_id UUID REFERENCES users(id) ON DELETE CASCADE,
@@ -31,26 +33,7 @@ CREATE TABLE IF NOT EXISTS withdrawals (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
--- تفعيل RLS (Row Level Security)
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE deposit_requests ENABLE ROW LEVEL SECURITY;
-ALTER TABLE withdrawals ENABLE ROW LEVEL SECURITY;
-
--- سياسات الأمان
-CREATE POLICY "Users can insert own data" ON users
-  FOR INSERT WITH CHECK (auth.uid() = id);
-
-CREATE POLICY "Users can view own data" ON users
-  FOR SELECT USING (auth.uid() = id);
-
-CREATE POLICY "Users can insert own deposits" ON deposit_requests
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Users can view own deposits" ON deposit_requests
-  FOR SELECT USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can insert own withdrawals" ON withdrawals
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Users can view own withdrawals" ON withdrawals
-  FOR SELECT USING (auth.uid() = user_id);
+-- تعطيل RLS (لأننا نستخدم service_role)
+ALTER TABLE users DISABLE ROW LEVEL SECURITY;
+ALTER TABLE deposit_requests DISABLE ROW LEVEL SECURITY;
+ALTER TABLE withdrawals DISABLE ROW LEVEL SECURITY;
