@@ -1,12 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabase/client'
 
 export default function DashboardPage() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [activeDeposit, setActiveDeposit] = useState(0)
-  const [availableBalance, setAvailableBalance] = useState(0)
+  const [userData, setUserData] = useState(null)
   const [depositAmount, setDepositAmount] = useState('')
   const [withdrawAmount, setWithdrawAmount] = useState('')
   const [withdrawAddress, setWithdrawAddress] = useState('')
@@ -14,28 +14,51 @@ export default function DashboardPage() {
   const [messageType, setMessageType] = useState('')
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('user')
-    if (!storedUser) {
-      window.location.href = '/'
-      return
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        window.location.href = '/'
+        return
+      }
+      setUser(user)
+      
+      // جلب بيانات المستخدم من جدول users
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', user.email)
+        .single()
+      
+      if (data) {
+        setUserData(data)
+      } else if (!data && !error) {
+        // إنشاء مستخدم جديد
+        const { data: newUser } = await supabase
+          .from('users')
+          .insert({
+            email: user.email,
+            name: user.email?.split('@')[0],
+            available_balance: 0,
+            active_deposit: 0,
+            referral_code: Math.random().toString(36).substring(2, 10).toUpperCase()
+          })
+          .select()
+          .single()
+        setUserData(newUser)
+      }
+      
+      setLoading(false)
     }
-    setUser(JSON.parse(storedUser))
     
-    // تحميل البيانات المحفوظة
-    const savedActive = localStorage.getItem('activeDeposit')
-    const savedBalance = localStorage.getItem('availableBalance')
-    if (savedActive) setActiveDeposit(parseFloat(savedActive))
-    if (savedBalance) setAvailableBalance(parseFloat(savedBalance))
-    
-    setLoading(false)
+    getUser()
   }, [])
 
-  const handleLogout = () => {
-    localStorage.removeItem('user')
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
     window.location.href = '/'
   }
 
-  const handleDeposit = () => {
+  const handleDeposit = async () => {
     const amount = parseFloat(depositAmount)
     if (!amount || amount < 10) {
       setMessage('⚠️ الحد الأدنى للإيداع 10 USDT')
@@ -43,19 +66,28 @@ export default function DashboardPage() {
       return
     }
     
-    // تحديث الاستثمار النشط
-    const newActive = activeDeposit + amount
-    setActiveDeposit(newActive)
-    localStorage.setItem('activeDeposit', newActive)
+    // إنشاء طلب إيداع
+    const { error } = await supabase
+      .from('deposit_requests')
+      .insert({
+        user_id: userData?.id,
+        amount: amount,
+        status: 'pending'
+      })
     
-    setMessage(`✅ تم تقديم طلب إيداع بقيمة ${amount} USDT. يرجى إرسال المبلغ إلى المحفظة: 0x987cfde723a87b5ed33329eebe0595a4416b848f`)
-    setMessageType('success')
-    setDepositAmount('')
+    if (error) {
+      setMessage('❌ حدث خطأ، حاول مرة أخرى')
+      setMessageType('error')
+    } else {
+      setMessage(`✅ تم تقديم طلب إيداع بقيمة ${amount} USDT. يرجى إرسال المبلغ إلى المحفظة: 0x987cfde723a87b5ed33329eebe0595a4416b848f`)
+      setMessageType('success')
+      setDepositAmount('')
+    }
     
     setTimeout(() => setMessage(''), 5000)
   }
 
-  const handleWithdraw = () => {
+  const handleWithdraw = async () => {
     const amount = parseFloat(withdrawAmount)
     if (!amount || amount < 0.5) {
       setMessage('⚠️ الحد الأدنى للسحب 0.5 USDT')
@@ -67,36 +99,37 @@ export default function DashboardPage() {
       setMessageType('error')
       return
     }
-    if (amount > availableBalance) {
+    if (amount > (userData?.available_balance || 0)) {
       setMessage('⚠️ الرصيد غير كافٍ')
       setMessageType('error')
       return
     }
     
-    // تحديث الرصيد
-    const newBalance = availableBalance - amount
-    setAvailableBalance(newBalance)
-    localStorage.setItem('availableBalance', newBalance)
+    // إنشاء طلب سحب
+    const { error } = await supabase
+      .from('withdrawals')
+      .insert({
+        user_id: userData?.id,
+        amount: amount,
+        wallet_address: withdrawAddress,
+        status: 'pending'
+      })
     
-    setMessage(`✅ تم استلام طلب سحب ${amount} USDT. سيتم معالجته خلال 24 ساعة.`)
-    setMessageType('success')
-    setWithdrawAmount('')
-    setWithdrawAddress('')
+    if (error) {
+      setMessage('❌ حدث خطأ، حاول مرة أخرى')
+      setMessageType('error')
+    } else {
+      // تحديث الرصيد المحلي
+      const newBalance = (userData?.available_balance || 0) - amount
+      setUserData({ ...userData, available_balance: newBalance })
+      
+      setMessage(`✅ تم استلام طلب سحب ${amount} USDT. سيتم معالجته خلال 24 ساعة.`)
+      setMessageType('success')
+      setWithdrawAmount('')
+      setWithdrawAddress('')
+    }
     
     setTimeout(() => setMessage(''), 5000)
-  }
-
-  // إضافة أرباح يومية (محاكاة)
-  const addDailyProfit = () => {
-    if (activeDeposit > 0) {
-      const profit = activeDeposit * 0.02
-      const newBalance = availableBalance + profit
-      setAvailableBalance(newBalance)
-      localStorage.setItem('availableBalance', newBalance)
-      setMessage(`✅ تم إضافة أرباح اليوم: ${profit.toFixed(2)} USDT`)
-      setMessageType('success')
-      setTimeout(() => setMessage(''), 3000)
-    }
   }
 
   if (loading) {
@@ -105,7 +138,6 @@ export default function DashboardPage() {
 
   return (
     <div style={styles.container}>
-      {/* Navbar */}
       <nav style={styles.navbar}>
         <h1 style={styles.logo}>💰 CryptoMine</h1>
         <div style={styles.userInfo}>
@@ -114,15 +146,13 @@ export default function DashboardPage() {
         </div>
       </nav>
 
-      {/* Main Content */}
       <div style={styles.content}>
-        {/* Stats Cards */}
         <div style={styles.statsGrid}>
           <div style={styles.statCard}>
             <div style={styles.statIcon}>💰</div>
             <div>
               <p style={styles.statLabel}>الاستثمار النشط</p>
-              <p style={styles.statValue}>{activeDeposit.toFixed(2)} USDT</p>
+              <p style={styles.statValue}>{userData?.active_deposit || 0} USDT</p>
               <p style={styles.statSub}>العائد: 2% يومياً</p>
             </div>
           </div>
@@ -130,30 +160,19 @@ export default function DashboardPage() {
             <div style={styles.statIcon}>💎</div>
             <div>
               <p style={styles.statLabel}>الرصيد المتاح</p>
-              <p style={styles.statValue}>{availableBalance.toFixed(2)} USDT</p>
+              <p style={styles.statValue}>{userData?.available_balance || 0} USDT</p>
               <p style={styles.statSub}>قابل للسحب</p>
-            </div>
-          </div>
-          <div style={styles.statCard}>
-            <div style={styles.statIcon}>📈</div>
-            <div>
-              <p style={styles.statLabel}>إجمالي الأرباح</p>
-              <p style={styles.statValue}>{(availableBalance).toFixed(2)} USDT</p>
-              <p style={styles.statSub}>منذ البداية</p>
             </div>
           </div>
         </div>
 
-        {/* Message */}
         {message && (
           <div style={messageType === 'success' ? styles.successMsg : styles.errorMsg}>
             {message}
           </div>
         )}
 
-        {/* Two Columns */}
         <div style={styles.twoColumns}>
-          {/* Deposit Section */}
           <div style={styles.card}>
             <h2 style={styles.cardTitle}>📥 إيداع USDT</h2>
             <p style={styles.walletAddress}>
@@ -178,10 +197,9 @@ export default function DashboardPage() {
             </button>
           </div>
 
-          {/* Withdraw Section */}
           <div style={styles.card}>
             <h2 style={styles.cardTitle}>📤 سحب الأرباح</h2>
-            <p style={styles.balanceInfo}>الرصيد المتاح: <strong>{availableBalance.toFixed(2)} USDT</strong></p>
+            <p style={styles.balanceInfo}>الرصيد المتاح: <strong>{userData?.available_balance || 0} USDT</strong></p>
             <input
               type="number"
               value={withdrawAmount}
@@ -202,7 +220,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Investment Plans */}
         <div style={styles.plansSection}>
           <h2 style={styles.sectionTitle}>📊 خطط الاستثمار</h2>
           <div style={styles.plansGrid}>
@@ -220,14 +237,6 @@ export default function DashboardPage() {
               </div>
             ))}
           </div>
-        </div>
-
-        {/* Daily Profit Button */}
-        <div style={styles.profitSection}>
-          <button onClick={addDailyProfit} style={styles.profitBtn}>
-            🎁 احصل على أرباح اليوم (تجريبي)
-          </button>
-          <p style={styles.profitNote}>⚠️ سيتم حساب الأرباح تلقائياً يومياً في الإصدار النهائي</p>
         </div>
       </div>
     </div>
@@ -443,24 +452,6 @@ const styles = {
   },
   planMinAmount: {
     color: '#e94560',
-    fontSize: '12px',
-    marginTop: '8px',
-  },
-  profitSection: {
-    textAlign: 'center',
-  },
-  profitBtn: {
-    background: '#e94560',
-    color: 'white',
-    border: 'none',
-    padding: '12px 24px',
-    borderRadius: '12px',
-    fontSize: '16px',
-    fontWeight: 'bold',
-    cursor: 'pointer',
-  },
-  profitNote: {
-    color: '#a0aec0',
     fontSize: '12px',
     marginTop: '8px',
   },
