@@ -54,9 +54,13 @@
     .message { padding: 12px; border-radius: 8px; margin-bottom: 24px; text-align: center; }
     .success { background: #22c55e20; border: 1px solid #22c55e; color: #22c55e; }
     .error { background: #ef444420; border: 1px solid #ef4444; color: #ef4444; }
-    .info { background: #e9456020; border: 1px solid #e94560; color: #e94560; }
     .referral-box { background: #0f0f1a; padding: 16px; border-radius: 12px; text-align: center; margin-top: 16px; }
     .referral-code-text { font-size: 20px; font-weight: bold; color: #e94560; letter-spacing: 2px; margin: 8px 0; }
+    .plans-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-top: 16px; }
+    .plan-card { background: #1a1a2e; border-radius: 12px; padding: 20px; text-align: center; border: 1px solid #2d3748; }
+    .plan-name { color: #e94560; font-size: 18px; font-weight: bold; }
+    .plan-roi { color: white; font-size: 28px; font-weight: bold; }
+    .profit-btn { width: 100%; padding: 12px; background: #e94560; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 24px; }
   </style>
 </head>
 <body>
@@ -69,7 +73,7 @@
     </div>
   </div>
 
-  <div class="content" id="appContent">
+  <div class="content">
     <div class="stats-grid">
       <div class="stat-card">
         <div class="stat-icon">💰</div>
@@ -124,15 +128,15 @@
 
     <div class="card" style="margin-top: 24px;">
       <h2 class="card-title">📊 خطط الاستثمار</h2>
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
-        <div class="stat-card" style="flex-direction: column; text-align: center;"><h3 style="color: #e94560;">مبتدئ</h3><p style="font-size: 28px; font-weight: bold; color: white;">2%</p><p>من 10 USDT</p></div>
-        <div class="stat-card" style="flex-direction: column; text-align: center;"><h3 style="color: #e94560;">محترف</h3><p style="font-size: 28px; font-weight: bold; color: white;">2.5%</p><p>من 100 USDT</p></div>
-        <div class="stat-card" style="flex-direction: column; text-align: center;"><h3 style="color: #e94560;">VIP</h3><p style="font-size: 28px; font-weight: bold; color: white;">3%</p><p>من 500 USDT</p></div>
-        <div class="stat-card" style="flex-direction: column; text-align: center;"><h3 style="color: #e94560;">دياموند</h3><p style="font-size: 28px; font-weight: bold; color: white;">3.5%</p><p>من 1000 USDT</p></div>
+      <div class="plans-grid">
+        <div class="plan-card"><h3 class="plan-name">مبتدئ</h3><p class="plan-roi">2%</p><p class="stat-label">من 10 USDT</p></div>
+        <div class="plan-card"><h3 class="plan-name">محترف</h3><p class="plan-roi">2.5%</p><p class="stat-label">من 100 USDT</p></div>
+        <div class="plan-card"><h3 class="plan-name">VIP</h3><p class="plan-roi">3%</p><p class="stat-label">من 500 USDT</p></div>
+        <div class="plan-card"><h3 class="plan-name">دياموند</h3><p class="plan-roi">3.5%</p><p class="stat-label">من 1000 USDT</p></div>
       </div>
     </div>
 
-    <button class="deposit-btn" id="profitBtn" style="margin-top: 24px; background: #e94560;">🎁 احصل على أرباح اليوم</button>
+    <button class="profit-btn" id="profitBtn">🎁 احصل على أرباح اليوم</button>
   </div>
 
   <script>
@@ -180,8 +184,6 @@
         referralCode = data.referral_code;
         document.getElementById('userName').innerHTML = `مرحباً ${data.name || data.email.split('@')[0]}`;
         document.getElementById('referralCodeText').innerText = data.referral_code;
-      } else {
-        showMessage('⚠️ لم يتم العثور على بيانات المستخدم', 'error');
       }
       
       document.getElementById('activeDeposit').innerText = (userData?.active_deposit || 0) + ' USDT';
