@@ -81,7 +81,7 @@
   </div>
 
   <script>
-    let users = JSON.parse(localStorage.getItem('users') || '[]');
+    const API_URL = window.location.origin;
 
     function showMessage(msg, type) {
       const div = document.getElementById('message');
@@ -99,7 +99,7 @@
       document.getElementById('loginForm').classList.remove('hidden');
     };
 
-    document.getElementById('doLoginBtn').onclick = () => {
+    document.getElementById('doLoginBtn').onclick = async () => {
       const email = document.getElementById('loginEmail').value;
       const password = document.getElementById('loginPassword').value;
 
@@ -108,18 +108,35 @@
         return;
       }
 
-      const user = users.find(u => u.email === email && u.password === password);
-      
-      if (user) {
-        localStorage.setItem('currentUser', JSON.stringify(user));
-        showMessage('✅ تم تسجيل الدخول بنجاح!', 'success');
-        setTimeout(() => { window.location.href = '/dashboard.html'; }, 1000);
-      } else {
-        showMessage('❌ البريد الإلكتروني أو كلمة المرور غير صحيحة', 'error');
+      try {
+        const response = await fetch(`${API_URL}/api/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        
+        const data = await response.json();
+        
+        if (data.user) {
+          localStorage.setItem('userId', data.user.id);
+          localStorage.setItem('user', JSON.stringify(data.user));
+          if (data.profile?.is_admin) {
+            localStorage.setItem('isAdmin', 'true');
+            showMessage('✅ مرحباً أيها المدير! جاري التحويل...', 'success');
+            setTimeout(() => { window.location.href = '/admin.html'; }, 1000);
+          } else {
+            showMessage('✅ تم تسجيل الدخول بنجاح!', 'success');
+            setTimeout(() => { window.location.href = '/dashboard.html'; }, 1000);
+          }
+        } else {
+          showMessage('❌ ' + (data.error || 'فشل تسجيل الدخول'), 'error');
+        }
+      } catch (error) {
+        showMessage('❌ خطأ في الاتصال بالخادم', 'error');
       }
     };
 
-    document.getElementById('doRegisterBtn').onclick = () => {
+    document.getElementById('doRegisterBtn').onclick = async () => {
       const name = document.getElementById('regName').value;
       const email = document.getElementById('regEmail').value;
       const password = document.getElementById('regPassword').value;
@@ -141,44 +158,33 @@
         return;
       }
 
-      if (users.find(u => u.email === email)) {
-        showMessage('❌ هذا البريد مسجل بالفعل', 'error');
-        return;
-      }
-
-      let referrerId = null;
-      if (referralCode) {
-        const referrer = users.find(u => u.referral_code === referralCode);
-        if (referrer) {
-          referrerId = referrer.id;
+      try {
+        const response = await fetch(`${API_URL}/api/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, password, referralCode })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          localStorage.setItem('userId', data.user.id);
+          localStorage.setItem('user', JSON.stringify(data.user));
+          if (data.is_admin) localStorage.setItem('isAdmin', 'true');
+          showMessage(`✅ تم إنشاء الحساب بنجاح! رمز الدعوة: ${data.referral_code}`, 'success');
+          setTimeout(() => { 
+            if (data.is_admin) {
+              window.location.href = '/admin.html';
+            } else {
+              window.location.href = '/dashboard.html';
+            }
+          }, 2000);
         } else {
-          showMessage('⚠️ رمز الدعوة غير صحيح', 'error');
-          return;
+          showMessage('❌ ' + (data.error || 'فشل إنشاء الحساب'), 'error');
         }
+      } catch (error) {
+        showMessage('❌ خطأ في الاتصال بالخادم', 'error');
       }
-
-      const newUser = {
-        id: Date.now(),
-        name: name,
-        email: email,
-        password: password,
-        referral_code: Math.random().toString(36).substring(2, 10).toUpperCase(),
-        referrer_id: referrerId,
-        package: 'basic',
-        available_balance: 0,
-        active_deposit: 0,
-        total_withdrawn: 0,
-        total_deposited: 0,
-        daily_withdraw_limit: 10,
-        created_at: new Date().toISOString()
-      };
-
-      users.push(newUser);
-      localStorage.setItem('users', JSON.stringify(users));
-      localStorage.setItem('currentUser', JSON.stringify(newUser));
-      
-      showMessage(`✅ تم إنشاء الحساب بنجاح! رمز الدعوة: ${newUser.referral_code}`, 'success');
-      setTimeout(() => { window.location.href = '/dashboard.html'; }, 1500);
     };
   </script>
 </body>
