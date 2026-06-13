@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>منصة الاستثمار</title>
+  <title>تسجيل الدخول</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -16,39 +16,42 @@
       justify-content: center;
       padding: 16px;
     }
-    .card { background: #0f3460; border-radius: 24px; padding: 40px; max-width: 500px; width: 100%; }
-    h1 { font-size: 32px; color: #e94560; text-align: center; margin-bottom: 8px; }
-    input { width: 100%; padding: 14px; margin-bottom: 16px; border-radius: 12px; border: none; background: #1a1a2e; color: white; }
-    button { width: 100%; padding: 14px; background: #e94560; color: white; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; }
-    .message { margin-top: 16px; padding: 12px; border-radius: 8px; text-align: center; }
+    .card { background: #0f3460; border-radius: 24px; padding: 40px; max-width: 450px; width: 100%; }
+    h1 { font-size: 32px; color: #e94560; text-align: center; margin-bottom: 32px; }
+    input {
+      width: 100%;
+      padding: 14px;
+      margin-bottom: 16px;
+      border-radius: 12px;
+      border: none;
+      background: #1a1a2e;
+      color: white;
+      font-size: 16px;
+    }
+    button {
+      width: 100%;
+      padding: 14px;
+      background: #e94560;
+      color: white;
+      border: none;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .message { margin-top: 16px; padding: 12px; border-radius: 8px; text-align: center; font-size: 14px; }
     .error { background: #ef444420; border: 1px solid #ef4444; color: #ef4444; }
     .success { background: #22c55e20; border: 1px solid #22c55e; color: #22c55e; }
-    .hidden { display: none; }
   </style>
 </head>
 <body>
   <div class="card">
     <h1>💰 منصة الاستثمار</h1>
     
-    <div style="display: flex; gap: 16px; margin-bottom: 24px;">
-      <button id="loginTab" style="background: #e94560;">تسجيل الدخول</button>
-      <button id="registerTab" style="background: #1a1a2e;">إنشاء حساب</button>
-    </div>
-
-    <div id="loginForm">
-      <input type="email" id="loginEmail" placeholder="البريد الإلكتروني">
-      <input type="password" id="loginPassword" placeholder="كلمة المرور">
-      <button id="doLoginBtn">تسجيل الدخول</button>
-    </div>
-
-    <div id="registerForm" class="hidden">
-      <input type="text" id="regName" placeholder="اسم المستخدم">
-      <input type="email" id="regEmail" placeholder="البريد الإلكتروني">
-      <input type="password" id="regPassword" placeholder="كلمة المرور">
-      <input type="text" id="regReferral" placeholder="رمز الدعوة (اختياري)">
-      <button id="doRegisterBtn">إنشاء حساب</button>
-    </div>
-
+    <input type="email" id="email" placeholder="البريد الإلكتروني">
+    <input type="password" id="password" placeholder="كلمة المرور">
+    <button id="loginBtn">تسجيل الدخول</button>
+    
     <div id="message"></div>
   </div>
 
@@ -63,23 +66,9 @@
       setTimeout(() => div.innerHTML = '', 5000);
     }
 
-    document.getElementById('loginTab').onclick = () => {
-      document.getElementById('loginForm').style.display = 'block';
-      document.getElementById('registerForm').classList.add('hidden');
-      document.getElementById('loginTab').style.background = '#e94560';
-      document.getElementById('registerTab').style.background = '#1a1a2e';
-    };
-
-    document.getElementById('registerTab').onclick = () => {
-      document.getElementById('loginForm').style.display = 'none';
-      document.getElementById('registerForm').classList.remove('hidden');
-      document.getElementById('registerTab').style.background = '#e94560';
-      document.getElementById('loginTab').style.background = '#1a1a2e';
-    };
-
-    document.getElementById('doLoginBtn').onclick = async () => {
-      const email = document.getElementById('loginEmail').value;
-      const password = document.getElementById('loginPassword').value;
+    document.getElementById('loginBtn').onclick = async () => {
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
 
       if (!email || !password) {
         showMessage('⚠️ يرجى إدخال البريد الإلكتروني وكلمة المرور', 'error');
@@ -91,47 +80,8 @@
       if (error) {
         showMessage('❌ ' + error.message, 'error');
       } else {
-        showMessage('✅ تم تسجيل الدخول بنجاح! جاري التحويل...', 'success');
+        showMessage('✅ تم تسجيل الدخول بنجاح!', 'success');
         setTimeout(() => { window.location.href = '/dashboard.html'; }, 1500);
-      }
-    };
-
-    document.getElementById('doRegisterBtn').onclick = async () => {
-      const name = document.getElementById('regName').value;
-      const email = document.getElementById('regEmail').value;
-      const password = document.getElementById('regPassword').value;
-
-      if (!name || !email || !password) {
-        showMessage('⚠️ يرجى ملء جميع الحقول المطلوبة', 'error');
-        return;
-      }
-
-      if (password.length < 6) {
-        showMessage('⚠️ كلمة المرور يجب أن تكون 6 أحرف على الأقل', 'error');
-        return;
-      }
-
-      const { error } = await supabase.auth.signUp({ email, password });
-
-      if (error) {
-        showMessage('❌ ' + error.message, 'error');
-      } else {
-        const newReferralCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-        
-        const { data: user } = await supabase.auth.getUser();
-        if (user?.user) {
-          await supabase.from('users').insert({
-            id: user.user.id,
-            email: email,
-            name: name,
-            referral_code: newReferralCode,
-            available_balance: 0,
-            active_deposit: 0
-          });
-        }
-        
-        showMessage(`✅ تم إنشاء الحساب بنجاح! رمز الدعوة: ${newReferralCode}`, 'success');
-        setTimeout(() => { document.getElementById('loginTab').click(); }, 2000);
       }
     };
   </script>
