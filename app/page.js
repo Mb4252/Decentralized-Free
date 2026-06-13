@@ -1,24 +1,39 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabase/client'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    const user = localStorage.getItem('user')
-    if (user) {
-      window.location.href = '/dashboard'
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        window.location.href = '/dashboard'
+      }
     }
+    checkUser()
   }, [])
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault()
     setLoading(true)
-    if (email) {
-      localStorage.setItem('user', JSON.stringify({ email, name: email.split('@')[0] }))
-      window.location.href = '/dashboard'
+    setError('')
+
+    const { data, error } = await supabase.auth.signInWithOtp({
+      email: email,
+      options: {
+        shouldCreateUser: true,
+      }
+    })
+
+    if (error) {
+      setError(error.message)
+    } else {
+      setError('✅ تم إرسال رابط السحر إلى بريدك الإلكتروني!')
     }
     setLoading(false)
   }
@@ -43,9 +58,15 @@ export default function LoginPage() {
             disabled={loading}
             style={styles.button}
           >
-            {loading ? 'جاري...' : '🚀 تسجيل الدخول'}
+            {loading ? 'جاري...' : '🚀 إرسال رابط السحر'}
           </button>
         </form>
+
+        {error && (
+          <p style={error.includes('✅') ? styles.successMsg : styles.errorMsg}>
+            {error}
+          </p>
+        )}
 
         <div style={styles.stats}>
           <div style={styles.statBox}>
@@ -137,5 +158,17 @@ const styles = {
     display: 'block',
     fontSize: '12px',
     color: '#a0aec0',
+  },
+  errorMsg: {
+    color: '#ef4444',
+    textAlign: 'center',
+    marginTop: '16px',
+    fontSize: '14px',
+  },
+  successMsg: {
+    color: '#22c55e',
+    textAlign: 'center',
+    marginTop: '16px',
+    fontSize: '14px',
   },
 }
