@@ -2,399 +2,353 @@
 <html dir="rtl" lang="ar">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>لوحة التحكم | منصة الاستثمار</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>الرئيسية | منصة الاستثمار</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    
     body {
       min-height: 100vh;
-      background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%);
+      background: #0a0a0f;
+      background-image: 
+        linear-gradient(rgba(0, 255, 100, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 255, 100, 0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       padding-bottom: 80px;
     }
 
-    /* ========== Navbar ========== */
+    /* Glassmorphism Navbar */
     .navbar {
-      background: rgba(26, 26, 46, 0.95);
-      backdrop-filter: blur(10px);
-      padding: 16px 24px;
+      background: rgba(10, 10, 20, 0.8);
+      backdrop-filter: blur(12px);
+      padding: 16px 20px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      border-bottom: 1px solid rgba(233, 69, 96, 0.3);
+      border-bottom: 1px solid rgba(0, 255, 100, 0.2);
       position: sticky;
       top: 0;
       z-index: 100;
-      flex-wrap: wrap;
-      gap: 16px;
     }
-    .logo { font-size: 24px; font-weight: bold; color: #e94560; display: flex; align-items: center; gap: 8px; }
-    .lang-btn { background: transparent; border: 1px solid #e94560; color: #e94560; padding: 6px 12px; border-radius: 20px; cursor: pointer; font-size: 12px; }
-    .user-info { display: flex; align-items: center; gap: 16px; }
-    .user-name { color: #e94560; font-weight: bold; }
-    .logout-btn { background: transparent; border: 1px solid #ef4444; color: #ef4444; padding: 8px 16px; border-radius: 8px; cursor: pointer; transition: all 0.3s; }
-    .logout-btn:hover { background: #ef4444; color: white; }
+    .logo { font-size: 22px; font-weight: bold; background: linear-gradient(135deg, #00ff66, #00ccff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .nav-icons { display: flex; gap: 20px; align-items: center; }
+    .nav-icon { font-size: 22px; cursor: pointer; color: #8899aa; transition: all 0.3s; }
+    .nav-icon:hover { color: #00ff66; }
+    .user-name { color: #00ff66; font-size: 14px; margin-left: 8px; }
 
-    /* ========== Slider Section ========== */
-    .slider-container {
-      position: relative;
-      max-width: 100%;
-      margin: 20px auto;
-      overflow: hidden;
-      border-radius: 20px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-    }
-    .slider {
-      display: flex;
-      transition: transform 0.5s ease-in-out;
-    }
-    .slide {
-      min-width: 100%;
-      position: relative;
-    }
-    .slide img {
-      width: 100%;
-      height: 200px;
-      object-fit: cover;
-    }
-    .slide-caption {
-      position: absolute;
-      bottom: 20px;
+    /* Welcome Popup */
+    .popup-overlay {
+      position: fixed;
+      top: 0;
       left: 0;
       right: 0;
-      background: rgba(0,0,0,0.6);
-      color: white;
-      padding: 12px;
-      text-align: center;
-    }
-    .slider-btn {
-      position: absolute;
-      top: 50%;
-      transform: translateY(-50%);
-      background: rgba(0,0,0,0.5);
-      color: white;
-      border: none;
-      padding: 10px 15px;
-      cursor: pointer;
-      border-radius: 50%;
-      font-size: 18px;
-      z-index: 10;
-    }
-    .slider-btn.prev { left: 10px; }
-    .slider-btn.next { right: 10px; }
-    .dots {
-      text-align: center;
-      padding: 10px;
-      position: absolute;
       bottom: 0;
-      left: 0;
-      right: 0;
-    }
-    .dot {
-      display: inline-block;
-      width: 10px;
-      height: 10px;
-      margin: 0 5px;
-      background: #bbb;
-      border-radius: 50%;
-      cursor: pointer;
-    }
-    .dot.active { background: #e94560; }
-
-    /* ========== Content ========== */
-    .content { max-width: 1200px; margin: 0 auto; padding: 24px; }
-
-    /* ========== Wallet Section ========== */
-    .wallet-section {
-      background: linear-gradient(135deg, #1a1a2e, #16213e);
-      border-radius: 24px;
-      padding: 24px;
-      margin-bottom: 32px;
-      border: 1px solid rgba(233, 69, 96, 0.3);
-    }
-    .wallet-title { color: white; font-size: 20px; margin-bottom: 20px; border-right: 3px solid #e94560; padding-right: 12px; }
-    .wallet-stats {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 20px;
-    }
-    .wallet-card {
-      background: rgba(15, 15, 26, 0.8);
-      border-radius: 16px;
+      background: rgba(0,0,0,0.8);
+      backdrop-filter: blur(8px);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       padding: 20px;
-      text-align: center;
-      transition: transform 0.3s;
     }
-    .wallet-card:hover { transform: translateY(-5px); }
-    .wallet-icon { font-size: 32px; margin-bottom: 10px; }
-    .wallet-label { color: #a0aec0; font-size: 14px; margin-bottom: 8px; }
-    .wallet-amount { color: #e94560; font-size: 24px; font-weight: bold; }
+    .popup-content {
+      background: rgba(20, 20, 35, 0.95);
+      backdrop-filter: blur(12px);
+      border-radius: 32px;
+      padding: 28px;
+      max-width: 350px;
+      width: 100%;
+      border: 1px solid rgba(0, 255, 100, 0.3);
+      text-align: center;
+      animation: fadeInUp 0.4s ease-out;
+    }
+    .popup-content h3 { color: #00ff66; margin-bottom: 16px; font-size: 22px; }
+    .popup-content p { color: #8899aa; margin-bottom: 12px; line-height: 1.5; font-size: 14px; }
+    .popup-close { background: linear-gradient(135deg, #00ff66, #00ccff); color: #0a0a0f; border: none; padding: 12px 24px; border-radius: 30px; font-weight: bold; margin-top: 16px; cursor: pointer; width: 100%; }
 
-    /* ========== Cards ========== */
-    .card {
-      background: #1a1a2e;
-      border-radius: 20px;
-      padding: 24px;
-      border: 1px solid rgba(233, 69, 96, 0.2);
+    /* Main Content */
+    .content { max-width: 500px; margin: 0 auto; padding: 20px; }
+
+    /* Assets Card */
+    .assets-card {
+      background: rgba(20, 20, 35, 0.6);
+      backdrop-filter: blur(12px);
+      border-radius: 32px;
+      padding: 28px;
+      text-align: center;
+      border: 1px solid rgba(0, 255, 100, 0.2);
       margin-bottom: 24px;
     }
-    .card-title { color: white; font-size: 20px; margin-bottom: 16px; border-right: 3px solid #e94560; padding-right: 12px; }
-
-    /* ========== Forms ========== */
-    input, select {
-      width: 100%;
-      padding: 12px 16px;
-      margin-bottom: 12px;
-      border-radius: 12px;
-      border: 1px solid #2d3748;
-      background: #0f0f1a;
-      color: white;
-      font-size: 14px;
+    .assets-label { color: #8899aa; font-size: 14px; margin-bottom: 8px; }
+    .assets-amount { font-size: 48px; font-weight: bold; color: #00ff66; margin-bottom: 12px; }
+    .assets-detail { color: #00ccff; font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+    .assets-detail span { transition: transform 0.3s; }
+    .assets-detail:hover span { transform: rotate(180deg); }
+    .details-panel {
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 1px solid rgba(0, 255, 100, 0.2);
+      display: none;
     }
-    input:focus { outline: none; border-color: #e94560; }
+    .details-panel.show { display: block; }
+    .detail-row { display: flex; justify-content: space-between; padding: 8px 0; color: #8899aa; font-size: 14px; }
+    .detail-value { color: #00ccff; font-weight: bold; }
 
-    /* ========== Buttons ========== */
-    .deposit-btn { background: #22c55e; color: white; width: 100%; padding: 12px; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; transition: all 0.3s; }
-    .withdraw-btn { background: #ef4444; color: white; width: 100%; padding: 12px; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; transition: all 0.3s; }
-    .profit-btn { background: #e94560; color: white; width: 100%; padding: 12px; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; margin-top: 16px; }
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .stat-card {
+      background: rgba(20, 20, 35, 0.6);
+      backdrop-filter: blur(12px);
+      border-radius: 24px;
+      padding: 18px;
+      text-align: center;
+      border: 1px solid rgba(0, 255, 100, 0.15);
+    }
+    .stat-card .icon { font-size: 28px; margin-bottom: 8px; }
+    .stat-card .label { color: #8899aa; font-size: 12px; margin-bottom: 6px; }
+    .stat-card .value { color: #00ff66; font-size: 22px; font-weight: bold; }
 
-    /* ========== Message ========== */
-    .message { padding: 12px; border-radius: 12px; margin-bottom: 24px; text-align: center; }
-    .success { background: #22c55e20; border: 1px solid #22c55e; color: #22c55e; }
-    .error { background: #ef444420; border: 1px solid #ef4444; color: #ef4444; }
+    /* VIP Levels */
+    .section-title { color: white; font-size: 18px; margin-bottom: 16px; border-right: 3px solid #00ff66; padding-right: 12px; }
+    .vip-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; }
+    .vip-item {
+      background: rgba(20, 20, 35, 0.6);
+      backdrop-filter: blur(12px);
+      border-radius: 20px;
+      padding: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border: 1px solid rgba(0, 255, 100, 0.15);
+      transition: all 0.3s;
+    }
+    .vip-item:hover { border-color: rgba(0, 255, 100, 0.5); transform: translateX(-5px); }
+    .vip-name { font-weight: bold; color: #00ff66; }
+    .vip-roi { color: #00ccff; font-size: 14px; }
+    .vip-min { color: #8899aa; font-size: 12px; }
 
-    /* ========== Footer Navigation ========== */
-    .footer-nav {
+    /* Bottom Navigation */
+    .bottom-nav {
       position: fixed;
       bottom: 0;
       left: 0;
       right: 0;
-      background: rgba(26, 26, 46, 0.95);
-      backdrop-filter: blur(10px);
+      background: rgba(10, 10, 20, 0.95);
+      backdrop-filter: blur(12px);
       display: flex;
       justify-content: space-around;
       padding: 12px 16px;
-      border-top: 1px solid rgba(233, 69, 96, 0.3);
+      border-top: 1px solid rgba(0, 255, 100, 0.2);
       z-index: 99;
     }
-    .footer-nav-item {
+    .nav-item {
       display: flex;
       flex-direction: column;
       align-items: center;
       gap: 4px;
       background: none;
       border: none;
-      color: #a0aec0;
+      color: #8899aa;
       cursor: pointer;
-      padding: 8px 16px;
-      border-radius: 12px;
+      padding: 6px 12px;
+      border-radius: 30px;
       transition: all 0.3s;
     }
-    .footer-nav-item.active { color: #e94560; background: rgba(233, 69, 96, 0.1); }
-    .footer-nav-item:hover { color: #e94560; }
-    .footer-icon { font-size: 20px; }
-    .footer-label { font-size: 11px; }
+    .nav-item.active { color: #00ff66; background: rgba(0, 255, 102, 0.1); }
+    .nav-item .nav-icon { font-size: 22px; }
+    .nav-item .nav-label { font-size: 10px; }
 
-    /* ========== Withdrawals List ========== */
-    .withdrawals-list {
-      max-height: 300px;
-      overflow-y: auto;
+    /* Pages */
+    .page { display: none; }
+    .page.active { display: block; }
+
+    /* Buttons */
+    .btn-copy {
+      background: rgba(0, 255, 102, 0.15);
+      border: 1px solid rgba(0, 255, 102, 0.5);
+      color: #00ff66;
+      padding: 10px 16px;
+      border-radius: 30px;
+      cursor: pointer;
+      font-size: 14px;
+      width: 100%;
+      margin-top: 12px;
     }
-    .withdrawal-item {
-      background: #0f0f1a;
+    .referral-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin: 20px 0;
+    }
+    .message {
       padding: 12px;
-      border-radius: 12px;
-      margin-bottom: 8px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+      border-radius: 16px;
+      margin-bottom: 16px;
+      text-align: center;
+      font-size: 13px;
     }
-
-    /* ========== Responsive ========== */
-    @media (max-width: 768px) {
-      .wallet-stats { grid-template-columns: repeat(2, 1fr); }
-      .card { padding: 16px; }
-      .footer-label { font-size: 10px; }
-      .footer-nav-item { padding: 6px 12px; }
-    }
-
-    /* ========== Hidden ========== */
+    .success { background: rgba(0, 255, 102, 0.15); border: 1px solid #00ff66; color: #00ff66; }
+    .error { background: rgba(255, 68, 68, 0.15); border: 1px solid #ff4444; color: #ff4444; }
+    .warning { background: rgba(255, 170, 0, 0.15); border: 1px solid #ffaa00; color: #ffaa00; }
     .hidden { display: none; }
+    input { width: 100%; padding: 14px; border-radius: 16px; border: 1px solid rgba(0, 255, 100, 0.3); background: rgba(10, 10, 20, 0.8); color: white; margin-bottom: 12px; }
+    input:focus { outline: none; border-color: #00ff66; }
+    .deposit-btn { background: linear-gradient(135deg, #00ff66, #00ccff); color: #0a0a0f; border: none; padding: 14px; border-radius: 30px; font-weight: bold; width: 100%; cursor: pointer; }
+    .withdraw-btn { background: linear-gradient(135deg, #ff4444, #ff6680); color: white; border: none; padding: 14px; border-radius: 30px; font-weight: bold; width: 100%; cursor: pointer; }
+    .support-fab {
+      position: fixed;
+      bottom: 80px;
+      right: 16px;
+      background: linear-gradient(135deg, #00ff66, #00ccff);
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 4px 15px rgba(0, 255, 102, 0.3);
+      z-index: 98;
+      font-size: 24px;
+    }
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
   </style>
 </head>
 <body>
 
   <!-- Navbar -->
   <div class="navbar">
-    <div class="logo">
-      <span>💰</span>
-      <span id="siteTitle">منصة الاستثمار</span>
-    </div>
-    <div class="user-info">
-      <button class="lang-btn" id="langToggle">🇬🇧 English</button>
+    <div class="logo">💰 CryptoInvest</div>
+    <div class="nav-icons">
+      <span class="nav-icon" id="supportBtn">📞</span>
       <span class="user-name" id="userName"></span>
-      <button class="logout-btn" id="logoutBtn">🚪 تسجيل خروج</button>
     </div>
   </div>
 
-  <!-- Slider Section -->
-  <div class="slider-container">
-    <div class="slider" id="slider">
-      <div class="slide">
-        <img src="https://picsum.photos/1200/400?random=1" alt="Slide 1">
-        <div class="slide-caption">🚀 استثمر بحكمة مع منصة الاستثمار</div>
-      </div>
-      <div class="slide">
-        <img src="https://picsum.photos/1200/400?random=2" alt="Slide 2">
-        <div class="slide-caption">📈 أرباح يومية تصل إلى 3.5%</div>
-      </div>
-      <div class="slide">
-        <img src="https://picsum.photos/1200/400?random=3" alt="Slide 3">
-        <div class="slide-caption">🔒 أمان تام وحماية لاستثماراتك</div>
-      </div>
-    </div>
-    <button class="slider-btn prev" id="prevBtn">❮</button>
-    <button class="slider-btn next" id="nextBtn">❯</button>
-    <div class="dots" id="dots"></div>
-  </div>
+  <!-- Support FAB -->
+  <div class="support-fab" id="supportFab">💬</div>
 
   <!-- Main Content -->
-  <div class="content" id="mainContent"></div>
+  <div class="content">
+    <!-- Dashboard Page -->
+    <div id="dashboardPage" class="page active">
+      <div class="assets-card">
+        <div class="assets-label">إجمالي الأصول</div>
+        <div class="assets-amount" id="totalAssets">0 USDT</div>
+        <div class="assets-detail" id="toggleDetails">
+          <span>▼</span> عرض التفاصيل
+        </div>
+        <div class="details-panel" id="detailsPanel">
+          <div class="detail-row"><span>💰 الاستثمار النشط</span><span class="detail-value" id="activeDeposit">0 USDT</span></div>
+          <div class="detail-row"><span>💎 الرصيد المتاح</span><span class="detail-value" id="availableBalance">0 USDT</span></div>
+          <div class="detail-row"><span>📊 إجمالي الإيداعات</span><span class="detail-value" id="totalDeposit">0 USDT</span></div>
+          <div class="detail-row"><span>📤 إجمالي السحوبات</span><span class="detail-value" id="totalWithdraw">0 USDT</span></div>
+        </div>
+      </div>
 
-  <!-- Footer Navigation -->
-  <div class="footer-nav">
-    <button class="footer-nav-item active" data-page="dashboard">
-      <span class="footer-icon">🏠</span>
-      <span class="footer-label" data-key="home">الرئيسية</span>
-    </button>
-    <button class="footer-nav-item" data-page="deposit">
-      <span class="footer-icon">📥</span>
-      <span class="footer-label" data-key="deposit">إيداع</span>
-    </button>
-    <button class="footer-nav-item" data-page="withdraw">
-      <span class="footer-icon">📤</span>
-      <span class="footer-label" data-key="withdraw">سحب</span>
-    </button>
-    <button class="footer-nav-item" data-page="withdrawals-list">
-      <span class="footer-icon">📋</span>
-      <span class="footer-label" data-key="withdrawals">سحوباتي</span>
-    </button>
-    <button class="footer-nav-item" data-page="packages">
-      <span class="footer-icon">💎</span>
-      <span class="footer-label" data-key="packages">الباقات</span>
-    </button>
-    <button class="footer-nav-item" data-page="referrals">
-      <span class="footer-icon">👥</span>
-      <span class="footer-label" data-key="referrals">الإحالات</span>
-    </button>
+      <div class="stats-grid">
+        <div class="stat-card"><div class="icon">📈</div><div class="label">نسبة الربح</div><div class="value" id="roiPercent">2%</div></div>
+        <div class="stat-card"><div class="icon">💎</div><div class="label">الباقة الحالية</div><div class="value" id="packageName">عادي</div></div>
+      </div>
+
+      <div class="section-title">👑 كبار الشخصيات (VIP)</div>
+      <div class="vip-list" id="vipList"></div>
+    </div>
+
+    <!-- Deposit Page -->
+    <div id="depositPage" class="page">
+      <div class="assets-card" style="margin-bottom: 16px;">
+        <div class="assets-label">محفظة الإيداع (شبكة BSC)</div>
+        <code style="color:#00ff66; word-break:break-all; font-size:12px;">0x987cfde723a87b5ed33329eebe0595a4416b848f</code>
+        <button class="btn-copy" id="copyWalletBtn">📋 نسخ العنوان</button>
+      </div>
+      <input type="number" id="depositAmount" placeholder="المبلغ (USDT) - الحد الأدنى 10">
+      <button class="deposit-btn" id="doDepositBtn">إيداع USDT</button>
+      <p style="font-size:12px; color:#8899aa; text-align:center; margin-top:12px;">⚠️ سيتم تفعيل الإيداع بعد موافقة المدير</p>
+      <div id="depositMsg"></div>
+    </div>
+
+    <!-- Withdraw Page -->
+    <div id="withdrawPage" class="page">
+      <div class="assets-card" style="margin-bottom: 16px;">
+        <div class="assets-label">الرصيد المتاح للسحب</div>
+        <div class="assets-amount" id="withdrawBalance">0 USDT</div>
+      </div>
+      <input type="number" id="withdrawAmount" placeholder="المبلغ (USDT) - الحد الأدنى 0.5">
+      <input type="text" id="walletAddress" placeholder="عنوان محفظة BSC">
+      <button class="withdraw-btn" id="doWithdrawBtn">سحب USDT</button>
+      <p style="font-size:12px; color:#8899aa; text-align:center; margin-top:12px;">⚠️ سيتم صرف السحب بعد موافقة المدير</p>
+      <div id="withdrawMsg"></div>
+    </div>
+
+    <!-- VIP Page -->
+    <div id="vipPage" class="page">
+      <div class="section-title">💎 باقات الاشتراك VIP</div>
+      <div class="vip-list" id="packagesList"></div>
+    </div>
+
+    <!-- Referral Page -->
+    <div id="referralPage" class="page">
+      <div class="assets-card">
+        <div class="assets-label">🔗 رابط الدعوة الخاص بك</div>
+        <code id="referralLink" style="color:#00ff66; word-break:break-all; font-size:12px;"></code>
+        <button class="btn-copy" id="copyReferralBtn">📋 نسخ الرابط</button>
+      </div>
+      <div class="referral-stats">
+        <div class="stat-card"><div class="icon">👥</div><div class="label">المحالين</div><div class="value" id="referralCount">0</div></div>
+        <div class="stat-card"><div class="icon">💰</div><div class="label">حجم الفريق</div><div class="value" id="groupBalance">0 USDT</div></div>
+        <div class="stat-card"><div class="icon">📊</div><div class="label">إجمالي الإيداعات</div><div class="value" id="groupDeposit">0 USDT</div></div>
+      </div>
+      <div class="section-title">📋 قائمة المحالين</div>
+      <div id="referralsList"></div>
+    </div>
+  </div>
+
+  <!-- Bottom Navigation -->
+  <div class="bottom-nav">
+    <button class="nav-item active" data-page="dashboard"><span class="nav-icon">🏠</span><span class="nav-label">البيت</span></button>
+    <button class="nav-item" data-page="vip"><span class="nav-icon">👑</span><span class="nav-label">كبار الشخصيات</span></button>
+    <button class="nav-item" data-page="deposit"><span class="nav-icon">💰</span><span class="nav-label">الإيداع</span></button>
+    <button class="nav-item" data-page="withdraw"><span class="nav-icon">📤</span><span class="nav-label">السحب</span></button>
+    <button class="nav-item" data-page="referral"><span class="nav-icon">👥</span><span class="nav-label">الفريق</span></button>
+  </div>
+
+  <!-- Welcome Popup -->
+  <div id="welcomePopup" class="popup-overlay" style="display: none;">
+    <div class="popup-content">
+      <h3>✨ مرحباً بك ✨</h3>
+      <p>💰 الحد الأدنى للإيداع: <strong>10 USDT</strong></p>
+      <p>📤 الحد الأدنى للسحب: <strong>0.5 USDT</strong></p>
+      <p>📈 نسبة الربح اليومي: <strong>2% - 3.5%</strong> حسب الباقة</p>
+      <p>✅ يتم تفعيل الإيداع والسحب بعد موافقة المدير</p>
+      <button class="popup-close" id="closePopup">ابدأ الآن</button>
+    </div>
   </div>
 
   <script>
     const API_URL = window.location.origin;
-    let userId = null;
+    let userId = localStorage.getItem('userId');
     let userData = null;
-    let currentLang = 'ar';
-    let currentSlide = 0;
-    let slideInterval;
 
-    // ========== Language Translations ==========
-    const translations = {
-      ar: {
-        home: 'الرئيسية', deposit: 'إيداع', withdraw: 'سحب', withdrawals: 'سحوباتي',
-        packages: 'الباقات', referrals: 'الإحالات', instructions: 'التعليمات',
-        walletTitle: 'محفظتي', activeInvest: 'الاستثمار النشط', availableBalance: 'الرصيد المتاح',
-        totalDeposit: 'إجمالي الإيداع', totalWithdraw: 'إجمالي السحب', investmentPlans: 'خطط الاستثمار',
-        referralCode: 'رمز الدعوة', copyLink: 'نسخ الرابط', upgrade: 'ترقية',
-        depositWallet: 'محفظة الإيداع (شبكة BSC)', copy: 'نسخ', minDeposit: 'الحد الأدنى للإيداع 10 USDT',
-        minWithdraw: 'الحد الأدنى للسحب 0.5 USDT', pendingApproval: 'بانتظار موافقة المدير',
-        dailyProfit: 'احصل على أرباح اليوم'
-      },
-      en: {
-        home: 'Home', deposit: 'Deposit', withdraw: 'Withdraw', withdrawals: 'My Withdrawals',
-        packages: 'Packages', referrals: 'Referrals', instructions: 'Instructions',
-        walletTitle: 'My Wallet', activeInvest: 'Active Investment', availableBalance: 'Available Balance',
-        totalDeposit: 'Total Deposit', totalWithdraw: 'Total Withdraw', investmentPlans: 'Investment Plans',
-        referralCode: 'Referral Code', copyLink: 'Copy Link', upgrade: 'Upgrade',
-        depositWallet: 'Deposit Wallet (BSC Network)', copy: 'Copy', minDeposit: 'Minimum deposit 10 USDT',
-        minWithdraw: 'Minimum withdrawal 0.5 USDT', pendingApproval: 'Pending admin approval',
-        dailyProfit: 'Get Daily Profit'
-      }
+    const packages = {
+      basic: { name: 'عادي', price: 0, roi: 2, daily_limit: 10 },
+      silver: { name: 'فضي', price: 50, roi: 2.2, daily_limit: 20 },
+      gold: { name: 'ذهبي', price: 100, roi: 2.5, daily_limit: 50 },
+      platinum: { name: 'بلاتيني', price: 250, roi: 2.8, daily_limit: 100 },
+      diamond: { name: 'ماسي', price: 500, roi: 3.2, daily_limit: 200 },
+      vip: { name: 'VIP', price: 1000, roi: 3.5, daily_limit: 500 }
     };
-
-    function t(key) { return translations[currentLang][key] || key; }
-
-    function updateLanguage() {
-      document.querySelectorAll('[data-key]').forEach(el => {
-        el.textContent = t(el.getAttribute('data-key'));
-      });
-      document.getElementById('siteTitle').textContent = currentLang === 'ar' ? 'منصة الاستثمار' : 'Investment Platform';
-      document.getElementById('langToggle').textContent = currentLang === 'ar' ? '🇬🇧 English' : '🇸🇦 العربية';
-    }
-
-    document.getElementById('langToggle').onclick = () => {
-      currentLang = currentLang === 'ar' ? 'en' : 'ar';
-      updateLanguage();
-      const activePage = document.querySelector('.footer-nav-item.active').getAttribute('data-page');
-      if (pages[activePage]) pages[activePage]();
-    };
-
-    // ========== Slider Functions ==========
-    function updateSlider() {
-      const slider = document.getElementById('slider');
-      const slides = document.querySelectorAll('.slide');
-      if (slides.length === 0) return;
-      slider.style.transform = `translateX(-${currentSlide * 100}%)`;
-      document.querySelectorAll('.dot').forEach((dot, i) => {
-        dot.classList.toggle('active', i === currentSlide);
-      });
-    }
-
-    function nextSlide() {
-      const slides = document.querySelectorAll('.slide');
-      if (slides.length === 0) return;
-      currentSlide = (currentSlide + 1) % slides.length;
-      updateSlider();
-    }
-
-    function prevSlide() {
-      const slides = document.querySelectorAll('.slide');
-      if (slides.length === 0) return;
-      currentSlide = (currentSlide - 1 + slides.length) % slides.length;
-      updateSlider();
-    }
-
-    function startAutoSlide() {
-      if (slideInterval) clearInterval(slideInterval);
-      slideInterval = setInterval(nextSlide, 5000);
-    }
-
-    function initSlider() {
-      const slides = document.querySelectorAll('.slide');
-      if (slides.length === 0) return;
-      const dotsContainer = document.getElementById('dots');
-      dotsContainer.innerHTML = '';
-      slides.forEach((_, i) => {
-        const dot = document.createElement('span');
-        dot.classList.add('dot');
-        dot.onclick = () => { currentSlide = i; updateSlider(); startAutoSlide(); };
-        dotsContainer.appendChild(dot);
-      });
-      document.getElementById('prevBtn').onclick = () => { prevSlide(); startAutoSlide(); };
-      document.getElementById('nextBtn').onclick = () => { nextSlide(); startAutoSlide(); };
-      updateSlider();
-      startAutoSlide();
-    }
-
-    // ========== API Functions ==========
-    async function testConnection() {
-      try {
-        const response = await fetch(`${API_URL}/api/health`);
-        return response.ok;
-      } catch (error) { return false; }
-    }
 
     async function loadUserData() {
-      userId = localStorage.getItem('userId');
       if (!userId) { window.location.href = '/'; return false; }
       try {
         const response = await fetch(`${API_URL}/api/user`, {
@@ -402,218 +356,50 @@
           body: JSON.stringify({ userId })
         });
         const data = await response.json();
-        if (data.error) { localStorage.removeItem('userId'); window.location.href = '/'; return false; }
+        if (data.error) { localStorage.clear(); window.location.href = '/'; return false; }
         userData = data;
-        document.getElementById('userName').innerHTML = `👋 ${userData.name}`;
+        document.getElementById('userName').innerHTML = `${userData.name}`;
+        updateDashboardUI();
         return true;
-      } catch (error) { window.location.href = '/'; return false; }
+      } catch (error) { return false; }
     }
 
-    function showMessage(msg, type) {
-      const container = document.getElementById('mainContent');
-      const msgDiv = document.createElement('div');
-      msgDiv.className = `message ${type}`;
-      msgDiv.innerHTML = msg;
-      container.insertBefore(msgDiv, container.firstChild);
-      setTimeout(() => msgDiv.remove(), 5000);
-    }
+    function updateDashboardUI() {
+      const activeInvest = userData?.active_deposit || 0;
+      const availableBalance = userData?.available_balance || 0;
+      const totalDeposit = userData?.total_deposited || 0;
+      const totalWithdraw = userData?.total_withdrawn || 0;
+      const totalAssets = activeInvest + availableBalance;
+      const currentPackage = packages[userData?.package] || packages.basic;
 
-    // ========== Wallet Section ==========
-    function renderWalletSection() {
-      return `
-        <div class="wallet-section">
-          <h2 class="wallet-title">💰 ${t('walletTitle')}</h2>
-          <div class="wallet-stats">
-            <div class="wallet-card"><div class="wallet-icon">📈</div><div class="wallet-label">${t('activeInvest')}</div><div class="wallet-amount" id="walletActiveDeposit">${(userData?.active_deposit || 0)} USDT</div></div>
-            <div class="wallet-card"><div class="wallet-icon">💎</div><div class="wallet-label">${t('availableBalance')}</div><div class="wallet-amount" id="walletAvailableBalance">${(userData?.available_balance || 0)} USDT</div></div>
-            <div class="wallet-card"><div class="wallet-icon">💰</div><div class="wallet-label">${t('totalDeposit')}</div><div class="wallet-amount" id="walletTotalDeposit">${(userData?.total_deposited || 0)} USDT</div></div>
-            <div class="wallet-card"><div class="wallet-icon">📤</div><div class="wallet-label">${t('totalWithdraw')}</div><div class="wallet-amount" id="walletTotalWithdraw">${(userData?.total_withdrawn || 0)} USDT</div></div>
-          </div>
+      document.getElementById('totalAssets').innerHTML = totalAssets.toFixed(2) + ' USDT';
+      document.getElementById('activeDeposit').innerHTML = activeInvest.toFixed(2) + ' USDT';
+      document.getElementById('availableBalance').innerHTML = availableBalance.toFixed(2) + ' USDT';
+      document.getElementById('totalDeposit').innerHTML = totalDeposit.toFixed(2) + ' USDT';
+      document.getElementById('totalWithdraw').innerHTML = totalWithdraw.toFixed(2) + ' USDT';
+      document.getElementById('roiPercent').innerHTML = currentPackage.roi + '%';
+      document.getElementById('packageName').innerHTML = currentPackage.name;
+      document.getElementById('withdrawBalance').innerHTML = availableBalance.toFixed(2) + ' USDT';
+
+      const vipList = document.getElementById('vipList');
+      vipList.innerHTML = Object.entries(packages).map(([key, pkg]) => `
+        <div class="vip-item">
+          <div><div class="vip-name">${pkg.name}</div><div class="vip-min">من ${pkg.price} USDT</div></div>
+          <div class="vip-roi">💰 ${pkg.roi}% يومياً</div>
         </div>
-      `;
-    }
+      `).join('');
 
-    // ========== Pages ==========
-    async function renderDashboard() {
-      const referralsRes = await fetch(`${API_URL}/api/referrals`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId })
-      });
-      const referralsData = await referralsRes.json();
-
-      document.getElementById('mainContent').innerHTML = `
-        ${renderWalletSection()}
-        <div class="card">
-          <h2 class="card-title">📊 ${t('investmentPlans')}</h2>
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px;">
-            <div style="background:#0f0f1a; padding:16px; border-radius:12px; text-align:center;"><h3 style="color:#e94560;">مبتدئ</h3><p style="font-size:24px; font-weight:bold;">2%</p><p>من 10 USDT</p></div>
-            <div style="background:#0f0f1a; padding:16px; border-radius:12px; text-align:center;"><h3 style="color:#e94560;">محترف</h3><p style="font-size:24px; font-weight:bold;">2.5%</p><p>من 100 USDT</p></div>
-            <div style="background:#0f0f1a; padding:16px; border-radius:12px; text-align:center;"><h3 style="color:#e94560;">VIP</h3><p style="font-size:24px; font-weight:bold;">3%</p><p>من 500 USDT</p></div>
-            <div style="background:#0f0f1a; padding:16px; border-radius:12px; text-align:center;"><h3 style="color:#e94560;">دياموند</h3><p style="font-size:24px; font-weight:bold;">3.5%</p><p>من 1000 USDT</p></div>
-          </div>
+      const packagesList = document.getElementById('packagesList');
+      packagesList.innerHTML = Object.entries(packages).map(([key, pkg]) => `
+        <div class="vip-item">
+          <div><div class="vip-name">${pkg.name}</div><div class="vip-min">${pkg.price === 0 ? 'مجاني' : pkg.price + ' USDT'}</div></div>
+          <div class="vip-roi">📈 ${pkg.roi}% يومياً</div>
+          ${userData?.package !== key ? `<button class="upgrade-btn" data-package="${key}" style="background:#00ff66; border:none; padding:6px 12px; border-radius:20px; color:#0a0a0f; font-weight:bold; cursor:pointer;">ترقية</button>` : '<span style="color:#00ff66;">✅ مستخدم</span>'}
         </div>
-        <div class="card">
-          <h2 class="card-title">👥 ${t('referrals')}</h2>
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
-            <div style="text-align:center;"><p style="color:#a0aec0;">عدد المحالين</p><p style="font-size:28px; font-weight:bold; color:#e94560;">${referralsData.count || 0}</p></div>
-            <div style="text-align:center;"><p style="color:#a0aec0;">رصيد المجموعة</p><p style="font-size:28px; font-weight:bold; color:#e94560;">${referralsData.groupBalance || 0} USDT</p></div>
-          </div>
-          <div style="background:#0f0f1a; padding:16px; border-radius:12px; text-align:center; margin-top:16px;">
-            <p style="color:#a0aec0;">${t('referralCode')}</p>
-            <code style="font-size:18px; color:#e94560;">${userData.referral_code}</code>
-            <button onclick="navigator.clipboard.writeText('${window.location.origin}?ref=${userData.referral_code}')" style="margin-top:8px; background:#e94560; border:none; padding:8px 16px; border-radius:8px; color:white; cursor:pointer;">📋 ${t('copyLink')}</button>
-          </div>
-        </div>
-        <button class="profit-btn" id="profitBtn">🎁 ${t('dailyProfit')}</button>
-      `;
-      document.getElementById('profitBtn').onclick = async () => {
-        const profit = (userData.active_deposit || 0) * 0.02;
-        if (profit <= 0) { showMessage('⚠️ لا يوجد استثمار نشط', 'error'); return; }
-        await fetch(`${API_URL}/api/update-user`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId, updates: { available_balance: (userData.available_balance || 0) + profit } })
-        });
-        userData.available_balance += profit;
-        showMessage(`✅ تم إضافة ${profit.toFixed(2)} USDT كأرباح يومية!`, 'success');
-        renderDashboard();
-      };
-    }
+      `).join('');
 
-    async function renderDeposit() {
-      document.getElementById('mainContent').innerHTML = `
-        ${renderWalletSection()}
-        <div class="card">
-          <h2 class="card-title">📥 ${t('deposit')} USDT</h2>
-          <div style="background:#0f0f1a; padding:16px; border-radius:12px; margin-bottom:16px;">
-            <p style="color:#a0aec0;">${t('depositWallet')}:</p>
-            <code style="color:#e94560; word-break:break-all;">0x987cfde723a87b5ed33329eebe0595a4416b848f</code>
-            <button onclick="navigator.clipboard.writeText('0x987cfde723a87b5ed33329eebe0595a4416b848f')" style="margin-top:8px; background:#2d3748; border:none; padding:6px 12px; border-radius:6px; color:white; cursor:pointer;">📋 ${t('copy')}</button>
-          </div>
-          <input type="number" id="depositAmount" placeholder="${t('minDeposit')}">
-          <button class="deposit-btn" id="doDepositBtn">${t('deposit')}</button>
-          <p style="font-size:12px; color:#a0aec0; margin-top:12px;">⚠️ ${t('pendingApproval')}</p>
-        </div>
-      `;
-      document.getElementById('doDepositBtn').onclick = async () => {
-        const amount = parseFloat(document.getElementById('depositAmount').value);
-        if (!amount || amount < 10) { showMessage('⚠️ الحد الأدنى للإيداع 10 USDT', 'error'); return; }
-        const response = await fetch(`${API_URL}/api/deposit`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId, amount })
-        });
-        const data = await response.json();
-        if (data.success) { showMessage(`✅ تم تقديم طلب إيداع ${amount} USDT`, 'success'); document.getElementById('depositAmount').value = ''; }
-        else showMessage('❌ ' + (data.error || 'حدث خطأ'), 'error');
-      };
-    }
-
-    async function renderWithdraw() {
-      document.getElementById('mainContent').innerHTML = `
-        ${renderWalletSection()}
-        <div class="card">
-          <h2 class="card-title">📤 ${t('withdraw')} USDT</h2>
-          <div style="background:#0f0f1a; padding:12px; border-radius:8px; margin-bottom:16px;">
-            <p>💰 ${t('availableBalance')}: <strong>${(userData.available_balance || 0)} USDT</strong></p>
-          </div>
-          <input type="number" id="withdrawAmount" placeholder="${t('minWithdraw')}">
-          <input type="text" id="walletAddress" placeholder="عنوان محفظة BSC">
-          <button class="withdraw-btn" id="doWithdrawBtn">${t('withdraw')}</button>
-          <p style="font-size:12px; color:#a0aec0; margin-top:12px;">⚠️ ${t('pendingApproval')}</p>
-        </div>
-      `;
-      document.getElementById('doWithdrawBtn').onclick = async () => {
-        const amount = parseFloat(document.getElementById('withdrawAmount').value);
-        const address = document.getElementById('walletAddress').value;
-        if (!amount || amount < 0.5) { showMessage('⚠️ الحد الأدنى للسحب 0.5 USDT', 'error'); return; }
-        if (!address) { showMessage('⚠️ يرجى إدخال عنوان محفظة BSC', 'error'); return; }
-        if (amount > (userData.available_balance || 0)) { showMessage('⚠️ الرصيد غير كافٍ', 'error'); return; }
-        const response = await fetch(`${API_URL}/api/withdraw`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId, amount, walletAddress: address })
-        });
-        const data = await response.json();
-        if (data.success) { showMessage(`✅ تم تقديم طلب سحب ${amount} USDT`, 'success'); document.getElementById('withdrawAmount').value = ''; document.getElementById('walletAddress').value = ''; }
-        else showMessage('❌ ' + (data.error || 'حدث خطأ'), 'error');
-      };
-    }
-
-    async function renderWithdrawalsList() {
-      const response = await fetch(`${API_URL}/api/admin/withdrawals`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId })
-      });
-      const withdrawals = await response.json();
-      const userWithdrawals = withdrawals.filter(w => w.user_id === userId) || [];
-
-      document.getElementById('mainContent').innerHTML = `
-        ${renderWalletSection()}
-        <div class="card">
-          <h2 class="card-title">📋 ${t('withdrawals')}</h2>
-          <div class="withdrawals-list">
-            ${userWithdrawals.length === 0 ? '<p style="color:#a0aec0; text-align:center;">لا توجد طلبات سحب</p>' : userWithdrawals.map(w => `
-              <div class="withdrawal-item">
-                <span>💰 ${w.amount} USDT</span>
-                <span class="${w.status === 'pending' ? 'warning' : w.status === 'approved' ? 'success' : 'error'}">${w.status === 'pending' ? 'قيد الانتظار' : w.status === 'approved' ? 'تم الصرف' : 'مرفوض'}</span>
-                <span>📅 ${new Date(w.created_at).toLocaleDateString('ar')}</span>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-      `;
-    }
-
-    async function renderReferrals() {
-      const response = await fetch(`${API_URL}/api/referrals`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId })
-      });
-      const data = await response.json();
-      document.getElementById('mainContent').innerHTML = `
-        ${renderWalletSection()}
-        <div class="card">
-          <h2 class="card-title">👥 ${t('referrals')}</h2>
-          <div style="background:#0f0f1a; padding:16px; border-radius:12px; text-align:center; margin-bottom:16px;">
-            <p>🔗 ${t('referralCode')}</p>
-            <code style="font-size:20px; color:#e94560;">${userData.referral_code}</code>
-            <button onclick="navigator.clipboard.writeText('${window.location.origin}?ref=${userData.referral_code}')" style="margin-top:8px; background:#e94560; border:none; padding:8px 16px; border-radius:8px; color:white; cursor:pointer;">📋 ${t('copyLink')}</button>
-          </div>
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;">
-            <div style="text-align:center;"><p style="color:#a0aec0;">عدد المحالين</p><p style="font-size:28px; font-weight:bold; color:#e94560;">${data.count || 0}</p></div>
-            <div style="text-align:center;"><p style="color:#a0aec0;">رصيد المجموعة</p><p style="font-size:28px; font-weight:bold; color:#e94560;">${data.groupBalance || 0} USDT</p></div>
-          </div>
-          <h3 style="color:white;">قائمة المحالين</h3>
-          <div id="referredList"></div>
-        </div>
-      `;
-      const listDiv = document.getElementById('referredList');
-      if (!data.referrals || data.referrals.length === 0) listDiv.innerHTML = '<p style="color:#a0aec0;">لا يوجد محالين</p>';
-      else listDiv.innerHTML = data.referrals.map(u => `<div class="withdrawal-item"><span>${u.name}</span><span>${u.email}</span><span>استثمر: ${u.active_deposit || 0} USDT</span></div>`).join('');
-    }
-
-    function renderPackages() {
-      const packages = {
-        basic: { name: 'عادي', price: 0, roi: 2 }, silver: { name: 'فضي', price: 50, roi: 2.2 },
-        gold: { name: 'ذهبي', price: 100, roi: 2.5 }, platinum: { name: 'بلاتيني', price: 250, roi: 2.8 },
-        diamond: { name: 'ماسي', price: 500, roi: 3.2 }, vip: { name: 'VIP', price: 1000, roi: 3.5 }
-      };
-      document.getElementById('mainContent').innerHTML = `
-        ${renderWalletSection()}
-        <div class="card">
-          <h2 class="card-title">💎 ${t('packages')}</h2>
-          <div class="packages-grid" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:16px;">
-            ${Object.entries(packages).map(([key, pkg]) => `
-              <div class="package-card" style="background:#0f0f1a; padding:20px; border-radius:16px; text-align:center; border:1px solid ${userData.package === key ? '#e94560' : '#2d3748'}">
-                <h3 style="color:#e94560;">${pkg.name}</h3>
-                <p style="font-size:28px; font-weight:bold; color:white;">${pkg.price === 0 ? 'مجاني' : pkg.price + ' USDT'}</p>
-                <p style="color:#22c55e;">💰 ربح: ${pkg.roi}% يومياً</p>
-                ${userData.package !== key ? `<button class="package-btn" data-package="${key}" style="margin-top:12px; background:#e94560; border:none; padding:8px; border-radius:8px; color:white; cursor:pointer;">${t('upgrade')}</button>` : '<button disabled style="margin-top:12px; background:#2d3748; border:none; padding:8px; border-radius:8px; color:#a0aec0;">✅ مستخدم حالياً</button>'}
-              </div>
-            `).join('')}
-          </div>
-        </div>
-      `;
-      document.querySelectorAll('.package-btn').forEach(btn => {
-        btn.onclick = async (e) => {
+      document.querySelectorAll('.upgrade-btn').forEach(btn => {
+        btn.onclick = async () => {
           const pkgKey = btn.getAttribute('data-package');
           const pkg = packages[pkgKey];
           if (userData.available_balance >= pkg.price) {
@@ -623,32 +409,108 @@
             });
             userData.package = pkgKey;
             userData.available_balance -= pkg.price;
-            showMessage(`✅ تم الترقية إلى ${pkg.name}`, 'success');
-            renderPackages();
-          } else showMessage(`⚠️ تحتاج ${pkg.price} USDT للترقية`, 'error');
+            showMessage('referralMsg', `✅ تم الترقية إلى ${pkg.name} بنجاح!`, 'success');
+            loadUserData();
+          } else {
+            showMessage('referralMsg', `⚠️ تحتاج ${pkg.price} USDT للترقية`, 'warning');
+          }
         };
       });
     }
 
-    const pages = { dashboard: renderDashboard, deposit: renderDeposit, withdraw: renderWithdraw, 'withdrawals-list': renderWithdrawalsList, referrals: renderReferrals, packages: renderPackages };
+    async function loadReferrals() {
+      const response = await fetch(`${API_URL}/api/referrals`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId })
+      });
+      const data = await response.json();
+      document.getElementById('referralCount').innerHTML = data.count || 0;
+      document.getElementById('groupBalance').innerHTML = (data.groupBalance || 0).toFixed(2) + ' USDT';
+      document.getElementById('groupDeposit').innerHTML = (data.groupBalance || 0).toFixed(2) + ' USDT';
+      document.getElementById('referralLink').innerHTML = `${window.location.origin}?ref=${userData?.referral_code}`;
+      
+      const listDiv = document.getElementById('referralsList');
+      if (!data.referrals || data.referrals.length === 0) {
+        listDiv.innerHTML = '<p style="color:#8899aa; text-align:center;">لا يوجد محالين حتى الآن</p>';
+      } else {
+        listDiv.innerHTML = data.referrals.map(u => `
+          <div style="background:rgba(20,20,35,0.6); border-radius:16px; padding:12px; margin-bottom:8px; display:flex; justify-content:space-between;">
+            <span>${u.name}</span><span>💰 ${u.active_deposit || 0} USDT</span>
+          </div>
+        `).join('');
+      }
+    }
 
-    document.querySelectorAll('.footer-nav-item').forEach(btn => {
-      btn.onclick = async () => {
-        document.querySelectorAll('.footer-nav-item').forEach(b => b.classList.remove('active'));
+    function showMessage(elementId, msg, type) {
+      const div = document.getElementById(elementId);
+      if (div) { div.innerHTML = `<div class="message ${type}">${msg}</div>`; setTimeout(() => div.innerHTML = '', 5000); }
+    }
+
+    document.getElementById('toggleDetails').onclick = () => {
+      document.getElementById('detailsPanel').classList.toggle('show');
+    };
+
+    document.getElementById('copyWalletBtn').onclick = () => {
+      navigator.clipboard.writeText('0x987cfde723a87b5ed33329eebe0595a4416b848f');
+      showMessage('depositMsg', '✅ تم نسخ عنوان المحفظة!', 'success');
+    };
+
+    document.getElementById('copyReferralBtn').onclick = () => {
+      navigator.clipboard.writeText(`${window.location.origin}?ref=${userData?.referral_code}`);
+      showMessage('referralMsg', '✅ تم نسخ رابط الدعوة!', 'success');
+    };
+
+    document.getElementById('doDepositBtn').onclick = async () => {
+      const amount = parseFloat(document.getElementById('depositAmount').value);
+      if (!amount || amount < 10) { showMessage('depositMsg', '⚠️ الحد الأدنى للإيداع 10 USDT', 'error'); return; }
+      const response = await fetch(`${API_URL}/api/deposit`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, amount })
+      });
+      const data = await response.json();
+      if (data.success) { showMessage('depositMsg', `✅ تم تقديم طلب إيداع ${amount} USDT`, 'success'); document.getElementById('depositAmount').value = ''; }
+      else { showMessage('depositMsg', '❌ ' + (data.error || 'حدث خطأ'), 'error'); }
+    };
+
+    document.getElementById('doWithdrawBtn').onclick = async () => {
+      const amount = parseFloat(document.getElementById('withdrawAmount').value);
+      const address = document.getElementById('walletAddress').value;
+      if (!amount || amount < 0.5) { showMessage('withdrawMsg', '⚠️ الحد الأدنى للسحب 0.5 USDT', 'error'); return; }
+      if (!address) { showMessage('withdrawMsg', '⚠️ يرجى إدخال عنوان محفظة BSC', 'error'); return; }
+      if (amount > (userData?.available_balance || 0)) { showMessage('withdrawMsg', '⚠️ الرصيد غير كافٍ', 'error'); return; }
+      const response = await fetch(`${API_URL}/api/withdraw`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, amount, walletAddress: address })
+      });
+      const data = await response.json();
+      if (data.success) { showMessage('withdrawMsg', `✅ تم تقديم طلب سحب ${amount} USDT`, 'success'); document.getElementById('withdrawAmount').value = ''; document.getElementById('walletAddress').value = ''; }
+      else { showMessage('withdrawMsg', '❌ ' + (data.error || 'حدث خطأ'), 'error'); }
+    };
+
+    document.getElementById('supportFab').onclick = () => { window.open('https://t.me/+fPunvn_76Q45NDg8', '_blank'); };
+    document.getElementById('supportBtn').onclick = () => { window.open('https://t.me/+fPunvn_76Q45NDg8', '_blank'); };
+    document.getElementById('closePopup').onclick = () => { document.getElementById('welcomePopup').style.display = 'none'; localStorage.setItem('welcomeShown', 'true'); };
+
+    document.querySelectorAll('.nav-item').forEach(btn => {
+      btn.onclick = () => {
+        document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         const page = btn.getAttribute('data-page');
-        if (pages[page]) await pages[page]();
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        if (page === 'dashboard') document.getElementById('dashboardPage').classList.add('active');
+        else if (page === 'deposit') document.getElementById('depositPage').classList.add('active');
+        else if (page === 'withdraw') document.getElementById('withdrawPage').classList.add('active');
+        else if (page === 'vip') document.getElementById('vipPage').classList.add('active');
+        else if (page === 'referral') { document.getElementById('referralPage').classList.add('active'); loadReferrals(); }
       };
     });
 
-    document.getElementById('logoutBtn').onclick = () => { localStorage.clear(); window.location.href = '/'; };
-
     (async () => {
-      if (!await testConnection()) { document.getElementById('mainContent').innerHTML = '<div class="message error">❌ لا يمكن الاتصال بالخادم</div>'; return; }
-      if (!await loadUserData()) return;
-      initSlider();
-      updateLanguage();
-      await renderDashboard();
+      const loaded = await loadUserData();
+      if (loaded) {
+        if (!localStorage.getItem('welcomeShown')) { document.getElementById('welcomePopup').style.display = 'flex'; }
+        await loadReferrals();
+      }
     })();
   </script>
 </body>
