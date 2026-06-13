@@ -12,16 +12,17 @@ app.use(express.json());
 app.use(express.static('app'));
 
 // ========================================
-// تهيئة Supabase
+// تهيئة Supabase (بدون Auth)
 // ========================================
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY
-);
-
 const supabaseAdmin = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
+  process.env.SUPABASE_SERVICE_ROLE_KEY,
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  }
 );
 
 // ========================================
@@ -32,7 +33,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // ========================================
-// API: تسجيل الدخول
+// API: تسجيل الدخول (بدون Auth)
 // ========================================
 app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
@@ -41,29 +42,27 @@ app.post('/api/login', async (req, res) => {
     return res.status(400).json({ error: 'البريد الإلكتروني وكلمة المرور مطلوبة' });
   }
   
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email, password
-  });
-  
-  if (error) {
-    return res.status(401).json({ error: error.message });
-  }
-  
-  // جلب بيانات المستخدم الإضافية
-  const { data: userData } = await supabaseAdmin
+  // البحث عن المستخدم في جدول users مباشرة
+  const { data: user, error } = await supabaseAdmin
     .from('users')
     .select('*')
-    .eq('id', data.user.id)
+    .eq('email', email)
+    .eq('password', password)  // مقارنة مباشرة (بدون تشفير)
     .single();
   
+  if (error || !user) {
+    return res.status(401).json({ error: 'البريد الإلكتروني أو كلمة المرور غير صحيحة' });
+  }
+  
   res.json({ 
-    user: data.user,
-    profile: userData
+    success: true,
+    user: { id: user.id, email: user.email },
+    profile: user
   });
 });
 
 // ========================================
-// API: إنشاء حساب جديد
+// API: إنشاء حساب جديد (بدون Auth ولا بريد)
 // ========================================
 app.post('/api/register', async (req, res) => {
   const { email, password, name, referralCode } = req.body;
@@ -72,17 +71,19 @@ app.post('/api/register', async (req, res) => {
     return res.status(400).json({ error: 'جميع الحقول مطلوبة' });
   }
   
-  if (password.length < 6) {
-    return res.status(400).json({ error: 'كلمة المرور يجب أن تكون 6 أحرف على الأقل' });
+  if (password.length < 4) {
+    return res.status(400).json({ error: 'كلمة المرور يجب أن تكون 4 أحرف على الأقل' });
   }
   
-  // إنشاء المستخدم في Supabase Auth
-  const { data, error } = await supabase.auth.signUp({
-    email, password
-  });
+  // التحقق من عدم وجود البريد مسبقاً
+  const { data: existingUser } = await supabaseAdmin
+    .from('users')
+    .select('id')
+    .eq('email', email)
+    .single();
   
-  if (error) {
-    return res.status(400).json({ error: error.message });
+  if (existingUser) {
+    return res.status(400).json({ error: 'هذا البريد مسجل بالفعل' });
   }
   
   // توليد رمز دعوة فريد
@@ -99,25 +100,20 @@ app.post('/api/register', async (req, res) => {
     if (referrer) referrerId = referrer.id;
   }
   
-  // تحديد صلاحية المدير (البريد المحدد)
+  // تحديد صلاحية المدير
   const ADMIN_EMAIL = 'mb425262@gmail.com';
-  let isAdmin = false;
+  let isAdmin = (email === ADMIN_EMAIL);
   
-  // التحقق من عدد المستخدمين أو البريد المحدد
-  const { count } = await supabaseAdmin
-    .from('users')
-    .select('*', { count: 'exact', head: true });
+  // إنشاء معرف فريد للمستخدم
+  const userId = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString();
   
-  if (count === 0 || email === ADMIN_EMAIL) {
-    isAdmin = true;
-  }
-  
-  // إضافة المستخدم إلى جدول users
+  // إضافة المستخدم مباشرة إلى جدول users (بدون Supabase Auth)
   const { error: insertError } = await supabaseAdmin
     .from('users')
     .insert({
-      id: data.user.id,
+      id: userId,
       email: email,
+      password: password,  // تخزين كلمة المرور كما هي (بدون تشفير)
       name: name,
       referral_code: newReferralCode,
       referrer_id: referrerId,
@@ -126,16 +122,18 @@ app.post('/api/register', async (req, res) => {
       available_balance: 0,
       active_deposit: 0,
       total_withdrawn: 0,
-      total_deposited: 0
+      total_deposited: 0,
+      created_at: new Date().toISOString()
     });
   
   if (insertError) {
+    console.error('Insert error:', insertError);
     return res.status(500).json({ error: 'حدث خطأ في إنشاء الحساب' });
   }
   
   res.json({ 
     success: true, 
-    user: data.user, 
+    user: { id: userId, email: email },
     referral_code: newReferralCode,
     is_admin: isAdmin
   });
@@ -247,30 +245,6 @@ app.post('/api/withdraw', async (req, res) => {
 });
 
 // ========================================
-// API: إضافة أرباح يومية
-// ========================================
-app.post('/api/add-profit', async (req, res) => {
-  const { userId, profit } = req.body;
-  
-  const { data: user } = await supabaseAdmin
-    .from('users')
-    .select('available_balance')
-    .eq('id', userId)
-    .single();
-  
-  const { error } = await supabaseAdmin
-    .from('users')
-    .update({ available_balance: (user?.available_balance || 0) + profit })
-    .eq('id', userId);
-  
-  if (error) {
-    return res.status(500).json({ error: error.message });
-  }
-  
-  res.json({ success: true });
-});
-
-// ========================================
 // API: الإحالات - جلب المحالين
 // ========================================
 app.post('/api/referrals', async (req, res) => {
@@ -281,7 +255,6 @@ app.post('/api/referrals', async (req, res) => {
     .select('*')
     .eq('referrer_id', userId);
   
-  // التحقق من أن data مصفوفة وليست null
   const referrals = data || [];
   const groupBalance = referrals.reduce((sum, u) => sum + (u.active_deposit || 0), 0);
   
@@ -346,13 +319,11 @@ app.post('/api/admin/users', checkAdmin, async (req, res) => {
 app.post('/api/admin/approve-deposit', checkAdmin, async (req, res) => {
   const { depositId, userId, amount } = req.body;
   
-  // تحديث حالة الطلب
   await supabaseAdmin
     .from('deposit_requests')
     .update({ status: 'approved' })
     .eq('id', depositId);
   
-  // تحديث رصيد المستخدم
   const { data: user } = await supabaseAdmin
     .from('users')
     .select('active_deposit, total_deposited')
@@ -386,13 +357,11 @@ app.post('/api/admin/reject-deposit', checkAdmin, async (req, res) => {
 app.post('/api/admin/approve-withdraw', checkAdmin, async (req, res) => {
   const { withdrawalId, userId, amount } = req.body;
   
-  // تحديث حالة الطلب
   await supabaseAdmin
     .from('withdrawals')
     .update({ status: 'approved' })
     .eq('id', withdrawalId);
   
-  // تحديث رصيد المستخدم
   const { data: user } = await supabaseAdmin
     .from('users')
     .select('available_balance, total_withdrawn')
@@ -414,13 +383,11 @@ app.post('/api/admin/approve-withdraw', checkAdmin, async (req, res) => {
 app.post('/api/admin/reject-withdraw', checkAdmin, async (req, res) => {
   const { withdrawalId, userId, amount } = req.body;
   
-  // تحديث حالة الطلب
   await supabaseAdmin
     .from('withdrawals')
     .update({ status: 'rejected' })
     .eq('id', withdrawalId);
   
-  // رد الرصيد للمستخدم
   const { data: user } = await supabaseAdmin
     .from('users')
     .select('available_balance')
