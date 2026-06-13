@@ -2,7 +2,7 @@
 <html dir="rtl" lang="ar">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
   <title>منصة الاستثمار | تسجيل الدخول</title>
   <style>
     * {
@@ -19,49 +19,14 @@
       align-items: center;
       justify-content: center;
       padding: 16px;
-      position: relative;
-      overflow-x: hidden;
-    }
-
-    /* Animated Background */
-    body::before {
-      content: '';
-      position: absolute;
-      width: 200%;
-      height: 200%;
-      background: radial-gradient(circle at 20% 50%, rgba(233, 69, 96, 0.1) 0%, transparent 50%);
-      animation: rotate 20s linear infinite;
-      z-index: 0;
-    }
-
-    @keyframes rotate {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-
-    /* Floating Bubbles */
-    .bubble {
-      position: absolute;
-      background: rgba(233, 69, 96, 0.15);
-      border-radius: 50%;
-      pointer-events: none;
-      animation: float 8s infinite ease-in-out;
-      z-index: 0;
-    }
-
-    @keyframes float {
-      0%, 100% { transform: translateY(0) scale(1); }
-      50% { transform: translateY(-20px) scale(1.05); }
     }
 
     /* Main Card */
     .card {
-      position: relative;
-      z-index: 1;
       background: rgba(26, 26, 46, 0.95);
       backdrop-filter: blur(20px);
       border-radius: 32px;
-      padding: 40px;
+      padding: 32px 28px;
       max-width: 500px;
       width: 100%;
       box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(233, 69, 96, 0.2);
@@ -82,50 +47,45 @@
     /* Logo Section */
     .logo {
       text-align: center;
-      margin-bottom: 32px;
+      margin-bottom: 28px;
     }
     .logo-icon {
-      font-size: 64px;
+      font-size: 56px;
       margin-bottom: 8px;
-      animation: pulse 2s infinite;
-    }
-    @keyframes pulse {
-      0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.05); }
     }
     .logo h1 {
-      font-size: 32px;
+      font-size: 28px;
       color: #e94560;
       background: linear-gradient(135deg, #e94560, #ff6b6b);
       -webkit-background-clip: text;
       background-clip: text;
       color: transparent;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
     }
     .logo p {
       color: #a0aec0;
-      font-size: 14px;
+      font-size: 13px;
     }
 
     /* Tabs */
     .tabs {
       display: flex;
-      gap: 16px;
-      margin-bottom: 32px;
+      gap: 12px;
+      margin-bottom: 28px;
       background: #0f0f1a;
-      padding: 6px;
+      padding: 5px;
       border-radius: 60px;
     }
     .tab {
       flex: 1;
-      padding: 12px;
+      padding: 10px;
       text-align: center;
       background: transparent;
       border: none;
       border-radius: 50px;
       color: #a0aec0;
       cursor: pointer;
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 600;
       transition: all 0.3s;
     }
@@ -137,14 +97,14 @@
 
     /* Input Groups */
     .input-group {
-      margin-bottom: 20px;
+      margin-bottom: 18px;
       position: relative;
     }
     .input-group label {
       display: block;
       color: #a0aec0;
-      margin-bottom: 8px;
-      font-size: 14px;
+      margin-bottom: 6px;
+      font-size: 13px;
       font-weight: 500;
     }
     .input-wrapper {
@@ -154,9 +114,9 @@
     }
     .input-wrapper input {
       width: 100%;
-      padding: 14px 16px;
-      padding-right: 45px;
-      border-radius: 16px;
+      padding: 12px 16px;
+      padding-right: 42px;
+      border-radius: 14px;
       border: 1px solid #2d3748;
       background: #0f0f1a;
       color: white;
@@ -170,19 +130,19 @@
     }
     .input-icon {
       position: absolute;
-      right: 16px;
+      right: 14px;
       top: 50%;
       transform: translateY(-50%);
-      font-size: 18px;
+      font-size: 16px;
     }
     .toggle-password {
       position: absolute;
-      left: 16px;
+      left: 14px;
       top: 50%;
       transform: translateY(-50%);
       cursor: pointer;
       color: #a0aec0;
-      font-size: 18px;
+      font-size: 16px;
       transition: color 0.3s;
       z-index: 2;
     }
@@ -204,20 +164,20 @@
       transition: width 0.3s, background 0.3s;
     }
     .strength-text {
-      font-size: 11px;
-      margin-top: 6px;
+      font-size: 10px;
+      margin-top: 5px;
       color: #a0aec0;
     }
 
     /* Buttons */
     .btn-primary {
       width: 100%;
-      padding: 14px;
+      padding: 12px;
       background: linear-gradient(135deg, #e94560, #ff6b6b);
       color: white;
       border: none;
       border-radius: 60px;
-      font-size: 16px;
+      font-size: 15px;
       font-weight: bold;
       cursor: pointer;
       transition: all 0.3s;
@@ -236,9 +196,9 @@
       background: transparent;
       border: 1px solid rgba(233, 69, 96, 0.5);
       color: #e94560;
-      padding: 14px;
+      padding: 12px;
       border-radius: 60px;
-      font-size: 14px;
+      font-size: 13px;
       cursor: pointer;
       transition: all 0.3s;
       margin-top: 12px;
@@ -250,11 +210,11 @@
 
     /* Message */
     .message {
-      margin-top: 20px;
-      padding: 12px;
-      border-radius: 16px;
+      margin-top: 18px;
+      padding: 10px;
+      border-radius: 14px;
       text-align: center;
-      font-size: 14px;
+      font-size: 13px;
       animation: fadeIn 0.3s;
     }
     @keyframes fadeIn {
@@ -281,30 +241,30 @@
     .stats {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 16px;
-      margin-top: 32px;
+      gap: 14px;
+      margin-top: 28px;
     }
     .stat-box {
       background: rgba(15, 15, 26, 0.8);
-      padding: 16px;
-      border-radius: 20px;
+      padding: 14px;
+      border-radius: 18px;
       text-align: center;
       backdrop-filter: blur(10px);
       border: 1px solid rgba(233, 69, 96, 0.2);
       transition: transform 0.3s;
     }
     .stat-box:hover {
-      transform: translateY(-3px);
+      transform: translateY(-2px);
       border-color: rgba(233, 69, 96, 0.5);
     }
     .stat-number {
       display: block;
-      font-size: 24px;
+      font-size: 22px;
       font-weight: bold;
       color: #e94560;
     }
     .stat-label {
-      font-size: 12px;
+      font-size: 11px;
       color: #a0aec0;
     }
 
@@ -315,18 +275,17 @@
 
     /* Responsive */
     @media (max-width: 480px) {
-      .card { padding: 24px; }
-      .logo h1 { font-size: 28px; }
+      .card { padding: 24px 20px; }
+      .logo h1 { font-size: 24px; }
+      .logo-icon { font-size: 48px; }
+      .tab { font-size: 13px; padding: 8px; }
+      .input-wrapper input { padding: 10px 14px; padding-right: 38px; font-size: 13px; }
+      .btn-primary { padding: 10px; font-size: 14px; }
+      .stat-number { font-size: 18px; }
     }
   </style>
 </head>
 <body>
-
-  <!-- Floating Bubbles -->
-  <div class="bubble" style="width: 150px; height: 150px; top: 10%; left: -50px;"></div>
-  <div class="bubble" style="width: 100px; height: 100px; bottom: 20%; right: -30px; animation-delay: 2s;"></div>
-  <div class="bubble" style="width: 80px; height: 80px; top: 50%; right: 10%; animation-delay: 4s;"></div>
-  <div class="bubble" style="width: 200px; height: 200px; bottom: -50px; left: 20%; animation-delay: 1s;"></div>
 
   <div class="card">
     <!-- Logo -->
@@ -406,7 +365,7 @@
         </div>
       </div>
       <button class="btn-primary" id="doRegisterBtn">إنشاء حساب</button>
-      <div id="generatedReferral" class="info hidden" style="margin-top: 16px; padding: 12px; text-align: center; border-radius: 16px;">
+      <div id="generatedReferral" class="info hidden" style="margin-top: 14px; padding: 10px; text-align: center; border-radius: 14px; font-size: 13px;">
         ✨ رمز الدعوة الخاص بك: <strong id="userReferralCode"></strong>
       </div>
     </div>
@@ -451,8 +410,8 @@
       let message = '';
       let color = '#ef4444';
       
-      if (password.length >= 6) strength++;
-      if (password.length >= 10) strength++;
+      if (password.length >= 4) strength++;
+      if (password.length >= 8) strength++;
       if (/[A-Z]/.test(password)) strength++;
       if (/[0-9]/.test(password)) strength++;
       if (/[^A-Za-z0-9]/.test(password)) strength++;
@@ -460,11 +419,10 @@
       const percent = (strength / 5) * 100;
       strengthBar.style.width = percent + '%';
       
-      if (strength === 0) { message = 'ضعيف جداً'; color = '#ef4444'; }
-      else if (strength === 1) { message = 'ضعيف'; color = '#f97316'; }
-      else if (strength === 2) { message = 'متوسط'; color = '#eab308'; }
-      else if (strength === 3) { message = 'جيد'; color = '#22c55e'; }
-      else { message = 'قوي جداً'; color = '#22c55e'; }
+      if (strength === 0 || strength === 1) { message = 'ضعيف'; color = '#ef4444'; }
+      else if (strength === 2) { message = 'متوسط'; color = '#f97316'; }
+      else if (strength === 3) { message = 'جيد'; color = '#eab308'; }
+      else { message = 'قوي'; color = '#22c55e'; }
       
       strengthBar.style.background = color;
       strengthText.innerHTML = `قوة كلمة المرور: ${message}`;
