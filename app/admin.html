@@ -3,49 +3,81 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>لوحة المدير</title>
+  <title>لوحة المدير | منصة الاستثمار</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       min-height: 100vh;
-      background: #0f0f1a;
+      background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%);
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     }
     .navbar {
-      background: #1a1a2e;
+      background: rgba(26, 26, 46, 0.95);
+      backdrop-filter: blur(10px);
       padding: 16px 32px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      border-bottom: 1px solid #2d3748;
+      border-bottom: 1px solid rgba(233, 69, 96, 0.3);
+      flex-wrap: wrap;
+      gap: 16px;
     }
-    .logo { font-size: 24px; font-weight: bold; color: #e94560; }
-    .logout-btn { background: transparent; border: 1px solid #ef4444; color: #ef4444; padding: 8px 16px; border-radius: 8px; cursor: pointer; }
-    .nav-links { display: flex; gap: 8px; background: #1a1a2e; padding: 8px 32px; border-bottom: 1px solid #2d3748; }
-    .nav-link { background: transparent; border: none; color: #a0aec0; padding: 8px 20px; cursor: pointer; }
+    .logo { font-size: 24px; font-weight: bold; color: #e94560; display: flex; align-items: center; gap: 8px; }
+    .user-info { display: flex; align-items: center; gap: 16px; }
+    .admin-email { color: #a0aec0; font-size: 14px; }
+    .logout-btn { background: transparent; border: 1px solid #ef4444; color: #ef4444; padding: 8px 16px; border-radius: 8px; cursor: pointer; transition: all 0.3s; }
+    .logout-btn:hover { background: #ef4444; color: white; }
+    .nav-links { display: flex; gap: 8px; background: #1a1a2e; padding: 8px 32px; border-bottom: 1px solid #2d3748; flex-wrap: wrap; }
+    .nav-link { background: transparent; border: none; color: #a0aec0; padding: 8px 20px; cursor: pointer; font-size: 14px; transition: all 0.3s; }
+    .nav-link:hover { color: #e94560; }
     .nav-link.active { color: #e94560; border-bottom: 2px solid #e94560; }
     .content { max-width: 1400px; margin: 0 auto; padding: 32px; }
-    table { width: 100%; border-collapse: collapse; background: #1a1a2e; border-radius: 12px; overflow: hidden; }
-    th, td { padding: 12px; text-align: right; border-bottom: 1px solid #2d3748; }
-    th { background: #0f0f1a; color: #e94560; }
+    table { width: 100%; border-collapse: collapse; background: #1a1a2e; border-radius: 16px; overflow: hidden; }
+    th, td { padding: 14px 16px; text-align: right; border-bottom: 1px solid #2d3748; }
+    th { background: #0f0f1a; color: #e94560; font-weight: 600; }
     td { color: #a0aec0; }
-    button { padding: 6px 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+    button { padding: 6px 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: all 0.3s; }
     .approve-btn { background: #22c55e; color: white; margin-left: 8px; }
+    .approve-btn:hover { background: #16a34a; transform: scale(1.02); }
     .reject-btn { background: #ef4444; color: white; }
+    .reject-btn:hover { background: #dc2626; transform: scale(1.02); }
     .status-pending { color: #fbbf24; }
     .status-approved { color: #22c55e; }
     .status-rejected { color: #ef4444; }
-    .card { background: #1a1a2e; border-radius: 16px; padding: 24px; border: 1px solid #2d3748; margin-bottom: 24px; }
-    .card-title { color: white; font-size: 20px; margin-bottom: 16px; }
-    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
-    .stat-card { background: #0f0f1a; border-radius: 12px; padding: 16px; text-align: center; }
+    .card { background: #1a1a2e; border-radius: 20px; padding: 24px; border: 1px solid rgba(233, 69, 96, 0.2); margin-bottom: 24px; }
+    .card-title { color: white; font-size: 20px; margin-bottom: 20px; border-right: 3px solid #e94560; padding-right: 12px; }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 24px; }
+    .stat-card { background: rgba(15, 15, 26, 0.8); backdrop-filter: blur(10px); border-radius: 16px; padding: 20px; text-align: center; border: 1px solid rgba(233, 69, 96, 0.2); transition: transform 0.3s; }
+    .stat-card:hover { transform: translateY(-3px); border-color: rgba(233, 69, 96, 0.5); }
+    .stat-label { color: #a0aec0; font-size: 13px; margin-bottom: 8px; }
     .stat-value { font-size: 28px; font-weight: bold; color: #e94560; }
+    .loading {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 200px;
+      color: #a0aec0;
+    }
+    @media (max-width: 768px) {
+      .navbar { padding: 12px 16px; }
+      .nav-links { padding: 8px 16px; }
+      .content { padding: 16px; }
+      th, td { padding: 8px 10px; font-size: 12px; }
+      .card { padding: 16px; }
+      .stat-value { font-size: 22px; }
+    }
   </style>
 </head>
 <body>
   <div class="navbar">
-    <h1 class="logo">👑 لوحة تحكم المدير</h1>
-    <button class="logout-btn" id="logoutBtn">تسجيل خروج</button>
+    <div class="logo">
+      <span>👑</span>
+      <span>لوحة تحكم المدير</span>
+    </div>
+    <div class="user-info">
+      <span class="admin-email" id="adminEmail">جاري التحميل...</span>
+      <button class="logout-btn" id="logoutBtn">🚪 تسجيل خروج</button>
+    </div>
   </div>
 
   <div class="nav-links">
@@ -54,49 +86,90 @@
     <button class="nav-link" data-tab="users">👥 المستخدمين</button>
   </div>
 
-  <div class="content" id="mainContent"></div>
+  <div class="content" id="mainContent">
+    <div class="loading">⏳ جاري التحميل...</div>
+  </div>
 
   <script>
     const API_URL = window.location.origin;
     let userId = localStorage.getItem('userId');
+    let adminEmail = null;
     
     async function checkAdmin() {
       if (!userId) {
         window.location.href = '/';
-        return;
+        return false;
       }
       
-      const response = await fetch(`${API_URL}/api/user`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId })
-      });
-      const user = await response.json();
-      
-      if (!user.is_admin) {
-        alert('ليس لديك صلاحية الدخول إلى لوحة التحكم');
+      try {
+        const response = await fetch(`${API_URL}/api/user`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId })
+        });
+        const user = await response.json();
+        
+        if (!user || !user.is_admin) {
+          alert('❌ ليس لديك صلاحية الدخول إلى لوحة التحكم');
+          window.location.href = '/';
+          return false;
+        }
+        
+        adminEmail = user.email;
+        document.getElementById('adminEmail').innerHTML = `👑 ${adminEmail}`;
+        return true;
+      } catch (error) {
+        console.error('Check admin error:', error);
         window.location.href = '/';
+        return false;
       }
     }
 
     async function fetchData(endpoint) {
-      const response = await fetch(`${API_URL}/api/admin/${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId })
-      });
-      return response.json();
+      try {
+        const response = await fetch(`${API_URL}/api/admin/${endpoint}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId })
+        });
+        return await response.json();
+      } catch (error) {
+        console.error(`Error fetching ${endpoint}:`, error);
+        return [];
+      }
+    }
+
+    async function callAdminAPI(endpoint, data) {
+      try {
+        const response = await fetch(`${API_URL}/api/admin/${endpoint}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, ...data })
+        });
+        return await response.json();
+      } catch (error) {
+        console.error(`Error calling ${endpoint}:`, error);
+        return { error: error.message };
+      }
+    }
+
+    function formatDate(dateString) {
+      if (!dateString) return '-';
+      return new Date(dateString).toLocaleDateString('ar');
     }
 
     async function renderDeposits() {
       const deposits = await fetchData('deposits');
       const pending = deposits.filter(d => d.status === 'pending');
       const history = deposits.filter(d => d.status !== 'pending');
+      const totalAmount = deposits.reduce((s, d) => s + (d.amount || 0), 0);
       
       document.getElementById('mainContent').innerHTML = `
         <div class="stats-grid">
-          <div class="stat-card"><p>⏳ قيد الانتظار</p><p class="stat-value">${pending.length}</p></div>
-          <div class="stat-card"><p>💰 إجمالي الإيداعات</p><p class="stat-value">${deposits.reduce((s,d) => s + d.amount, 0)} USDT</p></div>
+          <div class="stat-card"><div class="stat-label">⏳ قيد الانتظار</div><div class="stat-value">${pending.length}</div></div>
+          <div class="stat-card"><div class="stat-label">💰 إجمالي الإيداعات</div><div class="stat-value">${totalAmount.toFixed(2)} USDT</div></div>
+          <div class="stat-card"><div class="stat-label">✅ تمت الموافقة</div><div class="stat-value">${history.filter(d => d.status === 'approved').length}</div></div>
+          <div class="stat-card"><div class="stat-label">❌ مرفوضة</div><div class="stat-value">${history.filter(d => d.status === 'rejected').length}</div></div>
         </div>
         
         <div class="card">
@@ -112,43 +185,54 @@
       
       const pendingDiv = document.getElementById('pendingDeposits');
       if (pending.length === 0) {
-        pendingDiv.innerHTML = '<p style="color:#a0aec0;">لا توجد طلبات</p>';
+        pendingDiv.innerHTML = '<p style="color:#a0aec0; text-align:center;">✨ لا توجد طلبات إيداع قيد الانتظار</p>';
       } else {
         pendingDiv.innerHTML = `
-          <table>
-            <thead><tr><th>المستخدم</th><th>المبلغ</th><th>التاريخ</th><th>إجراءات</th></tr></thead>
-            <tbody>
-              ${pending.map(d => `
-                <tr>
-                  <td>${d.users?.name || d.users?.email || 'غير معروف'}</td>
-                  <td>${d.amount} USDT</td>
-                  <td>${new Date(d.created_at).toLocaleDateString('ar')}</td>
-                  <td><button class="approve-btn" data-id="${d.id}" data-type="deposit" data-action="approve" data-user="${d.user_id}" data-amount="${d.amount}">موافقة</button><button class="reject-btn" data-id="${d.id}" data-type="deposit" data-action="reject">رفض</button></td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
+          <div style="overflow-x: auto;">
+            <table>
+              <thead>
+                <tr><th>المستخدم</th><th>المبلغ</th><th>التاريخ</th><th>إجراءات</th></tr>
+              </thead>
+              <tbody>
+                ${pending.map(d => `
+                  <tr>
+                    <td>${d.users?.name || d.users?.email || 'غير معروف'}</td>
+                    <td><strong>${d.amount} USDT</strong></td>
+                    <td>${formatDate(d.created_at)}</td>
+                    <td>
+                      <button class="approve-btn" data-id="${d.id}" data-type="deposit" data-action="approve" data-user="${d.user_id}" data-amount="${d.amount}">✅ موافقة</button>
+                      <button class="reject-btn" data-id="${d.id}" data-type="deposit" data-action="reject">❌ رفض</button>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
         `;
       }
       
       const historyDiv = document.getElementById('depositHistory');
       if (history.length === 0) {
-        historyDiv.innerHTML = '<p style="color:#a0aec0;">لا يوجد سجل</p>';
+        historyDiv.innerHTML = '<p style="color:#a0aec0; text-align:center;">📭 لا يوجد سجل إيداعات</p>';
       } else {
         historyDiv.innerHTML = `
-          <table>
-            <thead><tr><th>المستخدم</th><th>المبلغ</th><th>التاريخ</th><th>الحالة</th></tr></thead>
-            <tbody>
-              ${history.map(d => `
-                <tr>
-                  <td>${d.users?.name || d.users?.email || 'غير معروف'}</td>
-                  <td>${d.amount} USDT</td>
-                  <td>${new Date(d.created_at).toLocaleDateString('ar')}</td>
-                  <td class="status-${d.status}">${d.status === 'approved' ? 'تمت الموافقة' : 'مرفوض'}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
+          <div style="overflow-x: auto;">
+            <table>
+              <thead>
+                <tr><th>المستخدم</th><th>المبلغ</th><th>التاريخ</th><th>الحالة</th></tr>
+              </thead>
+              <tbody>
+                ${history.map(d => `
+                  <tr>
+                    <td>${d.users?.name || d.users?.email || 'غير معروف'}</td>
+                    <td>${d.amount} USDT</td>
+                    <td>${formatDate(d.created_at)}</td>
+                    <td class="status-${d.status}">${d.status === 'approved' ? '✅ تمت الموافقة' : '❌ مرفوض'}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
         `;
       }
       
@@ -159,11 +243,14 @@
       const withdrawals = await fetchData('withdrawals');
       const pending = withdrawals.filter(w => w.status === 'pending');
       const history = withdrawals.filter(w => w.status !== 'pending');
+      const totalAmount = withdrawals.reduce((s, w) => s + (w.amount || 0), 0);
       
       document.getElementById('mainContent').innerHTML = `
         <div class="stats-grid">
-          <div class="stat-card"><p>⏳ قيد الانتظار</p><p class="stat-value">${pending.length}</p></div>
-          <div class="stat-card"><p>📤 إجمالي السحوبات</p><p class="stat-value">${withdrawals.reduce((s,w) => s + w.amount, 0)} USDT</p></div>
+          <div class="stat-card"><div class="stat-label">⏳ قيد الانتظار</div><div class="stat-value">${pending.length}</div></div>
+          <div class="stat-card"><div class="stat-label">📤 إجمالي السحوبات</div><div class="stat-value">${totalAmount.toFixed(2)} USDT</div></div>
+          <div class="stat-card"><div class="stat-label">✅ تم الصرف</div><div class="stat-value">${history.filter(w => w.status === 'approved').length}</div></div>
+          <div class="stat-card"><div class="stat-label">❌ مرفوضة</div><div class="stat-value">${history.filter(w => w.status === 'rejected').length}</div></div>
         </div>
         
         <div class="card">
@@ -179,44 +266,55 @@
       
       const pendingDiv = document.getElementById('pendingWithdrawals');
       if (pending.length === 0) {
-        pendingDiv.innerHTML = '<p style="color:#a0aec0;">لا توجد طلبات</p>';
+        pendingDiv.innerHTML = '<p style="color:#a0aec0; text-align:center;">✨ لا توجد طلبات سحب قيد الانتظار</p>';
       } else {
         pendingDiv.innerHTML = `
-          <table>
-            <thead><tr><th>المستخدم</th><th>المبلغ</th><th>المحفظة</th><th>التاريخ</th><th>إجراءات</th></tr></thead>
-            <tbody>
-              ${pending.map(w => `
-                <tr>
-                  <td>${w.users?.name || w.users?.email || 'غير معروف'}</td>
-                  <td>${w.amount} USDT</td>
-                  <td>${w.wallet_address?.substring(0, 15)}...</td>
-                  <td>${new Date(w.created_at).toLocaleDateString('ar')}</td>
-                  <td><button class="approve-btn" data-id="${w.id}" data-type="withdraw" data-action="approve" data-user="${w.user_id}" data-amount="${w.amount}">صرف</button><button class="reject-btn" data-id="${w.id}" data-type="withdraw" data-action="reject" data-user="${w.user_id}" data-amount="${w.amount}">رفض</button></td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
+          <div style="overflow-x: auto;">
+            <table>
+              <thead>
+                <tr><th>المستخدم</th><th>المبلغ</th><th>المحفظة</th><th>التاريخ</th><th>إجراءات</th></tr>
+              </thead>
+              <tbody>
+                ${pending.map(w => `
+                  <tr>
+                    <td>${w.users?.name || w.users?.email || 'غير معروف'}</td>
+                    <td><strong>${w.amount} USDT</strong></td>
+                    <td><code style="font-size:11px;">${w.wallet_address?.substring(0, 15)}...</code></td>
+                    <td>${formatDate(w.created_at)}</td>
+                    <td>
+                      <button class="approve-btn" data-id="${w.id}" data-type="withdraw" data-action="approve" data-user="${w.user_id}" data-amount="${w.amount}">✅ صرف</button>
+                      <button class="reject-btn" data-id="${w.id}" data-type="withdraw" data-action="reject" data-user="${w.user_id}" data-amount="${w.amount}">❌ رفض</button>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
         `;
       }
       
       const historyDiv = document.getElementById('withdrawHistory');
       if (history.length === 0) {
-        historyDiv.innerHTML = '<p style="color:#a0aec0;">لا يوجد سجل</p>';
+        historyDiv.innerHTML = '<p style="color:#a0aec0; text-align:center;">📭 لا يوجد سجل سحوبات</p>';
       } else {
         historyDiv.innerHTML = `
-          <table>
-            <thead><tr><th>المستخدم</th><th>المبلغ</th><th>التاريخ</th><th>الحالة</th></tr></thead>
-            <tbody>
-              ${history.map(w => `
-                <tr>
-                  <td>${w.users?.name || w.users?.email || 'غير معروف'}</td>
-                  <td>${w.amount} USDT</td>
-                  <td>${new Date(w.created_at).toLocaleDateString('ar')}</td>
-                  <td class="status-${w.status}">${w.status === 'approved' ? 'تم الصرف' : 'مرفوض'}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
+          <div style="overflow-x: auto;">
+            <table>
+              <thead>
+                <tr><th>المستخدم</th><th>المبلغ</th><th>التاريخ</th><th>الحالة</th></tr>
+              </thead>
+              <tbody>
+                ${history.map(w => `
+                  <tr>
+                    <td>${w.users?.name || w.users?.email || 'غير معروف'}</td>
+                    <td>${w.amount} USDT</td>
+                    <td>${formatDate(w.created_at)}</td>
+                    <td class="status-${w.status}">${w.status === 'approved' ? '✅ تم الصرف' : '❌ مرفوض'}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
         `;
       }
       
@@ -228,8 +326,10 @@
       
       document.getElementById('mainContent').innerHTML = `
         <div class="stats-grid">
-          <div class="stat-card"><p>👥 إجمالي المستخدمين</p><p class="stat-value">${users.length}</p></div>
-          <div class="stat-card"><p>💰 إجمالي الاستثمارات</p><p class="stat-value">${users.reduce((s,u) => s + (u.active_deposit || 0), 0)} USDT</p></div>
+          <div class="stat-card"><div class="stat-label">👥 إجمالي المستخدمين</div><div class="stat-value">${users.length}</div></div>
+          <div class="stat-card"><div class="stat-label">💰 إجمالي الاستثمارات</div><div class="stat-value">${users.reduce((s, u) => s + (u.active_deposit || 0), 0).toFixed(2)} USDT</div></div>
+          <div class="stat-card"><div class="stat-label">💎 إجمالي الرصيد</div><div class="stat-value">${users.reduce((s, u) => s + (u.available_balance || 0), 0).toFixed(2)} USDT</div></div>
+          <div class="stat-card"><div class="stat-label">👑 المديرين</div><div class="stat-value">${users.filter(u => u.is_admin).length}</div></div>
         </div>
         
         <div class="card">
@@ -240,34 +340,28 @@
       
       const usersDiv = document.getElementById('usersList');
       usersDiv.innerHTML = `
-        <table>
-          <thead>
-            <tr><th>الاسم</th><th>البريد</th><th>الباقة</th><th>الاستثمار</th><th>الرصيد</th><th>كود الدعوة</th><th>مدير</th></tr>
-          </thead>
-          <tbody>
-            ${users.map(u => `
-              <tr>
-                <td>${u.name || '-'}</td>
-                <td>${u.email}</td>
-                <td>${u.package || 'basic'}</td>
-                <td>${u.active_deposit || 0} USDT</td>
-                <td>${u.available_balance || 0} USDT</td>
-                <td>${u.referral_code}</td>
-                <td>${u.is_admin ? '✅' : '❌'}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
+        <div style="overflow-x: auto;">
+          <table>
+            <thead>
+              <tr><th>الاسم</th><th>البريد</th><th>الباقة</th><th>الاستثمار</th><th>الرصيد</th><th>كود الدعوة</th><th>مدير</th><th>تاريخ التسجيل</th></tr>
+            </thead>
+            <tbody>
+              ${users.map(u => `
+                <tr>
+                  <td>${u.name || '-'}</td>
+                  <td>${u.email}</td>
+                  <td>${u.package === 'basic' ? 'عادي' : u.package === 'silver' ? 'فضي' : u.package === 'gold' ? 'ذهبي' : u.package === 'platinum' ? 'بلاتيني' : u.package === 'diamond' ? 'ماسي' : 'VIP'}</td>
+                  <td>${(u.active_deposit || 0).toFixed(2)} USDT</td>
+                  <td>${(u.available_balance || 0).toFixed(2)} USDT</td>
+                  <td><code style="font-size:11px;">${u.referral_code}</code></td>
+                  <td>${u.is_admin ? '✅' : '❌'}</td>
+                  <td>${formatDate(u.created_at)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
       `;
-    }
-
-    async function callAdminAPI(endpoint, data) {
-      const response = await fetch(`${API_URL}/api/admin/${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, ...data })
-      });
-      return response.json();
     }
 
     function attachEvents() {
@@ -293,18 +387,16 @@
             }
           }
           
-          // إعادة تحميل البيانات
           const activeTab = document.querySelector('.nav-link.active').getAttribute('data-tab');
           if (activeTab === 'deposits') await renderDeposits();
           else if (activeTab === 'withdrawals') await renderWithdrawals();
+          else if (activeTab === 'users') await renderUsers();
         };
       });
     }
 
     document.getElementById('logoutBtn').onclick = () => {
-      localStorage.removeItem('userId');
-      localStorage.removeItem('user');
-      localStorage.removeItem('isAdmin');
+      localStorage.clear();
       window.location.href = '/';
     };
 
@@ -320,8 +412,10 @@
     });
 
     (async () => {
-      await checkAdmin();
-      await renderDeposits();
+      const isAdmin = await checkAdmin();
+      if (isAdmin) {
+        await renderDeposits();
+      }
     })();
   </script>
 </body>
