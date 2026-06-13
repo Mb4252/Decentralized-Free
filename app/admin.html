@@ -117,7 +117,7 @@
       const history = deposits.filter(d => d.status !== 'pending');
       const historyDiv = document.getElementById('depositHistory');
       if (history.length === 0) historyDiv.innerHTML = '<p style="color:#8899aa;">لا يوجد سجل</p>';
-      else historyDiv.innerHTML = `<div style="overflow-x:auto;"><table><thead><tr><th>المستخدم</th><th>المبلغ</th><th>التاريخ</th><th>الحالة</th></tr></thead><tbody>${history.map(d => `<tr><td>${d.users?.name || d.users?.email}</td><td>${d.amount} USDT</td><td>${new Date(d.created_at).toLocaleDateString('ar')}</td><td style="color:${d.status === 'approved' ? '#00ff66' : '#ff4444'}">${d.status === 'approved' ? 'تمت الموافقة' : 'مرفوض'}</td></tr>`).join('')}</tbody></table></div>`;
+      else historyDiv.innerHTML = `<div style="overflow-x:auto;"><tr><thead><tr><th>المستخدم</th><th>المبلغ</th><th>التاريخ</th><th>الحالة</th></tr></thead><tbody>${history.map(d => `<tr><td>${d.users?.name || d.users?.email}</td><td>${d.amount} USDT</td><td>${new Date(d.created_at).toLocaleDateString('ar')}</td><td style="color:${d.status === 'approved' ? '#00ff66' : '#ff4444'}">${d.status === 'approved' ? 'تمت الموافقة' : 'مرفوض'}</td></tr>`).join('')}</tbody></table></div>`;
       attachEvents();
     }
 
@@ -147,7 +147,7 @@
         <div class="stats-grid"><div class="stat-card"><div class="stat-value">${users.length}</div><div class="stat-label">👥 إجمالي المستخدمين</div></div></div>
         <div class="card"><h2 class="card-title">📋 قائمة المستخدمين</h2><div id="usersList"></div></div>
       `;
-      document.getElementById('usersList').innerHTML = `<div style="overflow-x:auto;"><table><thead><tr><th>الاسم</th><th>البريد</th><th>الباقة</th><th>الاستثمار</th><th>الرصيد</th><th>مدير</th></tr></thead><tbody>${users.map(u => `<tr><td>${u.name || '-'}</td><td>${u.email}</td><td>${u.package}</td><td>${u.active_deposit || 0} USDT</td><td>${u.available_balance || 0} USDT</td><td>${u.is_admin ? '✅' : '❌'}</td></tr>`).join('')}</tbody></table></div>`;
+      document.getElementById('usersList').innerHTML = `<div style="overflow-x:auto;"><table><thead><tr><th>الاسم</th><th>البريد</th><th>المستوى</th><th>الاستثمار</th><th>الرصيد</th><th>مدير</th></tr></thead><tbody>${users.map(u => `<tr><td>${u.name || '-'}</td><td>${u.email}</td><td>VIP ${u.vip_level || 0</td><td>${u.active_deposit || 0} USDT</td><td>${u.available_balance || 0} USDT</td><td>${u.is_admin ? '✅' : '❌'}</td></tr>`).join('')}</tbody></table></div>`;
     }
 
     function attachEvents() {
