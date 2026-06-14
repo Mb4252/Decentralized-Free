@@ -480,7 +480,6 @@
         document.getElementById('welcomeNetworkText').innerHTML = t.welcomeNetworkText;
       }
       
-      // Re-render current page
       if (typeof currentPage === 'string' && pages[currentPage]) {
         pages[currentPage]();
       }
@@ -509,7 +508,6 @@
           document.getElementById('welcomeModal').classList.remove('hidden');
         }
         
-        // Start with dashboard
         currentPage = 'dashboard';
         renderDashboard();
       } catch(e) { console.error(e); }
@@ -585,7 +583,8 @@
       const totalDeposit = userData?.total_deposited || 0;
       const totalWithdraw = userData?.total_withdrawn || 0;
       const currentVip = userData?.vip_level || 0;
-      const currentRoi = currentVip > 0 ? (vipLevels[currentVip]?.roi || 2) : 2;
+      // اصلاح نسبة الربح: 0% للمستخدم غير المشترك
+      const currentRoi = currentVip > 0 ? (vipLevels[currentVip]?.roi || 0) : 0;
       const currentVipName = currentVip > 0 ? (vipLevels[currentVip]?.name || 'غير مشترك') : (currentLang === 'ar' ? 'غير مشترك' : 'Not subscribed');
       
       document.getElementById('mainContent').innerHTML = `
@@ -889,6 +888,7 @@
     async function renderProfile() {
       const t = translations[currentLang];
       const avail = userData?.available_balance || 0;
+      
       document.getElementById('mainContent').innerHTML = `
         <div class="card" style="text-align:center;">
           <div style="font-size:60px;">👤</div>
@@ -900,34 +900,79 @@
       `;
       
       try {
+        // جلب الإيداعات من API
         const depositsRes = await fetch(`${API_URL}/api/admin/deposits`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId })
         });
-        const deposits = await depositsRes.json();
+        let deposits = [];
+        try {
+          const depositsData = await depositsRes.json();
+          deposits = Array.isArray(depositsData) ? depositsData.filter(d => d.user_id === userId) : [];
+        } catch(e) { console.log('Deposits error:', e); }
         
+        // جلب السحوبات من API
         const withdrawsRes = await fetch(`${API_URL}/api/admin/withdrawals`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId })
         });
-        const withdrawals = await withdrawsRes.json();
+        let withdrawals = [];
+        try {
+          const withdrawalsData = await withdrawsRes.json();
+          withdrawals = Array.isArray(withdrawalsData) ? withdrawalsData.filter(w => w.user_id === userId) : [];
+        } catch(e) { console.log('Withdrawals error:', e); }
         
+        // جلب الأرباح من API
         const profitsRes = await fetch(`${API_URL}/api/transactions`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId })
         });
-        const profitsData = await profitsRes.json();
-        const profits = (profitsData || []).filter(p => p.type === 'ربح' || p.type === 'profit') || [];
+        let profits = [];
+        try {
+          const profitsData = await profitsRes.json();
+          profits = Array.isArray(profitsData) ? profitsData.filter(p => p.type === 'profit' || p.type === 'ربح') : [];
+        } catch(e) { console.log('Profits error:', e); }
         
-        const allTransactions = [
-          ...(deposits || []).filter(d => d.user_id === userId).map(d => ({ ...d, type: 'deposit', displayType: t.typeDeposit, date: d.created_at })),
-          ...(withdrawals || []).filter(w => w.user_id === userId).map(w => ({ ...w, type: 'withdraw', displayType: t.typeWithdraw, date: w.created_at })),
-          ...(profits || []).map(p => ({ ...p, type: 'profit', displayType: t.typeProfit, date: p.calculated_date || p.created_at, amount: p.profit_amount || p.amount, status: 'approved' }))
-        ];
+        // بناء قائمة المعاملات
+        const allTransactions = [];
         
+        deposits.forEach(d => {
+          allTransactions.push({
+            id: d.id,
+            type: 'deposit',
+            displayType: t.typeDeposit,
+            amount: d.amount,
+            date: d.created_at,
+            status: d.status || 'approved'
+          });
+        });
+        
+        withdrawals.forEach(w => {
+          allTransactions.push({
+            id: w.id,
+            type: 'withdraw',
+            displayType: t.typeWithdraw,
+            amount: w.amount,
+            date: w.created_at,
+            status: w.status || 'approved'
+          });
+        });
+        
+        profits.forEach(p => {
+          allTransactions.push({
+            id: p.id,
+            type: 'profit',
+            displayType: t.typeProfit,
+            amount: p.profit_amount || p.amount,
+            date: p.calculated_date || p.created_at,
+            status: 'approved'
+          });
+        });
+        
+        // ترتيب من الأحدث إلى الأقدم
         allTransactions.sort((a, b) => new Date(b.date) - new Date(a.date));
         
         const listDiv = document.getElementById('transactionsList');
@@ -938,7 +983,7 @@
             <div class="history-item">
               <div>
                 <div class="history-type">${txn.displayType}</div>
-                <div style="font-size:11px; color:#8899aa;">${new Date(txn.date).toLocaleDateString(currentLang === 'ar' ? 'ar' : 'en')}</div>
+                <div style="font-size:11px; color:#8899aa;">${txn.date ? new Date(txn.date).toLocaleDateString(currentLang === 'ar' ? 'ar' : 'en') : '-'}</div>
               </div>
               <div class="history-amount">${(txn.amount || 0).toFixed(2)} USDT</div>
               <div class="history-status ${txn.status === 'approved' ? 'status-approved' : 'status-pending'}">${txn.status === 'approved' ? t.statusApproved : t.statusPending}</div>
