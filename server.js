@@ -31,7 +31,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // ========================================
-// API: جلب رصيد BNB و USDT للمحفظة
+// API: جلب رصيد المحفظة
 // ========================================
 app.get('/api/wallet-balance', async (req, res) => {
   try {
@@ -65,15 +65,7 @@ app.post('/api/process-deposits', async (req, res) => {
     // 2. جلب رصيد USDT الحالي في محفظة البوت
     const currentUSDTBalance = await bsc.getUSDTBalance();
     
-    // 3. جلب آخر إيداع تمت معالجته من قاعدة البيانات
-    const { data: lastProcessed } = await supabaseAdmin
-      .from('processed_deposits')
-      .select('amount, tx_hash')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
-    
-    // 4. حساب المبلغ الجديد (70% للتحويل)
+    // 3. حساب المبلغ الجديد (70% للتحويل)
     const TRANSFER_PERCENTAGE = parseFloat(process.env.TRANSFER_PERCENTAGE || 70);
     const amountToTransfer = (currentUSDTBalance * TRANSFER_PERCENTAGE) / 100;
     
@@ -81,11 +73,11 @@ app.post('/api/process-deposits', async (req, res) => {
       return res.json({ message: 'المبلغ أقل من 10 USDT، لم يتم التحويل', amount: amountToTransfer });
     }
     
-    // 5. تحويل 70% إلى محفظة الاستثمار
+    // 4. تحويل 70% إلى محفظة الاستثمار
     const transferResult = await bsc.transferUSDT(bsc.INVESTMENT_WALLET, amountToTransfer);
     
     if (transferResult.success) {
-      // 6. تسجيل العملية في قاعدة البيانات
+      // 5. تسجيل العملية في قاعدة البيانات
       await supabaseAdmin
         .from('auto_transfers')
         .insert({
@@ -97,15 +89,6 @@ app.post('/api/process-deposits', async (req, res) => {
           gas_used: transferResult.gasUsed,
           block_number: transferResult.blockNumber,
           status: 'completed',
-          created_at: new Date().toISOString()
-        });
-      
-      // 7. تحديث آخر إيداع تمت معالجته
-      await supabaseAdmin
-        .from('processed_deposits')
-        .insert({
-          amount: amountToTransfer,
-          tx_hash: transferResult.hash,
           created_at: new Date().toISOString()
         });
     }
@@ -127,6 +110,274 @@ app.post('/api/process-deposits', async (req, res) => {
 });
 
 // ========================================
+// API: تسجيل الدخول
+// ========================================
+app.post('/api/login', async (req, res) => {
+  const { email, password } = req.body;
+  
+  if (!email || !password) {
+    return res.status(400).json({ error: 'البريد الإلكتروني وكلمة المرور مطلوبة' });
+  }
+  
+  const { data: user, error } = await supabaseAdmin
+    .from('users')
+    .select('*')
+    .eq('email', email)
+    .eq('password', password)
+    .single();
+  
+  if (error || !user) {
+    return res.status(401).json({ error: 'البريد الإلكتروني أو كلمة المرور غير صحيحة' });
+  }
+  
+  res.json({ 
+    success: true,
+    user: { id: user.id, email: user.email },
+    profile: user
+  });
+});
+
+// ========================================
+// API: إنشاء حساب جديد
+// ========================================
+app.post('/api/register', async (req, res) => {
+  const { email, password, name, referralCode } = req.body;
+  
+  if (!email || !password || !name) {
+    return res.status(400).json({ error: 'جميع الحقول مطلوبة' });
+  }
+  
+  if (password.length < 4) {
+    return res.status(400).json({ error: 'كلمة المرور يجب أن تكون 4 أحرف على الأقل' });
+  }
+  
+  const { data: existingUser } = await supabaseAdmin
+    .from('users')
+    .select('id')
+    .eq('email', email)
+    .single();
+  
+  if (existingUser) {
+    return res.status(400).json({ error: 'هذا البريد مسجل بالفعل' });
+  }
+  
+  const newReferralCode = Math.random().toString(36).substring(2, 10).toUpperCase();
+  
+  let referrerId = null;
+  if (referralCode) {
+    const { data: referrer } = await supabaseAdmin
+      .from('users')
+      .select('id')
+      .eq('referral_code', referralCode.toUpperCase())
+      .single();
+    if (referrer) referrerId = referrer.id;
+  }
+  
+  const ADMIN_EMAIL = 'mb425262@gmail.com';
+  const isAdmin = (email === ADMIN_EMAIL);
+  
+  const userId = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString();
+  
+  const { error: insertError } = await supabaseAdmin
+    .from('users')
+    .insert({
+      id: userId,
+      email: email,
+      password: password,
+      name: name,
+      referral_code: newReferralCode,
+      referrer_id: referrerId,
+      is_admin: isAdmin,
+      vip_level: 0,
+      available_balance: 0,
+      active_deposit: 0,
+      total_withdrawn: 0,
+      total_deposited: 0,
+      created_at: new Date().toISOString()
+    });
+  
+  if (insertError) {
+    console.error('Insert error:', insertError);
+    return res.status(500).json({ error: 'حدث خطأ في إنشاء الحساب' });
+  }
+  
+  res.json({ 
+    success: true, 
+    user: { id: userId, email: email },
+    referral_code: newReferralCode,
+    is_admin: isAdmin
+  });
+});
+
+// ========================================
+// API: جلب بيانات المستخدم
+// ========================================
+app.post('/api/user', async (req, res) => {
+  const { userId } = req.body;
+  
+  const { data, error } = await supabaseAdmin
+    .from('users')
+    .select('*')
+    .eq('id', userId)
+    .single();
+  
+  if (error) {
+    return res.status(404).json({ error: 'المستخدم غير موجود' });
+  }
+  
+  res.json(data);
+});
+
+// ========================================
+// API: تحديث بيانات المستخدم
+// ========================================
+app.post('/api/update-user', async (req, res) => {
+  const { userId, updates } = req.body;
+  
+  const { error } = await supabaseAdmin
+    .from('users')
+    .update(updates)
+    .eq('id', userId);
+  
+  if (error) {
+    return res.status(500).json({ error: error.message });
+  }
+  
+  res.json({ success: true });
+});
+
+// ========================================
+// API: تقديم طلب إيداع (تلقائي)
+// ========================================
+app.post('/api/deposit', async (req, res) => {
+  const { userId, amount } = req.body;
+  
+  if (!amount || amount < 10) {
+    return res.status(400).json({ error: 'الحد الأدنى للإيداع 10 USDT' });
+  }
+  
+  // التحقق من رصيد BNB
+  const bnbStatus = await bsc.checkBNBBalance();
+  if (bnbStatus.isLow) {
+    return res.status(400).json({ error: 'نظام الإيداع مؤقتاً، يرجى المحاولة لاحقاً' });
+  }
+  
+  // إنشاء طلب إيداع (موافق عليه تلقائياً)
+  const { data: deposit, error: depositError } = await supabaseAdmin
+    .from('deposit_requests')
+    .insert({ 
+      user_id: userId, 
+      amount: amount, 
+      status: 'approved',  // موافق عليه تلقائياً
+      created_at: new Date().toISOString(),
+      approved_at: new Date().toISOString()
+    })
+    .select()
+    .single();
+  
+  if (depositError) {
+    return res.status(500).json({ error: depositError.message });
+  }
+  
+  // تحديث رصيد المستخدم تلقائياً
+  const { data: user } = await supabaseAdmin
+    .from('users')
+    .select('active_deposit, total_deposited, available_balance')
+    .eq('id', userId)
+    .single();
+  
+  await supabaseAdmin
+    .from('users')
+    .update({ 
+      active_deposit: (user?.active_deposit || 0) + amount,
+      total_deposited: (user?.total_deposited || 0) + amount
+    })
+    .eq('id', userId);
+  
+  res.json({ 
+    success: true, 
+    message: `تم إيداع ${amount} USDT بنجاح`,
+    depositId: deposit.id 
+  });
+});
+
+// ========================================
+// API: تقديم طلب سحب (تلقائي)
+// ========================================
+app.post('/api/withdraw', async (req, res) => {
+  const { userId, amount, walletAddress } = req.body;
+  
+  if (!amount || amount < 0.5) {
+    return res.status(400).json({ error: 'الحد الأدنى للسحب 0.5 USDT' });
+  }
+  
+  if (!walletAddress) {
+    return res.status(400).json({ error: 'عنوان المحفظة مطلوب' });
+  }
+  
+  // التحقق من رصيد المستخدم
+  const { data: user } = await supabaseAdmin
+    .from('users')
+    .select('available_balance, total_withdrawn')
+    .eq('id', userId)
+    .single();
+  
+  if (!user || user.available_balance < amount) {
+    return res.status(400).json({ error: 'الرصيد غير كافٍ' });
+  }
+  
+  // التحقق من رصيد USDT في محفظة البوت
+  const botUSDTBalance = await bsc.getUSDTBalance();
+  if (botUSDTBalance < amount) {
+    return res.status(400).json({ error: 'رصيد المحفظة غير كافٍ، يرجى المحاولة لاحقاً' });
+  }
+  
+  // التحقق من رصيد BNB للرسوم
+  const bnbStatus = await bsc.checkBNBBalance();
+  if (bnbStatus.isLow) {
+    return res.status(400).json({ error: 'نظام السحب مؤقتاً، يرجى المحاولة لاحقاً' });
+  }
+  
+  // تحويل USDT إلى عنوان المستخدم
+  const transferResult = await bsc.transferUSDT(walletAddress, amount);
+  
+  if (!transferResult.success) {
+    return res.status(500).json({ error: 'فشل تحويل الأموال، يرجى المحاولة لاحقاً' });
+  }
+  
+  // إنشاء طلب سحب (موافق عليه تلقائياً)
+  const { error: withdrawError } = await supabaseAdmin
+    .from('withdrawals')
+    .insert({ 
+      user_id: userId, 
+      amount: amount, 
+      wallet_address: walletAddress, 
+      status: 'approved',  // موافق عليه تلقائياً
+      created_at: new Date().toISOString(),
+      processed_at: new Date().toISOString()
+    });
+  
+  if (withdrawError) {
+    console.error('Withdraw log error:', withdrawError);
+  }
+  
+  // تحديث رصيد المستخدم
+  await supabaseAdmin
+    .from('users')
+    .update({ 
+      available_balance: user.available_balance - amount,
+      total_withdrawn: (user.total_withdrawn || 0) + amount
+    })
+    .eq('id', userId);
+  
+  res.json({ 
+    success: true, 
+    message: `تم سحب ${amount} USDT إلى محفظتك بنجاح`,
+    txHash: transferResult.hash
+  });
+});
+
+// ========================================
 // API: توزيع الأرباح اليومية للمستخدمين
 // ========================================
 app.post('/api/distribute-profits', async (req, res) => {
@@ -136,10 +387,9 @@ app.post('/api/distribute-profits', async (req, res) => {
   }
   
   try {
-    // 1. جلب جميع المستخدمين مع مستوياتهم
     const { data: users } = await supabaseAdmin
       .from('users')
-      .select('id, active_deposit, vip_level');
+      .select('id, active_deposit, vip_level, available_balance');
     
     const vipLevels = {
       0: { roi: 2 }, 1: { roi: 2.2 }, 2: { roi: 2.5 },
@@ -153,7 +403,6 @@ app.post('/api/distribute-profits', async (req, res) => {
     for (const user of users) {
       if (!user.active_deposit || user.active_deposit <= 0) continue;
       
-      // التحقق من عدم تكرار الأرباح لليوم
       const { data: existingProfit } = await supabaseAdmin
         .from('daily_profit_log')
         .select('id')
@@ -168,13 +417,11 @@ app.post('/api/distribute-profits', async (req, res) => {
       
       if (profit <= 0) continue;
       
-      // تحديث رصيد المستخدم
       await supabaseAdmin
         .from('users')
-        .update({ available_balance: user.available_balance + profit })
+        .update({ available_balance: (user.available_balance || 0) + profit })
         .eq('id', user.id);
       
-      // تسجيل الربح
       await supabaseAdmin
         .from('daily_profit_log')
         .insert({
@@ -184,7 +431,6 @@ app.post('/api/distribute-profits', async (req, res) => {
           roi_percent: roi
         });
       
-      // تسجيل المعاملة
       await supabaseAdmin
         .from('transactions')
         .insert({
@@ -199,7 +445,6 @@ app.post('/api/distribute-profits', async (req, res) => {
       usersProcessed++;
     }
     
-    // 2. تسجيل إجمالي الأرباح الموزعة
     await supabaseAdmin
       .from('profit_distributions')
       .insert({
@@ -223,40 +468,42 @@ app.post('/api/distribute-profits', async (req, res) => {
 });
 
 // ========================================
-// API: جلب سجل العمليات (Logging)
+// API: الإحالات
 // ========================================
-app.get('/api/transaction-logs', async (req, res) => {
-  const { limit = 50 } = req.query;
+app.post('/api/referrals', async (req, res) => {
+  const { userId } = req.body;
   
-  try {
-    // جلب عمليات التحويل التلقائي
-    const { data: autoTransfers } = await supabaseAdmin
-      .from('auto_transfers')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(limit);
-    
-    // جلب توزيعات الأرباح
-    const { data: profitDistributions } = await supabaseAdmin
-      .from('profit_distributions')
-      .select('*')
-      .order('date', { ascending: false })
-      .limit(limit);
-    
-    res.json({
-      autoTransfers: autoTransfers || [],
-      profitDistributions: profitDistributions || []
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+  const { data } = await supabaseAdmin
+    .from('users')
+    .select('*')
+    .eq('referrer_id', userId);
+  
+  const referrals = data || [];
+  const groupBalance = referrals.reduce((sum, u) => sum + (u.active_deposit || 0), 0);
+  
+  res.json({ referrals: referrals, count: referrals.length, groupBalance });
 });
 
 // ========================================
-// باقي APIs (تسجيل الدخول، الإيداع، السحب، الإدارة)
+// API: جلب سجل المعاملات للمستخدم
 // ========================================
-
-// ... (ضع هنا ملف server.js السابق كاملاً)
+app.post('/api/transactions', async (req, res) => {
+  const { userId } = req.body;
+  
+  const [deposits, withdrawals, profits] = await Promise.all([
+    supabaseAdmin.from('deposit_requests').select('*').eq('user_id', userId),
+    supabaseAdmin.from('withdrawals').select('*').eq('user_id', userId),
+    supabaseAdmin.from('daily_profit_log').select('*').eq('user_id', userId)
+  ]);
+  
+  const allTransactions = [
+    ...(deposits.data || []).map(d => ({ ...d, type: 'إيداع', date: d.created_at })),
+    ...(withdrawals.data || []).map(w => ({ ...w, type: 'سحب', date: w.created_at })),
+    ...(profits.data || []).map(p => ({ ...p, type: 'ربح', amount: p.profit_amount, date: p.calculated_date, status: 'approved' }))
+  ].sort((a, b) => new Date(b.date) - new Date(a.date));
+  
+  res.json(allTransactions);
+});
 
 // ========================================
 // تشغيل الخادم
@@ -314,6 +561,6 @@ cron.schedule('0 * * * *', async () => {
   console.log('🔄 [Cron] جاري فحص رصيد BNB...');
   const bnbStatus = await bsc.checkBNBBalance();
   if (bnbStatus.isLow) {
-    await bsc.sendAlert(`⚠️ رصيد BNB منخفض! ${bnbStatus.balance} BNB متاح (الحد الأدنى: ${bnbStatus.minRequired} BNB)`);
+    await bsc.sendAlert(`⚠️ تنبيه: رصيد BNB منخفض! ${bnbStatus.balance} BNB متاح (الحد الأدنى: ${bnbStatus.minRequired} BNB)`);
   }
 });
