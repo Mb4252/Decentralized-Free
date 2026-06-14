@@ -85,8 +85,6 @@
     .vip-price { color: #fbbf24; font-size: 14px; }
     .vip-status { font-size: 12px; }
     .upgrade-btn { background: #00ff66; color: #0a0a0f; border: none; padding: 6px 12px; border-radius: 20px; cursor: pointer; font-weight: bold; }
-    .coming-soon { opacity: 0.6; cursor: not-allowed; }
-    .coming-soon .upgrade-btn { background: #8899aa; cursor: not-allowed; }
     
     input {
       width: 100%;
@@ -200,14 +198,6 @@
     .modal-content h3 { color: #00ff66; margin-bottom: 16px; font-size: 20px; }
     .modal-content h4 { color: #00ccff; margin: 16px 0 8px; }
     .modal-content p { color: #8899aa; margin-bottom: 10px; line-height: 1.5; font-size: 14px; }
-    .modal-content code {
-      background: #0a0a0f;
-      padding: 4px 8px;
-      border-radius: 8px;
-      font-size: 12px;
-      color: #00ff66;
-      display: inline-block;
-    }
     .close-modal {
       background: #00ff66;
       color: #0a0a0f;
@@ -220,6 +210,19 @@
       cursor: pointer;
     }
     .hidden { display: none; }
+    
+    .history-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px;
+      border-bottom: 1px solid #00ff66;
+    }
+    .history-type { font-weight: bold; }
+    .history-amount { color: #00ff66; }
+    .history-status { font-size: 12px; }
+    .status-approved { color: #00ff66; }
+    .status-pending { color: #ffaa00; }
   </style>
 </head>
 <body>
@@ -251,9 +254,8 @@
       <p>1. اضغط على أيقونة <strong>💰 الإيداع</strong></p>
       <p>2. انسخ عنوان المحفظة (شبكة <strong>BSC/BEP20</strong>)</p>
       <p>3. قم بتحويل USDT إلى هذا العنوان</p>
-      <p>4. الصق Transaction Hash وأدخل المبلغ</p>
-      <p>5. اضغط <strong>"تحقق وأيدع"</strong></p>
-      <p>📌 <strong>الحد الأدنى للإيداع: 10 USDT</strong></p>
+      <p>4. الصق Transaction Hash</p>
+      <p>5. اضغط <strong>"تحقق وأيدع"</strong> - سيتم إضافة المبلغ تلقائياً</p>
       <button class="close-modal" id="closeInstructions">✅ فهمت</button>
     </div>
   </div>
@@ -266,18 +268,16 @@
     // ✅ عنوان المحفظة الحقيقي
     const HOT_WALLET_ADDRESS = '0x9EB39A10c059877910DAff1fd8098e5DB32486F7';
     
-    // ✅ الحد الأدنى للإيداع 10 USDT
-    const MIN_DEPOSIT = 10;
     const MIN_WITHDRAW = 0.5;
 
-    // ✅ مستويات VIP (VIP1 إلى VIP5 جاهزة، VIP6 قريباً)
+    // ✅ مستويات VIP
     const vipLevels = {
-      1: { name: 'VIP 1', price: 10, roi: 2.2, active: true },
-      2: { name: 'VIP 2', price: 20, roi: 2.5, active: true },
-      3: { name: 'VIP 3', price: 30, roi: 2.8, active: true },
-      4: { name: 'VIP 4', price: 40, roi: 3.2, active: true },
-      5: { name: 'VIP 5', price: 50, roi: 3.5, active: true },
-      6: { name: 'VIP 6', price: 1000, roi: 4.0, active: false } // قريباً
+      1: { name: 'VIP 1', price: 10, roi: 2.2 },
+      2: { name: 'VIP 2', price: 50, roi: 2.5 },
+      3: { name: 'VIP 3', price: 100, roi: 2.8 },
+      4: { name: 'VIP 4', price: 250, roi: 3.2 },
+      5: { name: 'VIP 5', price: 500, roi: 3.5 },
+      6: { name: 'VIP 6', price: 1000, roi: 4.0 }
     };
 
     async function loadUser() {
@@ -301,15 +301,11 @@
       } catch(e) { console.error(e); }
     }
 
-    // تسجيل الخروج
     document.getElementById('logoutBtn').onclick = () => {
-      localStorage.removeItem('userId');
-      localStorage.removeItem('user');
-      localStorage.removeItem('rememberMe');
+      localStorage.clear();
       window.location.href = '/';
     };
 
-    // زر الدعم (تلغرام)
     document.getElementById('supportBtn').onclick = () => {
       window.open('https://t.me/+fPunvn_76Q45NDg8', '_blank');
     };
@@ -334,18 +330,12 @@
       messages.forEach(msg => msg.remove());
     }
 
-    // التوجيه للإيداع مع سعر الباقة
     function redirectToDepositWithPrice(packagePrice, packageName) {
-      // تغيير الصفحة إلى الإيداع
       document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
       document.querySelector('[data-page="deposit"]').classList.add('active');
       document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
       document.getElementById('depositPage').classList.add('active');
-      
-      // عرض رسالة توضيحية
       showMessage(`⚠️ تحتاج إلى إيداع ${packagePrice} USDT للاشتراك في ${packageName}`, 'warning', 6000);
-      
-      // إعادة تحميل صفحة الإيداع
       renderDeposit();
     }
 
@@ -386,7 +376,6 @@
         </div>
       `;
       
-      // إصلاح أزرار الإيداع والسحب في قسم البيت
       document.getElementById('quickDepositBtn').onclick = () => {
         document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
         document.querySelector('[data-page="deposit"]').classList.add('active');
@@ -404,6 +393,9 @@
       };
     }
 
+    // ========================================
+    // صفحة الإيداع (بدون إدخال المبلغ)
+    // ========================================
     async function renderDeposit() {
       document.getElementById('mainContent').innerHTML = `
         <div class="card">
@@ -415,14 +407,15 @@
           <code style="color:#00ff66; word-break:break-all;">${HOT_WALLET_ADDRESS}</code>
           <button class="btn-copy" id="copyWalletBtn">📋 نسخ العنوان</button>
           
-          <input type="number" id="depositAmount" placeholder="المبلغ (USDT) - الحد الأدنى ${MIN_DEPOSIT}" style="margin-top:16px;" step="1">
-          <input type="text" id="depositTxHash" placeholder="Transaction Hash (0x...)" style="direction:ltr; font-family: monospace;">
+          <input type="text" id="depositTxHash" placeholder="Transaction Hash (0x...)" style="direction:ltr; font-family: monospace; margin-top:16px;">
           <button class="deposit-btn" id="doDepositBtn">🔍 تحقق وأيدع</button>
           
           <div class="info-box">
-            <strong>📌 الحد الأدنى للإيداع: ${MIN_DEPOSIT} USDT</strong><br>
-            <strong>📌 أين تجد Transaction Hash؟</strong><br>
-            بعد التحويل، اضغط على المعاملة في محفظتك ثم اختر "نسخ Transaction Hash".
+            <strong>📌 كيف يتم الإيداع؟</strong><br>
+            1. انسخ عنوان المحفظة أعلاه<br>
+            2. أرسل USDT على شبكة BSC/BEP20<br>
+            3. الصق Transaction Hash هنا<br>
+            4. سيتم إضافة المبلغ تلقائياً بعد التحقق
           </div>
           <div id="depositMsg"></div>
         </div>
@@ -439,39 +432,56 @@
       };
       
       document.getElementById('doDepositBtn').onclick = async () => {
-        const amount = parseFloat(document.getElementById('depositAmount').value);
         const txHash = document.getElementById('depositTxHash').value.trim();
         
         clearMessages();
         
-        if (!amount || amount < MIN_DEPOSIT) {
-          showMessage(`⚠️ الحد الأدنى للإيداع ${MIN_DEPOSIT} USDT`, 'error', 3000);
-          return;
-        }
         if (!txHash) {
           showMessage('⚠️ يرجى إدخال Transaction Hash', 'error', 3000);
           return;
         }
         
-        showMessage('⏳ جاري التحقق من المعاملة...', 'loading', 10000);
+        showMessage('⏳ جاري التحقق من المعاملة...', 'loading', 15000);
         
         try {
-          const res = await fetch(`${API_URL}/api/deposit`, {
+          // أولاً: التحقق من المعاملة للحصول على المبلغ
+          const verifyRes = await fetch(`${API_URL}/api/verify-deposit`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId, amount, transactionHash: txHash })
+            body: JSON.stringify({ userId, transactionHash: txHash, amount: 0 })
           });
           
-          const data = await res.json();
+          const verifyData = await verifyRes.json();
+          
+          if (!verifyData.success) {
+            showMessage(`❌ ${verifyData.error}`, 'error', 6000);
+            return;
+          }
+          
+          // استخراج المبلغ من المعاملة
+          const actualAmount = verifyData.verification?.amount;
+          
+          if (!actualAmount || actualAmount < 10) {
+            showMessage(`⚠️ المبلغ المحول (${actualAmount || 0} USDT) أقل من الحد الأدنى 10 USDT`, 'error', 5000);
+            return;
+          }
+          
+          // الآن إرسال طلب الإيداع مع المبلغ المستخرج
+          const depositRes = await fetch(`${API_URL}/api/deposit`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId, amount: actualAmount, transactionHash: txHash })
+          });
+          
+          const depositData = await depositRes.json();
           clearMessages();
           
-          if (data.success) {
-            showMessage(`✅ تم إضافة ${amount} USDT إلى حسابك بنجاح!`, 'success', 5000);
-            document.getElementById('depositAmount').value = '';
+          if (depositData.success) {
+            showMessage(`✅ تم إضافة ${actualAmount} USDT إلى حسابك بنجاح!`, 'success', 5000);
             document.getElementById('depositTxHash').value = '';
             loadUser();
           } else {
-            showMessage(`❌ ${data.error}`, 'error', 6000);
+            showMessage(`❌ ${depositData.error}`, 'error', 6000);
           }
         } catch (error) {
           clearMessages();
@@ -544,42 +554,32 @@
         <div class="card">
           <div class="card-title">👑 مستويات VIP</div>
           <div id="vipList"></div>
-          <div class="info-box" style="margin-top:16px;">
-            ⭐ <strong>VIP 6 قريباً!</strong> سيكون بسعر 1000 USDT مع نسبة ربح 4% يومياً
-          </div>
         </div>
       `;
       
       const container = document.getElementById('vipList');
       container.innerHTML = Object.entries(vipLevels).map(([level, vip]) => `
-        <div class="vip-item ${!vip.active ? 'coming-soon' : ''}" data-level="${level}" data-price="${vip.price}" data-name="${vip.name}" data-active="${vip.active}">
+        <div class="vip-item" data-level="${level}" data-price="${vip.price}" data-name="${vip.name}">
           <div>
-            <div class="vip-name">${vip.name} ${!vip.active ? '(قريباً)' : ''}</div>
+            <div class="vip-name">${vip.name}</div>
             <div class="vip-roi">💰 ${vip.roi}% يومياً</div>
             <div class="vip-price">💎 سعر الاشتراك: ${vip.price} USDT</div>
           </div>
           <div>
             ${currentLevel >= parseInt(level) ? '<span class="vip-status" style="color:#00ff66;">✅ مفتوح</span>' : 
               (currentLevel > 0 && currentLevel < parseInt(level) ? '<span class="vip-status" style="color:#8899aa;">🔒 مغلق (يجب ترقية السابق)</span>' :
-              (!vip.active ? '<span class="vip-status" style="color:#ffaa00;">⏳ قريباً</span>' :
-              '<button class="upgrade-btn" data-level="'+level+'" data-price="'+vip.price+'" data-name="'+vip.name+'">اشتراك ('+vip.price+' USDT)</button>'))}
+              '<button class="upgrade-btn" data-level="'+level+'" data-price="'+vip.price+'" data-name="'+vip.name+'">اشتراك ('+vip.price+' USDT)</button>')}
           </div>
         </div>
       `).join('');
       
-      // إضافة حدث النقر على البطاقة نفسها للتوجيه للإيداع
       document.querySelectorAll('.vip-item').forEach(item => {
         const level = parseInt(item.dataset.level);
         const price = parseFloat(item.dataset.price);
         const name = item.dataset.name;
-        const isActive = item.dataset.active === 'true';
         
         item.onclick = (e) => {
           if (e.target.classList.contains('upgrade-btn')) return;
-          if (!isActive) {
-            showMessage(`⏳ ${name} سيتم إطلاقه قريباً!`, 'warning', 3000);
-            return;
-          }
           if (currentLevel >= level) {
             showMessage(`✅ ${name} مفتوح بالفعل`, 'success', 2000);
           } else if (currentLevel > 0 && currentLevel < level) {
@@ -656,6 +656,9 @@
       }
     }
 
+    // ========================================
+    // صفحة الملف الشخصي (أنا) - مع سجل العمليات
+    // ========================================
     async function renderProfile() {
       const avail = userData?.available_balance || 0;
       document.getElementById('mainContent').innerHTML = `
@@ -665,30 +668,64 @@
           <div style="color:#8899aa; font-size:12px;">📧 ${userData.email}</div>
           <div style="color:#00ff66; font-size:28px; margin-top:16px;">${avail.toFixed(2)} USDT</div>
         </div>
-        <div class="card"><div class="card-title">📋 سجل العمليات</div><div id="transactionsList" style="color:#8899aa;"></div></div>
+        <div class="card"><div class="card-title">📋 سجل العمليات</div><div id="transactionsList"></div></div>
       `;
       
-      const [depositsRes, withdrawsRes] = await Promise.all([
-        fetch(`${API_URL}/api/admin/deposits`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId }) }),
-        fetch(`${API_URL}/api/admin/withdrawals`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId }) })
-      ]);
-      const deposits = await depositsRes.json();
-      const withdrawals = await withdrawsRes.json();
-      const all = [...(deposits||[]).filter(d=>d.user_id===userId).map(d=>({...d,type:'إيداع'})), ...(withdrawals||[]).filter(w=>w.user_id===userId).map(w=>({...w,type:'سحب'}))];
-      all.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
-      
-      const tbody = document.getElementById('transactionsList');
-      if(all.length===0) {
-        tbody.innerHTML='<p>لا توجد معاملات</p>';
-      } else {
-        tbody.innerHTML = all.map(t => `
-          <div style="display:flex; justify-content:space-between; padding:8px; border-bottom:1px solid #00ff66;">
-            <span>${new Date(t.created_at).toLocaleDateString('ar')}</span>
-            <span>${t.type}</span>
-            <span>${t.amount} USDT</span>
-            <span style="color:${t.status==='approved'?'#00ff66':'#ffaa00'}">${t.status==='approved'?'مقبول':'قيد الانتظار'}</span>
-          </div>
-        `).join('');
+      // جلب جميع المعاملات (الإيداعات والسحوبات والأرباح)
+      try {
+        // جلب الإيداعات
+        const depositsRes = await fetch(`${API_URL}/api/admin/deposits`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId })
+        });
+        const deposits = await depositsRes.json();
+        
+        // جلب السحوبات
+        const withdrawsRes = await fetch(`${API_URL}/api/admin/withdrawals`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId })
+        });
+        const withdrawals = await withdrawsRes.json();
+        
+        // جلب الأرباح
+        const profitsRes = await fetch(`${API_URL}/api/transactions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId })
+        });
+        const profitsData = await profitsRes.json();
+        const profits = profitsData.filter(p => p.type === 'profit') || [];
+        
+        // دمج جميع المعاملات
+        const allTransactions = [
+          ...(deposits || []).filter(d => d.user_id === userId).map(d => ({ ...d, type: 'إيداع', displayType: '💰 إيداع', date: d.created_at })),
+          ...(withdrawals || []).filter(w => w.user_id === userId).map(w => ({ ...w, type: 'سحب', displayType: '📤 سحب', date: w.created_at })),
+          ...(profits || []).map(p => ({ ...p, type: 'ربح', displayType: '📈 ربح', date: p.date || p.created_at, amount: p.profit_amount || p.amount, status: 'approved' }))
+        ];
+        
+        // ترتيب من الأحدث إلى الأقدم
+        allTransactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+        
+        const listDiv = document.getElementById('transactionsList');
+        if (allTransactions.length === 0) {
+          listDiv.innerHTML = '<p style="color:#8899aa; text-align:center;">لا توجد معاملات بعد</p>';
+        } else {
+          listDiv.innerHTML = allTransactions.map(t => `
+            <div class="history-item">
+              <div>
+                <div class="history-type">${t.displayType}</div>
+                <div style="font-size:11px; color:#8899aa;">${new Date(t.date).toLocaleDateString('ar')}</div>
+              </div>
+              <div class="history-amount">${(t.amount || 0).toFixed(2)} USDT</div>
+              <div class="history-status status-${t.status === 'approved' ? 'approved' : 'pending'}">${t.status === 'approved' ? '✅ مقبول' : '⏳ قيد الانتظار'}</div>
+            </div>
+          `).join('');
+        }
+      } catch (error) {
+        console.error('Error loading transactions:', error);
+        document.getElementById('transactionsList').innerHTML = '<p style="color:#8899aa; text-align:center;">خطأ في تحميل المعاملات</p>';
       }
     }
 
