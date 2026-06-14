@@ -109,7 +109,6 @@ app.post('/api/process-deposits', async (req, res) => {
 app.post('/api/deposit', async (req, res) => {
   const { userId, amount, transactionHash } = req.body;
   
-  // ✅ الحد الأدنى للإيداع 10 USDT
   if (!amount || amount < 10) {
     return res.status(400).json({ error: 'الحد الأدنى للإيداع 10 USDT' });
   }
@@ -119,7 +118,6 @@ app.post('/api/deposit', async (req, res) => {
   }
   
   try {
-    // التحقق من عدم استخدام الهاش مسبقاً
     const { data: existingHash } = await supabaseAdmin
       .from('deposit_requests')
       .select('id, transaction_hash')
@@ -130,14 +128,12 @@ app.post('/api/deposit', async (req, res) => {
       return res.status(400).json({ error: 'تم استخدام هذا الـ Transaction Hash مسبقاً' });
     }
     
-    // التحقق من صحة المعاملة على الشبكة
     const verification = await bsc.verifyTransaction(transactionHash, amount, bsc.HOT_WALLET_ADDRESS);
     
     if (!verification.success) {
       return res.status(400).json({ error: verification.error });
     }
     
-    // إنشاء سجل الإيداع (موافق عليه تلقائياً)
     const { data: deposit, error: depositError } = await supabaseAdmin
       .from('deposit_requests')
       .insert({ 
@@ -155,7 +151,6 @@ app.post('/api/deposit', async (req, res) => {
       return res.status(500).json({ error: depositError.message });
     }
     
-    // تحديث رصيد المستخدم
     const { data: user } = await supabaseAdmin
       .from('users')
       .select('active_deposit, total_deposited, available_balance, vip_level')
@@ -173,7 +168,6 @@ app.post('/api/deposit', async (req, res) => {
       })
       .eq('id', userId);
     
-    // تحديث مستوى VIP تلقائياً
     const vipLevels = [0, 10, 20, 30, 40, 50, 1000];
     let newVipLevel = 0;
     for (let i = vipLevels.length - 1; i >= 0; i--) {
@@ -190,7 +184,6 @@ app.post('/api/deposit', async (req, res) => {
         .eq('id', userId);
     }
     
-    // تسجيل المعاملة
     await supabaseAdmin
       .from('transactions')
       .insert({
@@ -217,7 +210,7 @@ app.post('/api/deposit', async (req, res) => {
 });
 
 // ========================================
-// API: السحب (تلقائي مع التحقق من الرصيد)
+// API: السحب
 // ========================================
 app.post('/api/withdraw', async (req, res) => {
   const { userId, amount, walletAddress } = req.body;
@@ -231,7 +224,6 @@ app.post('/api/withdraw', async (req, res) => {
   }
   
   try {
-    // التحقق من رصيد المستخدم
     const { data: user } = await supabaseAdmin
       .from('users')
       .select('available_balance, total_withdrawn')
@@ -242,26 +234,22 @@ app.post('/api/withdraw', async (req, res) => {
       return res.status(400).json({ error: 'الرصيد غير كافٍ' });
     }
     
-    // التحقق من رصيد USDT في محفظة البوت
     const botUSDTBalance = await bsc.getUSDTBalance();
     if (botUSDTBalance < amount) {
       return res.status(400).json({ error: 'رصيد المحفظة غير كافٍ، يرجى المحاولة لاحقاً' });
     }
     
-    // التحقق من رصيد BNB للرسوم
     const bnbStatus = await bsc.checkBNBBalance();
     if (bnbStatus.isLow) {
       return res.status(400).json({ error: 'نظام السحب مؤقتاً، يرجى المحاولة لاحقاً' });
     }
     
-    // تحويل USDT إلى عنوان المستخدم
     const transferResult = await bsc.transferUSDT(walletAddress, amount);
     
     if (!transferResult.success) {
       return res.status(500).json({ error: 'فشل تحويل الأموال، يرجى المحاولة لاحقاً' });
     }
     
-    // تسجيل طلب السحب
     const { error: withdrawError } = await supabaseAdmin
       .from('withdrawals')
       .insert({ 
@@ -269,6 +257,7 @@ app.post('/api/withdraw', async (req, res) => {
         amount: amount, 
         wallet_address: walletAddress, 
         status: 'approved',
+        tx_hash: transferResult.hash,
         created_at: new Date().toISOString(),
         processed_at: new Date().toISOString()
       });
@@ -277,7 +266,6 @@ app.post('/api/withdraw', async (req, res) => {
       console.error('Withdraw log error:', withdrawError);
     }
     
-    // تحديث رصيد المستخدم
     await supabaseAdmin
       .from('users')
       .update({ 
@@ -285,6 +273,17 @@ app.post('/api/withdraw', async (req, res) => {
         total_withdrawn: (user.total_withdrawn || 0) + amount
       })
       .eq('id', userId);
+    
+    await supabaseAdmin
+      .from('transactions')
+      .insert({
+        user_id: userId,
+        type: 'withdraw',
+        amount: amount,
+        status: 'approved',
+        description: `سحب إلى ${walletAddress.substring(0, 15)}...`,
+        created_at: new Date().toISOString()
+      });
     
     res.json({ 
       success: true, 
@@ -349,7 +348,7 @@ app.post('/api/login', async (req, res) => {
   
   res.json({ 
     success: true,
-    user: { id: user.id, email: user.email },
+    user: { id: user.id, email: user.email, name: user.name },
     profile: user
   });
 });
@@ -420,7 +419,7 @@ app.post('/api/register', async (req, res) => {
   
   res.json({ 
     success: true, 
-    user: { id: userId, email: email },
+    user: { id: userId, email: email, name: name },
     referral_code: newReferralCode,
     is_admin: isAdmin
   });
@@ -477,7 +476,6 @@ app.post('/api/distribute-profits', async (req, res) => {
       .from('users')
       .select('id, active_deposit, vip_level, available_balance');
     
-    // نسب الربح حسب مستوى VIP
     const vipLevels = {
       1: { roi: 2.2 },
       2: { roi: 2.5 },
@@ -494,7 +492,6 @@ app.post('/api/distribute-profits', async (req, res) => {
     for (const user of users) {
       if (!user.active_deposit || user.active_deposit <= 0) continue;
       
-      // التحقق من عدم تكرار الأرباح لليوم
       const { data: existingProfit } = await supabaseAdmin
         .from('daily_profit_log')
         .select('id')
@@ -504,8 +501,7 @@ app.post('/api/distribute-profits', async (req, res) => {
       
       if (existingProfit) continue;
       
-      // حساب نسبة الربح
-      let roi = 2; // النسبة الافتراضية
+      let roi = 2;
       if (user.vip_level > 0 && vipLevels[user.vip_level]) {
         roi = vipLevels[user.vip_level].roi;
       }
@@ -514,13 +510,11 @@ app.post('/api/distribute-profits', async (req, res) => {
       
       if (profit <= 0) continue;
       
-      // تحديث رصيد المستخدم
       await supabaseAdmin
         .from('users')
         .update({ available_balance: (user.available_balance || 0) + profit })
         .eq('id', user.id);
       
-      // تسجيل الربح
       await supabaseAdmin
         .from('daily_profit_log')
         .insert({
@@ -530,7 +524,6 @@ app.post('/api/distribute-profits', async (req, res) => {
           roi_percent: roi
         });
       
-      // تسجيل المعاملة
       await supabaseAdmin
         .from('transactions')
         .insert({
@@ -538,7 +531,8 @@ app.post('/api/distribute-profits', async (req, res) => {
           type: 'profit',
           amount: profit,
           status: 'approved',
-          description: `Daily profit ${roi}%`
+          description: `Daily profit ${roi}%`,
+          created_at: new Date().toISOString()
         });
       
       totalDistributed += profit;
@@ -581,28 +575,178 @@ app.post('/api/referrals', async (req, res) => {
   const referrals = data || [];
   const groupBalance = referrals.reduce((sum, u) => sum + (u.active_deposit || 0), 0);
   
-  res.json({ referrals: referrals, count: referrals.length, groupBalance });
+  res.json({ referrals, count: referrals.length, groupBalance });
 });
 
 // ========================================
-// API: جلب سجل المعاملات
+// API: جلب سجل المعاملات (للمستخدم)
 // ========================================
 app.post('/api/transactions', async (req, res) => {
   const { userId } = req.body;
   
-  const [deposits, withdrawals, profits] = await Promise.all([
-    supabaseAdmin.from('deposit_requests').select('*').eq('user_id', userId),
-    supabaseAdmin.from('withdrawals').select('*').eq('user_id', userId),
-    supabaseAdmin.from('daily_profit_log').select('*').eq('user_id', userId)
-  ]);
+  const { data, error } = await supabaseAdmin
+    .from('transactions')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
   
-  const allTransactions = [
-    ...(deposits.data || []).map(d => ({ ...d, type: 'إيداع', date: d.created_at })),
-    ...(withdrawals.data || []).map(w => ({ ...w, type: 'سحب', date: w.created_at })),
-    ...(profits.data || []).map(p => ({ ...p, type: 'ربح', amount: p.profit_amount, date: p.calculated_date, status: 'approved' }))
-  ].sort((a, b) => new Date(b.date) - new Date(a.date));
+  if (error) {
+    return res.status(500).json({ error: error.message });
+  }
   
-  res.json(allTransactions);
+  res.json(data || []);
+});
+
+// ========================================
+// API: جلب إيداعات المستخدم (للمستخدم العادي)
+// ========================================
+app.post('/api/my-deposits', async (req, res) => {
+  const { userId } = req.body;
+  
+  if (!userId) {
+    return res.status(400).json({ error: 'userId مطلوب' });
+  }
+  
+  const { data, error } = await supabaseAdmin
+    .from('deposit_requests')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+  
+  if (error) {
+    return res.status(500).json({ error: error.message });
+  }
+  
+  res.json(data || []);
+});
+
+// ========================================
+// API: جلب سحوبات المستخدم (للمستخدم العادي)
+// ========================================
+app.post('/api/my-withdrawals', async (req, res) => {
+  const { userId } = req.body;
+  
+  if (!userId) {
+    return res.status(400).json({ error: 'userId مطلوب' });
+  }
+  
+  const { data, error } = await supabaseAdmin
+    .from('withdrawals')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+  
+  if (error) {
+    return res.status(500).json({ error: error.message });
+  }
+  
+  res.json(data || []);
+});
+
+// ========================================
+// API: جلب أرباح المستخدم (للمستخدم العادي)
+// ========================================
+app.post('/api/my-profits', async (req, res) => {
+  const { userId } = req.body;
+  
+  if (!userId) {
+    return res.status(400).json({ error: 'userId مطلوب' });
+  }
+  
+  const { data, error } = await supabaseAdmin
+    .from('daily_profit_log')
+    .select('*')
+    .eq('user_id', userId)
+    .order('calculated_date', { ascending: false });
+  
+  if (error) {
+    return res.status(500).json({ error: error.message });
+  }
+  
+  res.json(data || []);
+});
+
+// ========================================
+// API: جلب جميع المعاملات (مدمجة) للمستخدم
+// ========================================
+app.post('/api/my-transactions', async (req, res) => {
+  const { userId } = req.body;
+  
+  if (!userId) {
+    return res.status(400).json({ error: 'userId مطلوب' });
+  }
+  
+  // جلب الإيداعات
+  const { data: deposits } = await supabaseAdmin
+    .from('deposit_requests')
+    .select('id, amount, created_at, status, transaction_hash')
+    .eq('user_id', userId);
+  
+  // جلب السحوبات
+  const { data: withdrawals } = await supabaseAdmin
+    .from('withdrawals')
+    .select('id, amount, created_at, status, wallet_address')
+    .eq('user_id', userId);
+  
+  // جلب الأرباح من جدول المعاملات
+  const { data: profits } = await supabaseAdmin
+    .from('transactions')
+    .select('id, amount, created_at, status, description')
+    .eq('user_id', userId)
+    .eq('type', 'profit');
+  
+  // دمج وتنسيق المعاملات
+  const transactions = [];
+  
+  if (deposits) {
+    deposits.forEach(d => {
+      transactions.push({
+        id: d.id,
+        type: 'deposit',
+        type_ar: '💰 إيداع',
+        type_en: '💰 Deposit',
+        amount: d.amount,
+        date: d.created_at,
+        status: d.status,
+        reference: d.transaction_hash
+      });
+    });
+  }
+  
+  if (withdrawals) {
+    withdrawals.forEach(w => {
+      transactions.push({
+        id: w.id,
+        type: 'withdraw',
+        type_ar: '📤 سحب',
+        type_en: '📤 Withdrawal',
+        amount: w.amount,
+        date: w.created_at,
+        status: w.status,
+        reference: w.wallet_address
+      });
+    });
+  }
+  
+  if (profits) {
+    profits.forEach(p => {
+      transactions.push({
+        id: p.id,
+        type: 'profit',
+        type_ar: '📈 ربح',
+        type_en: '📈 Profit',
+        amount: p.amount,
+        date: p.created_at,
+        status: p.status || 'approved',
+        reference: null
+      });
+    });
+  }
+  
+  // ترتيب من الأحدث إلى الأقدم
+  transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+  
+  res.json(transactions);
 });
 
 // ========================================
