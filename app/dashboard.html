@@ -42,7 +42,6 @@
     .stat-value { color: #00ff66; font-size: 24px; font-weight: bold; }
     .stat-label { color: #8899aa; font-size: 12px; }
     
-    /* بطاقات الإيداع والسحب في البيت */
     .action-buttons {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -72,10 +71,31 @@
       justify-content: space-between;
       align-items: center;
       border: 1px solid #00ff66;
+      cursor: pointer;
+      transition: all 0.3s;
     }
+    .vip-item:hover { border-color: #00ff66; transform: translateX(-5px); }
     .vip-name { color: #00ff66; font-weight: bold; }
     .vip-roi { color: #00ccff; }
-    .upgrade-btn { background: #00ff66; color: #0a0a0f; border: none; padding: 6px 12px; border-radius: 20px; cursor: pointer; }
+    .vip-price { color: #fbbf24; font-size: 14px; }
+    .upgrade-btn {
+      background: #00ff66;
+      color: #0a0a0f;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    .upgrade-btn.disabled { background: #8899aa; cursor: not-allowed; }
+    .no-subscription {
+      text-align: center;
+      padding: 20px;
+      color: #ffaa00;
+      border: 1px dashed #ffaa00;
+      border-radius: 16px;
+      margin-bottom: 16px;
+    }
     
     input {
       width: 100%;
@@ -162,7 +182,6 @@
     .page { display: none; }
     .page.active { display: block; }
     
-    /* Modal for instructions */
     .modal {
       position: fixed;
       top: 0;
@@ -190,8 +209,6 @@
     .modal-content h3 { color: #00ff66; margin-bottom: 16px; font-size: 20px; }
     .modal-content h4 { color: #00ccff; margin: 16px 0 8px; }
     .modal-content p { color: #8899aa; margin-bottom: 10px; line-height: 1.5; font-size: 14px; }
-    .modal-content ul { color: #8899aa; padding-right: 20px; margin-bottom: 12px; }
-    .modal-content li { margin-bottom: 6px; }
     .modal-content code {
       background: #0a0a0f;
       padding: 4px 8px;
@@ -222,7 +239,6 @@
 
   <div class="content" id="mainContent"></div>
 
-  <!-- الشريط السفلي -->
   <div class="bottom-nav">
     <button class="nav-item active" data-page="dashboard">🏠<span class="nav-label">البيت</span></button>
     <button class="nav-item" data-page="vip">👑<span class="nav-label">VIP</span></button>
@@ -232,42 +248,20 @@
     <button class="nav-item" data-page="profile">👤<span class="nav-label">أنا</span></button>
   </div>
 
-  <!-- نافذة التعليمات المنبثقة (تظهر مرة واحدة) -->
+  <!-- نافذة التعليمات -->
   <div id="instructionsModal" class="modal hidden">
     <div class="modal-content">
       <h3>📖 مرحباً بك في منصة الاستثمار</h3>
-      
       <h4>💰 كيفية الإيداع:</h4>
-      <p>1. اضغط على أيقونة <strong>💰 الإيداع</strong> في الشريط السفلي</p>
-      <p>2. انسخ عنوان المحفظة الظاهر (شبكة <strong>BSC (BEP20)</strong>)</p>
-      <p>3. قم بتحويل USDT من محفظتك إلى هذا العنوان</p>
-      <p>4. بعد التحويل، انسخ <strong>Transaction Hash</strong> من محفظتك</p>
-      <p>5. الصق الـ Hash في الحقل المخصص وأدخل المبلغ</p>
-      <p>6. اضغط <strong>"تحقق وأيدع"</strong> - سيتم إضافة الرصيد تلقائياً</p>
-      
-      <h4>🔍 أين تجد Transaction Hash؟</h4>
-      <p>• في محفظتك (Trust Wallet / MetaMask) بعد إتمام التحويل</p>
-      <p>• اضغط على المعاملة ثم "نسخ Transaction Hash" أو "Copy TxHash"</p>
-      <p>• مثال: <code>0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb0</code></p>
-      
-      <h4>📤 كيفية السحب:</h4>
-      <p>1. اضغط على أيقونة <strong>📤 السحب</strong> في الشريط السفلي</p>
-      <p>2. أدخل المبلغ (الحد الأدنى 0.5 USDT)</p>
-      <p>3. أدخل عنوان محفظتك (BSC Network - يبدأ بـ 0x)</p>
-      <p>4. تأكد من صحة العنوان - يجب أن يكون من شبكة BSC</p>
-      <p>5. اضغط <strong>"سحب USDT"</strong></p>
-      
-      <h4>📈 توزيع الأرباح:</h4>
-      <p>• يتم توزيع الأرباح يومياً في منتصف الليل (00:00 UTC)</p>
-      <p>• نسبة الربح تعتمد على مستواك في VIP</p>
-      <p>• VIP 0: 2% | VIP 1: 2.2% | VIP 2: 2.5% | VIP 3: 2.8% | VIP 4: 3.2% | VIP 5: 3.5%</p>
-      <p>• الأرباح تضاف تلقائياً إلى "الرصيد المتاح"</p>
-      
-      <h4>👥 نظام الإحالات:</h4>
-      <p>• ادعُ أصدقائك باستخدام رابط الدعوة الخاص بك</p>
-      <p>• احصل على عمولة 10% من استثماراتهم</p>
-      
-      <button class="close-modal" id="closeInstructions">✅ فهمت، ابدأ الآن</button>
+      <p>1. اضغط على أيقونة <strong>💰 الإيداع</strong></p>
+      <p>2. انسخ عنوان المحفظة (شبكة <strong>BSC/BEP20</strong>)</p>
+      <p>3. قم بتحويل USDT إلى هذا العنوان</p>
+      <p>4. الصق Transaction Hash وأدخل المبلغ</p>
+      <p>5. اضغط <strong>"تحقق وأيدع"</strong></p>
+      <h4>👑 نظام VIP:</h4>
+      <p>• لست بحاجة لدفع أي شيء للانضمام إلى VIP</p>
+      <p>• كلما زاد استثمارك، يرتفع مستواك تلقائياً</p>
+      <button class="close-modal" id="closeInstructions">✅ فهمت</button>
     </div>
   </div>
 
@@ -276,13 +270,13 @@
     let userId = localStorage.getItem('userId');
     let userData = null;
 
+    // مستويات VIP (بدون مستوى مجاني - كلها مدفوعة)
     const vipLevels = {
-      0: { name: 'VIP 0', price: 0, roi: 2 },
-      1: { name: 'VIP 1', price: 50, roi: 2.2 },
-      2: { name: 'VIP 2', price: 100, roi: 2.5 },
-      3: { name: 'VIP 3', price: 250, roi: 2.8 },
-      4: { name: 'VIP 4', price: 500, roi: 3.2 },
-      5: { name: 'VIP 5', price: 1000, roi: 3.5 }
+      1: { name: 'VIP 1', price: 50, roi: 2.2, min_deposit: 50 },
+      2: { name: 'VIP 2', price: 100, roi: 2.5, min_deposit: 100 },
+      3: { name: 'VIP 3', price: 250, roi: 2.8, min_deposit: 250 },
+      4: { name: 'VIP 4', price: 500, roi: 3.2, min_deposit: 500 },
+      5: { name: 'VIP 5', price: 1000, roi: 3.5, min_deposit: 1000 }
     };
 
     async function loadUser() {
@@ -298,7 +292,6 @@
         userData = data;
         document.getElementById('userName').innerHTML = userData.name;
         
-        // إظهار نافذة التعليمات مرة واحدة فقط
         if (!localStorage.getItem('instructionsShown')) {
           document.getElementById('instructionsModal').classList.remove('hidden');
         }
@@ -327,15 +320,29 @@
       messages.forEach(msg => msg.remove());
     }
 
-    // ========================================
-    // الصفحة الرئيسية (البيت)
-    // ========================================
+    // التوجيه للإيداع مع سعر الباقة
+    function redirectToDepositWithPrice(packagePrice, packageName) {
+      // تغيير الصفحة إلى الإيداع
+      document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+      document.querySelector('[data-page="deposit"]').classList.add('active');
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.getElementById('depositPage').classList.add('active');
+      
+      // عرض رسالة توضيحية
+      showMessage(`⚠️ لست مشتركاً في VIP. يرجى إيداع ${packagePrice} USDT للاشتراك في ${packageName}`, 'warning', 6000);
+      
+      // إعادة تحميل صفحة الإيداع
+      renderDeposit();
+    }
+
     async function renderDashboard() {
-      const level = userData?.vip_level || 0;
       const active = userData?.active_deposit || 0;
       const avail = userData?.available_balance || 0;
       const totalDeposit = userData?.total_deposited || 0;
       const totalWithdraw = userData?.total_withdrawn || 0;
+      const currentVip = userData?.vip_level || 0;
+      const currentRoi = currentVip > 0 ? (vipLevels[currentVip]?.roi || 2) : 2;
+      const currentVipName = currentVip > 0 ? (vipLevels[currentVip]?.name || 'غير مشترك') : 'غير مشترك';
       
       document.getElementById('mainContent').innerHTML = `
         <div class="card">
@@ -360,8 +367,8 @@
         </div>
         
         <div class="stats-grid">
-          <div class="stat-card"><div class="stat-value">${vipLevels[level].roi}%</div><div class="stat-label">نسبة الربح</div></div>
-          <div class="stat-card"><div class="stat-value">${vipLevels[level].name}</div><div class="stat-label">المستوى الحالي</div></div>
+          <div class="stat-card"><div class="stat-value">${currentRoi}%</div><div class="stat-label">نسبة الربح</div></div>
+          <div class="stat-card"><div class="stat-value">${currentVipName}</div><div class="stat-label">المستوى الحالي</div></div>
         </div>
       `;
       
@@ -382,9 +389,6 @@
       };
     }
 
-    // ========================================
-    // صفحة الإيداع
-    // ========================================
     async function renderDeposit() {
       document.getElementById('mainContent').innerHTML = `
         <div class="card">
@@ -402,8 +406,7 @@
           
           <div class="info-box">
             <strong>📌 أين تجد Transaction Hash؟</strong><br>
-            بعد إتمام التحويل في محفظتك (Trust Wallet / MetaMask / Binance)، اضغط على المعاملة ثم اختر "نسخ Transaction Hash" أو "Copy TxHash".<br>
-            <strong>⚠️ تأكد من إرسال USDT على شبكة BSC (BEP20) وليس ERC20 أو TRC20.</strong>
+            بعد التحويل، اضغط على المعاملة في محفظتك ثم اختر "نسخ Transaction Hash".
           </div>
           <div id="depositMsg"></div>
         </div>
@@ -434,7 +437,7 @@
           return;
         }
         
-        showMessage('⏳ جاري التحقق من المعاملة على الشبكة...', 'loading', 10000);
+        showMessage('⏳ جاري التحقق من المعاملة...', 'loading', 10000);
         
         try {
           const res = await fetch(`${API_URL}/api/deposit`, {
@@ -452,23 +455,15 @@
             document.getElementById('depositTxHash').value = '';
             loadUser();
           } else {
-            let errorMsg = data.error;
-            if (errorMsg.includes('العنوان')) errorMsg = '❌ عنوان المحفظة المستلم غير متطابق. تأكد من إرسال USDT إلى المحفظة الصحيحة.';
-            else if (errorMsg.includes('المبلغ')) errorMsg = '❌ المبلغ المرسل لا يتطابق مع المبلغ المدخل.';
-            else if (errorMsg.includes('غير موجودة')) errorMsg = '❌ Transaction Hash غير موجود على الشبكة. تأكد من صحته.';
-            else if (errorMsg.includes('Pending')) errorMsg = '⏳ المعاملة لا تزال قيد الانتظار. يرجى الانتظار ثم المحاولة مرة أخرى.';
-            showMessage(errorMsg, 'error', 6000);
+            showMessage(`❌ ${data.error}`, 'error', 6000);
           }
         } catch (error) {
           clearMessages();
-          showMessage('❌ خطأ في الاتصال بالخادم. حاول مرة أخرى.', 'error', 5000);
+          showMessage('❌ خطأ في الاتصال بالخادم', 'error', 5000);
         }
       };
     }
 
-    // ========================================
-    // صفحة السحب
-    // ========================================
     async function renderWithdraw() {
       const avail = userData?.available_balance || 0;
       document.getElementById('mainContent').innerHTML = `
@@ -480,8 +475,7 @@
           <button class="withdraw-btn" id="doWithdrawBtn">💸 سحب USDT</button>
           <div class="info-box">
             <strong>⚠️ تأكد من صحة عنوان المحفظة!</strong><br>
-            يجب أن يكون عنوان محفظة من شبكة <strong>BNB Smart Chain (BSC / BEP20)</strong> ويبدأ بـ "0x".<br>
-            إرسال الأموال إلى عنوان خاطئ يؤدي إلى فقدانها.
+            يجب أن يكون من شبكة <strong>BNB Smart Chain (BSC / BEP20)</strong> ويبدأ بـ "0x".
           </div>
           <div id="withdrawMsg"></div>
         </div>
@@ -496,7 +490,7 @@
           return;
         }
         if (!address || !address.startsWith('0x') || address.length < 30) {
-          showMessage('⚠️ يرجى إدخال عنوان محفظة BSC صالح (يبدأ بـ 0x)', 'error', 4000);
+          showMessage('⚠️ يرجى إدخال عنوان محفظة BSC صالح', 'error', 4000);
           return;
         }
         if (amount > avail) {
@@ -527,33 +521,88 @@
     }
 
     // ========================================
-    // باقي الدوال (VIP, Referrals, Profile)
+    // صفحة VIP - مع التوجيه للإيداع إذا لم يكن مشتركاً
     // ========================================
     async function renderVIP() {
       const currentLevel = userData?.vip_level || 0;
-      document.getElementById('mainContent').innerHTML = `<div class="card"><div class="card-title">👑 مستويات VIP</div><div id="vipList"></div></div>`;
+      const hasSubscription = currentLevel > 0;
+      
+      document.getElementById('mainContent').innerHTML = `
+        <div class="card">
+          <div class="card-title">👑 مستويات VIP</div>
+          ${!hasSubscription ? '<div class="no-subscription">⚠️ أنت لست مشتركاً في أي باقة VIP. قم باختيار باقة أدناه للاشتراك.</div>' : ''}
+          <div id="vipList"></div>
+        </div>
+      `;
+      
       const container = document.getElementById('vipList');
       container.innerHTML = Object.entries(vipLevels).map(([level, vip]) => `
-        <div class="vip-item">
-          <div><div class="vip-name">${vip.name}</div><div class="vip-roi">💰 ${vip.roi}% يومياً</div></div>
-          ${currentLevel < parseInt(level) ? `<button class="upgrade-btn" data-level="${level}">ترقية (${vip.price} USDT)</button>` : (currentLevel == level ? '<span style="color:#00ff66;">✅ حالياً</span>' : '<span style="color:#8899aa;">🔒 مغلق</span>')}
+        <div class="vip-item" data-level="${level}" data-price="${vip.price}" data-name="${vip.name}">
+          <div>
+            <div class="vip-name">${vip.name}</div>
+            <div class="vip-roi">💰 ${vip.roi}% يومياً</div>
+            <div class="vip-price">💎 سعر الاشتراك: ${vip.price} USDT</div>
+          </div>
+          <div>
+            ${currentLevel >= parseInt(level) ? '<span style="color:#00ff66;">✅ مفتوح</span>' : 
+              (currentLevel > 0 && currentLevel < parseInt(level) ? '<span style="color:#8899aa;">🔒 مغلق (يجب ترقية السابق)</span>' :
+              '<button class="upgrade-btn" data-level="'+level+'" data-price="'+vip.price+'" data-name="'+vip.name+'">اشتراك ('+vip.price+' USDT)</button>')}
+          </div>
         </div>
       `).join('');
       
+      // إضافة حدث النقر على البطاقة نفسها للتوجيه للإيداع
+      document.querySelectorAll('.vip-item').forEach(item => {
+        const level = parseInt(item.dataset.level);
+        const price = parseFloat(item.dataset.price);
+        const name = item.dataset.name;
+        
+        item.onclick = (e) => {
+          // منع التنفيذ إذا تم الضغط على الزر نفسه
+          if (e.target.classList.contains('upgrade-btn')) return;
+          
+          if (currentLevel >= level) {
+            showMessage(`✅ ${name} مفتوح بالفعل`, 'success', 2000);
+          } else if (currentLevel > 0 && currentLevel < level) {
+            showMessage(`⚠️ يجب ترقية المستويات السابقة أولاً`, 'warning', 3000);
+          } else {
+            // توجيه للإيداع مع سعر الباقة
+            redirectToDepositWithPrice(price, name);
+          }
+        };
+      });
+      
       document.querySelectorAll('.upgrade-btn').forEach(btn => {
-        btn.onclick = async () => {
+        btn.onclick = async (e) => {
+          e.stopPropagation();
           const targetLevel = parseInt(btn.dataset.level);
-          const vip = vipLevels[targetLevel];
-          if (userData.available_balance >= vip.price) {
+          const price = parseFloat(btn.dataset.price);
+          const name = btn.dataset.name;
+          
+          if (currentLevel >= targetLevel) {
+            showMessage(`✅ أنت بالفعل مشترك في ${name}`, 'success', 2000);
+            return;
+          }
+          
+          if (currentLevel > 0 && currentLevel < targetLevel - 1) {
+            showMessage(`⚠️ يجب ترقية المستويات السابقة أولاً`, 'warning', 3000);
+            return;
+          }
+          
+          // التحقق من الرصيد
+          if (userData.available_balance >= price) {
+            // الترقية مباشرة
+            const newBalance = userData.available_balance - price;
             await fetch(`${API_URL}/api/update-user`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ userId, updates: { vip_level: targetLevel, available_balance: userData.available_balance - vip.price } })
+              body: JSON.stringify({ userId, updates: { vip_level: targetLevel, available_balance: newBalance } })
             });
-            showMessage(`✅ تم الترقية إلى ${vip.name}!`, 'success', 3000);
+            showMessage(`✅ تم الترقية إلى ${name} بنجاح!`, 'success', 3000);
             loadUser();
           } else {
-            showMessage(`⚠️ تحتاج ${vip.price} USDT للترقية`, 'warning', 3000);
+            // توجيه للإيداع
+            redirectToDepositWithPrice(price, name);
           }
         };
       });
