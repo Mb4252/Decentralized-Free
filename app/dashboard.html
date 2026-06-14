@@ -61,6 +61,11 @@
       width: 100%;
       border: 1px solid rgba(0, 255, 100, 0.3);
       text-align: center;
+      animation: fadeInUp 0.4s ease-out;
+    }
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
     }
     .popup-content h3 { color: #00ff66; margin-bottom: 16px; font-size: 22px; }
     .popup-content p { color: #8899aa; margin-bottom: 12px; line-height: 1.5; font-size: 14px; }
@@ -82,6 +87,8 @@
     .assets-label { color: #8899aa; font-size: 14px; margin-bottom: 8px; }
     .assets-amount { font-size: 48px; font-weight: bold; color: #00ff66; margin-bottom: 12px; }
     .assets-detail { color: #00ccff; font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+    .assets-detail span { transition: transform 0.3s; }
+    .assets-detail:hover span { transform: rotate(180deg); }
     .details-panel { margin-top: 20px; padding-top: 16px; border-top: 1px solid rgba(0, 255, 100, 0.2); display: none; }
     .details-panel.show { display: block; }
     .detail-row { display: flex; justify-content: space-between; padding: 8px 0; color: #8899aa; font-size: 14px; }
@@ -101,7 +108,9 @@
       padding: 18px;
       text-align: center;
       border: 1px solid rgba(0, 255, 100, 0.15);
+      transition: transform 0.3s;
     }
+    .stat-card:hover { transform: translateY(-3px); border-color: rgba(0, 255, 100, 0.5); }
     .stat-card .icon { font-size: 28px; margin-bottom: 8px; }
     .stat-card .label { color: #8899aa; font-size: 12px; margin-bottom: 6px; }
     .stat-card .value { color: #00ff66; font-size: 22px; font-weight: bold; }
@@ -125,8 +134,8 @@
     .vip-name { font-weight: bold; color: #00ff66; }
     .vip-roi { color: #00ccff; font-size: 14px; }
     .vip-min { color: #8899aa; font-size: 12px; }
-    .upgrade-btn { background: #00ff66; border: none; padding: 6px 12px; border-radius: 20px; color: #0a0a0f; font-weight: bold; cursor: pointer; }
-    .upgrade-btn.disabled { background: #8899aa; cursor: not-allowed; }
+    .upgrade-btn { background: #00ff66; border: none; padding: 6px 12px; border-radius: 20px; color: #0a0a0f; font-weight: bold; cursor: pointer; transition: all 0.3s; }
+    .upgrade-btn:hover { transform: scale(1.02); background: #00cc55; }
 
     /* Bottom Navigation */
     .bottom-nav {
@@ -217,8 +226,10 @@
       width: 100%;
       margin-top: 12px;
     }
-    .deposit-btn { background: linear-gradient(135deg, #00ff66, #00ccff); color: #0a0a0f; border: none; padding: 14px; border-radius: 30px; font-weight: bold; width: 100%; cursor: pointer; }
-    .withdraw-btn { background: linear-gradient(135deg, #ff4444, #ff6680); color: white; border: none; padding: 14px; border-radius: 30px; font-weight: bold; width: 100%; cursor: pointer; }
+    .deposit-btn { background: linear-gradient(135deg, #00ff66, #00ccff); color: #0a0a0f; border: none; padding: 14px; border-radius: 30px; font-weight: bold; width: 100%; cursor: pointer; transition: all 0.3s; }
+    .deposit-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 25px -5px rgba(0, 255, 102, 0.4); }
+    .withdraw-btn { background: linear-gradient(135deg, #ff4444, #ff6680); color: white; border: none; padding: 14px; border-radius: 30px; font-weight: bold; width: 100%; cursor: pointer; transition: all 0.3s; }
+    .withdraw-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 25px -5px rgba(255, 68, 68, 0.4); }
     .support-fab {
       position: fixed;
       bottom: 80px;
@@ -234,15 +245,39 @@
       box-shadow: 0 4px 15px rgba(0, 255, 102, 0.3);
       z-index: 98;
       font-size: 24px;
+      transition: all 0.3s;
     }
-    input { width: 100%; padding: 14px; border-radius: 16px; border: 1px solid rgba(0, 255, 100, 0.3); background: rgba(10, 10, 20, 0.8); color: white; margin-bottom: 12px; }
-    input:focus { outline: none; border-color: #00ff66; }
-    .message { padding: 12px; border-radius: 16px; margin-bottom: 16px; text-align: center; font-size: 13px; }
+    .support-fab:hover { transform: scale(1.05); }
+
+    /* Inputs */
+    input {
+      width: 100%;
+      padding: 14px;
+      border-radius: 16px;
+      border: 1px solid rgba(0, 255, 100, 0.3);
+      background: rgba(10, 10, 20, 0.8);
+      color: white;
+      margin-bottom: 12px;
+      outline: none;
+    }
+    input:focus { border-color: #00ff66; box-shadow: 0 0 0 3px rgba(0, 255, 102, 0.2); }
+
+    /* Messages */
+    .message { padding: 12px; border-radius: 16px; margin-bottom: 16px; text-align: center; font-size: 13px; animation: fadeIn 0.3s; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
     .success { background: rgba(0, 255, 102, 0.15); border: 1px solid #00ff66; color: #00ff66; }
     .error { background: rgba(255, 68, 68, 0.15); border: 1px solid #ff4444; color: #ff4444; }
     .warning { background: rgba(255, 170, 0, 0.15); border: 1px solid #ffaa00; color: #ffaa00; }
+
     .hidden { display: none; }
-    @keyframes fadeInUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+
+    @media (max-width: 480px) {
+      .content { padding: 16px; }
+      .assets-amount { font-size: 36px; }
+      .stat-card .value { font-size: 18px; }
+      .vip-item { flex-direction: column; text-align: center; gap: 8px; }
+      .nav-item .nav-label { font-size: 9px; }
+    }
   </style>
 </head>
 <body>
@@ -291,8 +326,7 @@
         <button class="btn-copy" id="copyWalletBtn">📋 نسخ العنوان</button>
       </div>
       <input type="number" id="depositAmount" placeholder="المبلغ (USDT) - الحد الأدنى 10">
-      <button class="deposit-btn" id="doDepositBtn">إيداع USDT</button>
-      <p style="font-size:12px; color:#8899aa; text-align:center; margin-top:12px;">⚠️ سيتم تفعيل الإيداع بعد موافقة المدير</p>
+      <button class="deposit-btn" id="doDepositBtn">💰 إيداع USDT</button>
       <div id="depositMsg"></div>
     </div>
 
@@ -304,8 +338,7 @@
       </div>
       <input type="number" id="withdrawAmount" placeholder="المبلغ (USDT) - الحد الأدنى 0.5">
       <input type="text" id="walletAddress" placeholder="عنوان محفظة BSC">
-      <button class="withdraw-btn" id="doWithdrawBtn">سحب USDT</button>
-      <p style="font-size:12px; color:#8899aa; text-align:center; margin-top:12px;">⚠️ سيتم صرف السحب بعد موافقة المدير</p>
+      <button class="withdraw-btn" id="doWithdrawBtn">💸 سحب USDT</button>
       <div id="withdrawMsg"></div>
     </div>
 
@@ -347,9 +380,9 @@
               <tr><th>التاريخ</th><th>النوع</th><th>المبلغ</th><th>الحالة</th></tr>
             </thead>
             <tbody id="transactionsList">
-              <tr><td colspan="4" style="text-align:center;">جاري التحميل...</td></tr>
+              <tr><td colspan="4" style="text-align:center;">جاري التحميل...<\/td><\/tr>
             </tbody>
-          </table>
+          <\/table>
         </div>
       </div>
     </div>
@@ -372,13 +405,17 @@
       <p>💰 الحد الأدنى للإيداع: <strong>10 USDT</strong></p>
       <p>📤 الحد الأدنى للسحب: <strong>0.5 USDT</strong></p>
       <p>📈 نسبة الربح اليومي: <strong>2% - 3.5%</strong> حسب المستوى</p>
-      <p>✅ يتم تفعيل الإيداع والسحب بعد موافقة المدير</p>
+      <p>✅ الإيداع والسحب يتم تلقائياً فوراً</p>
       <button class="popup-close" id="closePopup">ابدأ الآن</button>
     </div>
   </div>
 
   <script>
-    const API_URL = window.location.origin;
+    // ========================================
+    // ✅ الرابط الصحيح للمنصة على Render
+    // ========================================
+    const API_URL = 'https://crypto-api-c2v8.onrender.com';
+    
     let userId = localStorage.getItem('userId');
     let userData = null;
     let allTransactions = [];
@@ -393,53 +430,84 @@
       5: { name: 'VIP 5', price: 1000, roi: 3.5, daily_limit: 500, min_deposit: 1000 }
     };
 
+    // ========================================
+    // تحميل بيانات المستخدم
+    // ========================================
     async function loadUserData() {
-      if (!userId) { window.location.href = '/'; return false; }
+      if (!userId) {
+        window.location.href = '/';
+        return false;
+      }
       try {
         const response = await fetch(`${API_URL}/api/user`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId })
         });
         const data = await response.json();
-        if (data.error) { localStorage.clear(); window.location.href = '/'; return false; }
+        if (data.error) {
+          localStorage.clear();
+          window.location.href = '/';
+          return false;
+        }
         userData = data;
         document.getElementById('userName').innerHTML = userData.name;
         updateDashboardUI();
         await loadTransactions();
         return true;
-      } catch (error) { return false; }
-    }
-
-    async function loadTransactions() {
-      // جلب الإيداعات والسحوبات للمستخدم
-      const [depositsRes, withdrawsRes] = await Promise.all([
-        fetch(`${API_URL}/api/admin/deposits`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId }) }),
-        fetch(`${API_URL}/api/admin/withdrawals`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId }) })
-      ]);
-      
-      const deposits = await depositsRes.json();
-      const withdrawals = await withdrawsRes.json();
-      
-      const userDeposits = (deposits || []).filter(d => d.user_id === userId).map(d => ({ ...d, type: 'إيداع' }));
-      const userWithdrawals = (withdrawals || []).filter(w => w.user_id === userId).map(w => ({ ...w, type: 'سحب' }));
-      
-      allTransactions = [...userDeposits, ...userWithdrawals].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-      
-      const tbody = document.getElementById('transactionsList');
-      if (allTransactions.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">لا توجد معاملات</td></tr>';
-      } else {
-        tbody.innerHTML = allTransactions.map(t => `
-          <tr>
-            <td>${new Date(t.created_at).toLocaleDateString('ar')}</td>
-            <td>${t.type}</td>
-            <td>${t.amount} USDT</td>
-            <td class="status-${t.status}">${t.status === 'pending' ? 'قيد الانتظار' : t.status === 'approved' ? 'مقبول' : 'مرفوض'}</td>
-          </tr>
-        `).join('');
+      } catch (error) {
+        console.error('Error loading user:', error);
+        return false;
       }
     }
 
+    // ========================================
+    // تحميل المعاملات (لصفحة الملف الشخصي)
+    // ========================================
+    async function loadTransactions() {
+      try {
+        // جلب الإيداعات
+        const depositsRes = await fetch(`${API_URL}/api/admin/deposits`, { 
+          method: 'POST', 
+          headers: { 'Content-Type': 'application/json' }, 
+          body: JSON.stringify({ userId })
+        });
+        const deposits = await depositsRes.json();
+        
+        // جلب السحوبات
+        const withdrawsRes = await fetch(`${API_URL}/api/admin/withdrawals`, { 
+          method: 'POST', 
+          headers: { 'Content-Type': 'application/json' }, 
+          body: JSON.stringify({ userId })
+        });
+        const withdrawals = await withdrawsRes.json();
+        
+        const userDeposits = (deposits || []).filter(d => d.user_id === userId).map(d => ({ ...d, type: 'إيداع' }));
+        const userWithdrawals = (withdrawals || []).filter(w => w.user_id === userId).map(w => ({ ...w, type: 'سحب' }));
+        
+        allTransactions = [...userDeposits, ...userWithdrawals].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        
+        const tbody = document.getElementById('transactionsList');
+        if (allTransactions.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">لا توجد معاملات<\/td><\/tr>';
+        } else {
+          tbody.innerHTML = allTransactions.map(t => `
+            <tr>
+              <td>${new Date(t.created_at).toLocaleDateString('ar')}<\/td>
+              <td>${t.type}<\/td>
+              <td>${t.amount} USDT<\/td>
+              <td class="status-${t.status}">${t.status === 'pending' ? 'قيد الانتظار' : t.status === 'approved' ? 'مقبول' : 'مرفوض'}<\/td>
+            <\/tr>
+          `).join('');
+        }
+      } catch (error) {
+        console.error('Error loading transactions:', error);
+      }
+    }
+
+    // ========================================
+    // تحديث واجهة المستخدم الرئيسية
+    // ========================================
     function updateDashboardUI() {
       const currentLevel = userData?.vip_level || 0;
       const activeInvest = userData?.active_deposit || 0;
@@ -467,8 +535,14 @@
       const vipList = document.getElementById('vipLevelsList');
       vipList.innerHTML = Object.entries(vipLevels).map(([level, vip]) => `
         <div class="vip-item" data-level="${level}">
-          <div><div class="vip-name">${vip.name}</div><div class="vip-min">من ${vip.min_deposit} USDT</div></div>
-          <div><div class="vip-roi">💰 ${vip.roi}% يومياً</div><div class="vip-min">حد سحب: ${vip.daily_limit} USDT</div></div>
+          <div>
+            <div class="vip-name">${vip.name}</div>
+            <div class="vip-min">من ${vip.min_deposit} USDT</div>
+          </div>
+          <div>
+            <div class="vip-roi">💰 ${vip.roi}% يومياً</div>
+            <div class="vip-min">حد سحب: ${vip.daily_limit} USDT</div>
+          </div>
           ${currentLevel < parseInt(level) ? `<button class="upgrade-btn" data-level="${level}">ترقية (${vip.price} USDT)</button>` : (currentLevel == level ? '<span style="color:#00ff66;">✅ مستخدم حالياً</span>' : '<span style="color:#8899aa;">🔒 مغلق</span>')}
         </div>
       `).join('');
@@ -491,7 +565,7 @@
             showMessage('depositMsg', `✅ تم الترقية إلى ${targetVIP.name} بنجاح!`, 'success');
             loadUserData();
           } else {
-            // الرصيد غير كافٍ -> توجيه إلى صفحة الإيداع
+            // الرصيد غير كافٍ -> توجيه إلى صفحة الإيداع مع رسالة
             showMessage('depositMsg', `⚠️ رصيدك غير كافٍ للترقية إلى ${targetVIP.name} (تحتاج ${targetVIP.price} USDT). يرجى إيداع المبلغ المطلوب.`, 'warning');
             // التبديل إلى صفحة الإيداع
             document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
@@ -503,34 +577,50 @@
       });
     }
 
+    // ========================================
+    // تحميل بيانات الإحالات
+    // ========================================
     async function loadReferrals() {
-      const response = await fetch(`${API_URL}/api/referrals`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId })
-      });
-      const data = await response.json();
-      document.getElementById('referralCount').innerHTML = data.count || 0;
-      document.getElementById('groupBalance').innerHTML = (data.groupBalance || 0).toFixed(2) + ' USDT';
-      document.getElementById('referralLink').innerHTML = `${window.location.origin}?ref=${userData?.referral_code}`;
-      
-      const listDiv = document.getElementById('referralsList');
-      if (!data.referrals || data.referrals.length === 0) {
-        listDiv.innerHTML = '<p style="color:#8899aa; text-align:center;">لا يوجد محالين حتى الآن</p>';
-      } else {
-        listDiv.innerHTML = data.referrals.map(u => `
-          <div style="background:rgba(20,20,35,0.6); border-radius:16px; padding:12px; margin-bottom:8px; display:flex; justify-content:space-between;">
-            <span>${u.name}</span><span>💰 ${u.active_deposit || 0} USDT</span>
-          </div>
-        `).join('');
+      try {
+        const response = await fetch(`${API_URL}/api/referrals`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId })
+        });
+        const data = await response.json();
+        document.getElementById('referralCount').innerHTML = data.count || 0;
+        document.getElementById('groupBalance').innerHTML = (data.groupBalance || 0).toFixed(2) + ' USDT';
+        document.getElementById('referralLink').innerHTML = `${window.location.origin}?ref=${userData?.referral_code}`;
+        
+        const listDiv = document.getElementById('referralsList');
+        if (!data.referrals || data.referrals.length === 0) {
+          listDiv.innerHTML = '<p style="color:#8899aa; text-align:center;">لا يوجد محالين حتى الآن</p>';
+        } else {
+          listDiv.innerHTML = data.referrals.map(u => `
+            <div style="background:rgba(20,20,35,0.6); border-radius:16px; padding:12px; margin-bottom:8px; display:flex; justify-content:space-between;">
+              <span>${u.name}</span>
+              <span>💰 ${u.active_deposit || 0} USDT</span>
+            </div>
+          `).join('');
+        }
+      } catch (error) {
+        console.error('Error loading referrals:', error);
       }
     }
 
+    // ========================================
+    // عرض الرسائل
+    // ========================================
     function showMessage(elementId, msg, type) {
       const div = document.getElementById(elementId);
-      if (div) { div.innerHTML = `<div class="message ${type}">${msg}</div>`; setTimeout(() => div.innerHTML = '', 5000); }
+      if (div) {
+        div.innerHTML = `<div class="message ${type}">${msg}</div>`;
+        setTimeout(() => div.innerHTML = '', 5000);
+      }
     }
 
+    // ========================================
     // Event Listeners
+    // ========================================
     document.getElementById('toggleDetails').onclick = () => {
       document.getElementById('detailsPanel').classList.toggle('show');
     };
@@ -545,57 +635,124 @@
       showMessage('referralMsg', '✅ تم نسخ رابط الدعوة!', 'success');
     };
 
+    // ========================================
+    // إيداع تلقائي (بدون موافقة)
+    // ========================================
     document.getElementById('doDepositBtn').onclick = async () => {
       const amount = parseFloat(document.getElementById('depositAmount').value);
-      if (!amount || amount < 10) { showMessage('depositMsg', '⚠️ الحد الأدنى للإيداع 10 USDT', 'error'); return; }
-      const response = await fetch(`${API_URL}/api/deposit`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, amount })
-      });
-      const data = await response.json();
-      if (data.success) { showMessage('depositMsg', `✅ تم تقديم طلب إيداع ${amount} USDT`, 'success'); document.getElementById('depositAmount').value = ''; }
-      else { showMessage('depositMsg', '❌ ' + (data.error || 'حدث خطأ'), 'error'); }
+      if (!amount || amount < 10) {
+        showMessage('depositMsg', '⚠️ الحد الأدنى للإيداع 10 USDT', 'error');
+        return;
+      }
+      
+      try {
+        const response = await fetch(`${API_URL}/api/deposit`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, amount })
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+          showMessage('depositMsg', `✅ تم إيداع ${amount} USDT بنجاح!`, 'success');
+          document.getElementById('depositAmount').value = '';
+          await loadUserData(); // تحديث البيانات
+        } else {
+          showMessage('depositMsg', '❌ ' + (data.error || 'حدث خطأ'), 'error');
+        }
+      } catch (error) {
+        showMessage('depositMsg', '❌ خطأ في الاتصال بالخادم', 'error');
+      }
     };
 
+    // ========================================
+    // سحب تلقائي (بدون موافقة)
+    // ========================================
     document.getElementById('doWithdrawBtn').onclick = async () => {
       const amount = parseFloat(document.getElementById('withdrawAmount').value);
       const address = document.getElementById('walletAddress').value;
-      if (!amount || amount < 0.5) { showMessage('withdrawMsg', '⚠️ الحد الأدنى للسحب 0.5 USDT', 'error'); return; }
-      if (!address) { showMessage('withdrawMsg', '⚠️ يرجى إدخال عنوان محفظة BSC', 'error'); return; }
-      if (amount > (userData?.available_balance || 0)) { showMessage('withdrawMsg', '⚠️ الرصيد غير كافٍ', 'error'); return; }
-      const response = await fetch(`${API_URL}/api/withdraw`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, amount, walletAddress: address })
-      });
-      const data = await response.json();
-      if (data.success) { showMessage('withdrawMsg', `✅ تم تقديم طلب سحب ${amount} USDT`, 'success'); document.getElementById('withdrawAmount').value = ''; document.getElementById('walletAddress').value = ''; }
-      else { showMessage('withdrawMsg', '❌ ' + (data.error || 'حدث خطأ'), 'error'); }
+      
+      if (!amount || amount < 0.5) {
+        showMessage('withdrawMsg', '⚠️ الحد الأدنى للسحب 0.5 USDT', 'error');
+        return;
+      }
+      if (!address) {
+        showMessage('withdrawMsg', '⚠️ يرجى إدخال عنوان محفظة BSC', 'error');
+        return;
+      }
+      if (amount > (userData?.available_balance || 0)) {
+        showMessage('withdrawMsg', '⚠️ الرصيد غير كافٍ', 'error');
+        return;
+      }
+      
+      try {
+        const response = await fetch(`${API_URL}/api/withdraw`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, amount, walletAddress: address })
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+          showMessage('withdrawMsg', `✅ تم سحب ${amount} USDT إلى محفظتك بنجاح!`, 'success');
+          document.getElementById('withdrawAmount').value = '';
+          document.getElementById('walletAddress').value = '';
+          await loadUserData(); // تحديث البيانات
+        } else {
+          showMessage('withdrawMsg', '❌ ' + (data.error || 'حدث خطأ'), 'error');
+        }
+      } catch (error) {
+        showMessage('withdrawMsg', '❌ خطأ في الاتصال بالخادم', 'error');
+      }
     };
 
-    document.getElementById('supportFab').onclick = () => { window.open('https://t.me/+fPunvn_76Q45NDg8', '_blank'); };
-    document.getElementById('supportBtn').onclick = () => { window.open('https://t.me/+fPunvn_76Q45NDg8', '_blank'); };
-    document.getElementById('closePopup').onclick = () => { document.getElementById('welcomePopup').style.display = 'none'; localStorage.setItem('welcomeShown', 'true'); };
+    document.getElementById('supportFab').onclick = () => { 
+      window.open('https://t.me/+fPunvn_76Q45NDg8', '_blank'); 
+    };
+    document.getElementById('supportBtn').onclick = () => { 
+      window.open('https://t.me/+fPunvn_76Q45NDg8', '_blank'); 
+    };
+    document.getElementById('closePopup').onclick = () => { 
+      document.getElementById('welcomePopup').style.display = 'none'; 
+      localStorage.setItem('welcomeShown', 'true'); 
+    };
 
-    // Navigation
+    // ========================================
+    // التنقل بين الصفحات
+    // ========================================
     document.querySelectorAll('.nav-item').forEach(btn => {
       btn.onclick = () => {
         document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         const page = btn.getAttribute('data-page');
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-        if (page === 'dashboard') document.getElementById('dashboardPage').classList.add('active');
-        else if (page === 'deposit') document.getElementById('depositPage').classList.add('active');
-        else if (page === 'withdraw') document.getElementById('withdrawPage').classList.add('active');
-        else if (page === 'vip') document.getElementById('vipPage').classList.add('active');
-        else if (page === 'referral') { document.getElementById('referralPage').classList.add('active'); loadReferrals(); }
-        else if (page === 'profile') document.getElementById('profilePage').classList.add('active');
+        
+        if (page === 'dashboard') {
+          document.getElementById('dashboardPage').classList.add('active');
+        } else if (page === 'deposit') {
+          document.getElementById('depositPage').classList.add('active');
+        } else if (page === 'withdraw') {
+          document.getElementById('withdrawPage').classList.add('active');
+        } else if (page === 'vip') {
+          document.getElementById('vipPage').classList.add('active');
+        } else if (page === 'referral') {
+          document.getElementById('referralPage').classList.add('active');
+          loadReferrals();
+        } else if (page === 'profile') {
+          document.getElementById('profilePage').classList.add('active');
+        }
       };
     });
 
+    // ========================================
+    // تشغيل الصفحة
+    // ========================================
     (async () => {
       const loaded = await loadUserData();
       if (loaded) {
-        if (!localStorage.getItem('welcomeShown')) { document.getElementById('welcomePopup').style.display = 'flex'; }
+        if (!localStorage.getItem('welcomeShown')) {
+          document.getElementById('welcomePopup').style.display = 'flex';
+        }
         await loadReferrals();
       }
     })();
