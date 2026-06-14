@@ -40,9 +40,9 @@
       border: 1px solid #00ff66;
     }
     .card-title { color: white; font-size: 18px; margin-bottom: 16px; border-right: 3px solid #00ff66; padding-right: 12px; }
-    .assets-amount { font-size: 42px; font-weight: bold; color: #00ff66; text-align: center; margin: 16px 0; }
-    .detail-row { display: flex; justify-content: space-between; padding: 8px 0; color: #8899aa; }
-    .detail-value { color: #00ff66; }
+    .assets-amount { font-size: 42px; font-weight: bold; color: #00ff66; text-align: center; margin: 16px 0; text-shadow: 0 0 10px rgba(0,255,102,0.3); }
+    .detail-row { display: flex; justify-content: space-between; padding: 8px 0; color: #aabbcc; font-size: 14px; }
+    .detail-value { color: #00ff66; font-weight: bold; }
     .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
     .stat-card { background: #1a1a2e; border-radius: 20px; padding: 16px; text-align: center; border: 1px solid #00ff66; }
     .stat-value { color: #00ff66; font-size: 24px; font-weight: bold; }
@@ -97,6 +97,7 @@
       margin-bottom: 12px;
     }
     input:focus { outline: none; border-color: #00ff66; }
+    input::placeholder { color: #556677; }
     .deposit-btn, .withdraw-btn {
       width: 100%;
       padding: 12px;
@@ -210,17 +211,17 @@
     .hidden { display: none; }
     
     .history-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+      background: #1a1a2e;
+      border-radius: 16px;
+      margin-bottom: 12px;
       padding: 12px;
-      border-bottom: 1px solid #00ff66;
+      border: 1px solid #00ff66;
     }
-    .history-type { font-weight: bold; }
-    .history-amount { color: #00ff66; }
-    .history-status { font-size: 12px; }
-    .status-approved { color: #00ff66; }
-    .status-pending { color: #ffaa00; }
+    .history-type { color: #00ff66; font-weight: bold; font-size: 14px; }
+    .history-amount { color: #ffcc00; font-weight: bold; font-size: 16px; }
+    .history-status { font-size: 11px; margin-top: 5px; padding: 2px 8px; border-radius: 20px; display: inline-block; }
+    .status-approved { background: rgba(0,255,102,0.15); color: #00ff66; }
+    .status-pending { background: rgba(255,170,0,0.15); color: #ffaa00; }
     
     .network-option {
       background: #0a0a0f;
@@ -899,7 +900,6 @@
       `;
       
       try {
-        // استخدام API واحد لجلب جميع المعاملات
         const response = await fetch(`${API_URL}/api/my-transactions`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -907,7 +907,6 @@
         });
         
         const transactions = await response.json();
-        
         const listDiv = document.getElementById('transactionsList');
         
         if (!transactions || transactions.length === 0) {
@@ -915,19 +914,26 @@
           return;
         }
         
-        // تحديد نوع العرض حسب اللغة
         const typeText = currentLang === 'ar' ? 'type_ar' : 'type_en';
         
         listDiv.innerHTML = transactions.map(txn => `
           <div class="history-item">
-            <div>
-              <div class="history-type">${txn[typeText] || txn.type}</div>
-              <div style="font-size:11px; color:#8899aa;">${new Date(txn.date).toLocaleDateString(currentLang === 'ar' ? 'ar' : 'en')}</div>
-              ${txn.reference ? `<div style="font-size:10px; color:#666; direction:ltr;">${txn.reference.substring(0, 15)}...</div>` : ''}
-            </div>
-            <div class="history-amount">${(txn.amount || 0).toFixed(2)} USDT</div>
-            <div class="history-status ${txn.status === 'approved' ? 'status-approved' : 'status-pending'}">
-              ${txn.status === 'approved' ? t.statusApproved : t.statusPending}
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div>
+                <div class="history-type">${txn[typeText] || txn.type}</div>
+                <div style="font-size:11px; color:#8899aa; margin-top:4px;">${new Date(txn.date).toLocaleDateString(currentLang === 'ar' ? 'ar' : 'en')}</div>
+                ${txn.reference ? `<div style="font-size:10px; color:#00ccff; direction:ltr; margin-top:4px;">${txn.reference.substring(0, 16)}...</div>` : ''}
+              </div>
+              <div style="text-align:center;">
+                <div class="history-amount">${(txn.amount || 0).toFixed(2)} USDT</div>
+                <div class="history-status ${txn.status === 'approved' ? 'status-approved' : 'status-pending'}">
+                  ${txn.status === 'approved' ? 
+                    (txn.type === 'deposit' ? '✅ تم الإيداع' : 
+                     txn.type === 'withdraw' ? '✅ تم السحب' : 
+                     '✅ تم الربح') : 
+                    '⏳ قيد الانتظار'}
+                </div>
+              </div>
             </div>
           </div>
         `).join('');
