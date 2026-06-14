@@ -43,6 +43,7 @@
       border-radius: 20px;
       cursor: pointer;
       font-size: 12px;
+      transition: all 0.3s;
     }
     .lang-btn.active {
       background: #00ff66;
@@ -114,14 +115,24 @@
     .message { margin-top: 16px; padding: 12px; border-radius: 16px; text-align: center; font-size: 13px; }
     .error { background: rgba(255,68,68,0.15); border: 1px solid #ff4444; color: #ff4444; }
     .success { background: rgba(0,255,102,0.15); border: 1px solid #00ff66; color: #00ff66; }
+    .warning { background: rgba(255,170,0,0.15); border: 1px solid #ffaa00; color: #ffaa00; }
     
     .hidden { display: none; }
+    
+    .generated-code {
+      background: rgba(0,255,102,0.1);
+      border: 1px solid #00ff66;
+      border-radius: 16px;
+      padding: 12px;
+      margin-top: 16px;
+      text-align: center;
+    }
   </style>
 </head>
 <body>
   <div class="card">
     <div class="lang-switch">
-      <button class="lang-btn active" data-lang="ar">🇸🇦 العربية</button>
+      <button class="lang-btn" data-lang="ar">🇸🇦 العربية</button>
       <button class="lang-btn" data-lang="en">🇬🇧 English</button>
     </div>
     
@@ -153,7 +164,7 @@
         <input type="checkbox" id="rememberMe">
         <label id="rememberLabel">تذكرني (البقاء مسجل الدخول)</label>
       </div>
-      <button class="btn-primary" id="doLoginBtn" data-key="login">تسجيل الدخول</button>
+      <button class="btn-primary" id="doLoginBtn">تسجيل الدخول</button>
     </div>
     
     <!-- Register Form -->
@@ -188,8 +199,8 @@
           <input type="text" id="regReferral" placeholder="XXXXXX">
         </div>
       </div>
-      <button class="btn-primary" id="doRegisterBtn" data-key="register">إنشاء حساب</button>
-      <div id="generatedReferral" class="success hidden" style="margin-top:14px; padding:10px; text-align:center;"></div>
+      <button class="btn-primary" id="doRegisterBtn">إنشاء حساب</button>
+      <div id="generatedReferral" class="generated-code hidden"></div>
     </div>
     
     <div id="message"></div>
@@ -197,60 +208,93 @@
   
   <script>
     const API_URL = window.location.origin;
-    let currentLang = localStorage.getItem('lang') || 'ar';
+    let currentLang = localStorage.getItem('loginLang') || 'ar';
     
     // ========================================
-    // الترجمة
+    // الترجمة الكاملة
     // ========================================
     const translations = {
       ar: {
         siteTitle: '💰 CryptoInvest',
         siteSub: 'استثمر بأمان | أرباح يومية',
+        loginTab: 'تسجيل الدخول',
+        registerTab: 'إنشاء حساب',
         emailLabel: '📧 البريد الإلكتروني',
         passwordLabel: '🔒 كلمة المرور',
         rememberLabel: 'تذكرني (البقاء مسجل الدخول)',
-        login: 'تسجيل الدخول',
-        register: 'إنشاء حساب',
+        loginBtn: 'تسجيل الدخول',
         regNameLabel: '👤 اسم المستخدم',
         regEmailLabel: '📧 البريد الإلكتروني',
         regPasswordLabel: '🔒 كلمة المرور',
         regConfirmLabel: '✔️ تأكيد كلمة المرور',
         regReferralLabel: '🎁 رمز الدعوة (اختياري)',
-        welcomeBack: 'مرحباً بعودتك!',
-        accountCreated: '✅ تم إنشاء الحساب بنجاح!'
+        registerBtn: 'إنشاء حساب',
+        // Error messages
+        errorFillFields: '⚠️ يرجى ملء جميع الحقول',
+        errorPasswordMatch: '⚠️ كلمة المرور غير متطابقة',
+        errorPasswordLength: '⚠️ كلمة المرور يجب أن تكون 4 أحرف على الأقل',
+        errorLogin: '❌ البريد الإلكتروني أو كلمة المرور غير صحيحة',
+        errorConnection: '❌ خطأ في الاتصال بالخادم',
+        successLogin: '✅ تم تسجيل الدخول بنجاح!',
+        successRegister: '✅ تم إنشاء الحساب بنجاح!',
+        redirecting: 'جاري التحويل...',
+        yourReferralCode: '✨ رمز الدعوة الخاص بك:',
+        emailExists: '❌ هذا البريد مسجل بالفعل'
       },
       en: {
         siteTitle: '💰 CryptoInvest',
         siteSub: 'Invest Safely | Daily Returns',
+        loginTab: 'Login',
+        registerTab: 'Sign Up',
         emailLabel: '📧 Email',
         passwordLabel: '🔒 Password',
         rememberLabel: 'Remember Me (Stay logged in)',
-        login: 'Login',
-        register: 'Sign Up',
+        loginBtn: 'Login',
         regNameLabel: '👤 Username',
         regEmailLabel: '📧 Email',
         regPasswordLabel: '🔒 Password',
         regConfirmLabel: '✔️ Confirm Password',
         regReferralLabel: '🎁 Referral Code (Optional)',
-        welcomeBack: 'Welcome Back!',
-        accountCreated: '✅ Account created successfully!'
+        registerBtn: 'Sign Up',
+        // Error messages
+        errorFillFields: '⚠️ Please fill in all fields',
+        errorPasswordMatch: '⚠️ Passwords do not match',
+        errorPasswordLength: '⚠️ Password must be at least 4 characters',
+        errorLogin: '❌ Invalid email or password',
+        errorConnection: '❌ Server connection error',
+        successLogin: '✅ Login successful!',
+        successRegister: '✅ Account created successfully!',
+        redirecting: 'Redirecting...',
+        yourReferralCode: '✨ Your referral code:',
+        emailExists: '❌ This email is already registered'
       }
     };
     
-    function updateLanguage() {
+    function updateUILanguage() {
       const t = translations[currentLang];
       document.getElementById('siteTitle').innerHTML = t.siteTitle;
       document.getElementById('siteSub').innerHTML = t.siteSub;
+      document.getElementById('loginTab').innerHTML = t.loginTab;
+      document.getElementById('registerTab').innerHTML = t.registerTab;
       document.getElementById('emailLabel').innerHTML = t.emailLabel;
       document.getElementById('passwordLabel').innerHTML = t.passwordLabel;
       document.getElementById('rememberLabel').innerHTML = t.rememberLabel;
-      document.getElementById('doLoginBtn').innerHTML = t.login;
-      document.getElementById('doRegisterBtn').innerHTML = t.register;
+      document.getElementById('doLoginBtn').innerHTML = t.loginBtn;
       document.getElementById('regNameLabel').innerHTML = t.regNameLabel;
       document.getElementById('regEmailLabel').innerHTML = t.regEmailLabel;
       document.getElementById('regPasswordLabel').innerHTML = t.regPasswordLabel;
       document.getElementById('regConfirmLabel').innerHTML = t.regConfirmLabel;
       document.getElementById('regReferralLabel').innerHTML = t.regReferralLabel;
+      document.getElementById('doRegisterBtn').innerHTML = t.registerBtn;
+      
+      // Update placeholders
+      document.getElementById('loginEmail').placeholder = "example@email.com";
+      document.getElementById('loginPassword').placeholder = "********";
+      document.getElementById('regName').placeholder = currentLang === 'ar' ? "أدخل اسمك" : "Enter your name";
+      document.getElementById('regEmail').placeholder = "example@email.com";
+      document.getElementById('regPassword').placeholder = "********";
+      document.getElementById('regConfirmPassword').placeholder = "********";
+      document.getElementById('regReferral').placeholder = "XXXXXX";
       
       document.querySelectorAll('.lang-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.lang === currentLang);
@@ -260,8 +304,8 @@
     document.querySelectorAll('.lang-btn').forEach(btn => {
       btn.onclick = () => {
         currentLang = btn.dataset.lang;
-        localStorage.setItem('lang', currentLang);
-        updateLanguage();
+        localStorage.setItem('loginLang', currentLang);
+        updateUILanguage();
       };
     });
     
@@ -286,15 +330,16 @@
     };
     
     // ========================================
-    // تسجيل الدخول مع حفظ الجلسة
+    // تسجيل الدخول مع حفظ اللغة والجلسة
     // ========================================
     document.getElementById('doLoginBtn').onclick = async () => {
+      const t = translations[currentLang];
       const email = document.getElementById('loginEmail').value;
       const password = document.getElementById('loginPassword').value;
       const rememberMe = document.getElementById('rememberMe').checked;
       
       if (!email || !password) {
-        showMessage('⚠️ يرجى إدخال البريد الإلكتروني وكلمة المرور', 'error');
+        showMessage(t.errorFillFields, 'error');
         return;
       }
       
@@ -309,25 +354,28 @@
         if (data.success) {
           localStorage.setItem('userId', data.user.id);
           localStorage.setItem('user', JSON.stringify(data.user));
+          // حفظ اللغة لتستخدم في لوحة التحكم
+          localStorage.setItem('dashboardLang', currentLang);
           if (rememberMe) {
             localStorage.setItem('rememberMe', 'true');
           } else {
             localStorage.removeItem('rememberMe');
           }
-          showMessage('✅ تم تسجيل الدخول بنجاح!', 'success');
-          setTimeout(() => { window.location.href = '/dashboard.html'; }, 1000);
+          showMessage(`${t.successLogin} ${t.redirecting}`, 'success');
+          setTimeout(() => { window.location.href = '/dashboard.html'; }, 1500);
         } else {
-          showMessage('❌ ' + data.error, 'error');
+          showMessage(t.errorLogin, 'error');
         }
       } catch (error) {
-        showMessage('❌ خطأ في الاتصال', 'error');
+        showMessage(t.errorConnection, 'error');
       }
     };
     
     // ========================================
-    // إنشاء حساب
+    // إنشاء حساب مع حفظ اللغة
     // ========================================
     document.getElementById('doRegisterBtn').onclick = async () => {
+      const t = translations[currentLang];
       const name = document.getElementById('regName').value;
       const email = document.getElementById('regEmail').value;
       const password = document.getElementById('regPassword').value;
@@ -335,15 +383,15 @@
       const referralCode = document.getElementById('regReferral').value;
       
       if (!name || !email || !password || !confirm) {
-        showMessage('⚠️ يرجى ملء جميع الحقول', 'error');
+        showMessage(t.errorFillFields, 'error');
         return;
       }
       if (password !== confirm) {
-        showMessage('⚠️ كلمة المرور غير متطابقة', 'error');
+        showMessage(t.errorPasswordMatch, 'error');
         return;
       }
       if (password.length < 4) {
-        showMessage('⚠️ كلمة المرور يجب أن تكون 4 أحرف على الأقل', 'error');
+        showMessage(t.errorPasswordLength, 'error');
         return;
       }
       
@@ -358,15 +406,23 @@
         if (data.success) {
           localStorage.setItem('userId', data.user.id);
           localStorage.setItem('user', JSON.stringify(data.user));
-          document.getElementById('generatedReferral').innerHTML = `✨ رمز الدعوة الخاص بك: <strong>${data.referral_code}</strong>`;
-          document.getElementById('generatedReferral').classList.remove('hidden');
-          showMessage(`✅ تم إنشاء الحساب بنجاح!`, 'success');
+          localStorage.setItem('dashboardLang', currentLang);
+          
+          const generatedDiv = document.getElementById('generatedReferral');
+          generatedDiv.innerHTML = `${t.yourReferralCode} <strong>${data.referral_code}</strong>`;
+          generatedDiv.classList.remove('hidden');
+          
+          showMessage(`${t.successRegister} ${t.redirecting}`, 'success');
           setTimeout(() => { window.location.href = '/dashboard.html'; }, 2000);
         } else {
-          showMessage('❌ ' + data.error, 'error');
+          if (data.error && data.error.includes('مسجل')) {
+            showMessage(t.emailExists, 'error');
+          } else {
+            showMessage(`❌ ${data.error}`, 'error');
+          }
         }
       } catch (error) {
-        showMessage('❌ خطأ في الاتصال', 'error');
+        showMessage(t.errorConnection, 'error');
       }
     };
     
@@ -374,11 +430,10 @@
     const savedUserId = localStorage.getItem('userId');
     const rememberMe = localStorage.getItem('rememberMe');
     if (savedUserId && rememberMe === 'true') {
-      // تمديد الجلسة لمدة 30 يوم
       window.location.href = '/dashboard.html';
     }
     
-    updateLanguage();
+    updateUILanguage();
   </script>
 </body>
 </html>
