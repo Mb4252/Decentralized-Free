@@ -392,7 +392,8 @@ app.post('/api/register', async (req, res) => {
   const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'mb425262@gmail.com';
   const isAdmin = (email === ADMIN_EMAIL);
   
-  const userId = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString();
+  // إصلاح خطأ إنشاء ID المستخدم
+  const userId = Date.now().toString() + '_' + Math.random().toString(36).substring(2, 10);
   
   const { error: insertError } = await supabaseAdmin
     .from('users')
@@ -414,7 +415,7 @@ app.post('/api/register', async (req, res) => {
   
   if (insertError) {
     console.error('Insert error:', insertError);
-    return res.status(500).json({ error: 'حدث خطأ في إنشاء الحساب' });
+    return res.status(500).json({ error: 'حدث خطأ في إنشاء الحساب: ' + insertError.message });
   }
   
   res.json({ 
@@ -598,7 +599,7 @@ app.post('/api/transactions', async (req, res) => {
 });
 
 // ========================================
-// API: جلب إيداعات المستخدم (للمستخدم العادي)
+// API: جلب إيداعات المستخدم
 // ========================================
 app.post('/api/my-deposits', async (req, res) => {
   const { userId } = req.body;
@@ -621,7 +622,7 @@ app.post('/api/my-deposits', async (req, res) => {
 });
 
 // ========================================
-// API: جلب سحوبات المستخدم (للمستخدم العادي)
+// API: جلب سحوبات المستخدم
 // ========================================
 app.post('/api/my-withdrawals', async (req, res) => {
   const { userId } = req.body;
@@ -644,7 +645,7 @@ app.post('/api/my-withdrawals', async (req, res) => {
 });
 
 // ========================================
-// API: جلب أرباح المستخدم (للمستخدم العادي)
+// API: جلب أرباح المستخدم
 // ========================================
 app.post('/api/my-profits', async (req, res) => {
   const { userId } = req.body;
