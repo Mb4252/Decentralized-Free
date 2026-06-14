@@ -29,6 +29,7 @@
     .user-name { color: #00ff66; font-size: 14px; }
     .support-btn { background: rgba(0,255,102,0.15); border: 1px solid #00ff66; color: #00ff66; padding: 6px 12px; border-radius: 20px; cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 5px; }
     .logout-btn { background: transparent; border: 1px solid #ff4444; color: #ff4444; padding: 6px 12px; border-radius: 20px; cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 5px; }
+    .lang-btn-header { background: rgba(0,255,102,0.15); border: 1px solid #00ff66; color: #00ff66; padding: 6px 12px; border-radius: 20px; cursor: pointer; font-size: 12px; }
     .content { max-width: 500px; margin: 0 auto; padding: 20px; }
     
     .card {
@@ -223,40 +224,81 @@
     .history-status { font-size: 12px; }
     .status-approved { color: #00ff66; }
     .status-pending { color: #ffaa00; }
+    
+    /* Network selection modal */
+    .network-option {
+      background: #0a0a0f;
+      border: 1px solid #00ff66;
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 12px;
+      cursor: pointer;
+      transition: all 0.3s;
+      text-align: center;
+    }
+    .network-option:hover {
+      background: rgba(0,255,102,0.1);
+      transform: translateX(-5px);
+    }
+    .network-name {
+      color: #00ff66;
+      font-weight: bold;
+      font-size: 18px;
+    }
+    .network-desc {
+      color: #8899aa;
+      font-size: 12px;
+      margin-top: 5px;
+    }
   </style>
 </head>
 <body>
   <div class="navbar">
-    <div class="logo">💰 CryptoInvest</div>
+    <div class="logo">💰 <span id="logoText">CryptoInvest</span></div>
     <div class="user-actions">
-      <button class="support-btn" id="supportBtn">💬 الدعم</button>
+      <button class="lang-btn-header" id="langToggleBtn">🇸🇦 العربية</button>
+      <button class="support-btn" id="supportBtn">💬 <span id="supportText">الدعم</span></button>
       <span class="user-name" id="userName"></span>
-      <button class="logout-btn" id="logoutBtn">🚪 خروج</button>
+      <button class="logout-btn" id="logoutBtn">🚪 <span id="logoutText">خروج</span></button>
     </div>
   </div>
 
   <div class="content" id="mainContent"></div>
 
   <div class="bottom-nav">
-    <button class="nav-item active" data-page="dashboard">🏠<span class="nav-label">البيت</span></button>
-    <button class="nav-item" data-page="vip">👑<span class="nav-label">VIP</span></button>
-    <button class="nav-item" data-page="deposit">💰<span class="nav-label">إيداع</span></button>
-    <button class="nav-item" data-page="withdraw">📤<span class="nav-label">سحب</span></button>
-    <button class="nav-item" data-page="referral">👥<span class="nav-label">فريق</span></button>
-    <button class="nav-item" data-page="profile">👤<span class="nav-label">أنا</span></button>
+    <button class="nav-item active" data-page="dashboard"><span id="navHomeIcon">🏠</span><span class="nav-label" id="navHome">البيت</span></button>
+    <button class="nav-item" data-page="vip"><span id="navVipIcon">👑</span><span class="nav-label" id="navVip">VIP</span></button>
+    <button class="nav-item" data-page="deposit"><span id="navDepositIcon">💰</span><span class="nav-label" id="navDeposit">إيداع</span></button>
+    <button class="nav-item" data-page="withdraw"><span id="navWithdrawIcon">📤</span><span class="nav-label" id="navWithdraw">سحب</span></button>
+    <button class="nav-item" data-page="referral"><span id="navReferralIcon">👥</span><span class="nav-label" id="navReferral">فريق</span></button>
+    <button class="nav-item" data-page="profile"><span id="navProfileIcon">👤</span><span class="nav-label" id="navProfile">أنا</span></button>
   </div>
 
-  <!-- نافذة التعليمات -->
-  <div id="instructionsModal" class="modal hidden">
+  <!-- نافذة اختيار الشبكة للإيداع -->
+  <div id="networkModal" class="modal hidden">
     <div class="modal-content">
-      <h3>📖 مرحباً بك في منصة الاستثمار</h3>
-      <h4>💰 كيفية الإيداع:</h4>
-      <p>1. اضغط على أيقونة <strong>💰 الإيداع</strong></p>
-      <p>2. انسخ عنوان المحفظة (شبكة <strong>BSC/BEP20</strong>)</p>
-      <p>3. قم بتحويل USDT إلى هذا العنوان</p>
-      <p>4. الصق Transaction Hash</p>
-      <p>5. اضغط <strong>"تحقق وأيدع"</strong> - سيتم إضافة المبلغ تلقائياً</p>
-      <button class="close-modal" id="closeInstructions">✅ فهمت</button>
+      <h3 id="networkModalTitle">🌐 اختر شبكة التحويل</h3>
+      <div class="network-option" id="selectBSCNetwork">
+        <div class="network-name">BNB Smart Chain (BSC)</div>
+        <div class="network-desc">شبكة BEP20 - العملة: USDT</div>
+      </div>
+      <button class="close-modal" id="closeNetworkModal" idKey="closeNetworkBtn">إلغاء</button>
+    </div>
+  </div>
+
+  <!-- نافذة التعليمات الترحيبية -->
+  <div id="welcomeModal" class="modal hidden">
+    <div class="modal-content">
+      <h3 id="welcomeTitle">📖 مرحباً بك في منصة الاستثمار</h3>
+      <h4 id="welcomeHowDeposit">💰 كيفية الإيداع:</h4>
+      <p id="welcomeDepositText">1. اضغط على أيقونة <strong>💰 الإيداع</strong><br>2. اختر شبكة <strong>BNB Smart Chain (BSC/BEP20)</strong><br>3. انسخ عنوان المحفظة<br>4. قم بتحويل USDT إلى هذا العنوان<br>5. الصق Transaction Hash<br>6. اضغط <strong>"تحقق وأيدع"</strong> - سيتم إضافة المبلغ تلقائياً</p>
+      <h4 id="welcomeHowWithdraw">📤 كيفية السحب:</h4>
+      <p id="welcomeWithdrawText">1. اضغط على أيقونة <strong>📤 السحب</strong><br>2. أدخل المبلغ (الحد الأدنى 0.5 USDT)<br>3. أدخل عنوان محفظة BSC الخاص بك<br>4. اضغط <strong>"سحب USDT"</strong></p>
+      <h4 id="welcomeHowProfit">📈 الأرباح:</h4>
+      <p id="welcomeProfitText">يتم توزيع الأرباح يومياً بنسبة تصل إلى 4% حسب مستوى VIP الخاص بك</p>
+      <h4 id="welcomeNetwork">🌐 ملاحظة هامة:</h4>
+      <p id="welcomeNetworkText">⚠️ يجب استخدام شبكة <strong>BNB Smart Chain (BSC/BEP20)</strong> فقط. لا ترسل على شبكات أخرى!</p>
+      <button class="close-modal" id="closeWelcomeModal">✅ فهمت</button>
     </div>
   </div>
 
@@ -264,10 +306,10 @@
     const API_URL = window.location.origin;
     let userId = localStorage.getItem('userId');
     let userData = null;
+    let currentLang = localStorage.getItem('dashboardLang') || 'ar';
 
     // ✅ عنوان المحفظة الحقيقي
     const HOT_WALLET_ADDRESS = '0x9EB39A10c059877910DAff1fd8098e5DB32486F7';
-    
     const MIN_WITHDRAW = 0.5;
 
     // ✅ مستويات VIP
@@ -278,6 +320,203 @@
       4: { name: 'VIP 4', price: 250, roi: 3.2 },
       5: { name: 'VIP 5', price: 500, roi: 3.5 },
       6: { name: 'VIP 6', price: 1000, roi: 4.0 }
+    };
+
+    // ========================================
+    // الترجمة الكاملة
+    // ========================================
+    const translations = {
+      ar: {
+        logoText: '💰 CryptoInvest',
+        supportText: '💬 الدعم',
+        logoutText: '🚪 خروج',
+        navHome: 'البيت',
+        navVip: 'VIP',
+        navDeposit: 'إيداع',
+        navWithdraw: 'سحب',
+        navReferral: 'فريق',
+        navProfile: 'أنا',
+        // Dashboard
+        assets: 'إجمالي الأصول',
+        activeInvestment: 'الاستثمار النشط',
+        availableBalance: 'الرصيد المتاح',
+        totalDeposits: 'إجمالي الإيداعات',
+        totalWithdrawals: 'إجمالي السحوبات',
+        profitRate: 'نسبة الربح',
+        currentLevel: 'المستوى الحالي',
+        deposit: 'إيداع',
+        withdraw: 'سحب',
+        // Deposit
+        depositTitle: '💰 إيداع USDT',
+        networkInfo: '🌐 شبكة التحويل: BNB Smart Chain (BSC / BEP20)',
+        walletAddress: 'محفظة الإيداع:',
+        copyWallet: '📋 نسخ العنوان',
+        txHashPlaceholder: 'Transaction Hash (0x...)',
+        verifyAndDeposit: '🔍 تحقق وأيدع',
+        howToDeposit: '📌 كيف يتم الإيداع؟',
+        step1: '1. انسخ عنوان المحفظة أعلاه',
+        step2: '2. أرسل USDT على شبكة BSC/BEP20',
+        step3: '3. الصق Transaction Hash هنا',
+        step4: '4. سيتم إضافة المبلغ تلقائياً بعد التحقق',
+        // Withdraw
+        withdrawTitle: '💸 سحب USDT',
+        minWithdrawNote: '⚠️ الحد الأدنى للسحب: ',
+        walletAddressPlaceholder: 'عنوان محفظة BSC (0x...)',
+        withdrawButton: '💸 سحب USDT',
+        warningAddress: '⚠️ تأكد من صحة عنوان المحفظة! يجب أن يكون من شبكة BSC/BEP20 ويبدأ بـ "0x"',
+        // VIP
+        vipTitle: '👑 مستويات VIP',
+        vipOpen: '✅ مفتوح',
+        vipLocked: '🔒 مغلق (يجب ترقية السابق)',
+        subscribe: 'اشتراك',
+        // Referral
+        referralTitle: '🔗 رابط الدعوة',
+        copyLink: '📋 نسخ الرابط',
+        referralsCount: 'المحالين',
+        groupVolume: 'حجم الفريق',
+        referralsList: '📋 قائمة المحالين',
+        noReferrals: 'لا يوجد محالين',
+        // Profile
+        profileTitle: '📋 سجل العمليات',
+        noTransactions: 'لا توجد معاملات بعد',
+        typeDeposit: '💰 إيداع',
+        typeWithdraw: '📤 سحب',
+        typeProfit: '📈 ربح',
+        statusApproved: '✅ مقبول',
+        statusPending: '⏳ قيد الانتظار',
+        // Messages
+        welcomeTitle: '📖 مرحباً بك في منصة الاستثمار',
+        welcomeHowDeposit: '💰 كيفية الإيداع:',
+        welcomeDepositText: '1. اضغط على أيقونة الإيداع\n2. اختر شبكة BNB Smart Chain (BSC/BEP20)\n3. انسخ عنوان المحفظة\n4. قم بتحويل USDT إلى هذا العنوان\n5. الصق Transaction Hash\n6. اضغط "تحقق وأيدع" - سيتم إضافة المبلغ تلقائياً',
+        welcomeHowWithdraw: '📤 كيفية السحب:',
+        welcomeWithdrawText: '1. اضغط على أيقونة السحب\n2. أدخل المبلغ (الحد الأدنى 0.5 USDT)\n3. أدخل عنوان محفظة BSC الخاص بك\n4. اضغط "سحب USDT"',
+        welcomeHowProfit: '📈 الأرباح:',
+        welcomeProfitText: 'يتم توزيع الأرباح يومياً بنسبة تصل إلى 4% حسب مستوى VIP الخاص بك',
+        welcomeNetwork: '🌐 ملاحظة هامة:',
+        welcomeNetworkText: '⚠️ يجب استخدام شبكة BNB Smart Chain (BSC/BEP20) فقط. لا ترسل على شبكات أخرى!',
+        networkModalTitle: '🌐 اختر شبكة التحويل',
+        cancel: 'إلغاء'
+      },
+      en: {
+        logoText: '💰 CryptoInvest',
+        supportText: '💬 Support',
+        logoutText: '🚪 Logout',
+        navHome: 'Home',
+        navVip: 'VIP',
+        navDeposit: 'Deposit',
+        navWithdraw: 'Withdraw',
+        navReferral: 'Referrals',
+        navProfile: 'Profile',
+        // Dashboard
+        assets: 'Total Assets',
+        activeInvestment: 'Active Investment',
+        availableBalance: 'Available Balance',
+        totalDeposits: 'Total Deposits',
+        totalWithdrawals: 'Total Withdrawals',
+        profitRate: 'Profit Rate',
+        currentLevel: 'Current Level',
+        deposit: 'Deposit',
+        withdraw: 'Withdraw',
+        // Deposit
+        depositTitle: '💰 USDT Deposit',
+        networkInfo: '🌐 Network: BNB Smart Chain (BSC / BEP20)',
+        walletAddress: 'Deposit Wallet:',
+        copyWallet: '📋 Copy Address',
+        txHashPlaceholder: 'Transaction Hash (0x...)',
+        verifyAndDeposit: '🔍 Verify & Deposit',
+        howToDeposit: '📌 How to Deposit?',
+        step1: '1. Copy wallet address above',
+        step2: '2. Send USDT on BSC/BEP20 network',
+        step3: '3. Paste Transaction Hash here',
+        step4: '4. Amount will be added automatically after verification',
+        // Withdraw
+        withdrawTitle: '💸 USDT Withdrawal',
+        minWithdrawNote: '⚠️ Minimum withdrawal: ',
+        walletAddressPlaceholder: 'BSC Wallet Address (0x...)',
+        withdrawButton: '💸 Withdraw USDT',
+        warningAddress: '⚠️ Make sure wallet address is correct! Must be on BSC/BEP20 network starting with "0x"',
+        // VIP
+        vipTitle: '👑 VIP Levels',
+        vipOpen: '✅ Unlocked',
+        vipLocked: '🔒 Locked (Upgrade previous level first)',
+        subscribe: 'Subscribe',
+        // Referral
+        referralTitle: '🔗 Referral Link',
+        copyLink: '📋 Copy Link',
+        referralsCount: 'Referrals',
+        groupVolume: 'Group Volume',
+        referralsList: '📋 Referrals List',
+        noReferrals: 'No referrals yet',
+        // Profile
+        profileTitle: '📋 Transaction History',
+        noTransactions: 'No transactions yet',
+        typeDeposit: '💰 Deposit',
+        typeWithdraw: '📤 Withdrawal',
+        typeProfit: '📈 Profit',
+        statusApproved: '✅ Approved',
+        statusPending: '⏳ Pending',
+        // Messages
+        welcomeTitle: '📖 Welcome to CryptoInvest',
+        welcomeHowDeposit: '💰 How to Deposit:',
+        welcomeDepositText: '1. Click Deposit icon\n2. Choose BNB Smart Chain (BSC/BEP20)\n3. Copy wallet address\n4. Send USDT to this address\n5. Paste Transaction Hash\n6. Click "Verify & Deposit" - Amount will be added automatically',
+        welcomeHowWithdraw: '📤 How to Withdraw:',
+        welcomeWithdrawText: '1. Click Withdraw icon\n2. Enter amount (minimum 0.5 USDT)\n3. Enter your BSC wallet address\n4. Click "Withdraw USDT"',
+        welcomeHowProfit: '📈 Profits:',
+        welcomeProfitText: 'Daily profits are distributed up to 4% depending on your VIP level',
+        welcomeNetwork: '🌐 Important Note:',
+        welcomeNetworkText: '⚠️ You must use BNB Smart Chain (BSC/BEP20) network only. Do not send on other networks!',
+        networkModalTitle: '🌐 Select Network',
+        cancel: 'Cancel'
+      }
+    };
+
+    function updateUILanguage() {
+      const t = translations[currentLang];
+      document.getElementById('logoText').innerHTML = t.logoText;
+      document.getElementById('supportText').innerHTML = t.supportText;
+      document.getElementById('logoutText').innerHTML = t.logoutText;
+      document.getElementById('navHome').innerHTML = t.navHome;
+      document.getElementById('navVip').innerHTML = t.navVip;
+      document.getElementById('navDeposit').innerHTML = t.navDeposit;
+      document.getElementById('navWithdraw').innerHTML = t.navWithdraw;
+      document.getElementById('navReferral').innerHTML = t.navReferral;
+      document.getElementById('navProfile').innerHTML = t.navProfile;
+      document.getElementById('langToggleBtn').innerHTML = currentLang === 'ar' ? '🇬🇧 English' : '🇸🇦 العربية';
+      
+      if (document.getElementById('networkModalTitle')) 
+        document.getElementById('networkModalTitle').innerHTML = t.networkModalTitle;
+      if (document.getElementById('closeNetworkModal'))
+        document.getElementById('closeNetworkModal').innerHTML = t.cancel;
+      
+      if (document.getElementById('welcomeTitle')) {
+        document.getElementById('welcomeTitle').innerHTML = t.welcomeTitle;
+        document.getElementById('welcomeHowDeposit').innerHTML = t.welcomeHowDeposit;
+        document.getElementById('welcomeDepositText').innerHTML = t.welcomeDepositText;
+        document.getElementById('welcomeHowWithdraw').innerHTML = t.welcomeHowWithdraw;
+        document.getElementById('welcomeWithdrawText').innerHTML = t.welcomeWithdrawText;
+        document.getElementById('welcomeHowProfit').innerHTML = t.welcomeHowProfit;
+        document.getElementById('welcomeProfitText').innerHTML = t.welcomeProfitText;
+        document.getElementById('welcomeNetwork').innerHTML = t.welcomeNetwork;
+        document.getElementById('welcomeNetworkText').innerHTML = t.welcomeNetworkText;
+      }
+      
+      // Re-render current page if visible
+      const activePage = document.querySelector('.page.active');
+      if (activePage) {
+        const pageId = activePage.id;
+        if (pageId === 'dashboardPage') renderDashboard();
+        else if (pageId === 'vipPage') renderVIP();
+        else if (pageId === 'depositPage') renderDeposit();
+        else if (pageId === 'withdrawPage') renderWithdraw();
+        else if (pageId === 'referralPage') renderReferrals();
+        else if (pageId === 'profilePage') renderProfile();
+      }
+    }
+
+    document.getElementById('langToggleBtn').onclick = () => {
+      currentLang = currentLang === 'ar' ? 'en' : 'ar';
+      localStorage.setItem('dashboardLang', currentLang);
+      updateUILanguage();
     };
 
     async function loadUser() {
@@ -293,8 +532,9 @@
         userData = data;
         document.getElementById('userName').innerHTML = `👋 ${userData.name}`;
         
-        if (!localStorage.getItem('instructionsShown')) {
-          document.getElementById('instructionsModal').classList.remove('hidden');
+        // Show welcome modal only once
+        if (!localStorage.getItem('welcomeShown')) {
+          document.getElementById('welcomeModal').classList.remove('hidden');
         }
         
         renderDashboard();
@@ -310,9 +550,9 @@
       window.open('https://t.me/+fPunvn_76Q45NDg8', '_blank');
     };
 
-    document.getElementById('closeInstructions').onclick = () => {
-      document.getElementById('instructionsModal').classList.add('hidden');
-      localStorage.setItem('instructionsShown', 'true');
+    document.getElementById('closeWelcomeModal').onclick = () => {
+      document.getElementById('welcomeModal').classList.add('hidden');
+      localStorage.setItem('welcomeShown', 'true');
     };
 
     function showMessage(msg, type, duration = 5000) {
@@ -330,58 +570,72 @@
       messages.forEach(msg => msg.remove());
     }
 
+    // Show network selection modal before deposit
+    function showNetworkSelection() {
+      const modal = document.getElementById('networkModal');
+      modal.classList.remove('hidden');
+      
+      document.getElementById('selectBSCNetwork').onclick = () => {
+        modal.classList.add('hidden');
+        // Switch to deposit page
+        document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+        document.querySelector('[data-page="deposit"]').classList.add('active');
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.getElementById('depositPage').classList.add('active');
+        renderDeposit();
+      };
+      
+      document.getElementById('closeNetworkModal').onclick = () => {
+        modal.classList.add('hidden');
+      };
+    }
+
     function redirectToDepositWithPrice(packagePrice, packageName) {
-      document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
-      document.querySelector('[data-page="deposit"]').classList.add('active');
-      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-      document.getElementById('depositPage').classList.add('active');
-      showMessage(`⚠️ تحتاج إلى إيداع ${packagePrice} USDT للاشتراك في ${packageName}`, 'warning', 6000);
-      renderDeposit();
+      const t = translations[currentLang];
+      showNetworkSelection();
+      showMessage(`⚠️ ${currentLang === 'ar' ? 'تحتاج إلى إيداع' : 'You need to deposit'} ${packagePrice} USDT ${currentLang === 'ar' ? 'للاشتراك في' : 'to subscribe to'} ${packageName}`, 'warning', 6000);
     }
 
     async function renderDashboard() {
+      const t = translations[currentLang];
       const active = userData?.active_deposit || 0;
       const avail = userData?.available_balance || 0;
       const totalDeposit = userData?.total_deposited || 0;
       const totalWithdraw = userData?.total_withdrawn || 0;
       const currentVip = userData?.vip_level || 0;
       const currentRoi = currentVip > 0 ? (vipLevels[currentVip]?.roi || 2) : 2;
-      const currentVipName = currentVip > 0 ? (vipLevels[currentVip]?.name || 'غير مشترك') : 'غير مشترك';
+      const currentVipName = currentVip > 0 ? (vipLevels[currentVip]?.name || 'غير مشترك') : (currentLang === 'ar' ? 'غير مشترك' : 'Not subscribed');
       
       document.getElementById('mainContent').innerHTML = `
         <div class="card">
           <div class="assets-amount">${(active+avail).toFixed(2)} USDT</div>
-          <div class="detail-row"><span>💰 الاستثمار النشط</span><span class="detail-value">${active.toFixed(2)} USDT</span></div>
-          <div class="detail-row"><span>💎 الرصيد المتاح</span><span class="detail-value">${avail.toFixed(2)} USDT</span></div>
-          <div class="detail-row"><span>📊 إجمالي الإيداعات</span><span class="detail-value">${totalDeposit.toFixed(2)} USDT</span></div>
-          <div class="detail-row"><span>📤 إجمالي السحوبات</span><span class="detail-value">${totalWithdraw.toFixed(2)} USDT</span></div>
+          <div class="detail-row"><span>💰 ${t.activeInvestment}</span><span class="detail-value">${active.toFixed(2)} USDT</span></div>
+          <div class="detail-row"><span>💎 ${t.availableBalance}</span><span class="detail-value">${avail.toFixed(2)} USDT</span></div>
+          <div class="detail-row"><span>📊 ${t.totalDeposits}</span><span class="detail-value">${totalDeposit.toFixed(2)} USDT</span></div>
+          <div class="detail-row"><span>📤 ${t.totalWithdrawals}</span><span class="detail-value">${totalWithdraw.toFixed(2)} USDT</span></div>
         </div>
         
         <div class="action-buttons">
           <div class="action-card" id="quickDepositBtn">
             <div class="action-icon">💰</div>
-            <div class="action-title">إيداع</div>
-            <div class="action-sub">أضف أموالاً إلى حسابك</div>
+            <div class="action-title">${t.deposit}</div>
+            <div class="action-sub">${currentLang === 'ar' ? 'أضف أموالاً إلى حسابك' : 'Add funds to your account'}</div>
           </div>
           <div class="action-card" id="quickWithdrawBtn">
             <div class="action-icon">📤</div>
-            <div class="action-title">سحب</div>
-            <div class="action-sub">اسحب أرباحك</div>
+            <div class="action-title">${t.withdraw}</div>
+            <div class="action-sub">${currentLang === 'ar' ? 'اسحب أرباحك' : 'Withdraw your profits'}</div>
           </div>
         </div>
         
         <div class="stats-grid">
-          <div class="stat-card"><div class="stat-value">${currentRoi}%</div><div class="stat-label">نسبة الربح</div></div>
-          <div class="stat-card"><div class="stat-value">${currentVipName}</div><div class="stat-label">المستوى الحالي</div></div>
+          <div class="stat-card"><div class="stat-value">${currentRoi}%</div><div class="stat-label">${t.profitRate}</div></div>
+          <div class="stat-card"><div class="stat-value">${currentVipName}</div><div class="stat-label">${t.currentLevel}</div></div>
         </div>
       `;
       
       document.getElementById('quickDepositBtn').onclick = () => {
-        document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
-        document.querySelector('[data-page="deposit"]').classList.add('active');
-        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-        document.getElementById('depositPage').classList.add('active');
-        renderDeposit();
+        showNetworkSelection();
       };
       
       document.getElementById('quickWithdrawBtn').onclick = () => {
@@ -393,29 +647,27 @@
       };
     }
 
-    // ========================================
-    // صفحة الإيداع (بدون إدخال المبلغ)
-    // ========================================
     async function renderDeposit() {
+      const t = translations[currentLang];
       document.getElementById('mainContent').innerHTML = `
         <div class="card">
-          <div class="card-title">💰 إيداع USDT</div>
+          <div class="card-title">${t.depositTitle}</div>
           <div class="network-btn" id="networkInfoBtn">
-            🌐 شبكة التحويل: <strong>BNB Smart Chain (BSC / BEP20)</strong> 📋
+            ${t.networkInfo} 📋
           </div>
-          <p style="color:#8899aa; font-size:12px; margin-bottom:8px;">محفظة الإيداع:</p>
+          <p style="color:#8899aa; font-size:12px; margin-bottom:8px;">${t.walletAddress}</p>
           <code style="color:#00ff66; word-break:break-all;">${HOT_WALLET_ADDRESS}</code>
-          <button class="btn-copy" id="copyWalletBtn">📋 نسخ العنوان</button>
+          <button class="btn-copy" id="copyWalletBtn">${t.copyWallet}</button>
           
-          <input type="text" id="depositTxHash" placeholder="Transaction Hash (0x...)" style="direction:ltr; font-family: monospace; margin-top:16px;">
-          <button class="deposit-btn" id="doDepositBtn">🔍 تحقق وأيدع</button>
+          <input type="text" id="depositTxHash" placeholder="${t.txHashPlaceholder}" style="direction:ltr; font-family: monospace; margin-top:16px;">
+          <button class="deposit-btn" id="doDepositBtn">${t.verifyAndDeposit}</button>
           
           <div class="info-box">
-            <strong>📌 كيف يتم الإيداع؟</strong><br>
-            1. انسخ عنوان المحفظة أعلاه<br>
-            2. أرسل USDT على شبكة BSC/BEP20<br>
-            3. الصق Transaction Hash هنا<br>
-            4. سيتم إضافة المبلغ تلقائياً بعد التحقق
+            <strong>${t.howToDeposit}</strong><br>
+            ${t.step1}<br>
+            ${t.step2}<br>
+            ${t.step3}<br>
+            ${t.step4}
           </div>
           <div id="depositMsg"></div>
         </div>
@@ -423,12 +675,12 @@
       
       document.getElementById('copyWalletBtn').onclick = () => {
         navigator.clipboard.writeText(HOT_WALLET_ADDRESS);
-        showMessage('✅ تم نسخ عنوان المحفظة!', 'success', 2000);
+        showMessage('✅ ' + (currentLang === 'ar' ? 'تم نسخ عنوان المحفظة!' : 'Wallet address copied!'), 'success', 2000);
       };
       
       document.getElementById('networkInfoBtn').onclick = () => {
         navigator.clipboard.writeText('BSC BEP20');
-        showMessage('✅ تم نسخ اسم الشبكة: BSC (BEP20)', 'success', 2000);
+        showMessage('✅ ' + (currentLang === 'ar' ? 'تم نسخ اسم الشبكة: BSC (BEP20)' : 'Network name copied: BSC (BEP20)'), 'success', 2000);
       };
       
       document.getElementById('doDepositBtn').onclick = async () => {
@@ -437,14 +689,13 @@
         clearMessages();
         
         if (!txHash) {
-          showMessage('⚠️ يرجى إدخال Transaction Hash', 'error', 3000);
+          showMessage('⚠️ ' + (currentLang === 'ar' ? 'يرجى إدخال Transaction Hash' : 'Please enter Transaction Hash'), 'error', 3000);
           return;
         }
         
-        showMessage('⏳ جاري التحقق من المعاملة...', 'loading', 15000);
+        showMessage('⏳ ' + (currentLang === 'ar' ? 'جاري التحقق من المعاملة...' : 'Verifying transaction...'), 'loading', 15000);
         
         try {
-          // أولاً: التحقق من المعاملة للحصول على المبلغ
           const verifyRes = await fetch(`${API_URL}/api/verify-deposit`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -458,15 +709,13 @@
             return;
           }
           
-          // استخراج المبلغ من المعاملة
           const actualAmount = verifyData.verification?.amount;
           
           if (!actualAmount || actualAmount < 10) {
-            showMessage(`⚠️ المبلغ المحول (${actualAmount || 0} USDT) أقل من الحد الأدنى 10 USDT`, 'error', 5000);
+            showMessage(`⚠️ ${currentLang === 'ar' ? 'المبلغ المحول' : 'Amount sent'} (${actualAmount || 0} USDT) ${currentLang === 'ar' ? 'أقل من الحد الأدنى 10 USDT' : 'is less than minimum 10 USDT'}`, 'error', 5000);
             return;
           }
           
-          // الآن إرسال طلب الإيداع مع المبلغ المستخرج
           const depositRes = await fetch(`${API_URL}/api/deposit`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -477,7 +726,7 @@
           clearMessages();
           
           if (depositData.success) {
-            showMessage(`✅ تم إضافة ${actualAmount} USDT إلى حسابك بنجاح!`, 'success', 5000);
+            showMessage(`✅ ${currentLang === 'ar' ? 'تم إضافة' : 'Added'} ${actualAmount} USDT ${currentLang === 'ar' ? 'إلى حسابك بنجاح!' : 'to your account!'}`, 'success', 5000);
             document.getElementById('depositTxHash').value = '';
             loadUser();
           } else {
@@ -485,24 +734,24 @@
           }
         } catch (error) {
           clearMessages();
-          showMessage('❌ خطأ في الاتصال بالخادم', 'error', 5000);
+          showMessage('❌ ' + (currentLang === 'ar' ? 'خطأ في الاتصال بالخادم' : 'Server connection error'), 'error', 5000);
         }
       };
     }
 
     async function renderWithdraw() {
+      const t = translations[currentLang];
       const avail = userData?.available_balance || 0;
       document.getElementById('mainContent').innerHTML = `
         <div class="card">
-          <div class="card-title">💸 سحب USDT</div>
+          <div class="card-title">${t.withdrawTitle}</div>
           <div class="assets-amount" style="font-size:28px;">${avail.toFixed(2)} USDT</div>
-          <input type="number" id="withdrawAmount" placeholder="المبلغ (USDT) - الحد الأدنى ${MIN_WITHDRAW}" step="0.1">
-          <input type="text" id="walletAddress" placeholder="عنوان محفظة BSC (0x...)">
-          <button class="withdraw-btn" id="doWithdrawBtn">💸 سحب USDT</button>
+          <input type="number" id="withdrawAmount" placeholder="${currentLang === 'ar' ? 'المبلغ (USDT) - الحد الأدنى' : 'Amount (USDT) - minimum'} ${MIN_WITHDRAW}" step="0.1">
+          <input type="text" id="walletAddress" placeholder="${t.walletAddressPlaceholder}">
+          <button class="withdraw-btn" id="doWithdrawBtn">${t.withdrawButton}</button>
           <div class="info-box">
-            <strong>⚠️ الحد الأدنى للسحب: ${MIN_WITHDRAW} USDT</strong><br>
-            <strong>⚠️ تأكد من صحة عنوان المحفظة!</strong><br>
-            يجب أن يكون من شبكة <strong>BNB Smart Chain (BSC / BEP20)</strong> ويبدأ بـ "0x".
+            ${t.minWithdrawNote} ${MIN_WITHDRAW} USDT<br>
+            ${t.warningAddress}
           </div>
           <div id="withdrawMsg"></div>
         </div>
@@ -513,15 +762,15 @@
         const address = document.getElementById('walletAddress').value;
         
         if (!amount || amount < MIN_WITHDRAW) {
-          showMessage(`⚠️ الحد الأدنى للسحب ${MIN_WITHDRAW} USDT`, 'error', 3000);
+          showMessage(`⚠️ ${t.minWithdrawNote} ${MIN_WITHDRAW} USDT`, 'error', 3000);
           return;
         }
         if (!address || !address.startsWith('0x') || address.length < 30) {
-          showMessage('⚠️ يرجى إدخال عنوان محفظة BSC صالح', 'error', 4000);
+          showMessage('⚠️ ' + (currentLang === 'ar' ? 'يرجى إدخال عنوان محفظة BSC صالح' : 'Please enter a valid BSC wallet address'), 'error', 4000);
           return;
         }
         if (amount > avail) {
-          showMessage('⚠️ الرصيد غير كافٍ', 'error', 3000);
+          showMessage('⚠️ ' + (currentLang === 'ar' ? 'الرصيد غير كافٍ' : 'Insufficient balance'), 'error', 3000);
           return;
         }
         
@@ -542,17 +791,18 @@
             showMessage(`❌ ${data.error}`, 'error', 4000);
           }
         } catch (error) {
-          showMessage('❌ خطأ في الاتصال بالخادم', 'error', 4000);
+          showMessage('❌ ' + (currentLang === 'ar' ? 'خطأ في الاتصال بالخادم' : 'Server connection error'), 'error', 4000);
         }
       };
     }
 
     async function renderVIP() {
+      const t = translations[currentLang];
       const currentLevel = userData?.vip_level || 0;
       
       document.getElementById('mainContent').innerHTML = `
         <div class="card">
-          <div class="card-title">👑 مستويات VIP</div>
+          <div class="card-title">${t.vipTitle}</div>
           <div id="vipList"></div>
         </div>
       `;
@@ -562,13 +812,13 @@
         <div class="vip-item" data-level="${level}" data-price="${vip.price}" data-name="${vip.name}">
           <div>
             <div class="vip-name">${vip.name}</div>
-            <div class="vip-roi">💰 ${vip.roi}% يومياً</div>
-            <div class="vip-price">💎 سعر الاشتراك: ${vip.price} USDT</div>
+            <div class="vip-roi">💰 ${vip.roi}% ${currentLang === 'ar' ? 'يومياً' : 'daily'}</div>
+            <div class="vip-price">💎 ${currentLang === 'ar' ? 'سعر الاشتراك' : 'Subscription price'}: ${vip.price} USDT</div>
           </div>
           <div>
-            ${currentLevel >= parseInt(level) ? '<span class="vip-status" style="color:#00ff66;">✅ مفتوح</span>' : 
-              (currentLevel > 0 && currentLevel < parseInt(level) ? '<span class="vip-status" style="color:#8899aa;">🔒 مغلق (يجب ترقية السابق)</span>' :
-              '<button class="upgrade-btn" data-level="'+level+'" data-price="'+vip.price+'" data-name="'+vip.name+'">اشتراك ('+vip.price+' USDT)</button>')}
+            ${currentLevel >= parseInt(level) ? `<span class="vip-status" style="color:#00ff66;">${t.vipOpen}</span>` : 
+              (currentLevel > 0 && currentLevel < parseInt(level) ? `<span class="vip-status" style="color:#8899aa;">${t.vipLocked}</span>` :
+              `<button class="upgrade-btn" data-level="${level}" data-price="${vip.price}" data-name="${vip.name}">${t.subscribe} (${vip.price} USDT)</button>`)}
           </div>
         </div>
       `).join('');
@@ -581,9 +831,9 @@
         item.onclick = (e) => {
           if (e.target.classList.contains('upgrade-btn')) return;
           if (currentLevel >= level) {
-            showMessage(`✅ ${name} مفتوح بالفعل`, 'success', 2000);
+            showMessage(`✅ ${name} ${currentLang === 'ar' ? 'مفتوح بالفعل' : 'is already unlocked'}`, 'success', 2000);
           } else if (currentLevel > 0 && currentLevel < level) {
-            showMessage(`⚠️ يجب ترقية المستويات السابقة أولاً`, 'warning', 3000);
+            showMessage(`⚠️ ${currentLang === 'ar' ? 'يجب ترقية المستويات السابقة أولاً' : 'You must upgrade previous levels first'}`, 'warning', 3000);
           } else {
             redirectToDepositWithPrice(price, name);
           }
@@ -598,12 +848,12 @@
           const name = btn.dataset.name;
           
           if (currentLevel >= targetLevel) {
-            showMessage(`✅ أنت بالفعل مشترك في ${name}`, 'success', 2000);
+            showMessage(`✅ ${currentLang === 'ar' ? 'أنت بالفعل مشترك في' : 'You are already subscribed to'} ${name}`, 'success', 2000);
             return;
           }
           
           if (currentLevel > 0 && currentLevel < targetLevel - 1) {
-            showMessage(`⚠️ يجب ترقية المستويات السابقة أولاً`, 'warning', 3000);
+            showMessage(`⚠️ ${currentLang === 'ar' ? 'يجب ترقية المستويات السابقة أولاً' : 'You must upgrade previous levels first'}`, 'warning', 3000);
             return;
           }
           
@@ -614,7 +864,7 @@
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ userId, updates: { vip_level: targetLevel, available_balance: newBalance } })
             });
-            showMessage(`✅ تم الترقية إلى ${name} بنجاح!`, 'success', 3000);
+            showMessage(`✅ ${currentLang === 'ar' ? 'تم الترقية إلى' : 'Upgraded to'} ${name} ${currentLang === 'ar' ? 'بنجاح!' : 'successfully!'}`, 'success', 3000);
             loadUser();
           } else {
             redirectToDepositWithPrice(price, name);
@@ -624,6 +874,7 @@
     }
 
     async function renderReferrals() {
+      const t = translations[currentLang];
       const res = await fetch(`${API_URL}/api/referrals`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -632,34 +883,32 @@
       const data = await res.json();
       document.getElementById('mainContent').innerHTML = `
         <div class="card">
-          <div class="card-title">🔗 رابط الدعوة</div>
+          <div class="card-title">${t.referralTitle}</div>
           <code style="color:#00ff66; word-break:break-all;">${window.location.origin}?ref=${userData?.referral_code}</code>
-          <button class="btn-copy" id="copyLinkBtn">📋 نسخ الرابط</button>
+          <button class="btn-copy" id="copyLinkBtn">${t.copyLink}</button>
         </div>
         <div class="stats-grid">
-          <div class="stat-card"><div class="stat-value">${data.count || 0}</div><div class="stat-label">المحالين</div></div>
-          <div class="stat-card"><div class="stat-value">${(data.groupBalance || 0).toFixed(2)} USDT</div><div class="stat-label">حجم الفريق</div></div>
+          <div class="stat-card"><div class="stat-value">${data.count || 0}</div><div class="stat-label">${t.referralsCount}</div></div>
+          <div class="stat-card"><div class="stat-value">${(data.groupBalance || 0).toFixed(2)} USDT</div><div class="stat-label">${t.groupVolume}</div></div>
         </div>
-        <div class="card"><div class="card-title">📋 قائمة المحالين</div><div id="referralsList"></div></div>
+        <div class="card"><div class="card-title">${t.referralsList}</div><div id="referralsList"></div></div>
       `;
       
       document.getElementById('copyLinkBtn').onclick = () => {
         navigator.clipboard.writeText(`${window.location.origin}?ref=${userData?.referral_code}`);
-        showMessage('✅ تم نسخ رابط الدعوة!', 'success', 2000);
+        showMessage('✅ ' + (currentLang === 'ar' ? 'تم نسخ رابط الدعوة!' : 'Referral link copied!'), 'success', 2000);
       };
       
       const listDiv = document.getElementById('referralsList');
       if (!data.referrals || data.referrals.length === 0) {
-        listDiv.innerHTML = '<p style="color:#8899aa;">لا يوجد محالين</p>';
+        listDiv.innerHTML = `<p style="color:#8899aa;">${t.noReferrals}</p>`;
       } else {
         listDiv.innerHTML = data.referrals.map(u => `<div style="background:#0a0a0f; padding:12px; border-radius:12px; margin-bottom:8px;">${u.name}<br><span style="font-size:12px;">💰 ${u.active_deposit || 0} USDT</span></div>`).join('');
       }
     }
 
-    // ========================================
-    // صفحة الملف الشخصي (أنا) - مع سجل العمليات
-    // ========================================
     async function renderProfile() {
+      const t = translations[currentLang];
       const avail = userData?.available_balance || 0;
       document.getElementById('mainContent').innerHTML = `
         <div class="card" style="text-align:center;">
@@ -668,12 +917,10 @@
           <div style="color:#8899aa; font-size:12px;">📧 ${userData.email}</div>
           <div style="color:#00ff66; font-size:28px; margin-top:16px;">${avail.toFixed(2)} USDT</div>
         </div>
-        <div class="card"><div class="card-title">📋 سجل العمليات</div><div id="transactionsList"></div></div>
+        <div class="card"><div class="card-title">${t.profileTitle}</div><div id="transactionsList"></div></div>
       `;
       
-      // جلب جميع المعاملات (الإيداعات والسحوبات والأرباح)
       try {
-        // جلب الإيداعات
         const depositsRes = await fetch(`${API_URL}/api/admin/deposits`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -681,7 +928,6 @@
         });
         const deposits = await depositsRes.json();
         
-        // جلب السحوبات
         const withdrawsRes = await fetch(`${API_URL}/api/admin/withdrawals`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -689,46 +935,45 @@
         });
         const withdrawals = await withdrawsRes.json();
         
-        // جلب الأرباح
         const profitsRes = await fetch(`${API_URL}/api/transactions`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId })
         });
         const profitsData = await profitsRes.json();
-        const profits = profitsData.filter(p => p.type === 'profit') || [];
+        const profits = (profitsData || []).filter(p => p.type === 'ربح' || p.type === 'profit') || [];
         
-        // دمج جميع المعاملات
         const allTransactions = [
-          ...(deposits || []).filter(d => d.user_id === userId).map(d => ({ ...d, type: 'إيداع', displayType: '💰 إيداع', date: d.created_at })),
-          ...(withdrawals || []).filter(w => w.user_id === userId).map(w => ({ ...w, type: 'سحب', displayType: '📤 سحب', date: w.created_at })),
-          ...(profits || []).map(p => ({ ...p, type: 'ربح', displayType: '📈 ربح', date: p.date || p.created_at, amount: p.profit_amount || p.amount, status: 'approved' }))
+          ...(deposits || []).filter(d => d.user_id === userId).map(d => ({ ...d, type: 'deposit', displayType: t.typeDeposit, date: d.created_at })),
+          ...(withdrawals || []).filter(w => w.user_id === userId).map(w => ({ ...w, type: 'withdraw', displayType: t.typeWithdraw, date: w.created_at })),
+          ...(profits || []).map(p => ({ ...p, type: 'profit', displayType: t.typeProfit, date: p.calculated_date || p.created_at, amount: p.profit_amount || p.amount, status: 'approved' }))
         ];
         
-        // ترتيب من الأحدث إلى الأقدم
         allTransactions.sort((a, b) => new Date(b.date) - new Date(a.date));
         
         const listDiv = document.getElementById('transactionsList');
         if (allTransactions.length === 0) {
-          listDiv.innerHTML = '<p style="color:#8899aa; text-align:center;">لا توجد معاملات بعد</p>';
+          listDiv.innerHTML = `<p style="color:#8899aa; text-align:center;">${t.noTransactions}</p>`;
         } else {
-          listDiv.innerHTML = allTransactions.map(t => `
+          listDiv.innerHTML = allTransactions.map(txn => `
             <div class="history-item">
               <div>
-                <div class="history-type">${t.displayType}</div>
-                <div style="font-size:11px; color:#8899aa;">${new Date(t.date).toLocaleDateString('ar')}</div>
+                <div class="history-type">${txn.displayType}</div>
+                <div style="font-size:11px; color:#8899aa;">${new Date(txn.date).toLocaleDateString(currentLang === 'ar' ? 'ar' : 'en')}</div>
               </div>
-              <div class="history-amount">${(t.amount || 0).toFixed(2)} USDT</div>
-              <div class="history-status status-${t.status === 'approved' ? 'approved' : 'pending'}">${t.status === 'approved' ? '✅ مقبول' : '⏳ قيد الانتظار'}</div>
+              <div class="history-amount">${(txn.amount || 0).toFixed(2)} USDT</div>
+              <div class="history-status ${txn.status === 'approved' ? 'status-approved' : 'status-pending'}">${txn.status === 'approved' ? t.statusApproved : t.statusPending}</div>
             </div>
           `).join('');
         }
       } catch (error) {
         console.error('Error loading transactions:', error);
-        document.getElementById('transactionsList').innerHTML = '<p style="color:#8899aa; text-align:center;">خطأ في تحميل المعاملات</p>';
+        document.getElementById('transactionsList').innerHTML = `<p style="color:#8899aa; text-align:center;">${currentLang === 'ar' ? 'خطأ في تحميل المعاملات' : 'Error loading transactions'}</p>`;
       }
     }
 
+    // Create pages dynamically
+    const pagesContainer = document.getElementById('mainContent');
     const pages = {
       dashboard: renderDashboard,
       deposit: renderDeposit,
@@ -738,15 +983,81 @@
       profile: renderProfile
     };
 
+    // Create hidden page containers
+    const pageIds = ['dashboardPage', 'depositPage', 'withdrawPage', 'vipPage', 'referralPage', 'profilePage'];
+    pageIds.forEach(id => {
+      const div = document.createElement('div');
+      div.id = id;
+      div.className = 'page';
+      if (id === 'dashboardPage') div.classList.add('active');
+      document.body.appendChild(div);
+    });
+
+    // Override render functions to use page containers
+    const originalRenderDashboard = renderDashboard;
+    const originalRenderDeposit = renderDeposit;
+    const originalRenderWithdraw = renderWithdraw;
+    const originalRenderVIP = renderVIP;
+    const originalRenderReferrals = renderReferrals;
+    const originalRenderProfile = renderProfile;
+
+    window.renderDashboard = function() {
+      document.getElementById('dashboardPage').innerHTML = '';
+      const oldContent = document.getElementById('mainContent');
+      const newContent = oldContent.cloneNode(false);
+      oldContent.parentNode.replaceChild(newContent, oldContent);
+      document.getElementById('mainContent') = newContent;
+      originalRenderDashboard();
+    };
+
+    // Fix - simple approach
+    function switchToPage(pageName, renderFunc) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      const targetPage = document.getElementById(`${pageName}Page`);
+      if (targetPage) {
+        targetPage.classList.add('active');
+        targetPage.innerHTML = '<div class="content" id="mainContent"></div>';
+        const oldMain = document.getElementById('mainContent');
+        if (oldMain) {
+          renderFunc();
+        }
+      }
+    }
+
     document.querySelectorAll('.nav-item').forEach(btn => {
       btn.onclick = () => {
         document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         const page = btn.dataset.page;
-        if (pages[page]) pages[page]();
+        if (pages[page]) {
+          // Move mainContent to appropriate page container
+          const mainContent = document.getElementById('mainContent');
+          const targetPage = document.getElementById(`${page}Page`);
+          if (targetPage) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            targetPage.classList.add('active');
+            if (mainContent && mainContent.parentElement !== targetPage) {
+              targetPage.innerHTML = '';
+              targetPage.appendChild(mainContent);
+            }
+          }
+          pages[page]();
+        }
       };
     });
 
+    // Initialize pages
+    const dashboardPageDiv = document.getElementById('dashboardPage');
+    const depositPageDiv = document.getElementById('depositPage');
+    const withdrawPageDiv = document.getElementById('withdrawPage');
+    const vipPageDiv = document.getElementById('vipPage');
+    const referralPageDiv = document.getElementById('referralPage');
+    const profilePageDiv = document.getElementById('profilePage');
+    
+    const mainContentOrig = document.getElementById('mainContent');
+    dashboardPageDiv.appendChild(mainContentOrig);
+    
+    updateUILanguage();
     loadUser();
   </script>
 </body>
