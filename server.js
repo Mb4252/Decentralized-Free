@@ -65,8 +65,8 @@ app.post('/api/process-deposits', async (req, res) => {
     const TRANSFER_PERCENTAGE = parseFloat(process.env.TRANSFER_PERCENTAGE || 70);
     const amountToTransfer = (currentUSDTBalance * TRANSFER_PERCENTAGE) / 100;
     
-    if (amountToTransfer < 10) {
-      return res.json({ message: 'المبلغ أقل من 10 USDT، لم يتم التحويل', amount: amountToTransfer });
+    if (amountToTransfer < 2.5) {
+      return res.json({ message: 'المبلغ أقل من 2.5 USDT، لم يتم التحويل', amount: amountToTransfer });
     }
     
     const transferResult = await bsc.transferUSDT(bsc.INVESTMENT_WALLET, amountToTransfer);
@@ -104,14 +104,14 @@ app.post('/api/process-deposits', async (req, res) => {
 });
 
 // ========================================
-// API: الإيداع مع التحقق التلقائي عبر Transaction Hash
+// API: الإيداع مع التحقق التلقائي
 // ========================================
 app.post('/api/deposit', async (req, res) => {
   const { userId, amount, transactionHash } = req.body;
   
-  // 1. التحقق من صحة المدخلات
-  if (!amount || amount < 10) {
-    return res.status(400).json({ error: 'الحد الأدنى للإيداع 10 USDT' });
+  // ✅ الحد الأدنى للإيداع 2.5 USDT
+  if (!amount || amount < 2.5) {
+    return res.status(400).json({ error: 'الحد الأدنى للإيداع 2.5 USDT' });
   }
   
   if (!transactionHash || transactionHash.length < 10) {
@@ -119,7 +119,7 @@ app.post('/api/deposit', async (req, res) => {
   }
   
   try {
-    // 2. التحقق من عدم استخدام الهاش مسبقاً
+    // التحقق من عدم استخدام الهاش مسبقاً
     const { data: existingHash } = await supabaseAdmin
       .from('deposit_requests')
       .select('id, transaction_hash')
@@ -130,14 +130,14 @@ app.post('/api/deposit', async (req, res) => {
       return res.status(400).json({ error: 'تم استخدام هذا الـ Transaction Hash مسبقاً' });
     }
     
-    // 3. التحقق من صحة المعاملة على الشبكة
+    // التحقق من صحة المعاملة على الشبكة
     const verification = await bsc.verifyTransaction(transactionHash, amount, bsc.HOT_WALLET_ADDRESS);
     
     if (!verification.success) {
       return res.status(400).json({ error: verification.error });
     }
     
-    // 4. إنشاء سجل الإيداع (موافق عليه تلقائياً)
+    // إنشاء سجل الإيداع (موافق عليه تلقائياً)
     const { data: deposit, error: depositError } = await supabaseAdmin
       .from('deposit_requests')
       .insert({ 
@@ -155,7 +155,7 @@ app.post('/api/deposit', async (req, res) => {
       return res.status(500).json({ error: depositError.message });
     }
     
-    // 5. تحديث رصيد المستخدم
+    // تحديث رصيد المستخدم
     const { data: user } = await supabaseAdmin
       .from('users')
       .select('active_deposit, total_deposited, available_balance, vip_level')
@@ -173,7 +173,7 @@ app.post('/api/deposit', async (req, res) => {
       })
       .eq('id', userId);
     
-    // 6. تحديث مستوى VIP تلقائياً
+    // تحديث مستوى VIP تلقائياً
     const vipLevels = [0, 50, 100, 250, 500, 1000];
     let newVipLevel = 0;
     for (let i = vipLevels.length - 1; i >= 0; i--) {
@@ -190,7 +190,7 @@ app.post('/api/deposit', async (req, res) => {
         .eq('id', userId);
     }
     
-    // 7. تسجيل المعاملة
+    // تسجيل المعاملة
     await supabaseAdmin
       .from('transactions')
       .insert({
@@ -299,7 +299,7 @@ app.post('/api/withdraw', async (req, res) => {
 });
 
 // ========================================
-// API: التحقق اليدوي من الإيداع (للأمان)
+// API: التحقق اليدوي من الإيداع
 // ========================================
 app.post('/api/verify-deposit', async (req, res) => {
   const { userId, transactionHash, amount } = req.body;
@@ -478,8 +478,7 @@ app.post('/api/distribute-profits', async (req, res) => {
       .select('id, active_deposit, vip_level, available_balance');
     
     const vipLevels = {
-      0: { roi: 2 }, 1: { roi: 2.2 }, 2: { roi: 2.5 },
-      3: { roi: 2.8 }, 4: { roi: 3.2 }, 5: { roi: 3.5 }
+      1: { roi: 2.2 }, 2: { roi: 2.5 }, 3: { roi: 2.8 }, 4: { roi: 3.2 }, 5: { roi: 3.5 }
     };
     
     const today = new Date().toISOString().split('T')[0];
@@ -498,7 +497,12 @@ app.post('/api/distribute-profits', async (req, res) => {
       
       if (existingProfit) continue;
       
-      const roi = vipLevels[user.vip_level]?.roi || 2;
+      // نسبة الربح تعتمد على مستوى VIP (إذا كان المشترك)
+      let roi = 2; // النسبة الافتراضية
+      if (user.vip_level > 0 && vipLevels[user.vip_level]) {
+        roi = vipLevels[user.vip_level].roi;
+      }
+      
       const profit = (user.active_deposit * roi) / 100;
       
       if (profit <= 0) continue;
@@ -616,6 +620,18 @@ app.post('/api/admin/withdrawals', async (req, res) => {
 });
 
 // ========================================
+// API: جلب جميع المستخدمين (للمدير)
+// ========================================
+app.post('/api/admin/users', async (req, res) => {
+  const { data } = await supabaseAdmin
+    .from('users')
+    .select('*')
+    .order('created_at', { ascending: false });
+  
+  res.json(data || []);
+});
+
+// ========================================
 // تشغيل الخادم
 // ========================================
 const PORT = process.env.PORT || 3000;
@@ -625,8 +641,8 @@ app.listen(PORT, () => {
   ║   🚀 منصة الاستثمار تعمل بنجاح                                ║
   ║   📡 الخادم على المنفذ: ${PORT}                                  ║
   ║   🌐 http://localhost:${PORT}                                   ║
-  ║   💰 محفظة البوت: ${bsc.HOT_WALLET_ADDRESS.substring(0, 20)}... ║
-  ║   🏦 محفظة الاستثمار: ${bsc.INVESTMENT_WALLET.substring(0, 20)}...  ║
+  ║   💰 محفظة البوت: ${bsc.HOT_WALLET_ADDRESS?.substring(0, 20) || 'N/A'}... ║
+  ║   🏦 محفظة الاستثمار: ${bsc.INVESTMENT_WALLET?.substring(0, 20) || 'N/A'}...  ║
   ╚═══════════════════════════════════════════════════════════════╝
   `);
 });
@@ -635,6 +651,7 @@ app.listen(PORT, () => {
 // جدولة مهام Cron Job
 // ========================================
 
+// مهمة: فحص الإيداعات الجديدة كل 5 دقائق
 cron.schedule('*/5 * * * *', async () => {
   console.log('🔄 [Cron] جاري فحص الإيداعات الجديدة...');
   try {
@@ -649,6 +666,7 @@ cron.schedule('*/5 * * * *', async () => {
   }
 });
 
+// مهمة: توزيع الأرباح يومياً في منتصف الليل
 cron.schedule('0 0 * * *', async () => {
   console.log('🔄 [Cron] جاري توزيع الأرباح اليومية...');
   try {
@@ -664,10 +682,11 @@ cron.schedule('0 0 * * *', async () => {
   }
 });
 
+// مهمة: فحص رصيد BNB كل ساعة
 cron.schedule('0 * * * *', async () => {
   console.log('🔄 [Cron] جاري فحص رصيد BNB...');
   const bnbStatus = await bsc.checkBNBBalance();
   if (bnbStatus.isLow) {
-    await bsc.sendAlert(`⚠️ رصيد BNB منخفض! ${bnbStatus.balance} BNB`);
+    await bsc.sendAlert(`⚠️ تنبيه: رصيد BNB منخفض! ${bnbStatus.balance} BNB متاح (الحد الأدنى: ${bnbStatus.minRequired} BNB)`);
   }
 });
