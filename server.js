@@ -104,60 +104,44 @@ app.post('/api/process-deposits', async (req, res) => {
 });
 
 // ========================================
-// API: التحقق اليدوي من الإيداع (Manual Deposit Verification)
+// API: الإيداع مع التحقق التلقائي عبر Transaction Hash
 // ========================================
-app.post('/api/verify-deposit', async (req, res) => {
-  const { userId, transactionHash, amount } = req.body;
+app.post('/api/deposit', async (req, res) => {
+  const { userId, amount, transactionHash } = req.body;
   
-  if (!userId || !transactionHash || !amount) {
-    return res.status(400).json({ 
-      success: false, 
-      error: 'جميع الحقول مطلوبة: userId, transactionHash, amount' 
-    });
+  // 1. التحقق من صحة المدخلات
+  if (!amount || amount < 10) {
+    return res.status(400).json({ error: 'الحد الأدنى للإيداع 10 USDT' });
   }
   
-  if (amount < 10) {
-    return res.status(400).json({ success: false, error: 'الحد الأدنى للإيداع 10 USDT' });
+  if (!transactionHash || transactionHash.length < 10) {
+    return res.status(400).json({ error: 'Transaction Hash مطلوب' });
   }
   
   try {
-    // التحقق من تكرار الـ transaction_hash
-    const { data: existingDeposit } = await supabaseAdmin
+    // 2. التحقق من عدم استخدام الهاش مسبقاً
+    const { data: existingHash } = await supabaseAdmin
       .from('deposit_requests')
       .select('id, transaction_hash')
       .eq('transaction_hash', transactionHash)
       .maybeSingle();
     
-    if (existingDeposit) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'تم استخدام هذا الـ transaction_hash مسبقاً'
-      });
+    if (existingHash) {
+      return res.status(400).json({ error: 'تم استخدام هذا الـ Transaction Hash مسبقاً' });
     }
     
-    // التحقق من المعاملة على الشبكة
+    // 3. التحقق من صحة المعاملة على الشبكة
     const verification = await bsc.verifyTransaction(transactionHash, amount, bsc.HOT_WALLET_ADDRESS);
     
     if (!verification.success) {
-      return res.status(400).json({ success: false, error: verification.error });
+      return res.status(400).json({ error: verification.error });
     }
     
-    // جلب بيانات المستخدم
-    const { data: user, error: userError } = await supabaseAdmin
-      .from('users')
-      .select('active_deposit, total_deposited, available_balance, vip_level')
-      .eq('id', userId)
-      .single();
-    
-    if (userError || !user) {
-      return res.status(404).json({ success: false, error: 'المستخدم غير موجود' });
-    }
-    
-    // إنشاء سجل الإيداع
+    // 4. إنشاء سجل الإيداع (موافق عليه تلقائياً)
     const { data: deposit, error: depositError } = await supabaseAdmin
       .from('deposit_requests')
-      .insert({
-        user_id: userId,
+      .insert({ 
+        user_id: userId, 
         amount: amount,
         transaction_hash: transactionHash,
         status: 'approved',
@@ -168,36 +152,28 @@ app.post('/api/verify-deposit', async (req, res) => {
       .single();
     
     if (depositError) {
-      return res.status(500).json({ success: false, error: 'حدث خطأ في تسجيل الإيداع' });
+      return res.status(500).json({ error: depositError.message });
     }
     
-    // تحديث رصيد المستخدم
-    const newActiveDeposit = (user.active_deposit || 0) + amount;
-    const newTotalDeposited = (user.total_deposited || 0) + amount;
+    // 5. تحديث رصيد المستخدم
+    const { data: user } = await supabaseAdmin
+      .from('users')
+      .select('active_deposit, total_deposited, available_balance, vip_level')
+      .eq('id', userId)
+      .single();
+    
+    const newActiveDeposit = (user?.active_deposit || 0) + amount;
+    const newTotalDeposited = (user?.total_deposited || 0) + amount;
     
     await supabaseAdmin
       .from('users')
-      .update({
+      .update({ 
         active_deposit: newActiveDeposit,
         total_deposited: newTotalDeposited
       })
       .eq('id', userId);
     
-    // تسجيل المعاملة
-    await supabaseAdmin
-      .from('transactions')
-      .insert({
-        user_id: userId,
-        type: 'deposit',
-        amount: amount,
-        status: 'approved',
-        reference_id: deposit.id,
-        description: `إيداع عبر التحقق اليدوي - Tx: ${transactionHash.substring(0, 15)}...`,
-        created_at: new Date().toISOString(),
-        approved_at: new Date().toISOString()
-      });
-    
-    // تحديث مستوى VIP
+    // 6. تحديث مستوى VIP تلقائياً
     const vipLevels = [0, 50, 100, 250, 500, 1000];
     let newVipLevel = 0;
     for (let i = vipLevels.length - 1; i >= 0; i--) {
@@ -207,30 +183,146 @@ app.post('/api/verify-deposit', async (req, res) => {
       }
     }
     
-    if (newVipLevel > (user.vip_level || 0)) {
+    if (newVipLevel > (user?.vip_level || 0)) {
       await supabaseAdmin
         .from('users')
         .update({ vip_level: newVipLevel })
         .eq('id', userId);
     }
     
-    res.json({
-      success: true,
-      message: 'تم التحقق من الإيداع بنجاح!',
-      deposit: {
-        id: deposit.id,
+    // 7. تسجيل المعاملة
+    await supabaseAdmin
+      .from('transactions')
+      .insert({
+        user_id: userId,
+        type: 'deposit',
         amount: amount,
-        transactionHash: transactionHash
-      },
-      newBalance: {
-        activeDeposit: newActiveDeposit,
-        totalDeposited: newTotalDeposited
-      }
+        status: 'approved',
+        reference_id: deposit.id,
+        description: `إيداع عبر البوت - Tx: ${transactionHash.substring(0, 15)}...`,
+        created_at: new Date().toISOString()
+      });
+    
+    res.json({ 
+      success: true, 
+      message: `✅ تم التحقق والإيداع بنجاح! تم إضافة ${amount} USDT إلى رصيدك.`,
+      depositId: deposit.id,
+      verification: verification
     });
     
   } catch (error) {
-    console.error('Verify deposit error:', error);
-    res.status(500).json({ success: false, error: 'حدث خطأ داخلي في الخادم' });
+    console.error('Deposit error:', error);
+    res.status(500).json({ error: 'حدث خطأ داخلي في الخادم' });
+  }
+});
+
+// ========================================
+// API: السحب (تلقائي مع التحقق من الرصيد)
+// ========================================
+app.post('/api/withdraw', async (req, res) => {
+  const { userId, amount, walletAddress } = req.body;
+  
+  if (!amount || amount < 0.5) {
+    return res.status(400).json({ error: 'الحد الأدنى للسحب 0.5 USDT' });
+  }
+  
+  if (!walletAddress) {
+    return res.status(400).json({ error: 'عنوان المحفظة مطلوب' });
+  }
+  
+  try {
+    // التحقق من رصيد المستخدم
+    const { data: user } = await supabaseAdmin
+      .from('users')
+      .select('available_balance, total_withdrawn')
+      .eq('id', userId)
+      .single();
+    
+    if (!user || user.available_balance < amount) {
+      return res.status(400).json({ error: 'الرصيد غير كافٍ' });
+    }
+    
+    // التحقق من رصيد USDT في محفظة البوت
+    const botUSDTBalance = await bsc.getUSDTBalance();
+    if (botUSDTBalance < amount) {
+      return res.status(400).json({ error: 'رصيد المحفظة غير كافٍ، يرجى المحاولة لاحقاً' });
+    }
+    
+    // التحقق من رصيد BNB للرسوم
+    const bnbStatus = await bsc.checkBNBBalance();
+    if (bnbStatus.isLow) {
+      return res.status(400).json({ error: 'نظام السحب مؤقتاً، يرجى المحاولة لاحقاً' });
+    }
+    
+    // تحويل USDT إلى عنوان المستخدم
+    const transferResult = await bsc.transferUSDT(walletAddress, amount);
+    
+    if (!transferResult.success) {
+      return res.status(500).json({ error: 'فشل تحويل الأموال، يرجى المحاولة لاحقاً' });
+    }
+    
+    // تسجيل طلب السحب
+    const { error: withdrawError } = await supabaseAdmin
+      .from('withdrawals')
+      .insert({ 
+        user_id: userId, 
+        amount: amount, 
+        wallet_address: walletAddress, 
+        status: 'approved',
+        created_at: new Date().toISOString(),
+        processed_at: new Date().toISOString()
+      });
+    
+    if (withdrawError) {
+      console.error('Withdraw log error:', withdrawError);
+    }
+    
+    // تحديث رصيد المستخدم
+    await supabaseAdmin
+      .from('users')
+      .update({ 
+        available_balance: user.available_balance - amount,
+        total_withdrawn: (user.total_withdrawn || 0) + amount
+      })
+      .eq('id', userId);
+    
+    res.json({ 
+      success: true, 
+      message: `✅ تم سحب ${amount} USDT إلى محفظتك بنجاح`,
+      txHash: transferResult.hash
+    });
+    
+  } catch (error) {
+    console.error('Withdraw error:', error);
+    res.status(500).json({ error: 'حدث خطأ داخلي في الخادم' });
+  }
+});
+
+// ========================================
+// API: التحقق اليدوي من الإيداع (للأمان)
+// ========================================
+app.post('/api/verify-deposit', async (req, res) => {
+  const { userId, transactionHash, amount } = req.body;
+  
+  if (!userId || !transactionHash || !amount) {
+    return res.status(400).json({ error: 'جميع الحقول مطلوبة' });
+  }
+  
+  try {
+    const verification = await bsc.verifyTransaction(transactionHash, amount, bsc.HOT_WALLET_ADDRESS);
+    
+    if (!verification.success) {
+      return res.status(400).json({ error: verification.error });
+    }
+    
+    res.json({
+      success: true,
+      message: 'المعاملة صالحة',
+      verification
+    });
+    
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -372,128 +464,6 @@ app.post('/api/update-user', async (req, res) => {
 });
 
 // ========================================
-// API: تقديم طلب إيداع (تلقائي)
-// ========================================
-app.post('/api/deposit', async (req, res) => {
-  const { userId, amount } = req.body;
-  
-  if (!amount || amount < 10) {
-    return res.status(400).json({ error: 'الحد الأدنى للإيداع 10 USDT' });
-  }
-  
-  const bnbStatus = await bsc.checkBNBBalance();
-  if (bnbStatus.isLow) {
-    return res.status(400).json({ error: 'نظام الإيداع مؤقتاً، يرجى المحاولة لاحقاً' });
-  }
-  
-  const { data: deposit, error: depositError } = await supabaseAdmin
-    .from('deposit_requests')
-    .insert({ 
-      user_id: userId, 
-      amount: amount, 
-      status: 'approved',
-      created_at: new Date().toISOString(),
-      approved_at: new Date().toISOString()
-    })
-    .select()
-    .single();
-  
-  if (depositError) {
-    return res.status(500).json({ error: depositError.message });
-  }
-  
-  const { data: user } = await supabaseAdmin
-    .from('users')
-    .select('active_deposit, total_deposited, available_balance')
-    .eq('id', userId)
-    .single();
-  
-  await supabaseAdmin
-    .from('users')
-    .update({ 
-      active_deposit: (user?.active_deposit || 0) + amount,
-      total_deposited: (user?.total_deposited || 0) + amount
-    })
-    .eq('id', userId);
-  
-  res.json({ 
-    success: true, 
-    message: `تم إيداع ${amount} USDT بنجاح`,
-    depositId: deposit.id 
-  });
-});
-
-// ========================================
-// API: تقديم طلب سحب (تلقائي)
-// ========================================
-app.post('/api/withdraw', async (req, res) => {
-  const { userId, amount, walletAddress } = req.body;
-  
-  if (!amount || amount < 0.5) {
-    return res.status(400).json({ error: 'الحد الأدنى للسحب 0.5 USDT' });
-  }
-  
-  if (!walletAddress) {
-    return res.status(400).json({ error: 'عنوان المحفظة مطلوب' });
-  }
-  
-  const { data: user } = await supabaseAdmin
-    .from('users')
-    .select('available_balance, total_withdrawn')
-    .eq('id', userId)
-    .single();
-  
-  if (!user || user.available_balance < amount) {
-    return res.status(400).json({ error: 'الرصيد غير كافٍ' });
-  }
-  
-  const botUSDTBalance = await bsc.getUSDTBalance();
-  if (botUSDTBalance < amount) {
-    return res.status(400).json({ error: 'رصيد المحفظة غير كافٍ، يرجى المحاولة لاحقاً' });
-  }
-  
-  const bnbStatus = await bsc.checkBNBBalance();
-  if (bnbStatus.isLow) {
-    return res.status(400).json({ error: 'نظام السحب مؤقتاً، يرجى المحاولة لاحقاً' });
-  }
-  
-  const transferResult = await bsc.transferUSDT(walletAddress, amount);
-  
-  if (!transferResult.success) {
-    return res.status(500).json({ error: 'فشل تحويل الأموال، يرجى المحاولة لاحقاً' });
-  }
-  
-  const { error: withdrawError } = await supabaseAdmin
-    .from('withdrawals')
-    .insert({ 
-      user_id: userId, 
-      amount: amount, 
-      wallet_address: walletAddress, 
-      status: 'approved',
-      created_at: new Date().toISOString(),
-      processed_at: new Date().toISOString()
-    });
-  
-  if (withdrawError) {
-    console.error('Withdraw log error:', withdrawError);
-  }
-  
-  await supabaseAdmin
-    .from('users')
-    .update({ 
-      available_balance: user.available_balance - amount,
-      total_withdrawn: (user.total_withdrawn || 0) + amount
-    })
-    .eq('id', userId);
-  
-  res.json({ 
-    success: true, 
-    message: `تم سحب ${amount} USDT إلى محفظتك بنجاح`,
-    txHash: transferResult.hash
-  });
-});
-
-// ========================================
 // API: توزيع الأرباح اليومية
 // ========================================
 app.post('/api/distribute-profits', async (req, res) => {
@@ -619,6 +589,30 @@ app.post('/api/transactions', async (req, res) => {
   ].sort((a, b) => new Date(b.date) - new Date(a.date));
   
   res.json(allTransactions);
+});
+
+// ========================================
+// API: جلب طلبات الإيداع (للمدير)
+// ========================================
+app.post('/api/admin/deposits', async (req, res) => {
+  const { data } = await supabaseAdmin
+    .from('deposit_requests')
+    .select('*, users(name, email)')
+    .order('created_at', { ascending: false });
+  
+  res.json(data || []);
+});
+
+// ========================================
+// API: جلب طلبات السحب (للمدير)
+// ========================================
+app.post('/api/admin/withdrawals', async (req, res) => {
+  const { data } = await supabaseAdmin
+    .from('withdrawals')
+    .select('*, users(name, email)')
+    .order('created_at', { ascending: false });
+  
+  res.json(data || []);
 });
 
 // ========================================
