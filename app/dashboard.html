@@ -64,6 +64,7 @@
       color: white;
       margin-bottom: 12px;
     }
+    input:focus { outline: none; border-color: #00ff66; }
     .deposit-btn, .withdraw-btn {
       width: 100%;
       padding: 12px;
@@ -118,7 +119,6 @@
     
     .page { display: none; }
     .page.active { display: block; }
-    .hidden { display: none; }
   </style>
 </head>
 <body>
@@ -154,6 +154,9 @@
       5: { name: 'VIP 5', price: 1000, roi: 3.5 }
     };
 
+    // ========================================
+    // تحميل بيانات المستخدم
+    // ========================================
     async function loadUser() {
       if (!userId) { window.location.href = '/'; return; }
       try {
@@ -170,6 +173,9 @@
       } catch(e) { console.error(e); }
     }
 
+    // ========================================
+    // عرض الرسائل
+    // ========================================
     function showMessage(msg, type) {
       const container = document.getElementById('mainContent');
       const msgDiv = document.createElement('div');
@@ -179,6 +185,9 @@
       setTimeout(() => msgDiv.remove(), 5000);
     }
 
+    // ========================================
+    // الصفحة الرئيسية (Dashboard)
+    // ========================================
     async function renderDashboard() {
       const level = userData?.vip_level || 0;
       const active = userData?.active_deposit || 0;
@@ -201,6 +210,9 @@
       `;
     }
 
+    // ========================================
+    // صفحة الإيداع (مع Transaction Hash)
+    // ========================================
     async function renderDeposit() {
       document.getElementById('mainContent').innerHTML = `
         <div class="card">
@@ -208,34 +220,63 @@
           <p style="color:#8899aa; font-size:12px; margin-bottom:8px;">محفظة الإيداع (شبكة BSC):</p>
           <code style="color:#00ff66; word-break:break-all;">0x9EB39A10c059877910eEbe2841bA2474cB7Fffc8</code>
           <button class="btn-copy" id="copyWalletBtn">📋 نسخ العنوان</button>
+          
           <input type="number" id="depositAmount" placeholder="المبلغ (USDT) - الحد الأدنى 10" style="margin-top:16px;">
-          <button class="deposit-btn" id="doDepositBtn">💰 إيداع USDT</button>
+          <input type="text" id="depositTxHash" placeholder="Transaction Hash (0x...)" style="direction:ltr; font-family: monospace;">
+          <button class="deposit-btn" id="doDepositBtn">🔍 تحقق وأيدع</button>
           <div id="depositMsg"></div>
         </div>
       `;
+      
+      // زر نسخ العنوان
       document.getElementById('copyWalletBtn').onclick = () => {
         navigator.clipboard.writeText('0x9EB39A10c059877910eEbe2841bA2474cB7Fffc8');
         showMessage('✅ تم نسخ عنوان المحفظة!', 'success');
       };
+      
+      // زر الإيداع مع التحقق
       document.getElementById('doDepositBtn').onclick = async () => {
         const amount = parseFloat(document.getElementById('depositAmount').value);
-        if (!amount || amount < 10) { showMessage('⚠️ الحد الأدنى 10 USDT', 'error'); return; }
-        const res = await fetch(`${API_URL}/api/deposit`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId, amount })
-        });
-        const data = await res.json();
-        if (data.success) {
-          showMessage(`✅ تم إيداع ${amount} USDT بنجاح!`, 'success');
-          document.getElementById('depositAmount').value = '';
-          loadUser();
-        } else {
-          showMessage('❌ ' + data.error, 'error');
+        const txHash = document.getElementById('depositTxHash').value.trim();
+        
+        if (!amount || amount < 10) {
+          showMessage('depositMsg', '⚠️ الحد الأدنى للإيداع 10 USDT', 'error');
+          return;
+        }
+        
+        if (!txHash) {
+          showMessage('depositMsg', '⚠️ يرجى إدخال Transaction Hash', 'error');
+          return;
+        }
+        
+        showMessage('depositMsg', '⏳ جاري التحقق من المعاملة على الشبكة...', 'warning');
+        
+        try {
+          const res = await fetch(`${API_URL}/api/deposit`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId, amount, transactionHash: txHash })
+          });
+          
+          const data = await res.json();
+          
+          if (data.success) {
+            showMessage('depositMsg', `✅ ${data.message}`, 'success');
+            document.getElementById('depositAmount').value = '';
+            document.getElementById('depositTxHash').value = '';
+            loadUser();
+          } else {
+            showMessage('depositMsg', `❌ ${data.error}`, 'error');
+          }
+        } catch (error) {
+          showMessage('depositMsg', '❌ خطأ في الاتصال بالخادم', 'error');
         }
       };
     }
 
+    // ========================================
+    // صفحة السحب
+    // ========================================
     async function renderWithdraw() {
       const avail = userData?.available_balance || 0;
       document.getElementById('mainContent').innerHTML = `
@@ -248,29 +289,49 @@
           <div id="withdrawMsg"></div>
         </div>
       `;
+      
       document.getElementById('doWithdrawBtn').onclick = async () => {
         const amount = parseFloat(document.getElementById('withdrawAmount').value);
         const address = document.getElementById('walletAddress').value;
-        if (!amount || amount < 0.5) { showMessage('⚠️ الحد الأدنى 0.5 USDT', 'error'); return; }
-        if (!address) { showMessage('⚠️ أدخل عنوان المحفظة', 'error'); return; }
-        if (amount > avail) { showMessage('⚠️ الرصيد غير كافٍ', 'error'); return; }
-        const res = await fetch(`${API_URL}/api/withdraw`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId, amount, walletAddress: address })
-        });
-        const data = await res.json();
-        if (data.success) {
-          showMessage(`✅ تم سحب ${amount} USDT بنجاح!`, 'success');
-          document.getElementById('withdrawAmount').value = '';
-          document.getElementById('walletAddress').value = '';
-          loadUser();
-        } else {
-          showMessage('❌ ' + data.error, 'error');
+        
+        if (!amount || amount < 0.5) {
+          showMessage('withdrawMsg', '⚠️ الحد الأدنى للسحب 0.5 USDT', 'error');
+          return;
+        }
+        if (!address) {
+          showMessage('withdrawMsg', '⚠️ أدخل عنوان المحفظة', 'error');
+          return;
+        }
+        if (amount > avail) {
+          showMessage('withdrawMsg', '⚠️ الرصيد غير كافٍ', 'error');
+          return;
+        }
+        
+        try {
+          const res = await fetch(`${API_URL}/api/withdraw`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId, amount, walletAddress: address })
+          });
+          const data = await res.json();
+          
+          if (data.success) {
+            showMessage('withdrawMsg', `✅ ${data.message}`, 'success');
+            document.getElementById('withdrawAmount').value = '';
+            document.getElementById('walletAddress').value = '';
+            loadUser();
+          } else {
+            showMessage('withdrawMsg', `❌ ${data.error}`, 'error');
+          }
+        } catch (error) {
+          showMessage('withdrawMsg', '❌ خطأ في الاتصال بالخادم', 'error');
         }
       };
     }
 
+    // ========================================
+    // صفحة VIP
+    // ========================================
     async function renderVIP() {
       const currentLevel = userData?.vip_level || 0;
       document.getElementById('mainContent').innerHTML = `<div class="card"><div class="card-title">👑 مستويات VIP</div><div id="vipList"></div></div>`;
@@ -281,6 +342,7 @@
           ${currentLevel < parseInt(level) ? `<button class="upgrade-btn" data-level="${level}">ترقية (${vip.price} USDT)</button>` : (currentLevel == level ? '<span style="color:#00ff66;">✅ حالياً</span>' : '<span style="color:#8899aa;">🔒 مغلق</span>')}
         </div>
       `).join('');
+      
       document.querySelectorAll('.upgrade-btn').forEach(btn => {
         btn.onclick = async () => {
           const targetLevel = parseInt(btn.dataset.level);
@@ -300,6 +362,9 @@
       });
     }
 
+    // ========================================
+    // صفحة الإحالات (الفريق)
+    // ========================================
     async function renderReferrals() {
       const res = await fetch(`${API_URL}/api/referrals`, {
         method: 'POST',
@@ -319,10 +384,12 @@
         </div>
         <div class="card"><div class="card-title">📋 قائمة المحالين</div><div id="referralsList"></div></div>
       `;
+      
       document.getElementById('copyLinkBtn').onclick = () => {
         navigator.clipboard.writeText(`${window.location.origin}?ref=${userData?.referral_code}`);
         showMessage('✅ تم نسخ رابط الدعوة!', 'success');
       };
+      
       const listDiv = document.getElementById('referralsList');
       if (!data.referrals || data.referrals.length === 0) {
         listDiv.innerHTML = '<p style="color:#8899aa;">لا يوجد محالين</p>';
@@ -331,6 +398,9 @@
       }
     }
 
+    // ========================================
+    // صفحة الملف الشخصي (أنا) + سجل المعاملات
+    // ========================================
     async function renderProfile() {
       const avail = userData?.available_balance || 0;
       document.getElementById('mainContent').innerHTML = `
@@ -342,6 +412,7 @@
         </div>
         <div class="card"><div class="card-title">📋 سجل العمليات</div><div id="transactionsList" style="color:#8899aa;"></div></div>
       `;
+      
       // جلب المعاملات
       const [depositsRes, withdrawsRes] = await Promise.all([
         fetch(`${API_URL}/api/admin/deposits`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId }) }),
@@ -351,26 +422,47 @@
       const withdrawals = await withdrawsRes.json();
       const all = [...(deposits||[]).filter(d=>d.user_id===userId).map(d=>({...d,type:'إيداع'})), ...(withdrawals||[]).filter(w=>w.user_id===userId).map(w=>({...w,type:'سحب'}))];
       all.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+      
       const tbody = document.getElementById('transactionsList');
-      if(all.length===0) tbody.innerHTML='<p>لا توجد معاملات</p>';
-      else tbody.innerHTML = all.map(t => `<div style="display:flex; justify-content:space-between; padding:8px; border-bottom:1px solid #00ff66;"><span>${new Date(t.created_at).toLocaleDateString('ar')}</span><span>${t.type}</span><span>${t.amount} USDT</span><span style="color:${t.status==='approved'?'#00ff66':'#ffaa00'}">${t.status==='approved'?'مقبول':'قيد الانتظار'}</span></div>`).join('');
+      if(all.length===0) {
+        tbody.innerHTML='<p>لا توجد معاملات</p>';
+      } else {
+        tbody.innerHTML = all.map(t => `
+          <div style="display:flex; justify-content:space-between; padding:8px; border-bottom:1px solid #00ff66;">
+            <span>${new Date(t.created_at).toLocaleDateString('ar')}</span>
+            <span>${t.type}</span>
+            <span>${t.amount} USDT</span>
+            <span style="color:${t.status==='approved'?'#00ff66':'#ffaa00'}">${t.status==='approved'?'مقبول':'قيد الانتظار'}</span>
+          </div>
+        `).join('');
+      }
     }
 
+    // ========================================
+    // صفحة التحقق اليدوي
+    // ========================================
     async function renderVerify() {
       document.getElementById('mainContent').innerHTML = `
         <div class="card">
           <div class="card-title">🔍 التحقق اليدوي من الإيداع</div>
-          <input type="text" id="verifyTxHash" placeholder="Transaction Hash (0x...)" style="direction:ltr;">
+          <input type="text" id="verifyTxHash" placeholder="Transaction Hash (0x...)" style="direction:ltr; font-family: monospace;">
           <input type="number" id="verifyAmount" placeholder="المبلغ (USDT)">
-          <button class="deposit-btn" id="doVerifyBtn">🔍 تحقق وأيدع</button>
+          <button class="deposit-btn" id="doVerifyBtn">🔍 تحقق</button>
           <div id="verifyMsg"></div>
         </div>
       `;
+      
       document.getElementById('doVerifyBtn').onclick = async () => {
         const txHash = document.getElementById('verifyTxHash').value.trim();
         const amount = parseFloat(document.getElementById('verifyAmount').value);
-        if (!txHash || !amount) { showMessage('⚠️ أدخل Transaction Hash والمبلغ', 'error'); return; }
-        showMessage('⏳ جاري التحقق...', 'warning');
+        
+        if (!txHash || !amount) {
+          showMessage('verifyMsg', '⚠️ أدخل Transaction Hash والمبلغ', 'error');
+          return;
+        }
+        
+        showMessage('verifyMsg', '⏳ جاري التحقق...', 'warning');
+        
         try {
           const res = await fetch(`${API_URL}/api/verify-deposit`, {
             method: 'POST',
@@ -378,18 +470,21 @@
             body: JSON.stringify({ userId, transactionHash: txHash, amount })
           });
           const data = await res.json();
+          
           if (data.success) {
-            showMessage(`✅ ${data.message}`, 'success');
-            document.getElementById('verifyTxHash').value = '';
-            document.getElementById('verifyAmount').value = '';
-            loadUser();
+            showMessage('verifyMsg', `✅ ${data.message}`, 'success');
           } else {
-            showMessage(`❌ ${data.error}`, 'error');
+            showMessage('verifyMsg', `❌ ${data.error}`, 'error');
           }
-        } catch(e) { showMessage('❌ خطأ في الاتصال', 'error'); }
+        } catch(e) {
+          showMessage('verifyMsg', '❌ خطأ في الاتصال', 'error');
+        }
       };
     }
 
+    // ========================================
+    // التنقل بين الصفحات
+    // ========================================
     const pages = {
       dashboard: renderDashboard,
       deposit: renderDeposit,
@@ -409,6 +504,9 @@
       };
     });
 
+    // ========================================
+    // تشغيل التطبيق
+    // ========================================
     loadUser();
   </script>
 </body>
