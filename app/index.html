@@ -3,73 +3,87 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-  <title>منصة الاستثمار | تسجيل الدخول</title>
+  <title>تسجيل الدخول | منصة الاستثمار</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    
     body {
       min-height: 100vh;
-      background: #0a0a0f;
-      background-image: 
-        linear-gradient(rgba(0, 255, 100, 0.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(0, 255, 100, 0.03) 1px, transparent 1px);
-      background-size: 40px 40px;
+      background: linear-gradient(135deg, #1a1a2e 0%, #0a0a0f 100%);
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       display: flex;
       align-items: center;
       justify-content: center;
       padding: 16px;
     }
-
     .card {
-      background: rgba(20, 20, 35, 0.6);
+      background: rgba(26, 26, 46, 0.95);
       backdrop-filter: blur(12px);
       border-radius: 32px;
       padding: 32px 28px;
-      max-width: 500px;
+      max-width: 450px;
       width: 100%;
-      border: 1px solid rgba(0, 255, 100, 0.2);
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-      animation: fadeInUp 0.6s ease-out;
+      border: 1px solid #00ff66;
+      box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
     }
-
-    @keyframes fadeInUp {
-      from { opacity: 0; transform: translateY(30px); }
-      to { opacity: 1; transform: translateY(0); }
+    .logo { text-align: center; margin-bottom: 24px; }
+    .logo h1 { font-size: 28px; background: linear-gradient(135deg, #00ff66, #00ccff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .logo p { color: #8899aa; font-size: 13px; margin-top: 6px; }
+    
+    .lang-switch {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-bottom: 20px;
     }
-
-    .logo { text-align: center; margin-bottom: 32px; }
-    .logo-icon { font-size: 56px; margin-bottom: 8px; }
-    .logo h1 { font-size: 28px; background: linear-gradient(135deg, #00ff66, #00ccff); -webkit-background-clip: text; background-clip: text; color: transparent; margin-bottom: 6px; }
-    .logo p { color: #8899aa; font-size: 13px; }
-
-    .tabs { display: flex; gap: 12px; margin-bottom: 28px; background: rgba(10, 10, 20, 0.8); padding: 5px; border-radius: 60px; }
+    .lang-btn {
+      background: transparent;
+      border: 1px solid #00ff66;
+      color: #00ff66;
+      padding: 5px 12px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .lang-btn.active {
+      background: #00ff66;
+      color: #0a0a0f;
+    }
+    
+    .tabs { display: flex; gap: 12px; margin-bottom: 24px; background: rgba(10,10,20,0.8); padding: 5px; border-radius: 60px; }
     .tab { flex: 1; padding: 12px; text-align: center; background: transparent; border: none; border-radius: 50px; color: #8899aa; cursor: pointer; font-size: 15px; font-weight: 600; transition: all 0.3s; }
-    .tab.active { background: linear-gradient(135deg, #00ff66, #00ccff); color: #0a0a0f; box-shadow: 0 4px 15px rgba(0, 255, 102, 0.3); }
-
-    .input-group { margin-bottom: 18px; position: relative; }
-    .input-group label { display: block; color: #8899aa; margin-bottom: 6px; font-size: 13px; font-weight: 500; }
+    .tab.active { background: linear-gradient(135deg, #00ff66, #00ccff); color: #0a0a0f; box-shadow: 0 4px 15px rgba(0,255,102,0.3); }
+    
+    .input-group { margin-bottom: 18px; }
+    .input-group label { display: block; color: #8899aa; margin-bottom: 6px; font-size: 13px; }
     .input-wrapper { position: relative; display: flex; align-items: center; }
     .input-wrapper input {
       width: 100%;
       padding: 14px 16px;
-      padding-right: 45px;
       border-radius: 16px;
-      border: 1px solid rgba(0, 255, 100, 0.3);
-      background: rgba(10, 10, 20, 0.8);
+      border: 1px solid #00ff66;
+      background: rgba(10,10,20,0.8);
       color: white;
       font-size: 14px;
-      transition: all 0.3s;
     }
-    .input-wrapper input:focus { outline: none; border-color: #00ff66; box-shadow: 0 0 0 3px rgba(0, 255, 102, 0.2); }
-    .input-icon { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); font-size: 16px; }
-    .toggle-password { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #8899aa; font-size: 16px; transition: color 0.3s; z-index: 2; }
-    .toggle-password:hover { color: #00ff66; }
-
-    .password-strength { margin-top: 8px; height: 4px; background: #2d3748; border-radius: 4px; overflow: hidden; }
-    .strength-bar { width: 0%; height: 100%; transition: width 0.3s, background 0.3s; }
-    .strength-text { font-size: 10px; margin-top: 5px; color: #8899aa; }
-
+    .input-wrapper input:focus { outline: none; border-color: #00ff66; box-shadow: 0 0 0 3px rgba(0,255,102,0.2); }
+    
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 16px 0;
+    }
+    .checkbox-group input {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+    }
+    .checkbox-group label {
+      color: #8899aa;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    
     .btn-primary {
       width: 100%;
       padding: 14px;
@@ -81,13 +95,12 @@
       font-weight: bold;
       cursor: pointer;
       transition: all 0.3s;
-      margin-top: 8px;
     }
-    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 25px -5px rgba(0, 255, 102, 0.4); }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 25px -5px rgba(0,255,102,0.4); }
     .link-btn {
       width: 100%;
       background: transparent;
-      border: 1px solid rgba(0, 255, 102, 0.5);
+      border: 1px solid #00ff66;
       color: #00ff66;
       padding: 12px;
       border-radius: 60px;
@@ -96,215 +109,276 @@
       transition: all 0.3s;
       margin-top: 12px;
     }
-    .link-btn:hover { background: rgba(0, 255, 102, 0.1); border-color: #00ff66; }
-
-    .message { margin-top: 18px; padding: 12px; border-radius: 16px; text-align: center; font-size: 13px; animation: fadeIn 0.3s; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
-    .success { background: rgba(0, 255, 102, 0.15); border: 1px solid #00ff66; color: #00ff66; }
-    .error { background: rgba(255, 68, 68, 0.15); border: 1px solid #ff4444; color: #ff4444; }
-    .info { background: rgba(0, 204, 255, 0.15); border: 1px solid #00ccff; color: #00ccff; }
-
-    .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 28px; }
-    .stat-box { background: rgba(10, 10, 20, 0.8); backdrop-filter: blur(10px); padding: 14px; border-radius: 20px; text-align: center; border: 1px solid rgba(0, 255, 102, 0.2); transition: transform 0.3s; }
-    .stat-box:hover { transform: translateY(-2px); border-color: rgba(0, 255, 102, 0.5); }
-    .stat-number { display: block; font-size: 22px; font-weight: bold; color: #00ff66; }
-    .stat-label { font-size: 11px; color: #8899aa; }
-
+    .link-btn:hover { background: rgba(0,255,102,0.1); }
+    
+    .message { margin-top: 16px; padding: 12px; border-radius: 16px; text-align: center; font-size: 13px; }
+    .error { background: rgba(255,68,68,0.15); border: 1px solid #ff4444; color: #ff4444; }
+    .success { background: rgba(0,255,102,0.15); border: 1px solid #00ff66; color: #00ff66; }
+    
     .hidden { display: none; }
-
-    @media (max-width: 480px) {
-      .card { padding: 24px 20px; }
-      .logo h1 { font-size: 24px; }
-      .tab { font-size: 13px; padding: 10px; }
-      .btn-primary { padding: 12px; }
-    }
   </style>
 </head>
 <body>
   <div class="card">
-    <div class="logo">
-      <div class="logo-icon">💰</div>
-      <h1>CryptoInvest</h1>
-      <p>استثمر بأمان | أرباح يومية تصل إلى 3.5%</p>
+    <div class="lang-switch">
+      <button class="lang-btn active" data-lang="ar">🇸🇦 العربية</button>
+      <button class="lang-btn" data-lang="en">🇬🇧 English</button>
     </div>
-
+    
+    <div class="logo">
+      <h1 id="siteTitle">💰 CryptoInvest</h1>
+      <p id="siteSub">استثمر بأمان | أرباح يومية</p>
+    </div>
+    
     <div class="tabs">
       <button class="tab active" id="loginTab">تسجيل الدخول</button>
       <button class="tab" id="registerTab">إنشاء حساب</button>
     </div>
-
+    
     <!-- Login Form -->
     <div id="loginForm">
       <div class="input-group">
-        <label>📧 البريد الإلكتروني</label>
+        <label id="emailLabel">📧 البريد الإلكتروني</label>
         <div class="input-wrapper">
-          <span class="input-icon">📧</span>
           <input type="email" id="loginEmail" placeholder="example@email.com">
         </div>
       </div>
       <div class="input-group">
-        <label>🔒 كلمة المرور</label>
+        <label id="passwordLabel">🔒 كلمة المرور</label>
         <div class="input-wrapper">
-          <span class="input-icon">🔒</span>
           <input type="password" id="loginPassword" placeholder="********">
-          <span class="toggle-password" onclick="togglePassword('loginPassword', this)">👁️</span>
         </div>
       </div>
-      <button class="btn-primary" id="doLoginBtn">تسجيل الدخول</button>
+      <div class="checkbox-group">
+        <input type="checkbox" id="rememberMe">
+        <label id="rememberLabel">تذكرني (البقاء مسجل الدخول)</label>
+      </div>
+      <button class="btn-primary" id="doLoginBtn" data-key="login">تسجيل الدخول</button>
     </div>
-
+    
     <!-- Register Form -->
     <div id="registerForm" class="hidden">
       <div class="input-group">
-        <label>👤 اسم المستخدم</label>
+        <label id="regNameLabel">👤 اسم المستخدم</label>
         <div class="input-wrapper">
-          <span class="input-icon">👤</span>
           <input type="text" id="regName" placeholder="أدخل اسمك">
         </div>
       </div>
       <div class="input-group">
-        <label>📧 البريد الإلكتروني</label>
+        <label id="regEmailLabel">📧 البريد الإلكتروني</label>
         <div class="input-wrapper">
-          <span class="input-icon">📧</span>
           <input type="email" id="regEmail" placeholder="example@email.com">
         </div>
       </div>
       <div class="input-group">
-        <label>🔒 كلمة المرور</label>
+        <label id="regPasswordLabel">🔒 كلمة المرور</label>
         <div class="input-wrapper">
-          <span class="input-icon">🔒</span>
-          <input type="password" id="regPassword" placeholder="********" onkeyup="checkPasswordStrength()">
-          <span class="toggle-password" onclick="togglePassword('regPassword', this)">👁️</span>
+          <input type="password" id="regPassword" placeholder="********">
         </div>
-        <div class="password-strength"><div class="strength-bar" id="strengthBar"></div></div>
-        <div class="strength-text" id="strengthText"></div>
       </div>
       <div class="input-group">
-        <label>✔️ تأكيد كلمة المرور</label>
+        <label id="regConfirmLabel">✔️ تأكيد كلمة المرور</label>
         <div class="input-wrapper">
-          <span class="input-icon">✔️</span>
           <input type="password" id="regConfirmPassword" placeholder="********">
-          <span class="toggle-password" onclick="togglePassword('regConfirmPassword', this)">👁️</span>
         </div>
       </div>
       <div class="input-group">
-        <label>🎁 رمز الدعوة (اختياري)</label>
+        <label id="regReferralLabel">🎁 رمز الدعوة (اختياري)</label>
         <div class="input-wrapper">
-          <span class="input-icon">🎁</span>
           <input type="text" id="regReferral" placeholder="XXXXXX">
         </div>
       </div>
-      <button class="btn-primary" id="doRegisterBtn">إنشاء حساب</button>
-      <div id="generatedReferral" class="info hidden" style="margin-top: 14px; padding: 10px; text-align: center; border-radius: 14px;">
-        ✨ رمز الدعوة الخاص بك: <strong id="userReferralCode"></strong>
-      </div>
+      <button class="btn-primary" id="doRegisterBtn" data-key="register">إنشاء حساب</button>
+      <div id="generatedReferral" class="success hidden" style="margin-top:14px; padding:10px; text-align:center;"></div>
     </div>
-
+    
     <div id="message"></div>
-
-    <div class="stats">
-      <div class="stat-box"><span class="stat-number">5,941+</span><span class="stat-label">مستخدم نشط</span></div>
-      <div class="stat-box"><span class="stat-number">$64K+</span><span class="stat-label">إجمالي الأرباح</span></div>
-    </div>
   </div>
-
+  
   <script>
+    const API_URL = window.location.origin;
+    let currentLang = localStorage.getItem('lang') || 'ar';
+    
     // ========================================
-    // ✅ تم التعديل: الرابط الصحيح للمنصة على Render
+    // الترجمة
     // ========================================
-    const API_URL = 'https://crypto-api-c2v8.onrender.com';
-
-    function togglePassword(inputId, element) {
-      const input = document.getElementById(inputId);
-      if (input.type === 'password') { input.type = 'text'; element.innerHTML = '🙈'; }
-      else { input.type = 'password'; element.innerHTML = '👁️'; }
+    const translations = {
+      ar: {
+        siteTitle: '💰 CryptoInvest',
+        siteSub: 'استثمر بأمان | أرباح يومية',
+        emailLabel: '📧 البريد الإلكتروني',
+        passwordLabel: '🔒 كلمة المرور',
+        rememberLabel: 'تذكرني (البقاء مسجل الدخول)',
+        login: 'تسجيل الدخول',
+        register: 'إنشاء حساب',
+        regNameLabel: '👤 اسم المستخدم',
+        regEmailLabel: '📧 البريد الإلكتروني',
+        regPasswordLabel: '🔒 كلمة المرور',
+        regConfirmLabel: '✔️ تأكيد كلمة المرور',
+        regReferralLabel: '🎁 رمز الدعوة (اختياري)',
+        welcomeBack: 'مرحباً بعودتك!',
+        accountCreated: '✅ تم إنشاء الحساب بنجاح!'
+      },
+      en: {
+        siteTitle: '💰 CryptoInvest',
+        siteSub: 'Invest Safely | Daily Returns',
+        emailLabel: '📧 Email',
+        passwordLabel: '🔒 Password',
+        rememberLabel: 'Remember Me (Stay logged in)',
+        login: 'Login',
+        register: 'Sign Up',
+        regNameLabel: '👤 Username',
+        regEmailLabel: '📧 Email',
+        regPasswordLabel: '🔒 Password',
+        regConfirmLabel: '✔️ Confirm Password',
+        regReferralLabel: '🎁 Referral Code (Optional)',
+        welcomeBack: 'Welcome Back!',
+        accountCreated: '✅ Account created successfully!'
+      }
+    };
+    
+    function updateLanguage() {
+      const t = translations[currentLang];
+      document.getElementById('siteTitle').innerHTML = t.siteTitle;
+      document.getElementById('siteSub').innerHTML = t.siteSub;
+      document.getElementById('emailLabel').innerHTML = t.emailLabel;
+      document.getElementById('passwordLabel').innerHTML = t.passwordLabel;
+      document.getElementById('rememberLabel').innerHTML = t.rememberLabel;
+      document.getElementById('doLoginBtn').innerHTML = t.login;
+      document.getElementById('doRegisterBtn').innerHTML = t.register;
+      document.getElementById('regNameLabel').innerHTML = t.regNameLabel;
+      document.getElementById('regEmailLabel').innerHTML = t.regEmailLabel;
+      document.getElementById('regPasswordLabel').innerHTML = t.regPasswordLabel;
+      document.getElementById('regConfirmLabel').innerHTML = t.regConfirmLabel;
+      document.getElementById('regReferralLabel').innerHTML = t.regReferralLabel;
+      
+      document.querySelectorAll('.lang-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.lang === currentLang);
+      });
     }
-
-    function checkPasswordStrength() {
-      const password = document.getElementById('regPassword').value;
-      const strengthBar = document.getElementById('strengthBar');
-      const strengthText = document.getElementById('strengthText');
-      let strength = 0, message = '', color = '#ff4444';
-      if (password.length >= 4) strength++;
-      if (password.length >= 8) strength++;
-      if (/[A-Z]/.test(password)) strength++;
-      if (/[0-9]/.test(password)) strength++;
-      if (/[^A-Za-z0-9]/.test(password)) strength++;
-      const percent = (strength / 5) * 100;
-      strengthBar.style.width = percent + '%';
-      if (strength === 0 || strength === 1) { message = 'ضعيف'; color = '#ff4444'; }
-      else if (strength === 2) { message = 'متوسط'; color = '#ffaa00'; }
-      else if (strength === 3) { message = 'جيد'; color = '#00ccff'; }
-      else { message = 'قوي'; color = '#00ff66'; }
-      strengthBar.style.background = color;
-      strengthText.innerHTML = `قوة كلمة المرور: ${message}`;
-      strengthText.style.color = color;
-    }
-
+    
+    document.querySelectorAll('.lang-btn').forEach(btn => {
+      btn.onclick = () => {
+        currentLang = btn.dataset.lang;
+        localStorage.setItem('lang', currentLang);
+        updateLanguage();
+      };
+    });
+    
     function showMessage(msg, type) {
       const div = document.getElementById('message');
       div.innerHTML = `<div class="message ${type}">${msg}</div>`;
       setTimeout(() => div.innerHTML = '', 5000);
     }
-
+    
+    // Tabs
     document.getElementById('loginTab').onclick = () => {
       document.getElementById('loginTab').classList.add('active');
       document.getElementById('registerTab').classList.remove('active');
       document.getElementById('loginForm').classList.remove('hidden');
       document.getElementById('registerForm').classList.add('hidden');
-      document.getElementById('message').innerHTML = '';
     };
-
     document.getElementById('registerTab').onclick = () => {
       document.getElementById('registerTab').classList.add('active');
       document.getElementById('loginTab').classList.remove('active');
       document.getElementById('loginForm').classList.add('hidden');
       document.getElementById('registerForm').classList.remove('hidden');
-      document.getElementById('message').innerHTML = '';
     };
-
+    
+    // ========================================
+    // تسجيل الدخول مع حفظ الجلسة
+    // ========================================
     document.getElementById('doLoginBtn').onclick = async () => {
       const email = document.getElementById('loginEmail').value;
       const password = document.getElementById('loginPassword').value;
-      if (!email || !password) { showMessage('⚠️ يرجى إدخال البريد الإلكتروني وكلمة المرور', 'error'); return; }
+      const rememberMe = document.getElementById('rememberMe').checked;
+      
+      if (!email || !password) {
+        showMessage('⚠️ يرجى إدخال البريد الإلكتروني وكلمة المرور', 'error');
+        return;
+      }
+      
       try {
-        const response = await fetch(`${API_URL}/api/login`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
+        const res = await fetch(`${API_URL}/api/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, password })
         });
-        const data = await response.json();
+        const data = await res.json();
+        
         if (data.success) {
           localStorage.setItem('userId', data.user.id);
-          showMessage('✅ تم تسجيل الدخول بنجاح! جاري التحويل...', 'success');
-          setTimeout(() => { window.location.href = '/dashboard.html'; }, 1500);
-        } else { showMessage('❌ ' + (data.error || 'فشل تسجيل الدخول'), 'error'); }
-      } catch (error) { showMessage('❌ خطأ في الاتصال بالخادم', 'error'); }
+          localStorage.setItem('user', JSON.stringify(data.user));
+          if (rememberMe) {
+            localStorage.setItem('rememberMe', 'true');
+          } else {
+            localStorage.removeItem('rememberMe');
+          }
+          showMessage('✅ تم تسجيل الدخول بنجاح!', 'success');
+          setTimeout(() => { window.location.href = '/dashboard.html'; }, 1000);
+        } else {
+          showMessage('❌ ' + data.error, 'error');
+        }
+      } catch (error) {
+        showMessage('❌ خطأ في الاتصال', 'error');
+      }
     };
-
+    
+    // ========================================
+    // إنشاء حساب
+    // ========================================
     document.getElementById('doRegisterBtn').onclick = async () => {
       const name = document.getElementById('regName').value;
       const email = document.getElementById('regEmail').value;
       const password = document.getElementById('regPassword').value;
-      const confirmPassword = document.getElementById('regConfirmPassword').value;
+      const confirm = document.getElementById('regConfirmPassword').value;
       const referralCode = document.getElementById('regReferral').value;
-      if (!name || !email || !password || !confirmPassword) { showMessage('⚠️ يرجى ملء جميع الحقول المطلوبة', 'error'); return; }
-      if (password !== confirmPassword) { showMessage('⚠️ كلمة المرور وتأكيدها غير متطابقين', 'error'); return; }
-      if (password.length < 4) { showMessage('⚠️ كلمة المرور يجب أن تكون 4 أحرف على الأقل', 'error'); return; }
+      
+      if (!name || !email || !password || !confirm) {
+        showMessage('⚠️ يرجى ملء جميع الحقول', 'error');
+        return;
+      }
+      if (password !== confirm) {
+        showMessage('⚠️ كلمة المرور غير متطابقة', 'error');
+        return;
+      }
+      if (password.length < 4) {
+        showMessage('⚠️ كلمة المرور يجب أن تكون 4 أحرف على الأقل', 'error');
+        return;
+      }
+      
       try {
-        const response = await fetch(`${API_URL}/api/register`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
+        const res = await fetch(`${API_URL}/api/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name, email, password, referralCode })
         });
-        const data = await response.json();
+        const data = await res.json();
+        
         if (data.success) {
           localStorage.setItem('userId', data.user.id);
-          document.getElementById('userReferralCode').innerText = data.referral_code;
+          localStorage.setItem('user', JSON.stringify(data.user));
+          document.getElementById('generatedReferral').innerHTML = `✨ رمز الدعوة الخاص بك: <strong>${data.referral_code}</strong>`;
           document.getElementById('generatedReferral').classList.remove('hidden');
-          showMessage(`✅ تم إنشاء الحساب بنجاح! رمز الدعوة: ${data.referral_code}`, 'success');
+          showMessage(`✅ تم إنشاء الحساب بنجاح!`, 'success');
           setTimeout(() => { window.location.href = '/dashboard.html'; }, 2000);
-        } else { showMessage('❌ ' + (data.error || 'فشل إنشاء الحساب'), 'error'); }
-      } catch (error) { showMessage('❌ خطأ في الاتصال بالخادم', 'error'); }
+        } else {
+          showMessage('❌ ' + data.error, 'error');
+        }
+      } catch (error) {
+        showMessage('❌ خطأ في الاتصال', 'error');
+      }
     };
+    
+    // التحقق من وجود جلسة محفوظة
+    const savedUserId = localStorage.getItem('userId');
+    const rememberMe = localStorage.getItem('rememberMe');
+    if (savedUserId && rememberMe === 'true') {
+      // تمديد الجلسة لمدة 30 يوم
+      window.location.href = '/dashboard.html';
+    }
+    
+    updateLanguage();
   </script>
 </body>
 </html>
