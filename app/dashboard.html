@@ -21,9 +21,14 @@
       justify-content: space-between;
       align-items: center;
       border-bottom: 1px solid #00ff66;
+      flex-wrap: wrap;
+      gap: 10px;
     }
-    .logo { font-size: 22px; font-weight: bold; color: #00ff66; }
+    .logo { font-size: 22px; font-weight: bold; color: #00ff66; display: flex; align-items: center; gap: 10px; }
+    .user-actions { display: flex; align-items: center; gap: 15px; }
     .user-name { color: #00ff66; font-size: 14px; }
+    .support-btn { background: rgba(0,255,102,0.15); border: 1px solid #00ff66; color: #00ff66; padding: 6px 12px; border-radius: 20px; cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 5px; }
+    .logout-btn { background: transparent; border: 1px solid #ff4444; color: #ff4444; padding: 6px 12px; border-radius: 20px; cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 5px; }
     .content { max-width: 500px; margin: 0 auto; padding: 20px; }
     
     .card {
@@ -78,7 +83,10 @@
     .vip-name { color: #00ff66; font-weight: bold; }
     .vip-roi { color: #00ccff; }
     .vip-price { color: #fbbf24; font-size: 14px; }
+    .vip-status { font-size: 12px; }
     .upgrade-btn { background: #00ff66; color: #0a0a0f; border: none; padding: 6px 12px; border-radius: 20px; cursor: pointer; font-weight: bold; }
+    .coming-soon { opacity: 0.6; cursor: not-allowed; }
+    .coming-soon .upgrade-btn { background: #8899aa; cursor: not-allowed; }
     
     input {
       width: 100%;
@@ -217,7 +225,11 @@
 <body>
   <div class="navbar">
     <div class="logo">💰 CryptoInvest</div>
-    <div class="user-name" id="userName"></div>
+    <div class="user-actions">
+      <button class="support-btn" id="supportBtn">💬 الدعم</button>
+      <span class="user-name" id="userName"></span>
+      <button class="logout-btn" id="logoutBtn">🚪 خروج</button>
+    </div>
   </div>
 
   <div class="content" id="mainContent"></div>
@@ -241,6 +253,7 @@
       <p>3. قم بتحويل USDT إلى هذا العنوان</p>
       <p>4. الصق Transaction Hash وأدخل المبلغ</p>
       <p>5. اضغط <strong>"تحقق وأيدع"</strong></p>
+      <p>📌 <strong>الحد الأدنى للإيداع: 10 USDT</strong></p>
       <button class="close-modal" id="closeInstructions">✅ فهمت</button>
     </div>
   </div>
@@ -253,16 +266,18 @@
     // ✅ عنوان المحفظة الحقيقي
     const HOT_WALLET_ADDRESS = '0x9EB39A10c059877910DAff1fd8098e5DB32486F7';
     
-    // ✅ الحد الأدنى للإيداع (2.5 USDT)
-    const MIN_DEPOSIT = 2.5;
+    // ✅ الحد الأدنى للإيداع 10 USDT
+    const MIN_DEPOSIT = 10;
     const MIN_WITHDRAW = 0.5;
 
+    // ✅ مستويات VIP (VIP1 إلى VIP5 جاهزة، VIP6 قريباً)
     const vipLevels = {
-      1: { name: 'VIP 1', price: 50, roi: 2.2 },
-      2: { name: 'VIP 2', price: 100, roi: 2.5 },
-      3: { name: 'VIP 3', price: 250, roi: 2.8 },
-      4: { name: 'VIP 4', price: 500, roi: 3.2 },
-      5: { name: 'VIP 5', price: 1000, roi: 3.5 }
+      1: { name: 'VIP 1', price: 10, roi: 2.2, active: true },
+      2: { name: 'VIP 2', price: 20, roi: 2.5, active: true },
+      3: { name: 'VIP 3', price: 30, roi: 2.8, active: true },
+      4: { name: 'VIP 4', price: 40, roi: 3.2, active: true },
+      5: { name: 'VIP 5', price: 50, roi: 3.5, active: true },
+      6: { name: 'VIP 6', price: 1000, roi: 4.0, active: false } // قريباً
     };
 
     async function loadUser() {
@@ -276,7 +291,7 @@
         const data = await res.json();
         if (data.error) { localStorage.clear(); window.location.href = '/'; return; }
         userData = data;
-        document.getElementById('userName').innerHTML = userData.name;
+        document.getElementById('userName').innerHTML = `👋 ${userData.name}`;
         
         if (!localStorage.getItem('instructionsShown')) {
           document.getElementById('instructionsModal').classList.remove('hidden');
@@ -285,6 +300,19 @@
         renderDashboard();
       } catch(e) { console.error(e); }
     }
+
+    // تسجيل الخروج
+    document.getElementById('logoutBtn').onclick = () => {
+      localStorage.removeItem('userId');
+      localStorage.removeItem('user');
+      localStorage.removeItem('rememberMe');
+      window.location.href = '/';
+    };
+
+    // زر الدعم (تلغرام)
+    document.getElementById('supportBtn').onclick = () => {
+      window.open('https://t.me/+fPunvn_76Q45NDg8', '_blank');
+    };
 
     document.getElementById('closeInstructions').onclick = () => {
       document.getElementById('instructionsModal').classList.add('hidden');
@@ -306,12 +334,18 @@
       messages.forEach(msg => msg.remove());
     }
 
+    // التوجيه للإيداع مع سعر الباقة
     function redirectToDepositWithPrice(packagePrice, packageName) {
+      // تغيير الصفحة إلى الإيداع
       document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
       document.querySelector('[data-page="deposit"]').classList.add('active');
       document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
       document.getElementById('depositPage').classList.add('active');
+      
+      // عرض رسالة توضيحية
       showMessage(`⚠️ تحتاج إلى إيداع ${packagePrice} USDT للاشتراك في ${packageName}`, 'warning', 6000);
+      
+      // إعادة تحميل صفحة الإيداع
       renderDeposit();
     }
 
@@ -352,6 +386,7 @@
         </div>
       `;
       
+      // إصلاح أزرار الإيداع والسحب في قسم البيت
       document.getElementById('quickDepositBtn').onclick = () => {
         document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
         document.querySelector('[data-page="deposit"]').classList.add('active');
@@ -380,7 +415,7 @@
           <code style="color:#00ff66; word-break:break-all;">${HOT_WALLET_ADDRESS}</code>
           <button class="btn-copy" id="copyWalletBtn">📋 نسخ العنوان</button>
           
-          <input type="number" id="depositAmount" placeholder="المبلغ (USDT) - الحد الأدنى ${MIN_DEPOSIT}" style="margin-top:16px;" step="0.1">
+          <input type="number" id="depositAmount" placeholder="المبلغ (USDT) - الحد الأدنى ${MIN_DEPOSIT}" style="margin-top:16px;" step="1">
           <input type="text" id="depositTxHash" placeholder="Transaction Hash (0x...)" style="direction:ltr; font-family: monospace;">
           <button class="deposit-btn" id="doDepositBtn">🔍 تحقق وأيدع</button>
           
@@ -504,39 +539,47 @@
 
     async function renderVIP() {
       const currentLevel = userData?.vip_level || 0;
-      const hasSubscription = currentLevel > 0;
       
       document.getElementById('mainContent').innerHTML = `
         <div class="card">
           <div class="card-title">👑 مستويات VIP</div>
-          ${!hasSubscription ? '<div class="no-subscription" style="text-align:center; padding:20px; color:#ffaa00; border:1px dashed #ffaa00; border-radius:16px; margin-bottom:16px;">⚠️ أنت لست مشتركاً في أي باقة VIP. قم باختيار باقة أدناه للاشتراك.</div>' : ''}
           <div id="vipList"></div>
+          <div class="info-box" style="margin-top:16px;">
+            ⭐ <strong>VIP 6 قريباً!</strong> سيكون بسعر 1000 USDT مع نسبة ربح 4% يومياً
+          </div>
         </div>
       `;
       
       const container = document.getElementById('vipList');
       container.innerHTML = Object.entries(vipLevels).map(([level, vip]) => `
-        <div class="vip-item" data-level="${level}" data-price="${vip.price}" data-name="${vip.name}">
+        <div class="vip-item ${!vip.active ? 'coming-soon' : ''}" data-level="${level}" data-price="${vip.price}" data-name="${vip.name}" data-active="${vip.active}">
           <div>
-            <div class="vip-name">${vip.name}</div>
+            <div class="vip-name">${vip.name} ${!vip.active ? '(قريباً)' : ''}</div>
             <div class="vip-roi">💰 ${vip.roi}% يومياً</div>
             <div class="vip-price">💎 سعر الاشتراك: ${vip.price} USDT</div>
           </div>
           <div>
-            ${currentLevel >= parseInt(level) ? '<span style="color:#00ff66;">✅ مفتوح</span>' : 
-              (currentLevel > 0 && currentLevel < parseInt(level) ? '<span style="color:#8899aa;">🔒 مغلق (يجب ترقية السابق)</span>' :
-              '<button class="upgrade-btn" data-level="'+level+'" data-price="'+vip.price+'" data-name="'+vip.name+'">اشتراك ('+vip.price+' USDT)</button>')}
+            ${currentLevel >= parseInt(level) ? '<span class="vip-status" style="color:#00ff66;">✅ مفتوح</span>' : 
+              (currentLevel > 0 && currentLevel < parseInt(level) ? '<span class="vip-status" style="color:#8899aa;">🔒 مغلق (يجب ترقية السابق)</span>' :
+              (!vip.active ? '<span class="vip-status" style="color:#ffaa00;">⏳ قريباً</span>' :
+              '<button class="upgrade-btn" data-level="'+level+'" data-price="'+vip.price+'" data-name="'+vip.name+'">اشتراك ('+vip.price+' USDT)</button>'))}
           </div>
         </div>
       `).join('');
       
+      // إضافة حدث النقر على البطاقة نفسها للتوجيه للإيداع
       document.querySelectorAll('.vip-item').forEach(item => {
         const level = parseInt(item.dataset.level);
         const price = parseFloat(item.dataset.price);
         const name = item.dataset.name;
+        const isActive = item.dataset.active === 'true';
         
         item.onclick = (e) => {
           if (e.target.classList.contains('upgrade-btn')) return;
+          if (!isActive) {
+            showMessage(`⏳ ${name} سيتم إطلاقه قريباً!`, 'warning', 3000);
+            return;
+          }
           if (currentLevel >= level) {
             showMessage(`✅ ${name} مفتوح بالفعل`, 'success', 2000);
           } else if (currentLevel > 0 && currentLevel < level) {
