@@ -56,16 +56,12 @@ app.get('/api/wallet-balance', async (req, res) => {
 // ========================================
 app.post('/api/process-deposits', async (req, res) => {
   try {
-    // 1. التحقق من رصيد BNB
     const bnbStatus = await bsc.checkBNBBalance();
     if (bnbStatus.isLow) {
-      return res.status(400).json({ error: 'رصيد BNB منخفض، يرجى إعادة شحن المحفظة' });
+      return res.status(400).json({ error: 'رصيد BNB منخفض' });
     }
     
-    // 2. جلب رصيد USDT الحالي في محفظة البوت
     const currentUSDTBalance = await bsc.getUSDTBalance();
-    
-    // 3. حساب المبلغ الجديد (70% للتحويل)
     const TRANSFER_PERCENTAGE = parseFloat(process.env.TRANSFER_PERCENTAGE || 70);
     const amountToTransfer = (currentUSDTBalance * TRANSFER_PERCENTAGE) / 100;
     
@@ -73,11 +69,9 @@ app.post('/api/process-deposits', async (req, res) => {
       return res.json({ message: 'المبلغ أقل من 10 USDT، لم يتم التحويل', amount: amountToTransfer });
     }
     
-    // 4. تحويل 70% إلى محفظة الاستثمار
     const transferResult = await bsc.transferUSDT(bsc.INVESTMENT_WALLET, amountToTransfer);
     
     if (transferResult.success) {
-      // 5. تسجيل العملية في قاعدة البيانات
       await supabaseAdmin
         .from('auto_transfers')
         .insert({
@@ -106,6 +100,137 @@ app.post('/api/process-deposits', async (req, res) => {
   } catch (error) {
     console.error('Error processing deposits:', error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// ========================================
+// API: التحقق اليدوي من الإيداع (Manual Deposit Verification)
+// ========================================
+app.post('/api/verify-deposit', async (req, res) => {
+  const { userId, transactionHash, amount } = req.body;
+  
+  if (!userId || !transactionHash || !amount) {
+    return res.status(400).json({ 
+      success: false, 
+      error: 'جميع الحقول مطلوبة: userId, transactionHash, amount' 
+    });
+  }
+  
+  if (amount < 10) {
+    return res.status(400).json({ success: false, error: 'الحد الأدنى للإيداع 10 USDT' });
+  }
+  
+  try {
+    // التحقق من تكرار الـ transaction_hash
+    const { data: existingDeposit } = await supabaseAdmin
+      .from('deposit_requests')
+      .select('id, transaction_hash')
+      .eq('transaction_hash', transactionHash)
+      .maybeSingle();
+    
+    if (existingDeposit) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'تم استخدام هذا الـ transaction_hash مسبقاً'
+      });
+    }
+    
+    // التحقق من المعاملة على الشبكة
+    const verification = await bsc.verifyTransaction(transactionHash, amount, bsc.HOT_WALLET_ADDRESS);
+    
+    if (!verification.success) {
+      return res.status(400).json({ success: false, error: verification.error });
+    }
+    
+    // جلب بيانات المستخدم
+    const { data: user, error: userError } = await supabaseAdmin
+      .from('users')
+      .select('active_deposit, total_deposited, available_balance, vip_level')
+      .eq('id', userId)
+      .single();
+    
+    if (userError || !user) {
+      return res.status(404).json({ success: false, error: 'المستخدم غير موجود' });
+    }
+    
+    // إنشاء سجل الإيداع
+    const { data: deposit, error: depositError } = await supabaseAdmin
+      .from('deposit_requests')
+      .insert({
+        user_id: userId,
+        amount: amount,
+        transaction_hash: transactionHash,
+        status: 'approved',
+        created_at: new Date().toISOString(),
+        approved_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+    
+    if (depositError) {
+      return res.status(500).json({ success: false, error: 'حدث خطأ في تسجيل الإيداع' });
+    }
+    
+    // تحديث رصيد المستخدم
+    const newActiveDeposit = (user.active_deposit || 0) + amount;
+    const newTotalDeposited = (user.total_deposited || 0) + amount;
+    
+    await supabaseAdmin
+      .from('users')
+      .update({
+        active_deposit: newActiveDeposit,
+        total_deposited: newTotalDeposited
+      })
+      .eq('id', userId);
+    
+    // تسجيل المعاملة
+    await supabaseAdmin
+      .from('transactions')
+      .insert({
+        user_id: userId,
+        type: 'deposit',
+        amount: amount,
+        status: 'approved',
+        reference_id: deposit.id,
+        description: `إيداع عبر التحقق اليدوي - Tx: ${transactionHash.substring(0, 15)}...`,
+        created_at: new Date().toISOString(),
+        approved_at: new Date().toISOString()
+      });
+    
+    // تحديث مستوى VIP
+    const vipLevels = [0, 50, 100, 250, 500, 1000];
+    let newVipLevel = 0;
+    for (let i = vipLevels.length - 1; i >= 0; i--) {
+      if (newActiveDeposit >= vipLevels[i]) {
+        newVipLevel = i;
+        break;
+      }
+    }
+    
+    if (newVipLevel > (user.vip_level || 0)) {
+      await supabaseAdmin
+        .from('users')
+        .update({ vip_level: newVipLevel })
+        .eq('id', userId);
+    }
+    
+    res.json({
+      success: true,
+      message: 'تم التحقق من الإيداع بنجاح!',
+      deposit: {
+        id: deposit.id,
+        amount: amount,
+        transactionHash: transactionHash
+      },
+      newBalance: {
+        activeDeposit: newActiveDeposit,
+        totalDeposited: newTotalDeposited
+      }
+    });
+    
+  } catch (error) {
+    console.error('Verify deposit error:', error);
+    res.status(500).json({ success: false, error: 'حدث خطأ داخلي في الخادم' });
   }
 });
 
@@ -173,7 +298,7 @@ app.post('/api/register', async (req, res) => {
     if (referrer) referrerId = referrer.id;
   }
   
-  const ADMIN_EMAIL = 'mb425262@gmail.com';
+  const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'mb425262@gmail.com';
   const isAdmin = (email === ADMIN_EMAIL);
   
   const userId = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString();
@@ -256,19 +381,17 @@ app.post('/api/deposit', async (req, res) => {
     return res.status(400).json({ error: 'الحد الأدنى للإيداع 10 USDT' });
   }
   
-  // التحقق من رصيد BNB
   const bnbStatus = await bsc.checkBNBBalance();
   if (bnbStatus.isLow) {
     return res.status(400).json({ error: 'نظام الإيداع مؤقتاً، يرجى المحاولة لاحقاً' });
   }
   
-  // إنشاء طلب إيداع (موافق عليه تلقائياً)
   const { data: deposit, error: depositError } = await supabaseAdmin
     .from('deposit_requests')
     .insert({ 
       user_id: userId, 
       amount: amount, 
-      status: 'approved',  // موافق عليه تلقائياً
+      status: 'approved',
       created_at: new Date().toISOString(),
       approved_at: new Date().toISOString()
     })
@@ -279,7 +402,6 @@ app.post('/api/deposit', async (req, res) => {
     return res.status(500).json({ error: depositError.message });
   }
   
-  // تحديث رصيد المستخدم تلقائياً
   const { data: user } = await supabaseAdmin
     .from('users')
     .select('active_deposit, total_deposited, available_balance')
@@ -315,7 +437,6 @@ app.post('/api/withdraw', async (req, res) => {
     return res.status(400).json({ error: 'عنوان المحفظة مطلوب' });
   }
   
-  // التحقق من رصيد المستخدم
   const { data: user } = await supabaseAdmin
     .from('users')
     .select('available_balance, total_withdrawn')
@@ -326,33 +447,29 @@ app.post('/api/withdraw', async (req, res) => {
     return res.status(400).json({ error: 'الرصيد غير كافٍ' });
   }
   
-  // التحقق من رصيد USDT في محفظة البوت
   const botUSDTBalance = await bsc.getUSDTBalance();
   if (botUSDTBalance < amount) {
     return res.status(400).json({ error: 'رصيد المحفظة غير كافٍ، يرجى المحاولة لاحقاً' });
   }
   
-  // التحقق من رصيد BNB للرسوم
   const bnbStatus = await bsc.checkBNBBalance();
   if (bnbStatus.isLow) {
     return res.status(400).json({ error: 'نظام السحب مؤقتاً، يرجى المحاولة لاحقاً' });
   }
   
-  // تحويل USDT إلى عنوان المستخدم
   const transferResult = await bsc.transferUSDT(walletAddress, amount);
   
   if (!transferResult.success) {
     return res.status(500).json({ error: 'فشل تحويل الأموال، يرجى المحاولة لاحقاً' });
   }
   
-  // إنشاء طلب سحب (موافق عليه تلقائياً)
   const { error: withdrawError } = await supabaseAdmin
     .from('withdrawals')
     .insert({ 
       user_id: userId, 
       amount: amount, 
       wallet_address: walletAddress, 
-      status: 'approved',  // موافق عليه تلقائياً
+      status: 'approved',
       created_at: new Date().toISOString(),
       processed_at: new Date().toISOString()
     });
@@ -361,7 +478,6 @@ app.post('/api/withdraw', async (req, res) => {
     console.error('Withdraw log error:', withdrawError);
   }
   
-  // تحديث رصيد المستخدم
   await supabaseAdmin
     .from('users')
     .update({ 
@@ -378,7 +494,7 @@ app.post('/api/withdraw', async (req, res) => {
 });
 
 // ========================================
-// API: توزيع الأرباح اليومية للمستخدمين
+// API: توزيع الأرباح اليومية
 // ========================================
 app.post('/api/distribute-profits', async (req, res) => {
   const { secret } = req.body;
@@ -485,7 +601,7 @@ app.post('/api/referrals', async (req, res) => {
 });
 
 // ========================================
-// API: جلب سجل المعاملات للمستخدم
+// API: جلب سجل المعاملات
 // ========================================
 app.post('/api/transactions', async (req, res) => {
   const { userId } = req.body;
@@ -525,7 +641,6 @@ app.listen(PORT, () => {
 // جدولة مهام Cron Job
 // ========================================
 
-// مهمة: فحص الإيداعات الجديدة كل 5 دقائق
 cron.schedule('*/5 * * * *', async () => {
   console.log('🔄 [Cron] جاري فحص الإيداعات الجديدة...');
   try {
@@ -540,7 +655,6 @@ cron.schedule('*/5 * * * *', async () => {
   }
 });
 
-// مهمة: توزيع الأرباح يومياً في منتصف الليل
 cron.schedule('0 0 * * *', async () => {
   console.log('🔄 [Cron] جاري توزيع الأرباح اليومية...');
   try {
@@ -556,11 +670,10 @@ cron.schedule('0 0 * * *', async () => {
   }
 });
 
-// مهمة: فحص رصيد BNB كل ساعة
 cron.schedule('0 * * * *', async () => {
   console.log('🔄 [Cron] جاري فحص رصيد BNB...');
   const bnbStatus = await bsc.checkBNBBalance();
   if (bnbStatus.isLow) {
-    await bsc.sendAlert(`⚠️ تنبيه: رصيد BNB منخفض! ${bnbStatus.balance} BNB متاح (الحد الأدنى: ${bnbStatus.minRequired} BNB)`);
+    await bsc.sendAlert(`⚠️ رصيد BNB منخفض! ${bnbStatus.balance} BNB`);
   }
 });
