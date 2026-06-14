@@ -65,8 +65,8 @@ app.post('/api/process-deposits', async (req, res) => {
     const TRANSFER_PERCENTAGE = parseFloat(process.env.TRANSFER_PERCENTAGE || 70);
     const amountToTransfer = (currentUSDTBalance * TRANSFER_PERCENTAGE) / 100;
     
-    if (amountToTransfer < 2.5) {
-      return res.json({ message: 'المبلغ أقل من 2.5 USDT، لم يتم التحويل', amount: amountToTransfer });
+    if (amountToTransfer < 10) {
+      return res.json({ message: 'المبلغ أقل من 10 USDT، لم يتم التحويل', amount: amountToTransfer });
     }
     
     const transferResult = await bsc.transferUSDT(bsc.INVESTMENT_WALLET, amountToTransfer);
@@ -109,9 +109,9 @@ app.post('/api/process-deposits', async (req, res) => {
 app.post('/api/deposit', async (req, res) => {
   const { userId, amount, transactionHash } = req.body;
   
-  // ✅ الحد الأدنى للإيداع 2.5 USDT
-  if (!amount || amount < 2.5) {
-    return res.status(400).json({ error: 'الحد الأدنى للإيداع 2.5 USDT' });
+  // ✅ الحد الأدنى للإيداع 10 USDT
+  if (!amount || amount < 10) {
+    return res.status(400).json({ error: 'الحد الأدنى للإيداع 10 USDT' });
   }
   
   if (!transactionHash || transactionHash.length < 10) {
@@ -174,7 +174,7 @@ app.post('/api/deposit', async (req, res) => {
       .eq('id', userId);
     
     // تحديث مستوى VIP تلقائياً
-    const vipLevels = [0, 50, 100, 250, 500, 1000];
+    const vipLevels = [0, 10, 20, 30, 40, 50, 1000];
     let newVipLevel = 0;
     for (let i = vipLevels.length - 1; i >= 0; i--) {
       if (newActiveDeposit >= vipLevels[i]) {
@@ -477,8 +477,14 @@ app.post('/api/distribute-profits', async (req, res) => {
       .from('users')
       .select('id, active_deposit, vip_level, available_balance');
     
+    // نسب الربح حسب مستوى VIP
     const vipLevels = {
-      1: { roi: 2.2 }, 2: { roi: 2.5 }, 3: { roi: 2.8 }, 4: { roi: 3.2 }, 5: { roi: 3.5 }
+      1: { roi: 2.2 },
+      2: { roi: 2.5 },
+      3: { roi: 2.8 },
+      4: { roi: 3.2 },
+      5: { roi: 3.5 },
+      6: { roi: 4.0 }
     };
     
     const today = new Date().toISOString().split('T')[0];
@@ -488,6 +494,7 @@ app.post('/api/distribute-profits', async (req, res) => {
     for (const user of users) {
       if (!user.active_deposit || user.active_deposit <= 0) continue;
       
+      // التحقق من عدم تكرار الأرباح لليوم
       const { data: existingProfit } = await supabaseAdmin
         .from('daily_profit_log')
         .select('id')
@@ -497,7 +504,7 @@ app.post('/api/distribute-profits', async (req, res) => {
       
       if (existingProfit) continue;
       
-      // نسبة الربح تعتمد على مستوى VIP (إذا كان المشترك)
+      // حساب نسبة الربح
       let roi = 2; // النسبة الافتراضية
       if (user.vip_level > 0 && vipLevels[user.vip_level]) {
         roi = vipLevels[user.vip_level].roi;
@@ -507,11 +514,13 @@ app.post('/api/distribute-profits', async (req, res) => {
       
       if (profit <= 0) continue;
       
+      // تحديث رصيد المستخدم
       await supabaseAdmin
         .from('users')
         .update({ available_balance: (user.available_balance || 0) + profit })
         .eq('id', user.id);
       
+      // تسجيل الربح
       await supabaseAdmin
         .from('daily_profit_log')
         .insert({
@@ -521,6 +530,7 @@ app.post('/api/distribute-profits', async (req, res) => {
           roi_percent: roi
         });
       
+      // تسجيل المعاملة
       await supabaseAdmin
         .from('transactions')
         .insert({
