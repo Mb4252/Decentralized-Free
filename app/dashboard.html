@@ -15,83 +15,44 @@
         linear-gradient(90deg, rgba(0, 255, 100, 0.03) 1px, transparent 1px);
       background-size: 40px 40px;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      padding-bottom: 90px !important;
+      padding-bottom: 80px;
     }
 
-    /* Glassmorphism Navbar */
+    /* Navbar */
     .navbar {
-      background: rgba(10, 10, 20, 0.8);
-      backdrop-filter: blur(12px);
+      background: rgba(10, 10, 20, 0.9);
       padding: 16px 20px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      border-bottom: 1px solid rgba(0, 255, 100, 0.2);
+      border-bottom: 1px solid #00ff66;
       position: sticky;
       top: 0;
       z-index: 100;
     }
-    .logo { font-size: 22px; font-weight: bold; background: linear-gradient(135deg, #00ff66, #00ccff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .logo { font-size: 22px; font-weight: bold; color: #00ff66; }
     .nav-icons { display: flex; gap: 20px; align-items: center; }
-    .nav-icon { font-size: 22px; cursor: pointer; color: #8899aa; transition: all 0.3s; }
-    .nav-icon:hover { color: #00ff66; }
-    .user-name { color: #00ff66; font-size: 14px; margin-left: 8px; }
-
-    /* Welcome Popup */
-    .popup-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0,0,0,0.8);
-      backdrop-filter: blur(8px);
-      z-index: 1000;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-    }
-    .popup-content {
-      background: rgba(20, 20, 35, 0.95);
-      backdrop-filter: blur(12px);
-      border-radius: 32px;
-      padding: 28px;
-      max-width: 350px;
-      width: 100%;
-      border: 1px solid rgba(0, 255, 100, 0.3);
-      text-align: center;
-      animation: fadeInUp 0.4s ease-out;
-    }
-    @keyframes fadeInUp {
-      from { opacity: 0; transform: translateY(30px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    .popup-content h3 { color: #00ff66; margin-bottom: 16px; font-size: 22px; }
-    .popup-content p { color: #8899aa; margin-bottom: 12px; line-height: 1.5; font-size: 14px; }
-    .popup-close { background: linear-gradient(135deg, #00ff66, #00ccff); color: #0a0a0f; border: none; padding: 12px 24px; border-radius: 30px; font-weight: bold; margin-top: 16px; cursor: pointer; width: 100%; }
+    .nav-icon { font-size: 22px; cursor: pointer; color: #8899aa; }
+    .user-name { color: #00ff66; font-size: 14px; }
 
     /* Main Content */
-    .content { max-width: 500px; margin: 0 auto; padding: 20px; }
+    .content { max-width: 500px; margin: 0 auto; padding: 20px; padding-bottom: 100px; }
 
     /* Assets Card */
     .assets-card {
-      background: rgba(20, 20, 35, 0.6);
-      backdrop-filter: blur(12px);
+      background: rgba(20, 20, 35, 0.8);
       border-radius: 32px;
       padding: 28px;
       text-align: center;
-      border: 1px solid rgba(0, 255, 100, 0.2);
+      border: 1px solid #00ff66;
       margin-bottom: 24px;
     }
     .assets-label { color: #8899aa; font-size: 14px; margin-bottom: 8px; }
     .assets-amount { font-size: 48px; font-weight: bold; color: #00ff66; margin-bottom: 12px; }
-    .assets-detail { color: #00ccff; font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
-    .assets-detail span { transition: transform 0.3s; }
-    .assets-detail:hover span { transform: rotate(180deg); }
+    .assets-detail { color: #00ccff; font-size: 13px; cursor: pointer; }
     .details-panel { margin-top: 20px; padding-top: 16px; border-top: 1px solid rgba(0, 255, 100, 0.2); display: none; }
     .details-panel.show { display: block; }
-    .detail-row { display: flex; justify-content: space-between; padding: 8px 0; color: #8899aa; font-size: 14px; }
+    .detail-row { display: flex; justify-content: space-between; padding: 8px 0; color: #8899aa; }
     .detail-value { color: #00ccff; font-weight: bold; }
 
     /* Stats Grid */
@@ -102,93 +63,42 @@
       margin-bottom: 24px;
     }
     .stat-card {
-      background: rgba(20, 20, 35, 0.6);
-      backdrop-filter: blur(12px);
+      background: rgba(20, 20, 35, 0.8);
       border-radius: 24px;
       padding: 18px;
       text-align: center;
-      border: 1px solid rgba(0, 255, 100, 0.15);
-      transition: transform 0.3s;
+      border: 1px solid rgba(0, 255, 100, 0.3);
     }
-    .stat-card:hover { transform: translateY(-3px); border-color: rgba(0, 255, 100, 0.5); }
     .stat-card .icon { font-size: 28px; margin-bottom: 8px; }
-    .stat-card .label { color: #8899aa; font-size: 12px; margin-bottom: 6px; }
+    .stat-card .label { color: #8899aa; font-size: 12px; }
     .stat-card .value { color: #00ff66; font-size: 22px; font-weight: bold; }
 
-    /* VIP Levels */
+    /* Section Title */
     .section-title { color: white; font-size: 18px; margin-bottom: 16px; border-right: 3px solid #00ff66; padding-right: 12px; }
+
+    /* VIP List */
     .vip-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; }
     .vip-item {
-      background: rgba(20, 20, 35, 0.6);
-      backdrop-filter: blur(12px);
+      background: rgba(20, 20, 35, 0.8);
       border-radius: 20px;
       padding: 16px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      border: 1px solid rgba(0, 255, 100, 0.15);
-      transition: all 0.3s;
-      cursor: pointer;
+      border: 1px solid rgba(0, 255, 100, 0.3);
     }
-    .vip-item:hover { border-color: rgba(0, 255, 100, 0.5); transform: translateX(-5px); }
     .vip-name { font-weight: bold; color: #00ff66; }
     .vip-roi { color: #00ccff; font-size: 14px; }
     .vip-min { color: #8899aa; font-size: 12px; }
-    .upgrade-btn { background: #00ff66; border: none; padding: 6px 12px; border-radius: 20px; color: #0a0a0f; font-weight: bold; cursor: pointer; transition: all 0.3s; }
-    .upgrade-btn:hover { transform: scale(1.02); background: #00cc55; }
+    .upgrade-btn { background: #00ff66; border: none; padding: 6px 12px; border-radius: 20px; color: #0a0a0f; font-weight: bold; cursor: pointer; }
 
-    /* ======================================== */
-    /* الشريط السفلي - تم إصلاح ظهوره */
-    /* ======================================== */
-    .bottom-nav {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      background: rgba(10, 10, 20, 0.95);
-      backdrop-filter: blur(12px);
-      display: flex;
-      justify-content: space-around;
-      padding: 10px 12px;
-      border-top: 1px solid rgba(0, 255, 100, 0.2);
-      z-index: 9999;
-    }
-    .nav-item {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 4px;
-      background: none;
-      border: none;
-      color: #8899aa;
-      cursor: pointer;
-      padding: 5px 10px;
-      border-radius: 30px;
-      transition: all 0.3s;
-    }
-    .nav-item.active {
-      color: #00ff66;
-      background: rgba(0, 255, 102, 0.1);
-    }
-    .nav-item .nav-icon {
-      font-size: 22px;
-    }
-    .nav-item .nav-label {
-      font-size: 10px;
-    }
-
-    /* Pages */
-    .page { display: none; }
-    .page.active { display: block; }
-
-    /* Profile Page */
+    /* Profile Card */
     .profile-card {
-      background: rgba(20, 20, 35, 0.6);
-      backdrop-filter: blur(12px);
+      background: rgba(20, 20, 35, 0.8);
       border-radius: 32px;
       padding: 24px;
       text-align: center;
-      border: 1px solid rgba(0, 255, 100, 0.2);
+      border: 1px solid #00ff66;
       margin-bottom: 24px;
     }
     .avatar {
@@ -202,43 +112,51 @@
       margin: 0 auto 16px;
       font-size: 40px;
     }
-    .profile-name { font-size: 20px; font-weight: bold; color: white; margin-bottom: 8px; }
+    .profile-name { font-size: 20px; font-weight: bold; color: white; }
     .profile-id { color: #8899aa; font-size: 12px; margin-bottom: 16px; word-break: break-all; }
     .profile-balance { font-size: 24px; font-weight: bold; color: #00ff66; }
 
-    /* Transaction History Table */
-    .history-table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-    .history-table th, .history-table td {
-      padding: 12px;
-      text-align: center;
-      border-bottom: 1px solid rgba(0, 255, 100, 0.1);
-      color: #8899aa;
-      font-size: 13px;
-    }
+    /* History Table */
+    .history-table { width: 100%; border-collapse: collapse; }
+    .history-table th, .history-table td { padding: 12px; text-align: center; border-bottom: 1px solid rgba(0, 255, 100, 0.1); color: #8899aa; }
     .history-table th { color: #00ff66; }
-    .status-pending { color: #ffaa00; }
     .status-approved { color: #00ff66; }
+    .status-pending { color: #ffaa00; }
     .status-rejected { color: #ff4444; }
 
     /* Buttons */
     .btn-copy {
       background: rgba(0, 255, 102, 0.15);
-      border: 1px solid rgba(0, 255, 102, 0.5);
+      border: 1px solid #00ff66;
       color: #00ff66;
       padding: 10px 16px;
       border-radius: 30px;
       cursor: pointer;
-      font-size: 14px;
       width: 100%;
       margin-top: 12px;
     }
-    .deposit-btn { background: linear-gradient(135deg, #00ff66, #00ccff); color: #0a0a0f; border: none; padding: 14px; border-radius: 30px; font-weight: bold; width: 100%; cursor: pointer; transition: all 0.3s; }
-    .deposit-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 25px -5px rgba(0, 255, 102, 0.4); }
-    .withdraw-btn { background: linear-gradient(135deg, #ff4444, #ff6680); color: white; border: none; padding: 14px; border-radius: 30px; font-weight: bold; width: 100%; cursor: pointer; transition: all 0.3s; }
-    .withdraw-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 25px -5px rgba(255, 68, 68, 0.4); }
+    .deposit-btn { background: linear-gradient(135deg, #00ff66, #00ccff); color: #0a0a0f; border: none; padding: 14px; border-radius: 30px; font-weight: bold; width: 100%; cursor: pointer; }
+    .withdraw-btn { background: linear-gradient(135deg, #ff4444, #ff6680); color: white; border: none; padding: 14px; border-radius: 30px; font-weight: bold; width: 100%; cursor: pointer; }
+
+    /* Inputs */
+    input {
+      width: 100%;
+      padding: 14px;
+      border-radius: 16px;
+      border: 1px solid #00ff66;
+      background: rgba(10, 10, 20, 0.8);
+      color: white;
+      margin-bottom: 12px;
+    }
+    input:focus { outline: none; border-color: #00ff66; }
+
+    /* Messages */
+    .message { padding: 12px; border-radius: 16px; margin-bottom: 16px; text-align: center; font-size: 13px; }
+    .success { background: rgba(0, 255, 102, 0.15); border: 1px solid #00ff66; color: #00ff66; }
+    .error { background: rgba(255, 68, 68, 0.15); border: 1px solid #ff4444; color: #ff4444; }
+    .warning { background: rgba(255, 170, 0, 0.15); border: 1px solid #ffaa00; color: #ffaa00; }
+
+    /* Support FAB */
     .support-fab {
       position: fixed;
       bottom: 90px;
@@ -251,42 +169,52 @@
       align-items: center;
       justify-content: center;
       cursor: pointer;
-      box-shadow: 0 4px 15px rgba(0, 255, 102, 0.3);
       z-index: 98;
       font-size: 24px;
-      transition: all 0.3s;
     }
-    .support-fab:hover { transform: scale(1.05); }
 
-    /* Inputs */
-    input {
-      width: 100%;
-      padding: 14px;
-      border-radius: 16px;
-      border: 1px solid rgba(0, 255, 100, 0.3);
-      background: rgba(10, 10, 20, 0.8);
-      color: white;
-      margin-bottom: 12px;
-      outline: none;
+    /* ======================================== */
+    /* الشريط السفلي - تصميم بسيط ومضمون */
+    /* ======================================== */
+    .bottom-nav {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #0a0a0f;
+      display: flex;
+      justify-content: space-around;
+      padding: 8px 10px;
+      border-top: 2px solid #00ff66;
+      z-index: 9999;
     }
-    input:focus { border-color: #00ff66; box-shadow: 0 0 0 3px rgba(0, 255, 102, 0.2); }
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: none;
+      border: none;
+      color: #8899aa;
+      cursor: pointer;
+      padding: 5px;
+      font-size: 20px;
+    }
+    .nav-item.active {
+      color: #00ff66;
+    }
+    .nav-label {
+      font-size: 10px;
+      margin-top: 2px;
+    }
 
-    /* Messages */
-    .message { padding: 12px; border-radius: 16px; margin-bottom: 16px; text-align: center; font-size: 13px; animation: fadeIn 0.3s; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
-    .success { background: rgba(0, 255, 102, 0.15); border: 1px solid #00ff66; color: #00ff66; }
-    .error { background: rgba(255, 68, 68, 0.15); border: 1px solid #ff4444; color: #ff4444; }
-    .warning { background: rgba(255, 170, 0, 0.15); border: 1px solid #ffaa00; color: #ffaa00; }
-
+    .page { display: none; }
+    .page.active { display: block; }
     .hidden { display: none; }
 
     @media (max-width: 480px) {
       .content { padding: 16px; }
       .assets-amount { font-size: 36px; }
-      .stat-card .value { font-size: 18px; }
-      .vip-item { flex-direction: column; text-align: center; gap: 8px; }
-      .nav-item .nav-label { font-size: 9px; }
-      .nav-item { padding: 4px 6px; }
+      .nav-item { font-size: 18px; }
     }
   </style>
 </head>
@@ -311,9 +239,7 @@
       <div class="assets-card">
         <div class="assets-label">إجمالي الأصول</div>
         <div class="assets-amount" id="totalAssets">0 USDT</div>
-        <div class="assets-detail" id="toggleDetails">
-          <span>▼</span> عرض التفاصيل
-        </div>
+        <div class="assets-detail" id="toggleDetails">▼ عرض التفاصيل</div>
         <div class="details-panel" id="detailsPanel">
           <div class="detail-row"><span>💰 الاستثمار النشط</span><span class="detail-value" id="activeDeposit">0 USDT</span></div>
           <div class="detail-row"><span>💎 الرصيد المتاح</span><span class="detail-value" id="availableBalance">0 USDT</span></div>
@@ -321,7 +247,6 @@
           <div class="detail-row"><span>📤 إجمالي السحوبات</span><span class="detail-value" id="totalWithdraw">0 USDT</span></div>
         </div>
       </div>
-
       <div class="stats-grid">
         <div class="stat-card"><div class="icon">📈</div><div class="label">نسبة الربح</div><div class="value" id="roiPercent">2%</div></div>
         <div class="stat-card"><div class="icon">💎</div><div class="label">المستوى الحالي</div><div class="value" id="vipLevel">VIP 0</div></div>
@@ -330,9 +255,9 @@
 
     <!-- Deposit Page -->
     <div id="depositPage" class="page">
-      <div class="assets-card" style="margin-bottom: 16px;">
+      <div class="assets-card">
         <div class="assets-label">محفظة الإيداع (شبكة BSC)</div>
-        <code style="color:#00ff66; word-break:break-all; font-size:12px;">0x987cfde723a87b5ed33329eebe0595a4416b848f</code>
+        <code style="color:#00ff66; word-break:break-all;">0x987cfde723a87b5ed33329eebe0595a4416b848f</code>
         <button class="btn-copy" id="copyWalletBtn">📋 نسخ العنوان</button>
       </div>
       <input type="number" id="depositAmount" placeholder="المبلغ (USDT) - الحد الأدنى 10">
@@ -342,7 +267,7 @@
 
     <!-- Withdraw Page -->
     <div id="withdrawPage" class="page">
-      <div class="assets-card" style="margin-bottom: 16px;">
+      <div class="assets-card">
         <div class="assets-label">الرصيد المتاح للسحب</div>
         <div class="assets-amount" id="withdrawBalance">0 USDT</div>
       </div>
@@ -352,7 +277,7 @@
       <div id="withdrawMsg"></div>
     </div>
 
-    <!-- VIP Page - 6 Levels (VIP 0 to VIP 5) -->
+    <!-- VIP Page -->
     <div id="vipPage" class="page">
       <div class="section-title">👑 مستويات VIP</div>
       <div class="vip-list" id="vipLevelsList"></div>
@@ -362,7 +287,7 @@
     <div id="referralPage" class="page">
       <div class="assets-card">
         <div class="assets-label">🔗 رابط الدعوة الخاص بك</div>
-        <code id="referralLink" style="color:#00ff66; word-break:break-all; font-size:12px;"></code>
+        <code id="referralLink" style="color:#00ff66; word-break:break-all;"></code>
         <button class="btn-copy" id="copyReferralBtn">📋 نسخ الرابط</button>
       </div>
       <div class="stats-grid">
@@ -373,7 +298,7 @@
       <div id="referralsList"></div>
     </div>
 
-    <!-- Profile Page (أنا) -->
+    <!-- Profile Page -->
     <div id="profilePage" class="page">
       <div class="profile-card">
         <div class="avatar">👤</div>
@@ -381,49 +306,26 @@
         <div class="profile-id" id="profileId"></div>
         <div class="profile-balance" id="profileBalance">0 USDT</div>
       </div>
-      
       <div class="section-title">📋 سجل العمليات</div>
-      <div style="background: rgba(20,20,35,0.6); backdrop-filter: blur(12px); border-radius: 24px; padding: 16px; border: 1px solid rgba(0,255,100,0.15);">
+      <div style="background: rgba(20,20,35,0.8); border-radius: 24px; padding: 16px;">
         <div style="overflow-x: auto;">
           <table class="history-table">
-            <thead>
-              <tr><th>التاريخ</th><th>النوع</th><th>المبلغ</th><th>الحالة</th></tr>
-            </thead>
-            <tbody id="transactionsList">
-              <tr><td colspan="4" style="text-align:center;">جاري التحميل...<\/td><\/tr>
-            </tbody>
-          <\/table>
+            <thead><tr><th>التاريخ</th><th>النوع</th><th>المبلغ</th><th>الحالة</th></tr></thead>
+            <tbody id="transactionsList"><tr><td colspan="4">جاري التحميل...</td></tr></tbody>
+          </table>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- الشريط السفلي - 6 أيقونات -->
+  <!-- الشريط السفلي - تصميم بسيط ومضمون الظهور -->
   <div class="bottom-nav">
-    <button class="nav-item active" data-page="dashboard">
-      <span class="nav-icon">🏠</span>
-      <span class="nav-label">البيت</span>
-    </button>
-    <button class="nav-item" data-page="vip">
-      <span class="nav-icon">👑</span>
-      <span class="nav-label">VIP</span>
-    </button>
-    <button class="nav-item" data-page="deposit">
-      <span class="nav-icon">💰</span>
-      <span class="nav-label">الإيداع</span>
-    </button>
-    <button class="nav-item" data-page="withdraw">
-      <span class="nav-icon">📤</span>
-      <span class="nav-label">السحب</span>
-    </button>
-    <button class="nav-item" data-page="referral">
-      <span class="nav-icon">👥</span>
-      <span class="nav-label">الفريق</span>
-    </button>
-    <button class="nav-item" data-page="profile">
-      <span class="nav-icon">👤</span>
-      <span class="nav-label">أنا</span>
-    </button>
+    <button class="nav-item active" data-page="dashboard">🏠<span class="nav-label">البيت</span></button>
+    <button class="nav-item" data-page="vip">👑<span class="nav-label">VIP</span></button>
+    <button class="nav-item" data-page="deposit">💰<span class="nav-label">الإيداع</span></button>
+    <button class="nav-item" data-page="withdraw">📤<span class="nav-label">السحب</span></button>
+    <button class="nav-item" data-page="referral">👥<span class="nav-label">الفريق</span></button>
+    <button class="nav-item" data-page="profile">👤<span class="nav-label">أنا</span></button>
   </div>
 
   <!-- Welcome Popup -->
@@ -432,164 +334,100 @@
       <h3>✨ مرحباً بك ✨</h3>
       <p>💰 الحد الأدنى للإيداع: <strong>10 USDT</strong></p>
       <p>📤 الحد الأدنى للسحب: <strong>0.5 USDT</strong></p>
-      <p>📈 نسبة الربح اليومي: <strong>2% - 3.5%</strong> حسب المستوى</p>
-      <p>✅ الإيداع والسحب يتم تلقائياً فوراً</p>
+      <p>📈 نسبة الربح اليومي: <strong>2% - 3.5%</strong></p>
       <button class="popup-close" id="closePopup">ابدأ الآن</button>
     </div>
   </div>
 
   <script>
-    // ========================================
-    // ✅ الرابط الصحيح للمنصة على Render
-    // ========================================
     const API_URL = 'https://crypto-api-c2v8.onrender.com';
-    
     let userId = localStorage.getItem('userId');
     let userData = null;
-    let allTransactions = [];
 
-    // VIP Levels (0 to 5)
     const vipLevels = {
-      0: { name: 'VIP 0', price: 0, roi: 2, daily_limit: 10, min_deposit: 0 },
-      1: { name: 'VIP 1', price: 50, roi: 2.2, daily_limit: 20, min_deposit: 50 },
-      2: { name: 'VIP 2', price: 100, roi: 2.5, daily_limit: 50, min_deposit: 100 },
-      3: { name: 'VIP 3', price: 250, roi: 2.8, daily_limit: 100, min_deposit: 250 },
-      4: { name: 'VIP 4', price: 500, roi: 3.2, daily_limit: 200, min_deposit: 500 },
-      5: { name: 'VIP 5', price: 1000, roi: 3.5, daily_limit: 500, min_deposit: 1000 }
+      0: { name: 'VIP 0', price: 0, roi: 2, min_deposit: 0 },
+      1: { name: 'VIP 1', price: 50, roi: 2.2, min_deposit: 50 },
+      2: { name: 'VIP 2', price: 100, roi: 2.5, min_deposit: 100 },
+      3: { name: 'VIP 3', price: 250, roi: 2.8, min_deposit: 250 },
+      4: { name: 'VIP 4', price: 500, roi: 3.2, min_deposit: 500 },
+      5: { name: 'VIP 5', price: 1000, roi: 3.5, min_deposit: 1000 }
     };
 
-    // ========================================
-    // تحميل بيانات المستخدم
-    // ========================================
     async function loadUserData() {
-      if (!userId) {
-        window.location.href = '/';
-        return false;
-      }
+      if (!userId) { window.location.href = '/'; return; }
       try {
-        const response = await fetch(`${API_URL}/api/user`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+        const res = await fetch(`${API_URL}/api/user`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId })
         });
-        const data = await response.json();
-        if (data.error) {
-          localStorage.clear();
-          window.location.href = '/';
-          return false;
-        }
+        const data = await res.json();
+        if (data.error) { localStorage.clear(); window.location.href = '/'; return; }
         userData = data;
         document.getElementById('userName').innerHTML = userData.name;
-        updateDashboardUI();
+        updateUI();
         await loadTransactions();
         return true;
-      } catch (error) {
-        console.error('Error loading user:', error);
-        return false;
-      }
+      } catch(e) { return false; }
     }
 
-    // ========================================
-    // تحميل المعاملات (لصفحة الملف الشخصي)
-    // ========================================
     async function loadTransactions() {
       try {
-        const depositsRes = await fetch(`${API_URL}/api/admin/deposits`, { 
-          method: 'POST', 
-          headers: { 'Content-Type': 'application/json' }, 
-          body: JSON.stringify({ userId })
-        });
+        const [depositsRes, withdrawsRes] = await Promise.all([
+          fetch(`${API_URL}/api/admin/deposits`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId }) }),
+          fetch(`${API_URL}/api/admin/withdrawals`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId }) })
+        ]);
         const deposits = await depositsRes.json();
-        
-        const withdrawsRes = await fetch(`${API_URL}/api/admin/withdrawals`, { 
-          method: 'POST', 
-          headers: { 'Content-Type': 'application/json' }, 
-          body: JSON.stringify({ userId })
-        });
         const withdrawals = await withdrawsRes.json();
-        
-        const userDeposits = (deposits || []).filter(d => d.user_id === userId).map(d => ({ ...d, type: 'إيداع' }));
-        const userWithdrawals = (withdrawals || []).filter(w => w.user_id === userId).map(w => ({ ...w, type: 'سحب' }));
-        
-        allTransactions = [...userDeposits, ...userWithdrawals].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-        
+        const all = [...(deposits||[]).filter(d=>d.user_id===userId).map(d=>({...d,type:'إيداع'})),
+                     ...(withdrawals||[]).filter(w=>w.user_id===userId).map(w=>({...w,type:'سحب'}))];
+        all.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
         const tbody = document.getElementById('transactionsList');
-        if (allTransactions.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">لا توجد معاملات<\/td><\/tr>';
-        } else {
-          tbody.innerHTML = allTransactions.map(t => `
-            <tr>
-              <td>${new Date(t.created_at).toLocaleDateString('ar')}<\/td>
-              <td>${t.type}<\/td>
-              <td>${t.amount} USDT<\/td>
-              <td class="status-${t.status}">${t.status === 'pending' ? 'قيد الانتظار' : t.status === 'approved' ? 'مقبول' : 'مرفوض'}<\/td>
-            <\/tr>
-          `).join('');
-        }
-      } catch (error) {
-        console.error('Error loading transactions:', error);
-      }
+        if(all.length===0) tbody.innerHTML='<tr><td colspan="4">لا توجد معاملات</td></tr>';
+        else tbody.innerHTML=all.map(t=>`<tr><td>${new Date(t.created_at).toLocaleDateString('ar')}</td><td>${t.type}</td><td>${t.amount} USDT</td><td class="status-${t.status}">${t.status==='approved'?'مقبول':t.status==='pending'?'قيد الانتظار':'مرفوض'}</td></tr>`).join('');
+      } catch(e){}
     }
 
-    // ========================================
-    // تحديث واجهة المستخدم الرئيسية
-    // ========================================
-    function updateDashboardUI() {
-      const currentLevel = userData?.vip_level || 0;
-      const activeInvest = userData?.active_deposit || 0;
-      const availableBalance = userData?.available_balance || 0;
-      const totalDeposit = userData?.total_deposited || 0;
-      const totalWithdraw = userData?.total_withdrawn || 0;
-      const totalAssets = activeInvest + availableBalance;
-      const currentVIP = vipLevels[currentLevel] || vipLevels[0];
-
+    function updateUI() {
+      const level = userData?.vip_level || 0;
+      const active = userData?.active_deposit || 0;
+      const avail = userData?.available_balance || 0;
+      const totalAssets = active + avail;
+      const vip = vipLevels[level];
       document.getElementById('totalAssets').innerHTML = totalAssets.toFixed(2) + ' USDT';
-      document.getElementById('activeDeposit').innerHTML = activeInvest.toFixed(2) + ' USDT';
-      document.getElementById('availableBalance').innerHTML = availableBalance.toFixed(2) + ' USDT';
-      document.getElementById('totalDeposit').innerHTML = totalDeposit.toFixed(2) + ' USDT';
-      document.getElementById('totalWithdraw').innerHTML = totalWithdraw.toFixed(2) + ' USDT';
-      document.getElementById('roiPercent').innerHTML = currentVIP.roi + '%';
-      document.getElementById('vipLevel').innerHTML = currentVIP.name;
-      document.getElementById('withdrawBalance').innerHTML = availableBalance.toFixed(2) + ' USDT';
-
+      document.getElementById('activeDeposit').innerHTML = active.toFixed(2) + ' USDT';
+      document.getElementById('availableBalance').innerHTML = avail.toFixed(2) + ' USDT';
+      document.getElementById('totalDeposit').innerHTML = (userData?.total_deposited||0).toFixed(2) + ' USDT';
+      document.getElementById('totalWithdraw').innerHTML = (userData?.total_withdrawn||0).toFixed(2) + ' USDT';
+      document.getElementById('roiPercent').innerHTML = vip.roi + '%';
+      document.getElementById('vipLevel').innerHTML = vip.name;
+      document.getElementById('withdrawBalance').innerHTML = avail.toFixed(2) + ' USDT';
       document.getElementById('profileName').innerHTML = userData.name;
       document.getElementById('profileId').innerHTML = `📧 ${userData.email}`;
-      document.getElementById('profileBalance').innerHTML = availableBalance.toFixed(2) + ' USDT';
+      document.getElementById('profileBalance').innerHTML = avail.toFixed(2) + ' USDT';
+      document.getElementById('referralLink').innerHTML = `${window.location.origin}?ref=${userData?.referral_code}`;
 
       const vipList = document.getElementById('vipLevelsList');
-      vipList.innerHTML = Object.entries(vipLevels).map(([level, vip]) => `
-        <div class="vip-item" data-level="${level}">
-          <div>
-            <div class="vip-name">${vip.name}</div>
-            <div class="vip-min">من ${vip.min_deposit} USDT</div>
-          </div>
-          <div>
-            <div class="vip-roi">💰 ${vip.roi}% يومياً</div>
-            <div class="vip-min">حد سحب: ${vip.daily_limit} USDT</div>
-          </div>
-          ${currentLevel < parseInt(level) ? `<button class="upgrade-btn" data-level="${level}">ترقية (${vip.price} USDT)</button>` : (currentLevel == level ? '<span style="color:#00ff66;">✅ مستخدم حالياً</span>' : '<span style="color:#8899aa;">🔒 مغلق</span>')}
+      vipList.innerHTML = Object.entries(vipLevels).map(([l, v]) => `
+        <div class="vip-item">
+          <div><div class="vip-name">${v.name}</div><div class="vip-min">من ${v.min_deposit} USDT</div></div>
+          <div><div class="vip-roi">💰 ${v.roi}% يومياً</div></div>
+          ${level < parseInt(l) ? `<button class="upgrade-btn" data-level="${l}">ترقية (${v.price} USDT)</button>` : (level == l ? '<span style="color:#00ff66;">✅ حالياً</span>' : '<span style="color:#8899aa;">🔒 مغلق</span>')}
         </div>
       `).join('');
-
-      document.querySelectorAll('.upgrade-btn').forEach(btn => {
-        btn.onclick = async (e) => {
-          e.stopPropagation();
-          const targetLevel = parseInt(btn.getAttribute('data-level'));
-          const targetVIP = vipLevels[targetLevel];
-          
-          if (userData.available_balance >= targetVIP.price) {
-            await fetch(`${API_URL}/api/update-user`, {
-              method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ userId, updates: { vip_level: targetLevel, available_balance: userData.available_balance - targetVIP.price } })
-            });
-            userData.vip_level = targetLevel;
-            userData.available_balance -= targetVIP.price;
-            showMessage('depositMsg', `✅ تم الترقية إلى ${targetVIP.name} بنجاح!`, 'success');
+      document.querySelectorAll('.upgrade-btn').forEach(btn=>{
+        btn.onclick=async()=>{
+          const lvl=parseInt(btn.dataset.level);
+          const v=vipLevels[lvl];
+          if(userData.available_balance>=v.price){
+            await fetch(`${API_URL}/api/update-user`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId,updates:{vip_level:lvl,available_balance:userData.available_balance-v.price}})});
+            userData.vip_level=lvl;
+            userData.available_balance-=v.price;
+            showMsg('depositMsg',`✅ تم الترقية إلى ${v.name}!`,'success');
             loadUserData();
-          } else {
-            showMessage('depositMsg', `⚠️ رصيدك غير كافٍ للترقية إلى ${targetVIP.name} (تحتاج ${targetVIP.price} USDT). يرجى إيداع المبلغ المطلوب.`, 'warning');
-            document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
-            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+          }else{
+            showMsg('depositMsg',`⚠️ تحتاج ${v.price} USDT للترقية`,'warning');
+            document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+            document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
             document.getElementById('depositPage').classList.add('active');
             document.querySelector('[data-page="deposit"]').classList.add('active');
           }
@@ -597,173 +435,69 @@
       });
     }
 
-    // ========================================
-    // تحميل بيانات الإحالات
-    // ========================================
     async function loadReferrals() {
       try {
-        const response = await fetch(`${API_URL}/api/referrals`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId })
-        });
-        const data = await response.json();
-        document.getElementById('referralCount').innerHTML = data.count || 0;
-        document.getElementById('groupBalance').innerHTML = (data.groupBalance || 0).toFixed(2) + ' USDT';
-        document.getElementById('referralLink').innerHTML = `${window.location.origin}?ref=${userData?.referral_code}`;
-        
-        const listDiv = document.getElementById('referralsList');
-        if (!data.referrals || data.referrals.length === 0) {
-          listDiv.innerHTML = '<p style="color:#8899aa; text-align:center;">لا يوجد محالين حتى الآن</p>';
-        } else {
-          listDiv.innerHTML = data.referrals.map(u => `
-            <div style="background:rgba(20,20,35,0.6); border-radius:16px; padding:12px; margin-bottom:8px; display:flex; justify-content:space-between;">
-              <span>${u.name}</span>
-              <span>💰 ${u.active_deposit || 0} USDT</span>
-            </div>
-          `).join('');
-        }
-      } catch (error) {
-        console.error('Error loading referrals:', error);
-      }
+        const res = await fetch(`${API_URL}/api/referrals`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId})});
+        const data=await res.json();
+        document.getElementById('referralCount').innerHTML=data.count||0;
+        document.getElementById('groupBalance').innerHTML=(data.groupBalance||0).toFixed(2)+' USDT';
+        const listDiv=document.getElementById('referralsList');
+        if(!data.referrals||data.referrals.length===0) listDiv.innerHTML='<p style="color:#8899aa;">لا يوجد محالين</p>';
+        else listDiv.innerHTML=data.referrals.map(u=>`<div style="background:rgba(20,20,35,0.6); padding:12px; margin-bottom:8px; border-radius:16px; display:flex; justify-content:space-between;"><span>${u.name}</span><span>💰 ${u.active_deposit||0} USDT</span></div>`).join('');
+      } catch(e){}
     }
 
-    function showMessage(elementId, msg, type) {
-      const div = document.getElementById(elementId);
-      if (div) {
-        div.innerHTML = `<div class="message ${type}">${msg}</div>`;
-        setTimeout(() => div.innerHTML = '', 5000);
-      }
+    function showMsg(el,msg,t){
+      const d=document.getElementById(el);
+      if(d){ d.innerHTML=`<div class="message ${t}">${msg}</div>`; setTimeout(()=>d.innerHTML='',5000); }
     }
 
-    // ========================================
-    // Event Listeners
-    // ========================================
-    document.getElementById('toggleDetails').onclick = () => {
-      document.getElementById('detailsPanel').classList.toggle('show');
+    document.getElementById('toggleDetails').onclick=()=>document.getElementById('detailsPanel').classList.toggle('show');
+    document.getElementById('copyWalletBtn').onclick=()=>{ navigator.clipboard.writeText('0x987cfde723a87b5ed33329eebe0595a4416b848f'); showMsg('depositMsg','✅ تم نسخ العنوان!','success'); };
+    document.getElementById('copyReferralBtn').onclick=()=>{ navigator.clipboard.writeText(`${window.location.origin}?ref=${userData?.referral_code}`); showMsg('referralMsg','✅ تم نسخ الرابط!','success'); };
+    document.getElementById('doDepositBtn').onclick=async()=>{
+      const a=parseFloat(document.getElementById('depositAmount').value);
+      if(!a||a<10){ showMsg('depositMsg','⚠️ الحد الأدنى 10 USDT','error'); return; }
+      const res=await fetch(`${API_URL}/api/deposit`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId,amount:a})});
+      const data=await res.json();
+      if(data.success){ showMsg('depositMsg',`✅ تم إيداع ${a} USDT!`,'success'); document.getElementById('depositAmount').value=''; loadUserData(); }
+      else showMsg('depositMsg','❌ '+data.error,'error');
+    };
+    document.getElementById('doWithdrawBtn').onclick=async()=>{
+      const a=parseFloat(document.getElementById('withdrawAmount').value);
+      const ad=document.getElementById('walletAddress').value;
+      if(!a||a<0.5){ showMsg('withdrawMsg','⚠️ الحد الأدنى 0.5 USDT','error'); return; }
+      if(!ad){ showMsg('withdrawMsg','⚠️ أدخل عنوان المحفظة','error'); return; }
+      if(a>(userData?.available_balance||0)){ showMsg('withdrawMsg','⚠️ الرصيد غير كافٍ','error'); return; }
+      const res=await fetch(`${API_URL}/api/withdraw`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId,amount:a,walletAddress:ad})});
+      const data=await res.json();
+      if(data.success){ showMsg('withdrawMsg',`✅ تم سحب ${a} USDT!`,'success'); document.getElementById('withdrawAmount').value=''; document.getElementById('walletAddress').value=''; loadUserData(); }
+      else showMsg('withdrawMsg','❌ '+data.error,'error');
     };
 
-    document.getElementById('copyWalletBtn').onclick = () => {
-      navigator.clipboard.writeText('0x987cfde723a87b5ed33329eebe0595a4416b848f');
-      showMessage('depositMsg', '✅ تم نسخ عنوان المحفظة!', 'success');
-    };
+    document.getElementById('supportFab').onclick=()=>window.open('https://t.me/+fPunvn_76Q45NDg8','_blank');
+    document.getElementById('supportBtn').onclick=()=>window.open('https://t.me/+fPunvn_76Q45NDg8','_blank');
+    document.getElementById('closePopup').onclick=()=>{ document.getElementById('welcomePopup').style.display='none'; localStorage.setItem('welcomeShown','true'); };
 
-    document.getElementById('copyReferralBtn').onclick = () => {
-      navigator.clipboard.writeText(`${window.location.origin}?ref=${userData?.referral_code}`);
-      showMessage('referralMsg', '✅ تم نسخ رابط الدعوة!', 'success');
-    };
-
-    document.getElementById('doDepositBtn').onclick = async () => {
-      const amount = parseFloat(document.getElementById('depositAmount').value);
-      if (!amount || amount < 10) {
-        showMessage('depositMsg', '⚠️ الحد الأدنى للإيداع 10 USDT', 'error');
-        return;
-      }
-      
-      try {
-        const response = await fetch(`${API_URL}/api/deposit`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId, amount })
-        });
-        const data = await response.json();
-        
-        if (data.success) {
-          showMessage('depositMsg', `✅ تم إيداع ${amount} USDT بنجاح!`, 'success');
-          document.getElementById('depositAmount').value = '';
-          await loadUserData();
-        } else {
-          showMessage('depositMsg', '❌ ' + (data.error || 'حدث خطأ'), 'error');
-        }
-      } catch (error) {
-        showMessage('depositMsg', '❌ خطأ في الاتصال بالخادم', 'error');
-      }
-    };
-
-    document.getElementById('doWithdrawBtn').onclick = async () => {
-      const amount = parseFloat(document.getElementById('withdrawAmount').value);
-      const address = document.getElementById('walletAddress').value;
-      
-      if (!amount || amount < 0.5) {
-        showMessage('withdrawMsg', '⚠️ الحد الأدنى للسحب 0.5 USDT', 'error');
-        return;
-      }
-      if (!address) {
-        showMessage('withdrawMsg', '⚠️ يرجى إدخال عنوان محفظة BSC', 'error');
-        return;
-      }
-      if (amount > (userData?.available_balance || 0)) {
-        showMessage('withdrawMsg', '⚠️ الرصيد غير كافٍ', 'error');
-        return;
-      }
-      
-      try {
-        const response = await fetch(`${API_URL}/api/withdraw`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId, amount, walletAddress: address })
-        });
-        const data = await response.json();
-        
-        if (data.success) {
-          showMessage('withdrawMsg', `✅ تم سحب ${amount} USDT إلى محفظتك بنجاح!`, 'success');
-          document.getElementById('withdrawAmount').value = '';
-          document.getElementById('walletAddress').value = '';
-          await loadUserData();
-        } else {
-          showMessage('withdrawMsg', '❌ ' + (data.error || 'حدث خطأ'), 'error');
-        }
-      } catch (error) {
-        showMessage('withdrawMsg', '❌ خطأ في الاتصال بالخادم', 'error');
-      }
-    };
-
-    document.getElementById('supportFab').onclick = () => { 
-      window.open('https://t.me/+fPunvn_76Q45NDg8', '_blank'); 
-    };
-    document.getElementById('supportBtn').onclick = () => { 
-      window.open('https://t.me/+fPunvn_76Q45NDg8', '_blank'); 
-    };
-    document.getElementById('closePopup').onclick = () => { 
-      document.getElementById('welcomePopup').style.display = 'none'; 
-      localStorage.setItem('welcomeShown', 'true'); 
-    };
-
-    // ========================================
-    // التنقل بين الصفحات (الأزرار في الشريط السفلي)
-    // ========================================
-    document.querySelectorAll('.nav-item').forEach(btn => {
-      btn.onclick = () => {
-        document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(btn=>{
+      btn.onclick=()=>{
+        document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('active'));
         btn.classList.add('active');
-        const page = btn.getAttribute('data-page');
-        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-        
-        if (page === 'dashboard') {
-          document.getElementById('dashboardPage').classList.add('active');
-        } else if (page === 'deposit') {
-          document.getElementById('depositPage').classList.add('active');
-        } else if (page === 'withdraw') {
-          document.getElementById('withdrawPage').classList.add('active');
-        } else if (page === 'vip') {
-          document.getElementById('vipPage').classList.add('active');
-        } else if (page === 'referral') {
-          document.getElementById('referralPage').classList.add('active');
-          loadReferrals();
-        } else if (page === 'profile') {
-          document.getElementById('profilePage').classList.add('active');
-        }
+        const page=btn.dataset.page;
+        document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+        if(page==='dashboard') document.getElementById('dashboardPage').classList.add('active');
+        else if(page==='deposit') document.getElementById('depositPage').classList.add('active');
+        else if(page==='withdraw') document.getElementById('withdrawPage').classList.add('active');
+        else if(page==='vip') document.getElementById('vipPage').classList.add('active');
+        else if(page==='referral'){ document.getElementById('referralPage').classList.add('active'); loadReferrals(); }
+        else if(page==='profile') document.getElementById('profilePage').classList.add('active');
       };
     });
 
-    // ========================================
-    // تشغيل الصفحة
-    // ========================================
-    (async () => {
-      const loaded = await loadUserData();
-      if (loaded) {
-        if (!localStorage.getItem('welcomeShown')) {
-          document.getElementById('welcomePopup').style.display = 'flex';
-        }
-        await loadReferrals();
-      }
+    (async()=>{
+      await loadUserData();
+      if(!localStorage.getItem('welcomeShown')) document.getElementById('welcomePopup').style.display='flex';
+      await loadReferrals();
     })();
   </script>
 </body>
