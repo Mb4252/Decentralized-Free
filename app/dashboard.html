@@ -81,11 +81,12 @@
       transition: all 0.3s;
     }
     .vip-item:hover { border-color: #00ff66; transform: translateX(-5px); }
-    .vip-name { color: #00ff66; font-weight: bold; }
-    .vip-roi { color: #00ccff; }
+    .vip-name { color: #00ff66; font-weight: bold; font-size: 16px; }
+    .vip-roi { color: #00ccff; font-size: 13px; }
     .vip-price { color: #fbbf24; font-size: 14px; }
     .vip-status { font-size: 12px; }
-    .upgrade-btn { background: #00ff66; color: #0a0a0f; border: none; padding: 6px 12px; border-radius: 20px; cursor: pointer; font-weight: bold; }
+    .upgrade-btn { background: #00ff66; color: #0a0a0f; border: none; padding: 8px 16px; border-radius: 20px; cursor: pointer; font-weight: bold; }
+    .upgrade-btn:hover { transform: scale(1.02); }
     
     input {
       width: 100%;
@@ -247,6 +248,24 @@
       font-size: 12px;
       margin-top: 5px;
     }
+
+    .balance-box {
+      background: rgba(0,255,102,0.1);
+      border-radius: 16px;
+      padding: 12px;
+      margin-bottom: 16px;
+      text-align: center;
+      border: 1px solid #00ff66;
+    }
+    .balance-label {
+      color: #00ff66;
+      font-size: 14px;
+    }
+    .balance-amount {
+      color: #ffcc00;
+      font-size: 28px;
+      font-weight: bold;
+    }
   </style>
 </head>
 <body>
@@ -304,20 +323,11 @@
     let userId = localStorage.getItem('userId');
     let userData = null;
     let currentLang = localStorage.getItem('dashboardLang') || 'ar';
+    let vipPackages = [];
 
     // عنوان المحفظة الحقيقي
     const HOT_WALLET_ADDRESS = '0x9EB39A10c059877910DAff1fd8098e5DB32486F7';
     const MIN_WITHDRAW = 0.5;
-
-    // مستويات VIP
-    const vipLevels = {
-      1: { name: 'VIP 1', price: 10, roi: 2.2 },
-      2: { name: 'VIP 2', price: 50, roi: 2.5 },
-      3: { name: 'VIP 3', price: 100, roi: 2.8 },
-      4: { name: 'VIP 4', price: 250, roi: 3.2 },
-      5: { name: 'VIP 5', price: 500, roi: 3.5 },
-      6: { name: 'VIP 6', price: 1000, roi: 4.0 }
-    };
 
     // ========================================
     // الترجمة الكاملة
@@ -361,6 +371,7 @@
         vipOpen: '✅ مفتوح',
         vipLocked: '🔒 مغلق (يجب ترقية السابق)',
         subscribe: 'اشتراك',
+        yourBalance: '💰 رصيدك المتاح',
         referralTitle: '🔗 رابط الدعوة',
         copyLink: '📋 نسخ الرابط',
         referralsCount: 'المحالين',
@@ -372,6 +383,7 @@
         typeDeposit: '💰 إيداع',
         typeWithdraw: '📤 سحب',
         typeProfit: '📈 ربح',
+        typeVipUpgrade: '👑 ترقية VIP',
         statusApproved: '✅ مقبول',
         statusPending: '⏳ قيد الانتظار',
         welcomeTitle: '📖 مرحباً بك في منصة الاستثمار',
@@ -384,7 +396,10 @@
         welcomeNetwork: '🌐 ملاحظة هامة:',
         welcomeNetworkText: '⚠️ يجب استخدام شبكة BNB Smart Chain (BSC/BEP20) فقط. لا ترسل على شبكات أخرى!',
         networkModalTitle: '🌐 اختر شبكة التحويل',
-        cancel: 'إلغاء'
+        cancel: 'إلغاء',
+        upgradeSuccess: '✅ تم الترقية بنجاح!',
+        insufficientBalance: '⚠️ رصيد غير كافٍ',
+        mustUpgradePrevious: '⚠️ يجب ترقية المستويات السابقة أولاً'
       },
       en: {
         logoText: '💰 CryptoInvest',
@@ -424,6 +439,7 @@
         vipOpen: '✅ Unlocked',
         vipLocked: '🔒 Locked (Upgrade previous level first)',
         subscribe: 'Subscribe',
+        yourBalance: '💰 Your Balance',
         referralTitle: '🔗 Referral Link',
         copyLink: '📋 Copy Link',
         referralsCount: 'Referrals',
@@ -435,6 +451,7 @@
         typeDeposit: '💰 Deposit',
         typeWithdraw: '📤 Withdrawal',
         typeProfit: '📈 Profit',
+        typeVipUpgrade: '👑 VIP Upgrade',
         statusApproved: '✅ Approved',
         statusPending: '⏳ Pending',
         welcomeTitle: '📖 Welcome to CryptoInvest',
@@ -447,7 +464,10 @@
         welcomeNetwork: '🌐 Important Note:',
         welcomeNetworkText: '⚠️ You must use BNB Smart Chain (BSC/BEP20) network only. Do not send on other networks!',
         networkModalTitle: '🌐 Select Network',
-        cancel: 'Cancel'
+        cancel: 'Cancel',
+        upgradeSuccess: '✅ Upgrade successful!',
+        insufficientBalance: '⚠️ Insufficient balance',
+        mustUpgradePrevious: '⚠️ You must upgrade previous levels first'
       }
     };
 
@@ -504,6 +524,10 @@
         if (data.error) { localStorage.clear(); window.location.href = '/'; return; }
         userData = data;
         document.getElementById('userName').innerHTML = `👋 ${userData.name}`;
+        
+        // جلب باقات VIP
+        const vipRes = await fetch(`${API_URL}/api/vip-packages`);
+        vipPackages = await vipRes.json();
         
         if (!localStorage.getItem('welcomeShown')) {
           document.getElementById('welcomeModal').classList.remove('hidden');
@@ -563,11 +587,6 @@
       };
     }
 
-    function redirectToDepositWithPrice(packagePrice, packageName) {
-      showNetworkSelection();
-      showMessage(`${translations[currentLang].deposit} ${packagePrice} USDT ${currentLang === 'ar' ? 'مطلوب للاشتراك في' : 'required for'} ${packageName}`, 'warning', 6000);
-    }
-
     function highlightNav(page) {
       document.querySelectorAll('.nav-item').forEach(btn => {
         btn.classList.remove('active');
@@ -584,8 +603,15 @@
       const totalDeposit = userData?.total_deposited || 0;
       const totalWithdraw = userData?.total_withdrawn || 0;
       const currentVip = userData?.vip_level || 0;
-      const currentRoi = currentVip > 0 ? (vipLevels[currentVip]?.roi || 0) : 0;
-      const currentVipName = currentVip > 0 ? (vipLevels[currentVip]?.name || 'غير مشترك') : (currentLang === 'ar' ? 'غير مشترك' : 'Not subscribed');
+      
+      // جلب نسبة الربح من الباقات
+      let currentRoi = 0;
+      if (currentVip > 0 && vipPackages.length > 0) {
+        const vipPkg = vipPackages.find(p => p.level === currentVip);
+        currentRoi = vipPkg ? vipPkg.roi_percent : 0;
+      }
+      
+      const currentVipName = currentVip > 0 ? (vipPackages.find(p => p.level === currentVip)?.name || 'VIP ' + currentVip) : (currentLang === 'ar' ? 'غير مشترك' : 'Not subscribed');
       
       document.getElementById('mainContent').innerHTML = `
         <div class="card">
@@ -704,7 +730,11 @@
           clearMessages();
           
           if (depositData.success) {
-            showMessage(`✅ ${currentLang === 'ar' ? 'تم إضافة' : 'Added'} ${actualAmount} USDT ${currentLang === 'ar' ? 'إلى حسابك بنجاح!' : 'to your account!'}`, 'success', 5000);
+            let message = `✅ ${currentLang === 'ar' ? 'تم إضافة' : 'Added'} ${actualAmount} USDT ${currentLang === 'ar' ? 'إلى حسابك بنجاح!' : 'to your account!'}`;
+            if (depositData.autoUpgraded) {
+              message += ` 🎉 ${currentLang === 'ar' ? 'تمت ترقيتك تلقائياً إلى مستوى VIP!' : 'You were automatically upgraded to VIP level!'}`;
+            }
+            showMessage(message, 'success', 8000);
             document.getElementById('depositTxHash').value = '';
             loadUser();
           } else {
@@ -777,46 +807,40 @@
     async function renderVIP() {
       const t = translations[currentLang];
       const currentLevel = userData?.vip_level || 0;
+      const availableBalance = userData?.available_balance || 0;
       
       document.getElementById('mainContent').innerHTML = `
         <div class="card">
           <div class="card-title">${t.vipTitle}</div>
+          <div class="balance-box">
+            <div class="balance-label">${t.yourBalance}</div>
+            <div class="balance-amount">${availableBalance.toFixed(2)} USDT</div>
+          </div>
           <div id="vipList"></div>
         </div>
       `;
       
       const container = document.getElementById('vipList');
-      container.innerHTML = Object.entries(vipLevels).map(([level, vip]) => `
-        <div class="vip-item" data-level="${level}" data-price="${vip.price}" data-name="${vip.name}">
+      
+      if (!vipPackages || vipPackages.length === 0) {
+        container.innerHTML = '<p style="color:#8899aa; text-align:center;">جاري تحميل الباقات...</p>';
+        return;
+      }
+      
+      container.innerHTML = vipPackages.map(pkg => `
+        <div class="vip-item" data-level="${pkg.level}" data-price="${pkg.price}" data-name="${pkg.name}" data-roi="${pkg.roi_percent}">
           <div>
-            <div class="vip-name">${vip.name}</div>
-            <div class="vip-roi">💰 ${vip.roi}% ${currentLang === 'ar' ? 'يومياً' : 'daily'}</div>
-            <div class="vip-price">💎 ${currentLang === 'ar' ? 'سعر الاشتراك' : 'Subscription price'}: ${vip.price} USDT</div>
+            <div class="vip-name">${pkg.name}</div>
+            <div class="vip-roi">💰 ${pkg.roi_percent}% ${currentLang === 'ar' ? 'يومياً' : 'daily'}</div>
+            <div class="vip-price">💎 ${currentLang === 'ar' ? 'سعر الاشتراك' : 'Subscription price'}: ${pkg.price} USDT</div>
           </div>
           <div>
-            ${currentLevel >= parseInt(level) ? `<span class="vip-status" style="color:#00ff66;">${t.vipOpen}</span>` : 
-              (currentLevel > 0 && currentLevel < parseInt(level) ? `<span class="vip-status" style="color:#8899aa;">${t.vipLocked}</span>` :
-              `<button class="upgrade-btn" data-level="${level}" data-price="${vip.price}" data-name="${vip.name}">${t.subscribe} (${vip.price} USDT)</button>`)}
+            ${currentLevel >= pkg.level ? `<span class="vip-status" style="color:#00ff66;">${t.vipOpen}</span>` : 
+              (currentLevel > 0 && currentLevel < pkg.level - 1 ? `<span class="vip-status" style="color:#8899aa;">${t.vipLocked}</span>` :
+              `<button class="upgrade-btn" data-level="${pkg.level}" data-price="${pkg.price}" data-name="${pkg.name}">${t.subscribe} (${pkg.price} USDT)</button>`)}
           </div>
         </div>
       `).join('');
-      
-      document.querySelectorAll('.vip-item').forEach(item => {
-        const level = parseInt(item.dataset.level);
-        const price = parseFloat(item.dataset.price);
-        const name = item.dataset.name;
-        
-        item.onclick = (e) => {
-          if (e.target.classList.contains('upgrade-btn')) return;
-          if (currentLevel >= level) {
-            showMessage(`✅ ${name} ${currentLang === 'ar' ? 'مفتوح بالفعل' : 'is already unlocked'}`, 'success', 2000);
-          } else if (currentLevel > 0 && currentLevel < level) {
-            showMessage(`⚠️ ${currentLang === 'ar' ? 'يجب ترقية المستويات السابقة أولاً' : 'You must upgrade previous levels first'}`, 'warning', 3000);
-          } else {
-            redirectToDepositWithPrice(price, name);
-          }
-        };
-      });
       
       document.querySelectorAll('.upgrade-btn').forEach(btn => {
         btn.onclick = async (e) => {
@@ -831,21 +855,32 @@
           }
           
           if (currentLevel > 0 && currentLevel < targetLevel - 1) {
-            showMessage(`⚠️ ${currentLang === 'ar' ? 'يجب ترقية المستويات السابقة أولاً' : 'You must upgrade previous levels first'}`, 'warning', 3000);
+            showMessage(`⚠️ ${t.mustUpgradePrevious}`, 'warning', 3000);
             return;
           }
           
-          if (userData.available_balance >= price) {
-            const newBalance = userData.available_balance - price;
-            await fetch(`${API_URL}/api/update-user`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ userId, updates: { vip_level: targetLevel, available_balance: newBalance } })
-            });
-            showMessage(`✅ ${currentLang === 'ar' ? 'تم الترقية إلى' : 'Upgraded to'} ${name} ${currentLang === 'ar' ? 'بنجاح!' : 'successfully!'}`, 'success', 3000);
-            loadUser();
+          if (availableBalance >= price) {
+            try {
+              const res = await fetch(`${API_URL}/api/upgrade-vip`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId, packageLevel: targetLevel })
+              });
+              const data = await res.json();
+              
+              if (data.success) {
+                showMessage(`✅ ${t.upgradeSuccess} ${name}`, 'success', 3000);
+                loadUser();
+              } else {
+                showMessage(`❌ ${data.error}`, 'error', 4000);
+              }
+            } catch (error) {
+              showMessage('❌ ' + (currentLang === 'ar' ? 'خطأ في الاتصال بالخادم' : 'Server connection error'), 'error', 4000);
+            }
           } else {
-            redirectToDepositWithPrice(price, name);
+            showMessage(`⚠️ ${t.insufficientBalance} ${currentLang === 'ar' ? 'تحتاج' : 'need'} ${price} USDT`, 'warning', 4000);
+            // توجيه المستخدم للإيداع
+            showNetworkSelection();
           }
         };
       });
@@ -930,6 +965,7 @@
                   ${txn.status === 'approved' ? 
                     (txn.type === 'deposit' ? '✅ تم الإيداع' : 
                      txn.type === 'withdraw' ? '✅ تم السحب' : 
+                     txn.type === 'vip_upgrade' ? '👑 تم الترقية' :
                      '✅ تم الربح') : 
                     '⏳ قيد الانتظار'}
                 </div>
