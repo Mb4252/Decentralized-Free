@@ -15,7 +15,7 @@
         linear-gradient(90deg, rgba(0, 255, 100, 0.03) 1px, transparent 1px);
       background-size: 40px 40px;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      padding-bottom: 80px;
+      padding-bottom: 90px !important;
     }
 
     /* Glassmorphism Navbar */
@@ -137,7 +137,9 @@
     .upgrade-btn { background: #00ff66; border: none; padding: 6px 12px; border-radius: 20px; color: #0a0a0f; font-weight: bold; cursor: pointer; transition: all 0.3s; }
     .upgrade-btn:hover { transform: scale(1.02); background: #00cc55; }
 
-    /* Bottom Navigation */
+    /* ======================================== */
+    /* الشريط السفلي - تم إصلاح ظهوره */
+    /* ======================================== */
     .bottom-nav {
       position: fixed;
       bottom: 0;
@@ -147,9 +149,9 @@
       backdrop-filter: blur(12px);
       display: flex;
       justify-content: space-around;
-      padding: 12px 16px;
+      padding: 10px 12px;
       border-top: 1px solid rgba(0, 255, 100, 0.2);
-      z-index: 99;
+      z-index: 9999;
     }
     .nav-item {
       display: flex;
@@ -160,13 +162,20 @@
       border: none;
       color: #8899aa;
       cursor: pointer;
-      padding: 6px 12px;
+      padding: 5px 10px;
       border-radius: 30px;
       transition: all 0.3s;
     }
-    .nav-item.active { color: #00ff66; background: rgba(0, 255, 102, 0.1); }
-    .nav-item .nav-icon { font-size: 22px; }
-    .nav-item .nav-label { font-size: 10px; }
+    .nav-item.active {
+      color: #00ff66;
+      background: rgba(0, 255, 102, 0.1);
+    }
+    .nav-item .nav-icon {
+      font-size: 22px;
+    }
+    .nav-item .nav-label {
+      font-size: 10px;
+    }
 
     /* Pages */
     .page { display: none; }
@@ -232,7 +241,7 @@
     .withdraw-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 25px -5px rgba(255, 68, 68, 0.4); }
     .support-fab {
       position: fixed;
-      bottom: 80px;
+      bottom: 90px;
       right: 16px;
       background: linear-gradient(135deg, #00ff66, #00ccff);
       width: 50px;
@@ -277,6 +286,7 @@
       .stat-card .value { font-size: 18px; }
       .vip-item { flex-direction: column; text-align: center; gap: 8px; }
       .nav-item .nav-label { font-size: 9px; }
+      .nav-item { padding: 4px 6px; }
     }
   </style>
 </head>
@@ -388,14 +398,32 @@
     </div>
   </div>
 
-  <!-- Bottom Navigation (6 items) -->
+  <!-- الشريط السفلي - 6 أيقونات -->
   <div class="bottom-nav">
-    <button class="nav-item active" data-page="dashboard"><span class="nav-icon">🏠</span><span class="nav-label">البيت</span></button>
-    <button class="nav-item" data-page="vip"><span class="nav-icon">👑</span><span class="nav-label">VIP</span></button>
-    <button class="nav-item" data-page="deposit"><span class="nav-icon">💰</span><span class="nav-label">الإيداع</span></button>
-    <button class="nav-item" data-page="withdraw"><span class="nav-icon">📤</span><span class="nav-label">السحب</span></button>
-    <button class="nav-item" data-page="referral"><span class="nav-icon">👥</span><span class="nav-label">الفريق</span></button>
-    <button class="nav-item" data-page="profile"><span class="nav-icon">👤</span><span class="nav-label">أنا</span></button>
+    <button class="nav-item active" data-page="dashboard">
+      <span class="nav-icon">🏠</span>
+      <span class="nav-label">البيت</span>
+    </button>
+    <button class="nav-item" data-page="vip">
+      <span class="nav-icon">👑</span>
+      <span class="nav-label">VIP</span>
+    </button>
+    <button class="nav-item" data-page="deposit">
+      <span class="nav-icon">💰</span>
+      <span class="nav-label">الإيداع</span>
+    </button>
+    <button class="nav-item" data-page="withdraw">
+      <span class="nav-icon">📤</span>
+      <span class="nav-label">السحب</span>
+    </button>
+    <button class="nav-item" data-page="referral">
+      <span class="nav-icon">👥</span>
+      <span class="nav-label">الفريق</span>
+    </button>
+    <button class="nav-item" data-page="profile">
+      <span class="nav-icon">👤</span>
+      <span class="nav-label">أنا</span>
+    </button>
   </div>
 
   <!-- Welcome Popup -->
@@ -466,7 +494,6 @@
     // ========================================
     async function loadTransactions() {
       try {
-        // جلب الإيداعات
         const depositsRes = await fetch(`${API_URL}/api/admin/deposits`, { 
           method: 'POST', 
           headers: { 'Content-Type': 'application/json' }, 
@@ -474,7 +501,6 @@
         });
         const deposits = await depositsRes.json();
         
-        // جلب السحوبات
         const withdrawsRes = await fetch(`${API_URL}/api/admin/withdrawals`, { 
           method: 'POST', 
           headers: { 'Content-Type': 'application/json' }, 
@@ -526,12 +552,10 @@
       document.getElementById('vipLevel').innerHTML = currentVIP.name;
       document.getElementById('withdrawBalance').innerHTML = availableBalance.toFixed(2) + ' USDT';
 
-      // Profile Page
       document.getElementById('profileName').innerHTML = userData.name;
       document.getElementById('profileId').innerHTML = `📧 ${userData.email}`;
       document.getElementById('profileBalance').innerHTML = availableBalance.toFixed(2) + ' USDT';
 
-      // VIP Levels List
       const vipList = document.getElementById('vipLevelsList');
       vipList.innerHTML = Object.entries(vipLevels).map(([level, vip]) => `
         <div class="vip-item" data-level="${level}">
@@ -547,7 +571,6 @@
         </div>
       `).join('');
 
-      // Attach upgrade event
       document.querySelectorAll('.upgrade-btn').forEach(btn => {
         btn.onclick = async (e) => {
           e.stopPropagation();
@@ -555,7 +578,6 @@
           const targetVIP = vipLevels[targetLevel];
           
           if (userData.available_balance >= targetVIP.price) {
-            // الترقية ممكنة
             await fetch(`${API_URL}/api/update-user`, {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ userId, updates: { vip_level: targetLevel, available_balance: userData.available_balance - targetVIP.price } })
@@ -565,9 +587,7 @@
             showMessage('depositMsg', `✅ تم الترقية إلى ${targetVIP.name} بنجاح!`, 'success');
             loadUserData();
           } else {
-            // الرصيد غير كافٍ -> توجيه إلى صفحة الإيداع مع رسالة
             showMessage('depositMsg', `⚠️ رصيدك غير كافٍ للترقية إلى ${targetVIP.name} (تحتاج ${targetVIP.price} USDT). يرجى إيداع المبلغ المطلوب.`, 'warning');
-            // التبديل إلى صفحة الإيداع
             document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
             document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
             document.getElementById('depositPage').classList.add('active');
@@ -607,9 +627,6 @@
       }
     }
 
-    // ========================================
-    // عرض الرسائل
-    // ========================================
     function showMessage(elementId, msg, type) {
       const div = document.getElementById(elementId);
       if (div) {
@@ -635,9 +652,6 @@
       showMessage('referralMsg', '✅ تم نسخ رابط الدعوة!', 'success');
     };
 
-    // ========================================
-    // إيداع تلقائي (بدون موافقة)
-    // ========================================
     document.getElementById('doDepositBtn').onclick = async () => {
       const amount = parseFloat(document.getElementById('depositAmount').value);
       if (!amount || amount < 10) {
@@ -647,8 +661,7 @@
       
       try {
         const response = await fetch(`${API_URL}/api/deposit`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId, amount })
         });
         const data = await response.json();
@@ -656,7 +669,7 @@
         if (data.success) {
           showMessage('depositMsg', `✅ تم إيداع ${amount} USDT بنجاح!`, 'success');
           document.getElementById('depositAmount').value = '';
-          await loadUserData(); // تحديث البيانات
+          await loadUserData();
         } else {
           showMessage('depositMsg', '❌ ' + (data.error || 'حدث خطأ'), 'error');
         }
@@ -665,9 +678,6 @@
       }
     };
 
-    // ========================================
-    // سحب تلقائي (بدون موافقة)
-    // ========================================
     document.getElementById('doWithdrawBtn').onclick = async () => {
       const amount = parseFloat(document.getElementById('withdrawAmount').value);
       const address = document.getElementById('walletAddress').value;
@@ -687,8 +697,7 @@
       
       try {
         const response = await fetch(`${API_URL}/api/withdraw`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId, amount, walletAddress: address })
         });
         const data = await response.json();
@@ -697,7 +706,7 @@
           showMessage('withdrawMsg', `✅ تم سحب ${amount} USDT إلى محفظتك بنجاح!`, 'success');
           document.getElementById('withdrawAmount').value = '';
           document.getElementById('walletAddress').value = '';
-          await loadUserData(); // تحديث البيانات
+          await loadUserData();
         } else {
           showMessage('withdrawMsg', '❌ ' + (data.error || 'حدث خطأ'), 'error');
         }
@@ -718,7 +727,7 @@
     };
 
     // ========================================
-    // التنقل بين الصفحات
+    // التنقل بين الصفحات (الأزرار في الشريط السفلي)
     // ========================================
     document.querySelectorAll('.nav-item').forEach(btn => {
       btn.onclick = () => {
