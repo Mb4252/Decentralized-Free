@@ -252,6 +252,10 @@
 
     // ✅ عنوان المحفظة الحقيقي
     const HOT_WALLET_ADDRESS = '0x9EB39A10c059877910DAff1fd8098e5DB32486F7';
+    
+    // ✅ الحد الأدنى للإيداع (2.5 USDT)
+    const MIN_DEPOSIT = 2.5;
+    const MIN_WITHDRAW = 0.5;
 
     const vipLevels = {
       1: { name: 'VIP 1', price: 50, roi: 2.2 },
@@ -376,11 +380,12 @@
           <code style="color:#00ff66; word-break:break-all;">${HOT_WALLET_ADDRESS}</code>
           <button class="btn-copy" id="copyWalletBtn">📋 نسخ العنوان</button>
           
-          <input type="number" id="depositAmount" placeholder="المبلغ (USDT) - الحد الأدنى 10" style="margin-top:16px;">
+          <input type="number" id="depositAmount" placeholder="المبلغ (USDT) - الحد الأدنى ${MIN_DEPOSIT}" style="margin-top:16px;" step="0.1">
           <input type="text" id="depositTxHash" placeholder="Transaction Hash (0x...)" style="direction:ltr; font-family: monospace;">
           <button class="deposit-btn" id="doDepositBtn">🔍 تحقق وأيدع</button>
           
           <div class="info-box">
+            <strong>📌 الحد الأدنى للإيداع: ${MIN_DEPOSIT} USDT</strong><br>
             <strong>📌 أين تجد Transaction Hash؟</strong><br>
             بعد التحويل، اضغط على المعاملة في محفظتك ثم اختر "نسخ Transaction Hash".
           </div>
@@ -404,8 +409,8 @@
         
         clearMessages();
         
-        if (!amount || amount < 10) {
-          showMessage('⚠️ الحد الأدنى للإيداع 10 USDT', 'error', 3000);
+        if (!amount || amount < MIN_DEPOSIT) {
+          showMessage(`⚠️ الحد الأدنى للإيداع ${MIN_DEPOSIT} USDT`, 'error', 3000);
           return;
         }
         if (!txHash) {
@@ -446,10 +451,11 @@
         <div class="card">
           <div class="card-title">💸 سحب USDT</div>
           <div class="assets-amount" style="font-size:28px;">${avail.toFixed(2)} USDT</div>
-          <input type="number" id="withdrawAmount" placeholder="المبلغ (USDT) - الحد الأدنى 0.5">
+          <input type="number" id="withdrawAmount" placeholder="المبلغ (USDT) - الحد الأدنى ${MIN_WITHDRAW}" step="0.1">
           <input type="text" id="walletAddress" placeholder="عنوان محفظة BSC (0x...)">
           <button class="withdraw-btn" id="doWithdrawBtn">💸 سحب USDT</button>
           <div class="info-box">
+            <strong>⚠️ الحد الأدنى للسحب: ${MIN_WITHDRAW} USDT</strong><br>
             <strong>⚠️ تأكد من صحة عنوان المحفظة!</strong><br>
             يجب أن يكون من شبكة <strong>BNB Smart Chain (BSC / BEP20)</strong> ويبدأ بـ "0x".
           </div>
@@ -461,8 +467,8 @@
         const amount = parseFloat(document.getElementById('withdrawAmount').value);
         const address = document.getElementById('walletAddress').value;
         
-        if (!amount || amount < 0.5) {
-          showMessage('⚠️ الحد الأدنى للسحب 0.5 USDT', 'error', 3000);
+        if (!amount || amount < MIN_WITHDRAW) {
+          showMessage(`⚠️ الحد الأدنى للسحب ${MIN_WITHDRAW} USDT`, 'error', 3000);
           return;
         }
         if (!address || !address.startsWith('0x') || address.length < 30) {
