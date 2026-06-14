@@ -21,7 +21,6 @@
       padding: 16px;
     }
 
-    /* Glassmorphism Card */
     .card {
       background: rgba(20, 20, 35, 0.6);
       backdrop-filter: blur(12px);
@@ -30,7 +29,7 @@
       max-width: 500px;
       width: 100%;
       border: 1px solid rgba(0, 255, 100, 0.2);
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 255, 100, 0.1);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
       animation: fadeInUp 0.6s ease-out;
     }
 
@@ -39,72 +38,18 @@
       to { opacity: 1; transform: translateY(0); }
     }
 
-    .logo {
-      text-align: center;
-      margin-bottom: 32px;
-    }
-    .logo-icon {
-      font-size: 56px;
-      margin-bottom: 8px;
-    }
-    .logo h1 {
-      font-size: 28px;
-      background: linear-gradient(135deg, #00ff66, #00ccff);
-      -webkit-background-clip: text;
-      background-clip: text;
-      color: transparent;
-      margin-bottom: 6px;
-    }
-    .logo p {
-      color: #8899aa;
-      font-size: 13px;
-    }
+    .logo { text-align: center; margin-bottom: 32px; }
+    .logo-icon { font-size: 56px; margin-bottom: 8px; }
+    .logo h1 { font-size: 28px; background: linear-gradient(135deg, #00ff66, #00ccff); -webkit-background-clip: text; background-clip: text; color: transparent; margin-bottom: 6px; }
+    .logo p { color: #8899aa; font-size: 13px; }
 
-    /* Tabs */
-    .tabs {
-      display: flex;
-      gap: 12px;
-      margin-bottom: 28px;
-      background: rgba(10, 10, 20, 0.8);
-      padding: 5px;
-      border-radius: 60px;
-    }
-    .tab {
-      flex: 1;
-      padding: 12px;
-      text-align: center;
-      background: transparent;
-      border: none;
-      border-radius: 50px;
-      color: #8899aa;
-      cursor: pointer;
-      font-size: 15px;
-      font-weight: 600;
-      transition: all 0.3s;
-    }
-    .tab.active {
-      background: linear-gradient(135deg, #00ff66, #00ccff);
-      color: #0a0a0f;
-      box-shadow: 0 4px 15px rgba(0, 255, 102, 0.3);
-    }
+    .tabs { display: flex; gap: 12px; margin-bottom: 28px; background: rgba(10, 10, 20, 0.8); padding: 5px; border-radius: 60px; }
+    .tab { flex: 1; padding: 12px; text-align: center; background: transparent; border: none; border-radius: 50px; color: #8899aa; cursor: pointer; font-size: 15px; font-weight: 600; transition: all 0.3s; }
+    .tab.active { background: linear-gradient(135deg, #00ff66, #00ccff); color: #0a0a0f; box-shadow: 0 4px 15px rgba(0, 255, 102, 0.3); }
 
-    /* Input Groups */
-    .input-group {
-      margin-bottom: 18px;
-      position: relative;
-    }
-    .input-group label {
-      display: block;
-      color: #8899aa;
-      margin-bottom: 6px;
-      font-size: 13px;
-      font-weight: 500;
-    }
-    .input-wrapper {
-      position: relative;
-      display: flex;
-      align-items: center;
-    }
+    .input-group { margin-bottom: 18px; position: relative; }
+    .input-group label { display: block; color: #8899aa; margin-bottom: 6px; font-size: 13px; font-weight: 500; }
+    .input-wrapper { position: relative; display: flex; align-items: center; }
     .input-wrapper input {
       width: 100%;
       padding: 14px 16px;
@@ -116,43 +61,15 @@
       font-size: 14px;
       transition: all 0.3s;
     }
-    .input-wrapper input:focus {
-      outline: none;
-      border-color: #00ff66;
-      box-shadow: 0 0 0 3px rgba(0, 255, 102, 0.2);
-    }
-    .input-icon {
-      position: absolute;
-      right: 16px;
-      top: 50%;
-      transform: translateY(-50%);
-      font-size: 16px;
-    }
-    .toggle-password {
-      position: absolute;
-      left: 16px;
-      top: 50%;
-      transform: translateY(-50%);
-      cursor: pointer;
-      color: #8899aa;
-      font-size: 16px;
-      transition: color 0.3s;
-      z-index: 2;
-    }
+    .input-wrapper input:focus { outline: none; border-color: #00ff66; box-shadow: 0 0 0 3px rgba(0, 255, 102, 0.2); }
+    .input-icon { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); font-size: 16px; }
+    .toggle-password { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #8899aa; font-size: 16px; transition: color 0.3s; z-index: 2; }
     .toggle-password:hover { color: #00ff66; }
 
-    /* Password Strength */
-    .password-strength {
-      margin-top: 8px;
-      height: 4px;
-      background: #2d3748;
-      border-radius: 4px;
-      overflow: hidden;
-    }
+    .password-strength { margin-top: 8px; height: 4px; background: #2d3748; border-radius: 4px; overflow: hidden; }
     .strength-bar { width: 0%; height: 100%; transition: width 0.3s, background 0.3s; }
     .strength-text { font-size: 10px; margin-top: 5px; color: #8899aa; }
 
-    /* Buttons */
     .btn-primary {
       width: 100%;
       padding: 14px;
@@ -166,10 +83,7 @@
       transition: all 0.3s;
       margin-top: 8px;
     }
-    .btn-primary:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 10px 25px -5px rgba(0, 255, 102, 0.4);
-    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 25px -5px rgba(0, 255, 102, 0.4); }
     .link-btn {
       width: 100%;
       background: transparent;
@@ -182,44 +96,16 @@
       transition: all 0.3s;
       margin-top: 12px;
     }
-    .link-btn:hover {
-      background: rgba(0, 255, 102, 0.1);
-      border-color: #00ff66;
-    }
+    .link-btn:hover { background: rgba(0, 255, 102, 0.1); border-color: #00ff66; }
 
-    /* Message */
-    .message {
-      margin-top: 18px;
-      padding: 12px;
-      border-radius: 16px;
-      text-align: center;
-      font-size: 13px;
-      animation: fadeIn 0.3s;
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(-10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
+    .message { margin-top: 18px; padding: 12px; border-radius: 16px; text-align: center; font-size: 13px; animation: fadeIn 0.3s; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
     .success { background: rgba(0, 255, 102, 0.15); border: 1px solid #00ff66; color: #00ff66; }
     .error { background: rgba(255, 68, 68, 0.15); border: 1px solid #ff4444; color: #ff4444; }
     .info { background: rgba(0, 204, 255, 0.15); border: 1px solid #00ccff; color: #00ccff; }
 
-    /* Stats */
-    .stats {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 14px;
-      margin-top: 28px;
-    }
-    .stat-box {
-      background: rgba(10, 10, 20, 0.8);
-      backdrop-filter: blur(10px);
-      padding: 14px;
-      border-radius: 20px;
-      text-align: center;
-      border: 1px solid rgba(0, 255, 102, 0.2);
-      transition: transform 0.3s;
-    }
+    .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 28px; }
+    .stat-box { background: rgba(10, 10, 20, 0.8); backdrop-filter: blur(10px); padding: 14px; border-radius: 20px; text-align: center; border: 1px solid rgba(0, 255, 102, 0.2); transition: transform 0.3s; }
     .stat-box:hover { transform: translateY(-2px); border-color: rgba(0, 255, 102, 0.5); }
     .stat-number { display: block; font-size: 22px; font-weight: bold; color: #00ff66; }
     .stat-label { font-size: 11px; color: #8899aa; }
@@ -323,7 +209,10 @@
   </div>
 
   <script>
-    const API_URL = window.location.origin;
+    // ========================================
+    // ✅ تم التعديل: الرابط الصحيح للمنصة على Render
+    // ========================================
+    const API_URL = 'https://crypto-api-c2v8.onrender.com';
 
     function togglePassword(inputId, element) {
       const input = document.getElementById(inputId);
