@@ -1,1308 +1,1004 @@
-<!DOCTYPE html>
-<html dir="rtl" lang="ar">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-  <title>الرئيسية | منصة الاستثمار</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    
-    /* ======================================== */
-    /* الوضع الليلي (الافتراضي) */
-    /* ======================================== */
-    body {
-      min-height: 100vh;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      padding-bottom: 80px;
-      transition: all 0.3s ease;
-    }
-    
-    body.dark-mode {
-      background: #0a0a0f;
-      background-image: linear-gradient(rgba(0,255,100,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,255,100,0.03) 1px, transparent 1px);
-      background-size: 40px 40px;
-      color: #ffffff;
-    }
-    
-    body.light-mode {
-      background: #f0f2f5;
-      background-image: linear-gradient(rgba(0,100,50,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0,100,50,0.05) 1px, transparent 1px);
-      background-size: 40px 40px;
-      color: #1a1a2e;
-    }
-    
-    /* وضع النهار */
-    body.light-mode .navbar {
-      background: #ffffff;
-      border-bottom: 1px solid #00aa55;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-    }
-    
-    body.light-mode .navbar .logo {
-      color: #00aa55;
-    }
-    
-    body.light-mode .user-name {
-      color: #00aa55;
-    }
-    
-    body.light-mode .support-btn,
-    body.light-mode .lang-btn-header {
-      background: rgba(0,170,85,0.1);
-      border-color: #00aa55;
-      color: #00aa55;
-    }
-    
-    body.light-mode .logout-btn {
-      border-color: #ff4444;
-      color: #ff4444;
-    }
-    
-    body.light-mode .card {
-      background: #ffffff;
-      border-color: #00aa55;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-    }
-    
-    body.light-mode .card-title {
-      color: #1a1a2e;
-      border-right-color: #00aa55;
-    }
-    
-    body.light-mode .detail-row {
-      color: #666666;
-    }
-    
-    body.light-mode .detail-value {
-      color: #00aa55;
-    }
-    
-    body.light-mode .stat-card {
-      background: #f8f9fa;
-      border-color: #00aa55;
-    }
-    
-    body.light-mode .stat-value {
-      color: #00aa55;
-    }
-    
-    body.light-mode .stat-label {
-      color: #666666;
-    }
-    
-    body.light-mode .action-card {
-      background: linear-gradient(135deg, #ffffff, #f0f2f5);
-      border-color: #00aa55;
-    }
-    
-    body.light-mode .action-title {
-      color: #1a1a2e;
-    }
-    
-    body.light-mode .action-sub {
-      color: #888888;
-    }
-    
-    body.light-mode .vip-item {
-      background: #f8f9fa;
-      border-color: #00aa55;
-    }
-    
-    body.light-mode .vip-name {
-      color: #00aa55;
-    }
-    
-    body.light-mode input {
-      background: #ffffff;
-      border-color: #00aa55;
-      color: #1a1a2e;
-    }
-    
-    body.light-mode input::placeholder {
-      color: #aaaaaa;
-    }
-    
-    body.light-mode .bottom-nav {
-      background: #ffffff;
-      border-top-color: #00aa55;
-    }
-    
-    body.light-mode .nav-item {
-      color: #999999;
-    }
-    
-    body.light-mode .nav-item.active {
-      color: #00aa55;
-    }
-    
-    body.light-mode .modal-content {
-      background: #ffffff;
-      border-color: #00aa55;
-    }
-    
-    body.light-mode .modal-content h3 {
-      color: #00aa55;
-    }
-    
-    body.light-mode .modal-content p {
-      color: #555555;
-    }
-    
-    body.light-mode .history-item {
-      background: #f8f9fa;
-      border-color: #00aa55;
-    }
-    
-    body.light-mode .history-type {
-      color: #00aa55;
-    }
-    
-    body.light-mode .history-amount {
-      color: #ff9900;
-    }
-    
-    body.light-mode .info-box {
-      background: rgba(0,170,85,0.08);
-      border-color: #00aa55;
-      color: #00aa55;
-    }
-    
-    body.light-mode .balance-box {
-      background: rgba(0,170,85,0.08);
-      border-color: #00aa55;
-    }
-    
-    body.light-mode .balance-label {
-      color: #00aa55;
-    }
-    
-    /* ======================================== */
-    /* الأنماط العامة */
-    /* ======================================== */
-    .navbar {
-      background: #1a1a2e;
-      padding: 16px 20px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-bottom: 1px solid #00ff66;
-      flex-wrap: wrap;
-      gap: 10px;
-      transition: all 0.3s ease;
-    }
-    
-    .logo { font-size: 22px; font-weight: bold; color: #00ff66; display: flex; align-items: center; gap: 10px; }
-    .user-actions { display: flex; align-items: center; gap: 15px; }
-    .user-name { color: #00ff66; font-size: 14px; }
-    .support-btn { background: rgba(0,255,102,0.15); border: 1px solid #00ff66; color: #00ff66; padding: 6px 12px; border-radius: 20px; cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 5px; }
-    .logout-btn { background: transparent; border: 1px solid #ff4444; color: #ff4444; padding: 6px 12px; border-radius: 20px; cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 5px; }
-    .lang-btn-header { background: rgba(0,255,102,0.15); border: 1px solid #00ff66; color: #00ff66; padding: 6px 12px; border-radius: 20px; cursor: pointer; font-size: 12px; }
-    .theme-toggle { background: rgba(0,255,102,0.15); border: 1px solid #00ff66; color: #00ff66; padding: 6px 12px; border-radius: 20px; cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 5px; }
-    .content { max-width: 500px; margin: 0 auto; padding: 20px; }
-    
-    .card {
-      background: #1a1a2e;
-      border-radius: 24px;
-      padding: 24px;
-      margin-bottom: 20px;
-      border: 1px solid #00ff66;
-      transition: all 0.3s ease;
-    }
-    .card-title { color: white; font-size: 18px; margin-bottom: 16px; border-right: 3px solid #00ff66; padding-right: 12px; }
-    .assets-amount { font-size: 42px; font-weight: bold; color: #00ff66; text-align: center; margin: 16px 0; text-shadow: 0 0 10px rgba(0,255,102,0.3); }
-    .detail-row { display: flex; justify-content: space-between; padding: 8px 0; color: #aabbcc; font-size: 14px; }
-    .detail-value { color: #00ff66; font-weight: bold; }
-    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
-    .stat-card { background: #1a1a2e; border-radius: 20px; padding: 16px; text-align: center; border: 1px solid #00ff66; transition: all 0.3s ease; }
-    .stat-value { color: #00ff66; font-size: 24px; font-weight: bold; }
-    .stat-label { color: #8899aa; font-size: 12px; }
-    
-    .action-buttons {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16px;
-      margin-bottom: 20px;
-    }
-    .action-card {
-      background: linear-gradient(135deg, #1a1a2e, #0f0f1a);
-      border-radius: 20px;
-      padding: 20px;
-      text-align: center;
-      border: 1px solid #00ff66;
-      cursor: pointer;
-      transition: all 0.3s;
-    }
-    .action-card:hover { transform: translateY(-3px); border-color: #00ff66; box-shadow: 0 10px 20px rgba(0,255,102,0.2); }
-    .action-icon { font-size: 40px; margin-bottom: 10px; }
-    .action-title { color: white; font-size: 18px; font-weight: bold; }
-    .action-sub { color: #8899aa; font-size: 12px; margin-top: 5px; }
-    
-    .vip-item {
-      background: #1a1a2e;
-      border-radius: 16px;
-      padding: 16px;
-      margin-bottom: 12px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border: 1px solid #00ff66;
-      cursor: pointer;
-      transition: all 0.3s;
-    }
-    .vip-item:hover { border-color: #00ff66; transform: translateX(-5px); }
-    .vip-name { color: #00ff66; font-weight: bold; font-size: 16px; }
-    .vip-roi { color: #00ccff; font-size: 13px; }
-    .vip-price { color: #fbbf24; font-size: 14px; }
-    .vip-status { font-size: 12px; }
-    .upgrade-btn { background: #00ff66; color: #0a0a0f; border: none; padding: 8px 16px; border-radius: 20px; cursor: pointer; font-weight: bold; }
-    .upgrade-btn:hover { transform: scale(1.02); }
-    .vip-locked { opacity: 0.6; }
-    .vip-unlocked { border-color: #ffcc00; background: rgba(255,204,0,0.1); }
-    
-    input {
-      width: 100%;
-      padding: 12px;
-      border-radius: 12px;
-      border: 1px solid #00ff66;
-      background: #0a0a0f;
-      color: white;
-      margin-bottom: 12px;
-    }
-    input:focus { outline: none; border-color: #00ff66; }
-    input::placeholder { color: #556677; }
-    .deposit-btn, .withdraw-btn {
-      width: 100%;
-      padding: 12px;
-      border-radius: 30px;
-      font-weight: bold;
-      cursor: pointer;
-      border: none;
-    }
-    .deposit-btn { background: linear-gradient(135deg, #00ff66, #00ccff); color: #0a0a0f; }
-    .withdraw-btn { background: linear-gradient(135deg, #ff4444, #ff6680); color: white; }
-    .btn-copy {
-      background: rgba(0,255,102,0.15);
-      border: 1px solid #00ff66;
-      color: #00ff66;
-      padding: 8px;
-      border-radius: 20px;
-      cursor: pointer;
-      width: 100%;
-      margin-top: 8px;
-    }
-    .network-btn {
-      background: rgba(0,255,102,0.1);
-      border: 1px solid #00ff66;
-      color: #00ff66;
-      padding: 10px;
-      border-radius: 16px;
-      cursor: pointer;
-      width: 100%;
-      margin-bottom: 12px;
-      text-align: center;
-    }
-    .message { padding: 12px; border-radius: 12px; margin-bottom: 16px; text-align: center; font-size: 14px; }
-    .success { background: rgba(0,255,102,0.15); border: 1px solid #00ff66; color: #00ff66; }
-    .error { background: rgba(255,68,68,0.15); border: 1px solid #ff4444; color: #ff4444; }
-    .warning { background: rgba(255,170,0,0.15); border: 1px solid #ffaa00; color: #ffaa00; }
-    .loading { background: rgba(0,204,255,0.15); border: 1px solid #00ccff; color: #00ccff; }
-    .info-box {
-      background: rgba(0,204,255,0.1);
-      border: 1px solid #00ccff;
-      border-radius: 16px;
-      padding: 12px;
-      margin-top: 12px;
-      font-size: 12px;
-      color: #00ccff;
-    }
-    
-    .bottom-nav {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      background: #1a1a2e;
-      display: flex;
-      justify-content: space-around;
-      padding: 10px;
-      border-top: 2px solid #00ff66;
-      z-index: 999;
-      transition: all 0.3s ease;
-    }
-    .nav-item {
-      background: none;
-      border: none;
-      color: #8899aa;
-      cursor: pointer;
-      padding: 8px;
-      font-size: 20px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-    .nav-item.active { color: #00ff66; }
-    .nav-label { font-size: 10px; margin-top: 2px; }
-    
-    .modal {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0,0,0,0.9);
-      backdrop-filter: blur(8px);
-      z-index: 2000;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-    }
-    .modal-content {
-      background: #1a1a2e;
-      border-radius: 32px;
-      padding: 28px;
-      max-width: 450px;
-      width: 100%;
-      max-height: 85vh;
-      overflow-y: auto;
-      border: 1px solid #00ff66;
-    }
-    .modal-content h3 { color: #00ff66; margin-bottom: 16px; font-size: 20px; }
-    .modal-content h4 { color: #00ccff; margin: 16px 0 8px; }
-    .modal-content p { color: #8899aa; margin-bottom: 10px; line-height: 1.5; font-size: 14px; }
-    .close-modal {
-      background: #00ff66;
-      color: #0a0a0f;
-      border: none;
-      padding: 12px;
-      border-radius: 30px;
-      font-weight: bold;
-      width: 100%;
-      margin-top: 20px;
-      cursor: pointer;
-    }
-    .hidden { display: none; }
-    
-    .history-item {
-      background: #1a1a2e;
-      border-radius: 16px;
-      margin-bottom: 12px;
-      padding: 12px;
-      border: 1px solid #00ff66;
-      transition: all 0.3s ease;
-    }
-    .history-type { color: #00ff66; font-weight: bold; font-size: 14px; }
-    .history-amount { color: #ffcc00; font-weight: bold; font-size: 16px; }
-    .history-status { font-size: 11px; margin-top: 5px; padding: 2px 8px; border-radius: 20px; display: inline-block; }
-    .status-approved { background: rgba(0,255,102,0.15); color: #00ff66; }
-    .status-pending { background: rgba(255,170,0,0.15); color: #ffaa00; }
-    
-    .network-option {
-      background: #0a0a0f;
-      border: 1px solid #00ff66;
-      border-radius: 16px;
-      padding: 16px;
-      margin-bottom: 12px;
-      cursor: pointer;
-      transition: all 0.3s;
-      text-align: center;
-    }
-    .network-option:hover {
-      background: rgba(0,255,102,0.1);
-      transform: translateX(-5px);
-    }
-    .network-name {
-      color: #00ff66;
-      font-weight: bold;
-      font-size: 18px;
-    }
-    .network-desc {
-      color: #8899aa;
-      font-size: 12px;
-      margin-top: 5px;
-    }
+const express = require('express');
+const cors = require('cors');
+const path = require('path');
+const cron = require('node-cron');
+const { createClient } = require('@supabase/supabase-js');
+require('dotenv').config();
 
-    .balance-box {
-      background: rgba(0,255,102,0.1);
-      border-radius: 16px;
-      padding: 12px;
-      margin-bottom: 16px;
-      text-align: center;
-      border: 1px solid #00ff66;
-    }
-    .balance-label {
-      color: #00ff66;
-      font-size: 14px;
-    }
-    .balance-amount {
-      color: #ffcc00;
-      font-size: 28px;
-      font-weight: bold;
-    }
-    
-    .qualify-bar {
-      background: rgba(0,0,0,0.3);
-      border-radius: 10px;
-      height: 8px;
-      margin-top: 10px;
-      overflow: hidden;
-    }
-    .qualify-progress {
-      background: linear-gradient(90deg, #00ff66, #00ccff);
-      height: 100%;
-      border-radius: 10px;
-      transition: width 0.5s ease;
-    }
-  </style>
-</head>
-<body class="dark-mode">
-  <div class="navbar">
-    <div class="logo">💰 <span id="logoText">CryptoInvest</span></div>
-    <div class="user-actions">
-      <button class="theme-toggle" id="themeToggleBtn">🌙 <span id="themeText">وضع ليلي</span></button>
-      <button class="lang-btn-header" id="langToggleBtn">🇸🇦 العربية</button>
-      <button class="support-btn" id="supportBtn">💬 <span id="supportText">الدعم</span></button>
-      <span class="user-name" id="userName"></span>
-      <button class="logout-btn" id="logoutBtn">🚪 <span id="logoutText">خروج</span></button>
-    </div>
-  </div>
+const bsc = require('./lib/bsc');
 
-  <div class="content" id="mainContent"></div>
+const app = express();
 
-  <div class="bottom-nav">
-    <button class="nav-item active" data-page="dashboard">🏠<span class="nav-label" id="navHome">البيت</span></button>
-    <button class="nav-item" data-page="vip">👑<span class="nav-label" id="navVip">VIP</span></button>
-    <button class="nav-item" data-page="deposit">💰<span class="nav-label" id="navDeposit">إيداع</span></button>
-    <button class="nav-item" data-page="withdraw">📤<span class="nav-label" id="navWithdraw">سحب</span></button>
-    <button class="nav-item" data-page="referral">👥<span class="nav-label" id="navReferral">فريق</span></button>
-    <button class="nav-item" data-page="profile">👤<span class="nav-label" id="navProfile">أنا</span></button>
-  </div>
+// Middleware
+app.use(cors());
+app.use(express.json());
+app.use(express.static('app'));
 
-  <!-- نافذة اختيار الشبكة للإيداع -->
-  <div id="networkModal" class="modal hidden">
-    <div class="modal-content">
-      <h3 id="networkModalTitle">🌐 اختر شبكة التحويل</h3>
-      <div class="network-option" id="selectBSCNetwork">
-        <div class="network-name">BNB Smart Chain (BSC)</div>
-        <div class="network-desc">شبكة BEP20 - العملة: USDT</div>
-      </div>
-      <button class="close-modal" id="closeNetworkModal">إلغاء</button>
-    </div>
-  </div>
+// ========================================
+// تهيئة Supabase
+// ========================================
+const supabaseAdmin = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY,
+  { auth: { autoRefreshToken: false, persistSession: false } }
+);
 
-  <!-- نافذة التعليمات الترحيبية -->
-  <div id="welcomeModal" class="modal hidden">
-    <div class="modal-content">
-      <h3 id="welcomeTitle">📖 مرحباً بك في منصة الاستثمار</h3>
-      <h4 id="welcomeHowDeposit">💰 كيفية الإيداع:</h4>
-      <p id="welcomeDepositText">1. اضغط على أيقونة الإيداع<br>2. اختر شبكة BNB Smart Chain (BSC/BEP20)<br>3. انسخ عنوان المحفظة<br>4. قم بتحويل USDT إلى هذا العنوان<br>5. الصق Transaction Hash<br>6. اضغط "تحقق وأيدع" - سيتم إضافة المبلغ تلقائياً</p>
-      <h4 id="welcomeHowWithdraw">📤 كيفية السحب:</h4>
-      <p id="welcomeWithdrawText">1. اضغط على أيقونة السحب<br>2. أدخل المبلغ (الحد الأدنى 0.5 USDT)<br>3. أدخل عنوان محفظة BSC الخاص بك<br>4. اضغط "سحب USDT"</p>
-      <h4 id="welcomeHowProfit">📈 الأرباح:</h4>
-      <p id="welcomeProfitText">يتم توزيع الأرباح يومياً بنسبة تصل إلى 4% حسب مستوى VIP الخاص بك<br>⚠️ ملاحظة: لا تحصل على أرباح حتى يصل إجمالي إيداعاتك إلى 10 USDT</p>
-      <h4 id="welcomeNetwork">🌐 ملاحظة هامة:</h4>
-      <p id="welcomeNetworkText">⚠️ يجب استخدام شبكة BNB Smart Chain (BSC/BEP20) فقط. لا ترسل على شبكات أخرى!</p>
-      <button class="close-modal" id="closeWelcomeModal">✅ فهمت</button>
-    </div>
-  </div>
+// ========================================
+// دالة لتوليد UUID صحيح
+// ========================================
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
 
-  <script>
-    const API_URL = window.location.origin;
-    let userId = localStorage.getItem('userId');
-    let userData = null;
-    let currentLang = localStorage.getItem('dashboardLang') || 'ar';
-    let currentTheme = localStorage.getItem('theme') || 'dark';
-    let vipPackages = [];
-
-    // عنوان المحفظة الحقيقي
-    const HOT_WALLET_ADDRESS = '0x9EB39A10c059877910DAff1fd8098e5DB32486F7';
-    const MIN_WITHDRAW = 0.5;
-    const QUALIFY_AMOUNT = 10; // الحد الأدنى للأرباح
-
-    // ========================================
-    // الترجمة الكاملة
-    // ========================================
-    const translations = {
-      ar: {
-        logoText: '💰 CryptoInvest',
-        supportText: '💬 الدعم',
-        logoutText: '🚪 خروج',
-        themeDark: '🌙 وضع ليلي',
-        themeLight: '☀️ وضع نهاري',
-        navHome: 'البيت',
-        navVip: 'VIP',
-        navDeposit: 'إيداع',
-        navWithdraw: 'سحب',
-        navReferral: 'فريق',
-        navProfile: 'أنا',
-        activeInvestment: 'الاستثمار النشط',
-        availableBalance: 'الرصيد المتاح',
-        totalDeposits: 'إجمالي الإيداعات',
-        totalWithdrawals: 'إجمالي السحوبات',
-        profitRate: 'نسبة الربح',
-        currentLevel: 'المستوى الحالي',
-        deposit: 'إيداع',
-        withdraw: 'سحب',
-        depositTitle: '💰 إيداع USDT',
-        networkInfo: '🌐 شبكة التحويل: BNB Smart Chain (BSC / BEP20)',
-        walletAddress: 'محفظة الإيداع:',
-        copyWallet: '📋 نسخ العنوان',
-        txHashPlaceholder: 'Transaction Hash (0x...)',
-        verifyAndDeposit: '🔍 تحقق وأيدع',
-        howToDeposit: '📌 كيف يتم الإيداع؟',
-        step1: '1. انسخ عنوان المحفظة أعلاه',
-        step2: '2. أرسل USDT على شبكة BSC/BEP20',
-        step3: '3. الصق Transaction Hash هنا',
-        step4: '4. سيتم إضافة المبلغ تلقائياً بعد التحقق',
-        withdrawTitle: '💸 سحب USDT',
-        minWithdrawNote: '⚠️ الحد الأدنى للسحب: ',
-        walletAddressPlaceholder: 'عنوان محفظة BSC (0x...)',
-        withdrawButton: '💸 سحب USDT',
-        warningAddress: '⚠️ تأكد من صحة عنوان المحفظة! يجب أن يكون من شبكة BSC/BEP20 ويبدأ بـ "0x"',
-        vipTitle: '👑 مستويات VIP',
-        vipOpen: '✅ مفتوح',
-        vipLocked: '🔒 مغلق',
-        vipUnlockedByDeposit: '🔓 مفتوح بالإيداع',
-        subscribe: 'اشتراك',
-        yourBalance: '💰 رصيدك المتاح',
-        referralTitle: '🔗 رابط الدعوة',
-        copyLink: '📋 نسخ الرابط',
-        referralsCount: 'المحالين',
-        groupVolume: 'حجم الفريق',
-        referralsList: '📋 قائمة المحالين',
-        noReferrals: 'لا يوجد محالين',
-        profileTitle: '📋 سجل العمليات',
-        noTransactions: 'لا توجد معاملات بعد',
-        typeDeposit: '💰 إيداع',
-        typeWithdraw: '📤 سحب',
-        typeProfit: '📈 ربح',
-        typeVipUpgrade: '👑 ترقية VIP',
-        statusApproved: '✅ مقبول',
-        statusPending: '⏳ قيد الانتظار',
-        welcomeTitle: '📖 مرحباً بك في منصة الاستثمار',
-        welcomeHowDeposit: '💰 كيفية الإيداع:',
-        welcomeDepositText: '1. اضغط على أيقونة الإيداع\n2. اختر شبكة BNB Smart Chain (BSC/BEP20)\n3. انسخ عنوان المحفظة\n4. قم بتحويل USDT إلى هذا العنوان\n5. الصق Transaction Hash\n6. اضغط "تحقق وأيدع" - سيتم إضافة المبلغ تلقائياً',
-        welcomeHowWithdraw: '📤 كيفية السحب:',
-        welcomeWithdrawText: '1. اضغط على أيقونة السحب\n2. أدخل المبلغ (الحد الأدنى 0.5 USDT)\n3. أدخل عنوان محفظة BSC الخاص بك\n4. اضغط "سحب USDT"',
-        welcomeHowProfit: '📈 الأرباح:',
-        welcomeProfitText: 'يتم توزيع الأرباح يومياً بنسبة تصل إلى 4% حسب مستوى VIP الخاص بك\n⚠️ ملاحظة: لا تحصل على أرباح حتى يصل إجمالي إيداعاتك إلى 10 USDT',
-        welcomeNetwork: '🌐 ملاحظة هامة:',
-        welcomeNetworkText: '⚠️ يجب استخدام شبكة BNB Smart Chain (BSC/BEP20) فقط. لا ترسل على شبكات أخرى!',
-        networkModalTitle: '🌐 اختر شبكة التحويل',
-        cancel: 'إلغاء',
-        upgradeSuccess: '✅ تم الترقية بنجاح!',
-        insufficientBalance: '⚠️ رصيد غير كافٍ',
-        mustUpgradePrevious: '⚠️ يجب ترقية المستويات السابقة أولاً',
-        qualifyMessage: '⚠️ تحتاج إلى إيداع {amount} USDT إضافية لتفعيل الأرباح اليومية',
-        qualifyProgress: 'نسبة التقدم للأرباح',
-        notQualified: '❌ غير مؤهل للأرباح',
-        qualified: '✅ مؤهل للأرباح'
-      },
-      en: {
-        logoText: '💰 CryptoInvest',
-        supportText: '💬 Support',
-        logoutText: '🚪 Logout',
-        themeDark: '🌙 Dark Mode',
-        themeLight: '☀️ Light Mode',
-        navHome: 'Home',
-        navVip: 'VIP',
-        navDeposit: 'Deposit',
-        navWithdraw: 'Withdraw',
-        navReferral: 'Referrals',
-        navProfile: 'Profile',
-        activeInvestment: 'Active Investment',
-        availableBalance: 'Available Balance',
-        totalDeposits: 'Total Deposits',
-        totalWithdrawals: 'Total Withdrawals',
-        profitRate: 'Profit Rate',
-        currentLevel: 'Current Level',
-        deposit: 'Deposit',
-        withdraw: 'Withdraw',
-        depositTitle: '💰 USDT Deposit',
-        networkInfo: '🌐 Network: BNB Smart Chain (BSC / BEP20)',
-        walletAddress: 'Deposit Wallet:',
-        copyWallet: '📋 Copy Address',
-        txHashPlaceholder: 'Transaction Hash (0x...)',
-        verifyAndDeposit: '🔍 Verify & Deposit',
-        howToDeposit: '📌 How to Deposit?',
-        step1: '1. Copy wallet address above',
-        step2: '2. Send USDT on BSC/BEP20 network',
-        step3: '3. Paste Transaction Hash here',
-        step4: '4. Amount will be added automatically after verification',
-        withdrawTitle: '💸 USDT Withdrawal',
-        minWithdrawNote: '⚠️ Minimum withdrawal: ',
-        walletAddressPlaceholder: 'BSC Wallet Address (0x...)',
-        withdrawButton: '💸 Withdraw USDT',
-        warningAddress: '⚠️ Make sure wallet address is correct! Must be on BSC/BEP20 network starting with "0x"',
-        vipTitle: '👑 VIP Levels',
-        vipOpen: '✅ Unlocked',
-        vipLocked: '🔒 Locked',
-        vipUnlockedByDeposit: '🔓 Unlocked by deposit',
-        subscribe: 'Subscribe',
-        yourBalance: '💰 Your Balance',
-        referralTitle: '🔗 Referral Link',
-        copyLink: '📋 Copy Link',
-        referralsCount: 'Referrals',
-        groupVolume: 'Group Volume',
-        referralsList: '📋 Referrals List',
-        noReferrals: 'No referrals yet',
-        profileTitle: '📋 Transaction History',
-        noTransactions: 'No transactions yet',
-        typeDeposit: '💰 Deposit',
-        typeWithdraw: '📤 Withdrawal',
-        typeProfit: '📈 Profit',
-        typeVipUpgrade: '👑 VIP Upgrade',
-        statusApproved: '✅ Approved',
-        statusPending: '⏳ Pending',
-        welcomeTitle: '📖 Welcome to CryptoInvest',
-        welcomeHowDeposit: '💰 How to Deposit:',
-        welcomeDepositText: '1. Click Deposit icon\n2. Choose BNB Smart Chain (BSC/BEP20)\n3. Copy wallet address\n4. Send USDT to this address\n5. Paste Transaction Hash\n6. Click "Verify & Deposit" - Amount will be added automatically',
-        welcomeHowWithdraw: '📤 How to Withdraw:',
-        welcomeWithdrawText: '1. Click Withdraw icon\n2. Enter amount (minimum 0.5 USDT)\n3. Enter your BSC wallet address\n4. Click "Withdraw USDT"',
-        welcomeHowProfit: '📈 Profits:',
-        welcomeProfitText: 'Daily profits are distributed up to 4% depending on your VIP level\n⚠️ Note: You will not receive profits until your total deposits reach 10 USDT',
-        welcomeNetwork: '🌐 Important Note:',
-        welcomeNetworkText: '⚠️ You must use BNB Smart Chain (BSC/BEP20) network only. Do not send on other networks!',
-        networkModalTitle: '🌐 Select Network',
-        cancel: 'Cancel',
-        upgradeSuccess: '✅ Upgrade successful!',
-        insufficientBalance: '⚠️ Insufficient balance',
-        mustUpgradePrevious: '⚠️ You must upgrade previous levels first',
-        qualifyMessage: '⚠️ You need to deposit {amount} more USDT to activate daily profits',
-        qualifyProgress: 'Qualification Progress',
-        notQualified: '❌ Not qualified for profits',
-        qualified: '✅ Qualified for profits'
-      }
-    };
-
-    // ========================================
-    // إدارة الوضع النهاري/الليلي
-    // ========================================
-    function setTheme(theme) {
-      const body = document.body;
-      body.classList.remove('dark-mode', 'light-mode');
-      body.classList.add(theme === 'dark' ? 'dark-mode' : 'light-mode');
-      localStorage.setItem('theme', theme);
-      currentTheme = theme;
-      
-      const themeText = document.getElementById('themeText');
-      const themeToggleBtn = document.getElementById('themeToggleBtn');
-      const t = translations[currentLang];
-      
-      if (theme === 'dark') {
-        themeText.innerHTML = t.themeDark;
-        themeToggleBtn.innerHTML = '🌙 ' + t.themeDark;
-      } else {
-        themeText.innerHTML = t.themeLight;
-        themeToggleBtn.innerHTML = '☀️ ' + t.themeLight;
+// ========================================
+// دالة لتحديث مستوى VIP بناءً على إجمالي الإيداع
+// ========================================
+async function updateVIPLevel(userId, totalDeposits) {
+  const { data: vipPackages } = await supabaseAdmin
+    .from('vip_packages')
+    .select('*')
+    .order('level', { ascending: false });
+  
+  let newVipLevel = 0;
+  let unlockedPackage = null;
+  
+  if (vipPackages && vipPackages.length > 0) {
+    for (const pkg of vipPackages) {
+      if (totalDeposits >= pkg.price) {
+        newVipLevel = pkg.level;
+        unlockedPackage = pkg;
+        break;
       }
     }
+  }
+  
+  const { data: user } = await supabaseAdmin
+    .from('users')
+    .select('vip_level, total_invested, current_package_started_at')
+    .eq('id', userId)
+    .single();
+  
+  // إذا تم فتح باقة جديدة أعلى من الحالية
+  if (newVipLevel > (user?.vip_level || 0) && unlockedPackage) {
+    // تحديث مستوى VIP
+    await supabaseAdmin
+      .from('users')
+      .update({ 
+        vip_level: newVipLevel,
+        current_package_started_at: new Date().toISOString()
+      })
+      .eq('id', userId);
     
-    function toggleTheme() {
-      const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-      setTheme(newTheme);
-    }
-
-    function updateUILanguage() {
-      const t = translations[currentLang];
-      document.getElementById('logoText').innerHTML = t.logoText;
-      document.getElementById('supportText').innerHTML = t.supportText;
-      document.getElementById('logoutText').innerHTML = t.logoutText;
-      document.getElementById('navHome').innerHTML = t.navHome;
-      document.getElementById('navVip').innerHTML = t.navVip;
-      document.getElementById('navDeposit').innerHTML = t.navDeposit;
-      document.getElementById('navWithdraw').innerHTML = t.navWithdraw;
-      document.getElementById('navReferral').innerHTML = t.navReferral;
-      document.getElementById('navProfile').innerHTML = t.navProfile;
-      document.getElementById('langToggleBtn').innerHTML = currentLang === 'ar' ? '🇬🇧 English' : '🇸🇦 العربية';
-      
-      // تحديث نص زر الثيم
-      const themeToggleBtn = document.getElementById('themeToggleBtn');
-      if (currentTheme === 'dark') {
-        themeToggleBtn.innerHTML = '🌙 ' + t.themeDark;
-      } else {
-        themeToggleBtn.innerHTML = '☀️ ' + t.themeLight;
-      }
-      
-      if (document.getElementById('networkModalTitle')) 
-        document.getElementById('networkModalTitle').innerHTML = t.networkModalTitle;
-      if (document.getElementById('closeNetworkModal'))
-        document.getElementById('closeNetworkModal').innerHTML = t.cancel;
-      
-      if (document.getElementById('welcomeTitle')) {
-        document.getElementById('welcomeTitle').innerHTML = t.welcomeTitle;
-        document.getElementById('welcomeHowDeposit').innerHTML = t.welcomeHowDeposit;
-        document.getElementById('welcomeDepositText').innerHTML = t.welcomeDepositText;
-        document.getElementById('welcomeHowWithdraw').innerHTML = t.welcomeHowWithdraw;
-        document.getElementById('welcomeWithdrawText').innerHTML = t.welcomeWithdrawText;
-        document.getElementById('welcomeHowProfit').innerHTML = t.welcomeHowProfit;
-        document.getElementById('welcomeProfitText').innerHTML = t.welcomeProfitText;
-        document.getElementById('welcomeNetwork').innerHTML = t.welcomeNetwork;
-        document.getElementById('welcomeNetworkText').innerHTML = t.welcomeNetworkText;
-      }
-      
-      if (typeof currentPage === 'string' && pages[currentPage]) {
-        pages[currentPage]();
-      }
-    }
-
-    document.getElementById('langToggleBtn').onclick = () => {
-      currentLang = currentLang === 'ar' ? 'en' : 'ar';
-      localStorage.setItem('dashboardLang', currentLang);
-      updateUILanguage();
-    };
-    
-    document.getElementById('themeToggleBtn').onclick = () => {
-      toggleTheme();
-    };
-
-    async function loadUser() {
-      if (!userId) { window.location.href = '/'; return; }
-      try {
-        const res = await fetch(`${API_URL}/api/user`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId })
-        });
-        const data = await res.json();
-        if (data.error) { localStorage.clear(); window.location.href = '/'; return; }
-        userData = data;
-        document.getElementById('userName').innerHTML = `👋 ${userData.name}`;
-        
-        const vipRes = await fetch(`${API_URL}/api/vip-packages`);
-        vipPackages = await vipRes.json();
-        
-        if (!localStorage.getItem('welcomeShown')) {
-          document.getElementById('welcomeModal').classList.remove('hidden');
-        }
-        
-        currentPage = 'dashboard';
-        renderDashboard();
-      } catch(e) { console.error(e); }
-    }
-
-    document.getElementById('logoutBtn').onclick = () => {
-      localStorage.clear();
-      window.location.href = '/';
-    };
-
-    document.getElementById('supportBtn').onclick = () => {
-      window.open('https://t.me/+fPunvn_76Q45NDg8', '_blank');
-    };
-
-    document.getElementById('closeWelcomeModal').onclick = () => {
-      document.getElementById('welcomeModal').classList.add('hidden');
-      localStorage.setItem('welcomeShown', 'true');
-    };
-
-    function showMessage(msg, type, duration = 5000) {
-      const container = document.getElementById('mainContent');
-      const msgDiv = document.createElement('div');
-      msgDiv.className = `message ${type}`;
-      msgDiv.innerHTML = msg;
-      container.insertBefore(msgDiv, container.firstChild);
-      setTimeout(() => msgDiv.remove(), duration);
-    }
-
-    function clearMessages() {
-      const container = document.getElementById('mainContent');
-      const messages = container.querySelectorAll('.message');
-      messages.forEach(msg => msg.remove());
-    }
-
-    function showNetworkSelection() {
-      const modal = document.getElementById('networkModal');
-      modal.classList.remove('hidden');
-      
-      const selectBSC = document.getElementById('selectBSCNetwork');
-      const newSelectBSC = selectBSC.cloneNode(true);
-      selectBSC.parentNode.replaceChild(newSelectBSC, selectBSC);
-      
-      newSelectBSC.onclick = () => {
-        modal.classList.add('hidden');
-        currentPage = 'deposit';
-        highlightNav('deposit');
-        renderDeposit();
-      };
-      
-      document.getElementById('closeNetworkModal').onclick = () => {
-        modal.classList.add('hidden');
-      };
-    }
-
-    function highlightNav(page) {
-      document.querySelectorAll('.nav-item').forEach(btn => {
-        btn.classList.remove('active');
-        if (btn.dataset.page === page) {
-          btn.classList.add('active');
-        }
+    // تسجيل الاشتراك في الباقة (بمبلغ 0 لأنها فتحت بالإيداع)
+    await supabaseAdmin
+      .from('package_subscriptions')
+      .insert({
+        user_id: userId,
+        package_level: newVipLevel,
+        package_name: unlockedPackage.name,
+        amount_paid: 0,
+        total_invested_at_time: user?.total_invested || 0,
+        roi_percent: unlockedPackage.roi_percent,
+        created_at: new Date().toISOString()
       });
-    }
-
-    async function renderDashboard() {
-      const t = translations[currentLang];
-      const active = userData?.active_deposit || 0;
-      const avail = userData?.available_balance || 0;
-      const totalDeposit = userData?.total_deposits || 0;
-      const totalWithdraw = userData?.total_withdrawn || 0;
-      const currentVip = userData?.vip_level || 0;
-      const qualifying = userData?.qualifying_deposit || false;
-      
-      let currentRoi = 0;
-      if (qualifying) {
-        if (currentVip > 0 && vipPackages.length > 0) {
-          const vipPkg = vipPackages.find(p => p.level === currentVip);
-          currentRoi = vipPkg ? vipPkg.roi_percent : 2;
-        } else {
-          currentRoi = 2;
-        }
-      }
-      
-      const currentVipName = currentVip > 0 ? (vipPackages.find(p => p.level === currentVip)?.name || 'VIP ' + currentVip) : (currentLang === 'ar' ? 'غير مشترك' : 'Not subscribed');
-      const qualifyProgress = Math.min((totalDeposit / QUALIFY_AMOUNT) * 100, 100);
-      const remainingToQualify = Math.max(0, QUALIFY_AMOUNT - totalDeposit);
-      
-      document.getElementById('mainContent').innerHTML = `
-        <div class="card">
-          <div class="assets-amount">${(active+avail).toFixed(2)} USDT</div>
-          <div class="detail-row"><span>💰 ${t.activeInvestment}</span><span class="detail-value">${active.toFixed(2)} USDT</span></div>
-          <div class="detail-row"><span>💎 ${t.availableBalance}</span><span class="detail-value">${avail.toFixed(2)} USDT</span></div>
-          <div class="detail-row"><span>📊 ${t.totalDeposits}</span><span class="detail-value">${totalDeposit.toFixed(2)} USDT</span></div>
-          <div class="detail-row"><span>📤 ${t.totalWithdrawals}</span><span class="detail-value">${totalWithdraw.toFixed(2)} USDT</span></div>
-          ${!qualifying ? `
-            <div class="info-box" style="margin-top:16px;">
-              <strong>⚠️ ${t.notQualified}</strong><br>
-              ${t.qualifyMessage.replace('{amount}', remainingToQualify.toFixed(2))}
-              <div class="qualify-bar">
-                <div class="qualify-progress" style="width: ${qualifyProgress}%"></div>
-              </div>
-              <div style="font-size:11px; margin-top:5px;">${t.qualifyProgress}: ${qualifyProgress.toFixed(1)}%</div>
-            </div>
-          ` : `
-            <div class="info-box" style="margin-top:16px; background:rgba(0,255,102,0.15); color:#00ff66;">
-              <strong>✅ ${t.qualified}</strong><br>
-              ${currentLang === 'ar' ? 'أنت مؤهل للحصول على أرباح يومية بنسبة ' + currentRoi + '%' : 'You are qualified for daily profits of ' + currentRoi + '%'}
-            </div>
-          `}
-        </div>
-        
-        <div class="action-buttons">
-          <div class="action-card" id="quickDepositBtn">
-            <div class="action-icon">💰</div>
-            <div class="action-title">${t.deposit}</div>
-            <div class="action-sub">${currentLang === 'ar' ? 'أضف أموالاً إلى حسابك' : 'Add funds to your account'}</div>
-          </div>
-          <div class="action-card" id="quickWithdrawBtn">
-            <div class="action-icon">📤</div>
-            <div class="action-title">${t.withdraw}</div>
-            <div class="action-sub">${currentLang === 'ar' ? 'اسحب أرباحك' : 'Withdraw your profits'}</div>
-          </div>
-        </div>
-        
-        <div class="stats-grid">
-          <div class="stat-card"><div class="stat-value">${qualifying ? currentRoi + '%' : '0%'}</div><div class="stat-label">${t.profitRate}</div></div>
-          <div class="stat-card"><div class="stat-value">${currentVipName}</div><div class="stat-label">${t.currentLevel}</div></div>
-        </div>
-      `;
-      
-      document.getElementById('quickDepositBtn').onclick = () => {
-        showNetworkSelection();
-      };
-      
-      document.getElementById('quickWithdrawBtn').onclick = () => {
-        currentPage = 'withdraw';
-        highlightNav('withdraw');
-        renderWithdraw();
-      };
-    }
-
-    async function renderDeposit() {
-      const t = translations[currentLang];
-      const totalDeposit = userData?.total_deposits || 0;
-      const remainingToQualify = Math.max(0, QUALIFY_AMOUNT - totalDeposit);
-      
-      document.getElementById('mainContent').innerHTML = `
-        <div class="card">
-          <div class="card-title">${t.depositTitle}</div>
-          <div class="network-btn" id="networkInfoBtn">
-            ${t.networkInfo} 📋
-          </div>
-          <p style="color:#8899aa; font-size:12px; margin-bottom:8px;">${t.walletAddress}</p>
-          <code style="color:#00ff66; word-break:break-all;">${HOT_WALLET_ADDRESS}</code>
-          <button class="btn-copy" id="copyWalletBtn">${t.copyWallet}</button>
-          
-          <input type="text" id="depositTxHash" placeholder="${t.txHashPlaceholder}" style="direction:ltr; font-family: monospace; margin-top:16px;">
-          <button class="deposit-btn" id="doDepositBtn">${t.verifyAndDeposit}</button>
-          
-          <div class="info-box">
-            <strong>${t.howToDeposit}</strong><br>
-            ${t.step1}<br>
-            ${t.step2}<br>
-            ${t.step3}<br>
-            ${t.step4}
-          </div>
-          ${remainingToQualify > 0 ? `
-            <div class="info-box" style="margin-top:12px; background:rgba(255,170,0,0.15); color:#ffaa00;">
-              <strong>⚠️ ملاحظة:</strong><br>
-              ${currentLang === 'ar' ? 'تحتاج إلى ' + remainingToQualify.toFixed(2) + ' USDT إضافية لتفعيل الأرباح اليومية' : 'You need ' + remainingToQualify.toFixed(2) + ' more USDT to activate daily profits'}
-            </div>
-          ` : ''}
-          <div id="depositMsg"></div>
-        </div>
-      `;
-      
-      document.getElementById('copyWalletBtn').onclick = () => {
-        navigator.clipboard.writeText(HOT_WALLET_ADDRESS);
-        showMessage('✅ ' + (currentLang === 'ar' ? 'تم نسخ عنوان المحفظة!' : 'Wallet address copied!'), 'success', 2000);
-      };
-      
-      document.getElementById('networkInfoBtn').onclick = () => {
-        navigator.clipboard.writeText('BSC BEP20');
-        showMessage('✅ ' + (currentLang === 'ar' ? 'تم نسخ اسم الشبكة: BSC (BEP20)' : 'Network name copied: BSC (BEP20)'), 'success', 2000);
-      };
-      
-      document.getElementById('doDepositBtn').onclick = async () => {
-        const txHash = document.getElementById('depositTxHash').value.trim();
-        clearMessages();
-        
-        if (!txHash) {
-          showMessage('⚠️ ' + (currentLang === 'ar' ? 'يرجى إدخال Transaction Hash' : 'Please enter Transaction Hash'), 'error', 3000);
-          return;
-        }
-        
-        showMessage('⏳ ' + (currentLang === 'ar' ? 'جاري التحقق من المعاملة...' : 'Verifying transaction...'), 'loading', 15000);
-        
-        try {
-          const verifyRes = await fetch(`${API_URL}/api/verify-deposit`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId, transactionHash: txHash, amount: 0 })
-          });
-          
-          const verifyData = await verifyRes.json();
-          
-          if (!verifyData.success) {
-            showMessage(`❌ ${verifyData.error}`, 'error', 6000);
-            return;
-          }
-          
-          const actualAmount = verifyData.verification?.amount;
-          
-          if (!actualAmount || actualAmount < 1) {
-            showMessage(`⚠️ ${currentLang === 'ar' ? 'المبلغ المحول' : 'Amount sent'} (${actualAmount || 0} USDT) ${currentLang === 'ar' ? 'أقل من الحد الأدنى 1 USDT' : 'is less than minimum 1 USDT'}`, 'error', 5000);
-            return;
-          }
-          
-          const depositRes = await fetch(`${API_URL}/api/deposit`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId, amount: actualAmount, transactionHash: txHash })
-          });
-          
-          const depositData = await depositRes.json();
-          clearMessages();
-          
-          if (depositData.success) {
-            showMessage(depositData.message, 'success', 8000);
-            document.getElementById('depositTxHash').value = '';
-            loadUser();
-          } else {
-            showMessage(`❌ ${depositData.error}`, 'error', 6000);
-          }
-        } catch (error) {
-          clearMessages();
-          showMessage('❌ ' + (currentLang === 'ar' ? 'خطأ في الاتصال بالخادم' : 'Server connection error'), 'error', 5000);
-        }
-      };
-    }
-
-    async function renderWithdraw() {
-      const t = translations[currentLang];
-      const avail = userData?.available_balance || 0;
-      document.getElementById('mainContent').innerHTML = `
-        <div class="card">
-          <div class="card-title">${t.withdrawTitle}</div>
-          <div class="assets-amount" style="font-size:28px;">${avail.toFixed(2)} USDT</div>
-          <input type="number" id="withdrawAmount" placeholder="${currentLang === 'ar' ? 'المبلغ (USDT) - الحد الأدنى' : 'Amount (USDT) - minimum'} ${MIN_WITHDRAW}" step="0.1">
-          <input type="text" id="walletAddress" placeholder="${t.walletAddressPlaceholder}">
-          <button class="withdraw-btn" id="doWithdrawBtn">${t.withdrawButton}</button>
-          <div class="info-box">
-            ${t.minWithdrawNote} ${MIN_WITHDRAW} USDT<br>
-            ${t.warningAddress}
-          </div>
-          <div id="withdrawMsg"></div>
-        </div>
-      `;
-      
-      document.getElementById('doWithdrawBtn').onclick = async () => {
-        const amount = parseFloat(document.getElementById('withdrawAmount').value);
-        const address = document.getElementById('walletAddress').value;
-        
-        if (!amount || amount < MIN_WITHDRAW) {
-          showMessage(`⚠️ ${translations[currentLang].minWithdrawNote} ${MIN_WITHDRAW} USDT`, 'error', 3000);
-          return;
-        }
-        if (!address || !address.startsWith('0x') || address.length < 30) {
-          showMessage('⚠️ ' + (currentLang === 'ar' ? 'يرجى إدخال عنوان محفظة BSC صالح' : 'Please enter a valid BSC wallet address'), 'error', 4000);
-          return;
-        }
-        if (amount > avail) {
-          showMessage('⚠️ ' + (currentLang === 'ar' ? 'الرصيد غير كافٍ' : 'Insufficient balance'), 'error', 3000);
-          return;
-        }
-        
-        try {
-          const res = await fetch(`${API_URL}/api/withdraw`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId, amount, walletAddress: address })
-          });
-          const data = await res.json();
-          
-          if (data.success) {
-            showMessage(`✅ ${data.message}`, 'success', 5000);
-            document.getElementById('withdrawAmount').value = '';
-            document.getElementById('walletAddress').value = '';
-            loadUser();
-          } else {
-            showMessage(`❌ ${data.error}`, 'error', 4000);
-          }
-        } catch (error) {
-          showMessage('❌ ' + (currentLang === 'ar' ? 'خطأ في الاتصال بالخادم' : 'Server connection error'), 'error', 4000);
-        }
-      };
-    }
-
-    async function renderVIP() {
-      const t = translations[currentLang];
-      const currentLevel = userData?.vip_level || 0;
-      const availableBalance = userData?.available_balance || 0;
-      const totalDeposits = userData?.total_deposits || 0;
-      
-      document.getElementById('mainContent').innerHTML = `
-        <div class="card">
-          <div class="card-title">${t.vipTitle}</div>
-          <div class="balance-box">
-            <div class="balance-label">${t.yourBalance}</div>
-            <div class="balance-amount">${availableBalance.toFixed(2)} USDT</div>
-          </div>
-          <div class="info-box" style="margin-bottom:16px;">
-            📌 ${currentLang === 'ar' ? 'يتم فتح الباقات تلقائياً عند الوصول إلى قيمة الإيداع المطلوبة' : 'Packages are automatically unlocked when you reach the required deposit amount'}
-          </div>
-          <div id="vipList"></div>
-        </div>
-      `;
-      
-      const container = document.getElementById('vipList');
-      
-      if (!vipPackages || vipPackages.length === 0) {
-        container.innerHTML = '<p style="color:#8899aa; text-align:center;">جاري تحميل الباقات...</p>';
-        return;
-      }
-      
-      container.innerHTML = vipPackages.map(pkg => {
-        const isUnlockedByDeposit = totalDeposits >= pkg.price;
-        const isCurrentOrLower = currentLevel >= pkg.level;
-        const canUpgrade = isUnlockedByDeposit || availableBalance >= pkg.price;
-        const isNextLevel = (pkg.level === currentLevel + 1) || (currentLevel === 0 && pkg.level === 1);
-        
-        let statusHtml = '';
-        let statusClass = '';
-        
-        if (isCurrentOrLower) {
-          statusHtml = `<span class="vip-status" style="color:#00ff66;">${t.vipOpen}</span>`;
-          statusClass = 'vip-unlocked';
-        } else if (isUnlockedByDeposit) {
-          statusHtml = `<span class="vip-status" style="color:#ffcc00;">${t.vipUnlockedByDeposit}</span>
-                        <button class="upgrade-btn" data-level="${pkg.level}" data-price="${pkg.price}" data-name="${pkg.name}" data-unlocked="true">${t.subscribe} (0 USDT)</button>`;
-          statusClass = 'vip-unlocked';
-        } else if (canUpgrade && isNextLevel) {
-          statusHtml = `<button class="upgrade-btn" data-level="${pkg.level}" data-price="${pkg.price}" data-name="${pkg.name}" data-unlocked="false">${t.subscribe} (${pkg.price} USDT)</button>`;
-        } else if (!isNextLevel && currentLevel > 0) {
-          statusHtml = `<span class="vip-status" style="color:#8899aa;">${t.vipLocked} (${currentLang === 'ar' ? 'رقي السابق أولاً' : 'Upgrade previous first'})</span>`;
-          statusClass = 'vip-locked';
-        } else {
-          statusHtml = `<span class="vip-status" style="color:#8899aa;">${t.vipLocked}</span>`;
-          statusClass = 'vip-locked';
-        }
-        
-        return `
-          <div class="vip-item ${statusClass}" data-level="${pkg.level}" data-price="${pkg.price}" data-name="${pkg.name}" data-roi="${pkg.roi_percent}">
-            <div>
-              <div class="vip-name">${pkg.name}</div>
-              <div class="vip-roi">💰 ${pkg.roi_percent}% ${currentLang === 'ar' ? 'يومياً' : 'daily'}</div>
-              <div class="vip-price">💎 ${currentLang === 'ar' ? 'سعر الاشتراك' : 'Subscription price'}: ${pkg.price} USDT</div>
-              ${isUnlockedByDeposit && !isCurrentOrLower ? `<div style="font-size:11px; color:#ffcc00;">🔓 ${currentLang === 'ar' ? 'مفتوح بالإيداع' : 'Unlocked by deposit'}</div>` : ''}
-            </div>
-            <div>
-              ${statusHtml}
-            </div>
-          </div>
-        `;
-      }).join('');
-      
-      document.querySelectorAll('.upgrade-btn').forEach(btn => {
-        btn.onclick = async (e) => {
-          e.stopPropagation();
-          const targetLevel = parseInt(btn.dataset.level);
-          const price = parseFloat(btn.dataset.price);
-          const name = btn.dataset.name;
-          const isUnlocked = btn.dataset.unlocked === 'true';
-          
-          if (currentLevel >= targetLevel) {
-            showMessage(`✅ ${currentLang === 'ar' ? 'أنت بالفعل مشترك في' : 'You are already subscribed to'} ${name}`, 'success', 2000);
-            return;
-          }
-          
-          if (currentLevel > 0 && currentLevel < targetLevel - 1) {
-            showMessage(`⚠️ ${t.mustUpgradePrevious}`, 'warning', 3000);
-            return;
-          }
-          
-          if (isUnlocked || availableBalance >= price) {
-            try {
-              const res = await fetch(`${API_URL}/api/upgrade-vip`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId, packageLevel: targetLevel })
-              });
-              const data = await res.json();
-              
-              if (data.success) {
-                showMessage(`✅ ${t.upgradeSuccess} ${name}`, 'success', 3000);
-                loadUser();
-              } else {
-                showMessage(`❌ ${data.error}`, 'error', 4000);
-              }
-            } catch (error) {
-              showMessage('❌ ' + (currentLang === 'ar' ? 'خطأ في الاتصال بالخادم' : 'Server connection error'), 'error', 4000);
-            }
-          } else {
-            showMessage(`⚠️ ${t.insufficientBalance} ${currentLang === 'ar' ? 'تحتاج' : 'need'} ${price} USDT`, 'warning', 4000);
-            showNetworkSelection();
-          }
-        };
+    
+    await supabaseAdmin
+      .from('transactions')
+      .insert({
+        user_id: userId,
+        type: 'vip_upgrade',
+        amount: 0,
+        status: 'approved',
+        description: `🎉 فتح تلقائي لباقة ${unlockedPackage.name} (${unlockedPackage.roi_percent}% أرباح يومية) - بناءً على إيداع ${totalDeposits} USDT`,
+        created_at: new Date().toISOString()
       });
-    }
+    
+    return { newLevel: newVipLevel, unlockedPackage, byDeposit: true };
+  }
+  
+  return { newLevel: user?.vip_level || 0, unlockedPackage: null, byDeposit: false };
+}
 
-    async function renderReferrals() {
-      const t = translations[currentLang];
-      const res = await fetch(`${API_URL}/api/referrals`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId })
-      });
-      const data = await res.json();
-      document.getElementById('mainContent').innerHTML = `
-        <div class="card">
-          <div class="card-title">${t.referralTitle}</div>
-          <code style="color:#00ff66; word-break:break-all;">${window.location.origin}?ref=${userData?.referral_code}</code>
-          <button class="btn-copy" id="copyLinkBtn">${t.copyLink}</button>
-        </div>
-        <div class="stats-grid">
-          <div class="stat-card"><div class="stat-value">${data.count || 0}</div><div class="stat-label">${t.referralsCount}</div></div>
-          <div class="stat-card"><div class="stat-value">${(data.groupBalance || 0).toFixed(2)} USDT</div><div class="stat-label">${t.groupVolume}</div></div>
-        </div>
-        <div class="card"><div class="card-title">${t.referralsList}</div><div id="referralsList"></div></div>
-      `;
-      
-      document.getElementById('copyLinkBtn').onclick = () => {
-        navigator.clipboard.writeText(`${window.location.origin}?ref=${userData?.referral_code}`);
-        showMessage('✅ ' + (currentLang === 'ar' ? 'تم نسخ رابط الدعوة!' : 'Referral link copied!'), 'success', 2000);
-      };
-      
-      const listDiv = document.getElementById('referralsList');
-      if (!data.referrals || data.referrals.length === 0) {
-        listDiv.innerHTML = `<p style="color:#8899aa;">${t.noReferrals}</p>`;
-      } else {
-        listDiv.innerHTML = data.referrals.map(u => `<div style="background:#0a0a0f; padding:12px; border-radius:12px; margin-bottom:8px;">${u.name}<br><span style="font-size:12px;">💰 ${u.active_deposit || 0} USDT</span></div>`).join('');
-      }
-    }
-
-    async function renderProfile() {
-      const t = translations[currentLang];
-      const avail = userData?.available_balance || 0;
-      
-      document.getElementById('mainContent').innerHTML = `
-        <div class="card" style="text-align:center;">
-          <div style="font-size:60px;">👤</div>
-          <div style="font-size:20px; font-weight:bold; color:white;">${userData.name}</div>
-          <div style="color:#8899aa; font-size:12px;">📧 ${userData.email}</div>
-          <div style="color:#00ff66; font-size:28px; margin-top:16px;">${avail.toFixed(2)} USDT</div>
-        </div>
-        <div class="card"><div class="card-title">${t.profileTitle}</div><div id="transactionsList"></div></div>
-      `;
-      
-      try {
-        const response = await fetch(`${API_URL}/api/my-transactions`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId })
-        });
-        
-        const transactions = await response.json();
-        const listDiv = document.getElementById('transactionsList');
-        
-        if (!transactions || transactions.length === 0) {
-          listDiv.innerHTML = `<p style="color:#8899aa; text-align:center;">${t.noTransactions}</p>`;
-          return;
-        }
-        
-        const typeText = currentLang === 'ar' ? 'type_ar' : 'type_en';
-        
-        listDiv.innerHTML = transactions.map(txn => `
-          <div class="history-item">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-              <div>
-                <div class="history-type">${txn[typeText] || txn.type}</div>
-                <div style="font-size:11px; color:#8899aa; margin-top:4px;">${new Date(txn.date).toLocaleDateString(currentLang === 'ar' ? 'ar' : 'en')}</div>
-                ${txn.reference ? `<div style="font-size:10px; color:#00ccff; direction:ltr; margin-top:4px;">${txn.reference.substring(0, 16)}...</div>` : ''}
-              </div>
-              <div style="text-align:center;">
-                <div class="history-amount">${(txn.amount || 0).toFixed(2)} USDT</div>
-                <div class="history-status ${txn.status === 'approved' ? 'status-approved' : 'status-pending'}">
-                  ${txn.status === 'approved' ? 
-                    (txn.type === 'deposit' ? '✅ تم الإيداع' : 
-                     txn.type === 'withdraw' ? '✅ تم السحب' : 
-                     txn.type === 'vip_upgrade' ? '👑 تم الترقية' :
-                     '✅ تم الربح') : 
-                    '⏳ قيد الانتظار'}
-                </div>
-              </div>
-            </div>
-          </div>
-        `).join('');
-        
-      } catch (error) {
-        console.error('Error loading transactions:', error);
-        document.getElementById('transactionsList').innerHTML = `<p style="color:#8899aa; text-align:center;">${currentLang === 'ar' ? 'خطأ في تحميل المعاملات' : 'Error loading transactions'}</p>`;
-      }
-    }
-
-    const pages = {
-      dashboard: renderDashboard,
-      deposit: renderDeposit,
-      withdraw: renderWithdraw,
-      vip: renderVIP,
-      referral: renderReferrals,
-      profile: renderProfile
+// ========================================
+// دالة للترقية إلى باقة VIP (يدوياً أو تلقائياً)
+// ========================================
+async function upgradeToPackage(userId, targetLevel, isAutoUpgrade = false) {
+  // جلب بيانات الباقة
+  const { data: package, error: packageError } = await supabaseAdmin
+    .from('vip_packages')
+    .select('*')
+    .eq('level', targetLevel)
+    .single();
+  
+  if (packageError || !package) {
+    return { success: false, error: 'الباقة غير موجودة' };
+  }
+  
+  // جلب بيانات المستخدم
+  const { data: user, error: userError } = await supabaseAdmin
+    .from('users')
+    .select('vip_level, available_balance, total_deposits, total_invested, active_deposit')
+    .eq('id', userId)
+    .single();
+  
+  if (userError) {
+    return { success: false, error: 'المستخدم غير موجود' };
+  }
+  
+  // التحقق من أن المستوى المطلوب أعلى من المستوى الحالي
+  if (user.vip_level >= targetLevel) {
+    return { success: false, error: 'أنت بالفعل في هذا المستوى أو أعلى' };
+  }
+  
+  // التحقق من أنه لا يمكن تخطي المستويات
+  if (targetLevel > user.vip_level + 1) {
+    return { success: false, error: '⚠️ يجب ترقية المستويات السابقة أولاً!' };
+  }
+  
+  let amountToPay = package.price;
+  let message = '';
+  
+  // إذا كان إجمالي الإيداع أكبر من أو يساوي سعر الباقة، يتم فتحها تلقائياً بدون دفع
+  if (user.total_deposits >= package.price && isAutoUpgrade) {
+    amountToPay = 0;
+    message = `🎉 تم فتح باقة ${package.name} تلقائياً بناءً على إيداعاتك!`;
+  } 
+  // التحقق من الرصيد المتاح للدفع
+  else if (user.available_balance < amountToPay && !isAutoUpgrade) {
+    const needed = amountToPay - user.available_balance;
+    return { 
+      success: false, 
+      error: `⚠️ رصيدك غير كافٍ! تحتاج إلى ${needed.toFixed(2)} USDT إضافية لفتح هذه الباقة.`,
+      needed: needed,
+      currentBalance: user.available_balance,
+      packagePrice: package.price
     };
-
-    let currentPage = 'dashboard';
-
-    document.querySelectorAll('.nav-item').forEach(btn => {
-      btn.onclick = () => {
-        const page = btn.dataset.page;
-        currentPage = page;
-        highlightNav(page);
-        if (pages[page]) pages[page]();
-      };
+  }
+  
+  let newBalance = user.available_balance;
+  let newTotalInvested = user.total_invested || 0;
+  
+  if (amountToPay > 0) {
+    // خصم المبلغ من الرصيد المتاح
+    newBalance = user.available_balance - amountToPay;
+    // إضافة المبلغ إلى إجمالي المستثمر في الباقة
+    newTotalInvested = (user.total_invested || 0) + amountToPay;
+  } else {
+    // إذا كانت الباقة مفتوحة تلقائياً، نجمع إجمالي الإيداعات مع المستثمر
+    newTotalInvested = (user.total_invested || 0) + user.total_deposits;
+  }
+  
+  // تحديث بيانات المستخدم
+  await supabaseAdmin
+    .from('users')
+    .update({
+      vip_level: targetLevel,
+      available_balance: newBalance,
+      total_invested: newTotalInvested,
+      active_deposit: newTotalInvested,
+      current_package_started_at: new Date().toISOString(),
+      last_vip_upgrade: new Date().toISOString()
+    })
+    .eq('id', userId);
+  
+  // تسجيل الاشتراك
+  await supabaseAdmin
+    .from('package_subscriptions')
+    .insert({
+      user_id: userId,
+      package_level: targetLevel,
+      package_name: package.name,
+      amount_paid: amountToPay,
+      total_invested_at_time: newTotalInvested,
+      roi_percent: package.roi_percent,
+      created_at: new Date().toISOString()
     });
+  
+  // تسجيل المعاملة
+  await supabaseAdmin
+    .from('transactions')
+    .insert({
+      user_id: userId,
+      type: 'vip_upgrade',
+      amount: amountToPay,
+      status: 'approved',
+      description: amountToPay > 0 
+        ? `✨ ترقية إلى ${package.name} (${package.roi_percent}% أرباح يومية) - المبلغ المدفوع: ${amountToPay} USDT`
+        : `🎉 فتح تلقائي لباقة ${package.name} (${package.roi_percent}% أرباح يومية)`,
+      created_at: new Date().toISOString()
+    });
+  
+  return { 
+    success: true, 
+    message: message || `✅ تم الترقية إلى ${package.name} بنجاح! نسبة الربح: ${package.roi_percent}% يومياً`,
+    newLevel: targetLevel,
+    newBalance: newBalance,
+    totalInvested: newTotalInvested,
+    roiPercent: package.roi_percent
+  };
+}
 
-    // تهيئة الثيم
-    setTheme(currentTheme);
-    updateUILanguage();
-    loadUser();
-  </script>
-</body>
-</html>
+// ========================================
+// API: صحّة الخادم
+// ========================================
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// ========================================
+// API: جلب رصيد المحفظة
+// ========================================
+app.get('/api/wallet-balance', async (req, res) => {
+  try {
+    const bnbBalance = await bsc.getBNBBalance();
+    const usdtBalance = await bsc.getUSDTBalance();
+    const bnbStatus = await bsc.checkBNBBalance();
+    
+    res.json({
+      hotWallet: bsc.HOT_WALLET_ADDRESS,
+      bnbBalance: bnbBalance,
+      usdtBalance: usdtBalance,
+      isBnbLow: bnbStatus.isLow,
+      minBnbRequired: bnbStatus.minRequired
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ========================================
+// API: جلب باقات VIP
+// ========================================
+app.get('/api/vip-packages', async (req, res) => {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('vip_packages')
+      .select('*')
+      .order('level', { ascending: true });
+    
+    if (error) throw error;
+    res.json(data || []);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ========================================
+// API: ترقية VIP يدوياً
+// ========================================
+app.post('/api/upgrade-vip', async (req, res) => {
+  const { userId, packageLevel } = req.body;
+  
+  const result = await upgradeToPackage(userId, packageLevel, false);
+  
+  if (!result.success) {
+    return res.status(400).json({ error: result.error, needed: result.needed, currentBalance: result.currentBalance, packagePrice: result.packagePrice });
+  }
+  
+  res.json({
+    success: true,
+    message: result.message,
+    newLevel: result.newLevel,
+    newBalance: result.newBalance,
+    totalInvested: result.totalInvested,
+    roiPercent: result.roiPercent
+  });
+});
+
+// ========================================
+// API: الإيداع (مع نظام VIP المتطور)
+// ========================================
+app.post('/api/deposit', async (req, res) => {
+  const { userId, amount, transactionHash } = req.body;
+  
+  if (!amount || amount < 1) {
+    return res.status(400).json({ error: '⚠️ الحد الأدنى للإيداع هو 1 USDT' });
+  }
+  
+  if (!transactionHash || transactionHash.length < 10) {
+    return res.status(400).json({ error: '⚠️ Transaction Hash مطلوب' });
+  }
+  
+  try {
+    const { data: existingHash } = await supabaseAdmin
+      .from('deposit_requests')
+      .select('id, transaction_hash')
+      .eq('transaction_hash', transactionHash)
+      .maybeSingle();
+    
+    if (existingHash) {
+      return res.status(400).json({ error: '⚠️ تم استخدام هذا الـ Transaction Hash مسبقاً' });
+    }
+    
+    const verification = await bsc.verifyTransaction(transactionHash, amount, bsc.HOT_WALLET_ADDRESS);
+    
+    if (!verification.success) {
+      return res.status(400).json({ error: verification.error });
+    }
+    
+    const { data: deposit, error: depositError } = await supabaseAdmin
+      .from('deposit_requests')
+      .insert({ 
+        user_id: userId, 
+        amount: amount,
+        transaction_hash: transactionHash,
+        status: 'approved',
+        created_at: new Date().toISOString(),
+        approved_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+    
+    if (depositError) {
+      return res.status(500).json({ error: depositError.message });
+    }
+    
+    const { data: user } = await supabaseAdmin
+      .from('users')
+      .select('active_deposit, total_deposits, available_balance, vip_level, total_invested, qualifying_deposit')
+      .eq('id', userId)
+      .single();
+    
+    const newTotalDeposits = (user?.total_deposits || 0) + amount;
+    
+    // تحديث إجمالي الإيداعات
+    await supabaseAdmin
+      .from('users')
+      .update({ total_deposits: newTotalDeposits })
+      .eq('id', userId);
+    
+    // التحقق من التأهيل للأرباح (10 دولار على الأقل)
+    const qualifies = newTotalDeposits >= 10;
+    let message = `✅ تم إضافة ${amount} USDT إلى حسابك!`;
+    
+    if (!qualifies) {
+      const remaining = 10 - newTotalDeposits;
+      message += ` ⚠️ تحتاج إلى إيداع ${remaining.toFixed(2)} USDT إضافية لتفعيل الأرباح اليومية.`;
+    } else if (qualifies && !user?.qualifying_deposit) {
+      // أصبح مؤهلاً الآن
+      await supabaseAdmin
+        .from('users')
+        .update({ 
+          qualifying_deposit: true,
+          active_deposit: newTotalDeposits,
+          total_invested: newTotalDeposits,
+          last_profit_date: new Date().toISOString().split('T')[0]
+        })
+        .eq('id', userId);
+      message += ` 🎉 تهانينا! أصبحت مؤهلاً للأرباح اليومية بنسبة 2%!`;
+    } else if (qualifies && user?.qualifying_deposit) {
+      // مستخدم مؤهل بالفعل - أضف المبلغ إلى الاستثمار النشط
+      const newActiveDeposit = (user?.active_deposit || 0) + amount;
+      const newTotalInvested = (user?.total_invested || 0) + amount;
+      await supabaseAdmin
+        .from('users')
+        .update({ 
+          active_deposit: newActiveDeposit,
+          total_invested: newTotalInvested
+        })
+        .eq('id', userId);
+      message += ` 💰 تم إضافة المبلغ إلى استثمارك النشط.`;
+    }
+    
+    // التحقق من فتح باقات VIP جديدة تلقائياً بناءً على إجمالي الإيداع
+    const { newLevel, unlockedPackage, byDeposit } = await updateVIPLevel(userId, newTotalDeposits);
+    
+    if (newLevel > (user?.vip_level || 0) && unlockedPackage) {
+      message += ` 🎉🎉🎉 تم فتح باقة ${unlockedPackage.name} تلقائياً! نسبة أرباحك الآن ${unlockedPackage.roi_percent}% يومياً!`;
+    }
+    
+    // تسجيل معاملة الإيداع
+    await supabaseAdmin
+      .from('transactions')
+      .insert({
+        user_id: userId,
+        type: 'deposit',
+        amount: amount,
+        status: 'approved',
+        reference_id: deposit.id,
+        description: `💰 إيداع ${amount} USDT - Tx: ${transactionHash.substring(0, 15)}...`,
+        created_at: new Date().toISOString()
+      });
+    
+    res.json({ 
+      success: true, 
+      message: message,
+      depositId: deposit.id,
+      verification: verification,
+      qualifies: qualifies,
+      totalDeposits: newTotalDeposits,
+      remainingToQualify: qualifies ? 0 : (10 - newTotalDeposits),
+      newVipLevel: newLevel,
+      vipUnlocked: unlockedPackage ? unlockedPackage.name : null
+    });
+    
+  } catch (error) {
+    console.error('Deposit error:', error);
+    res.status(500).json({ error: 'حدث خطأ داخلي في الخادم' });
+  }
+});
+
+// ========================================
+// API: السحب
+// ========================================
+app.post('/api/withdraw', async (req, res) => {
+  const { userId, amount, walletAddress } = req.body;
+  
+  if (!amount || amount < 0.5) {
+    return res.status(400).json({ error: '⚠️ الحد الأدنى للسحب 0.5 USDT' });
+  }
+  
+  if (!walletAddress) {
+    return res.status(400).json({ error: '⚠️ عنوان المحفظة مطلوب' });
+  }
+  
+  try {
+    const { data: user } = await supabaseAdmin
+      .from('users')
+      .select('available_balance, total_withdrawn, qualifying_deposit')
+      .eq('id', userId)
+      .single();
+    
+    if (!user || user.available_balance < amount) {
+      return res.status(400).json({ error: '⚠️ الرصيد غير كافٍ' });
+    }
+    
+    const botUSDTBalance = await bsc.getUSDTBalance();
+    if (botUSDTBalance < amount) {
+      return res.status(400).json({ error: '⚠️ رصيد المحفظة غير كافٍ، يرجى المحاولة لاحقاً' });
+    }
+    
+    const bnbStatus = await bsc.checkBNBBalance();
+    if (bnbStatus.isLow) {
+      return res.status(400).json({ error: '⚠️ نظام السحب مؤقتاً، يرجى المحاولة لاحقاً' });
+    }
+    
+    const transferResult = await bsc.transferUSDT(walletAddress, amount);
+    
+    if (!transferResult.success) {
+      return res.status(500).json({ error: '❌ فشل تحويل الأموال، يرجى المحاولة لاحقاً' });
+    }
+    
+    const { error: withdrawError } = await supabaseAdmin
+      .from('withdrawals')
+      .insert({ 
+        user_id: userId, 
+        amount: amount, 
+        wallet_address: walletAddress, 
+        status: 'approved',
+        tx_hash: transferResult.hash,
+        created_at: new Date().toISOString(),
+        processed_at: new Date().toISOString()
+      });
+    
+    if (withdrawError) {
+      console.error('Withdraw log error:', withdrawError);
+    }
+    
+    await supabaseAdmin
+      .from('users')
+      .update({ 
+        available_balance: user.available_balance - amount,
+        total_withdrawn: (user.total_withdrawn || 0) + amount
+      })
+      .eq('id', userId);
+    
+    await supabaseAdmin
+      .from('transactions')
+      .insert({
+        user_id: userId,
+        type: 'withdraw',
+        amount: amount,
+        status: 'approved',
+        description: `📤 سحب ${amount} USDT إلى ${walletAddress.substring(0, 15)}...`,
+        created_at: new Date().toISOString()
+      });
+    
+    res.json({ 
+      success: true, 
+      message: `✅ تم سحب ${amount} USDT إلى محفظتك بنجاح`,
+      txHash: transferResult.hash
+    });
+    
+  } catch (error) {
+    console.error('Withdraw error:', error);
+    res.status(500).json({ error: 'حدث خطأ داخلي في الخادم' });
+  }
+});
+
+// ========================================
+// API: التحقق اليدوي من الإيداع
+// ========================================
+app.post('/api/verify-deposit', async (req, res) => {
+  const { userId, transactionHash, amount } = req.body;
+  
+  if (!userId || !transactionHash || !amount) {
+    return res.status(400).json({ error: 'جميع الحقول مطلوبة' });
+  }
+  
+  try {
+    const verification = await bsc.verifyTransaction(transactionHash, amount, bsc.HOT_WALLET_ADDRESS);
+    
+    if (!verification.success) {
+      return res.status(400).json({ error: verification.error });
+    }
+    
+    res.json({
+      success: true,
+      message: 'المعاملة صالحة',
+      verification
+    });
+    
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ========================================
+// API: تسجيل الدخول
+// ========================================
+app.post('/api/login', async (req, res) => {
+  const { email, password } = req.body;
+  
+  if (!email || !password) {
+    return res.status(400).json({ error: 'البريد الإلكتروني وكلمة المرور مطلوبة' });
+  }
+  
+  const { data: user, error } = await supabaseAdmin
+    .from('users')
+    .select('*')
+    .eq('email', email)
+    .eq('password', password)
+    .single();
+  
+  if (error || !user) {
+    return res.status(401).json({ error: 'البريد الإلكتروني أو كلمة المرور غير صحيحة' });
+  }
+  
+  res.json({ 
+    success: true,
+    user: { id: user.id, email: user.email, name: user.name },
+    profile: user
+  });
+});
+
+// ========================================
+// API: إنشاء حساب جديد
+// ========================================
+app.post('/api/register', async (req, res) => {
+  const { email, password, name, referralCode } = req.body;
+  
+  if (!email || !password || !name) {
+    return res.status(400).json({ error: 'جميع الحقول مطلوبة' });
+  }
+  
+  if (password.length < 4) {
+    return res.status(400).json({ error: 'كلمة المرور يجب أن تكون 4 أحرف على الأقل' });
+  }
+  
+  const { data: existingUser } = await supabaseAdmin
+    .from('users')
+    .select('id')
+    .eq('email', email)
+    .single();
+  
+  if (existingUser) {
+    return res.status(400).json({ error: 'هذا البريد مسجل بالفعل' });
+  }
+  
+  const newReferralCode = Math.random().toString(36).substring(2, 10).toUpperCase();
+  
+  let referrerId = null;
+  if (referralCode) {
+    const { data: referrer } = await supabaseAdmin
+      .from('users')
+      .select('id')
+      .eq('referral_code', referralCode.toUpperCase())
+      .single();
+    if (referrer) referrerId = referrer.id;
+  }
+  
+  const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'mb425262@gmail.com';
+  const isAdmin = (email === ADMIN_EMAIL);
+  
+  const userId = generateUUID();
+  
+  const { error: insertError } = await supabaseAdmin
+    .from('users')
+    .insert({
+      id: userId,
+      email: email,
+      password: password,
+      name: name,
+      referral_code: newReferralCode,
+      referrer_id: referrerId,
+      is_admin: isAdmin,
+      vip_level: 0,
+      available_balance: 0,
+      active_deposit: 0,
+      total_deposits: 0,
+      total_invested: 0,
+      total_withdrawn: 0,
+      total_deposited: 0,
+      qualifying_deposit: false,
+      created_at: new Date().toISOString()
+    });
+  
+  if (insertError) {
+    console.error('Insert error:', insertError);
+    return res.status(500).json({ error: 'حدث خطأ في إنشاء الحساب: ' + insertError.message });
+  }
+  
+  res.json({ 
+    success: true, 
+    user: { id: userId, email: email, name: name },
+    referral_code: newReferralCode,
+    is_admin: isAdmin
+  });
+});
+
+// ========================================
+// API: جلب بيانات المستخدم
+// ========================================
+app.post('/api/user', async (req, res) => {
+  const { userId } = req.body;
+  
+  const { data, error } = await supabaseAdmin
+    .from('users')
+    .select('*')
+    .eq('id', userId)
+    .single();
+  
+  if (error) {
+    return res.status(404).json({ error: 'المستخدم غير موجود' });
+  }
+  
+  res.json(data);
+});
+
+// ========================================
+// API: تحديث بيانات المستخدم
+// ========================================
+app.post('/api/update-user', async (req, res) => {
+  const { userId, updates } = req.body;
+  
+  const { error } = await supabaseAdmin
+    .from('users')
+    .update(updates)
+    .eq('id', userId);
+  
+  if (error) {
+    return res.status(500).json({ error: error.message });
+  }
+  
+  res.json({ success: true });
+});
+
+// ========================================
+// API: توزيع الأرباح اليومية
+// ========================================
+app.post('/api/distribute-profits', async (req, res) => {
+  const { secret } = req.body;
+  if (secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  try {
+    const { data: vipPackages } = await supabaseAdmin
+      .from('vip_packages')
+      .select('*');
+    
+    const vipRoiMap = {};
+    if (vipPackages) {
+      vipPackages.forEach(pkg => {
+        vipRoiMap[pkg.level] = pkg.roi_percent;
+      });
+    }
+    
+    const { data: users } = await supabaseAdmin
+      .from('users')
+      .select('id, total_invested, vip_level, available_balance, qualifying_deposit, last_profit_date')
+      .eq('qualifying_deposit', true)
+      .gt('total_invested', 0);
+    
+    const today = new Date().toISOString().split('T')[0];
+    let totalDistributed = 0;
+    let usersProcessed = 0;
+    
+    for (const user of users) {
+      if (user.last_profit_date === today) continue;
+      
+      let roi = 2;
+      if (user.vip_level > 0 && vipRoiMap[user.vip_level]) {
+        roi = vipRoiMap[user.vip_level];
+      }
+      
+      // الأرباح تحسب على total_invested (إجمالي المبلغ المستثمر في الباقة الحالية)
+      const profit = (user.total_invested * roi) / 100;
+      
+      if (profit <= 0) continue;
+      
+      await supabaseAdmin
+        .from('users')
+        .update({ 
+          available_balance: (user.available_balance || 0) + profit,
+          last_profit_date: today
+        })
+        .eq('id', user.id);
+      
+      await supabaseAdmin
+        .from('daily_profit_log')
+        .insert({
+          user_id: user.id,
+          profit_amount: profit,
+          calculated_date: today,
+          roi_percent: roi
+        });
+      
+      await supabaseAdmin
+        .from('transactions')
+        .insert({
+          user_id: user.id,
+          type: 'profit',
+          amount: profit,
+          status: 'approved',
+          description: `📈 أرباح يومية ${roi}% - على مبلغ ${user.total_invested} USDT`,
+          created_at: new Date().toISOString()
+        });
+      
+      totalDistributed += profit;
+      usersProcessed++;
+    }
+    
+    await supabaseAdmin
+      .from('profit_distributions')
+      .insert({
+        date: today,
+        total_amount: totalDistributed,
+        users_count: usersProcessed,
+        created_at: new Date().toISOString()
+      });
+    
+    res.json({
+      success: true,
+      date: today,
+      usersProcessed,
+      totalDistributed
+    });
+    
+  } catch (error) {
+    console.error('Profit distribution error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ========================================
+// API: الإحالات
+// ========================================
+app.post('/api/referrals', async (req, res) => {
+  const { userId } = req.body;
+  
+  const { data } = await supabaseAdmin
+    .from('users')
+    .select('*')
+    .eq('referrer_id', userId);
+  
+  const referrals = data || [];
+  const groupBalance = referrals.reduce((sum, u) => sum + (u.active_deposit || 0), 0);
+  
+  res.json({ referrals, count: referrals.length, groupBalance });
+});
+
+// ========================================
+// API: جلب سجل المعاملات
+// ========================================
+app.post('/api/transactions', async (req, res) => {
+  const { userId } = req.body;
+  
+  const { data, error } = await supabaseAdmin
+    .from('transactions')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+  
+  if (error) {
+    return res.status(500).json({ error: error.message });
+  }
+  
+  res.json(data || []);
+});
+
+// ========================================
+// API: جلب جميع المعاملات (مدمجة) للمستخدم
+// ========================================
+app.post('/api/my-transactions', async (req, res) => {
+  const { userId } = req.body;
+  
+  if (!userId) {
+    return res.status(400).json({ error: 'userId مطلوب' });
+  }
+  
+  const { data: deposits } = await supabaseAdmin
+    .from('deposit_requests')
+    .select('id, amount, created_at, status, transaction_hash')
+    .eq('user_id', userId);
+  
+  const { data: withdrawals } = await supabaseAdmin
+    .from('withdrawals')
+    .select('id, amount, created_at, status, wallet_address')
+    .eq('user_id', userId);
+  
+  const { data: profits } = await supabaseAdmin
+    .from('transactions')
+    .select('id, amount, created_at, status, description')
+    .eq('user_id', userId)
+    .eq('type', 'profit');
+  
+  const { data: vipUpgrades } = await supabaseAdmin
+    .from('package_subscriptions')
+    .select('*')
+    .eq('user_id', userId);
+  
+  const transactions = [];
+  
+  if (deposits) {
+    deposits.forEach(d => {
+      transactions.push({
+        id: d.id,
+        type: 'deposit',
+        type_ar: '💰 إيداع',
+        type_en: '💰 Deposit',
+        amount: d.amount,
+        date: d.created_at,
+        status: d.status,
+        reference: d.transaction_hash
+      });
+    });
+  }
+  
+  if (withdrawals) {
+    withdrawals.forEach(w => {
+      transactions.push({
+        id: w.id,
+        type: 'withdraw',
+        type_ar: '📤 سحب',
+        type_en: '📤 Withdrawal',
+        amount: w.amount,
+        date: w.created_at,
+        status: w.status,
+        reference: w.wallet_address
+      });
+    });
+  }
+  
+  if (profits) {
+    profits.forEach(p => {
+      transactions.push({
+        id: p.id,
+        type: 'profit',
+        type_ar: '📈 ربح',
+        type_en: '📈 Profit',
+        amount: p.amount,
+        date: p.created_at,
+        status: p.status || 'approved',
+        reference: null
+      });
+    });
+  }
+  
+  if (vipUpgrades) {
+    vipUpgrades.forEach(v => {
+      transactions.push({
+        id: v.id,
+        type: 'vip_upgrade',
+        type_ar: '👑 ترقية VIP',
+        type_en: '👑 VIP Upgrade',
+        amount: v.amount_paid,
+        date: v.created_at,
+        status: 'approved',
+        reference: `${v.package_name} - ${v.roi_percent}%`
+      });
+    });
+  }
+  
+  transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+  
+  res.json(transactions);
+});
+
+// ========================================
+// API: جلب طلبات الإيداع (للمدير)
+// ========================================
+app.post('/api/admin/deposits', async (req, res) => {
+  const { data } = await supabaseAdmin
+    .from('deposit_requests')
+    .select('*, users(name, email)')
+    .order('created_at', { ascending: false });
+  
+  res.json(data || []);
+});
+
+// ========================================
+// API: جلب طلبات السحب (للمدير)
+// ========================================
+app.post('/api/admin/withdrawals', async (req, res) => {
+  const { data } = await supabaseAdmin
+    .from('withdrawals')
+    .select('*, users(name, email)')
+    .order('created_at', { ascending: false });
+  
+  res.json(data || []);
+});
+
+// ========================================
+// API: جلب جميع المستخدمين (للمدير)
+// ========================================
+app.post('/api/admin/users', async (req, res) => {
+  const { data } = await supabaseAdmin
+    .from('users')
+    .select('*')
+    .order('created_at', { ascending: false });
+  
+  res.json(data || []);
+});
+
+// ========================================
+// تشغيل الخادم
+// ========================================
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`
+  ╔═══════════════════════════════════════════════════════════════╗
+  ║   🚀 منصة الاستثمار تعمل بنجاح                                ║
+  ║   📡 الخادم على المنفذ: ${PORT}                                  ║
+  ║   🌐 http://localhost:${PORT}                                   ║
+  ║   💰 محفظة البوت: ${bsc.HOT_WALLET_ADDRESS?.substring(0, 20) || 'N/A'}... ║
+  ║   🏦 محفظة الاستثمار: ${bsc.INVESTMENT_WALLET?.substring(0, 20) || 'N/A'}...  ║
+  ╚═══════════════════════════════════════════════════════════════╝
+  `);
+});
+
+// ========================================
+// جدولة مهام Cron Job
+// ========================================
+
+cron.schedule('*/5 * * * *', async () => {
+  console.log('🔄 [Cron] جاري فحص الإيداعات الجديدة...');
+  try {
+    const response = await fetch(`http://localhost:${PORT}/api/process-deposits`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const result = await response.json();
+    console.log('✅ [Cron] نتيجة فحص الإيداعات:', result);
+  } catch (error) {
+    console.error('❌ [Cron] خطأ في فحص الإيداعات:', error);
+  }
+});
+
+cron.schedule('0 0 * * *', async () => {
+  console.log('🔄 [Cron] جاري توزيع الأرباح اليومية...');
+  try {
+    const response = await fetch(`http://localhost:${PORT}/api/distribute-profits`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ secret: process.env.CRON_SECRET })
+    });
+    const result = await response.json();
+    console.log('✅ [Cron] نتيجة توزيع الأرباح:', result);
+  } catch (error) {
+    console.error('❌ [Cron] خطأ في توزيع الأرباح:', error);
+  }
+});
+
+cron.schedule('0 * * * *', async () => {
+  console.log('🔄 [Cron] جاري فحص رصيد BNB...');
+  const bnbStatus = await bsc.checkBNBBalance();
+  if (bnbStatus.isLow) {
+    await bsc.sendAlert(`⚠️ تنبيه: رصيد BNB منخفض! ${bnbStatus.balance} BNB متاح (الحد الأدنى: ${bnbStatus.minRequired} BNB)`);
+  }
+});
