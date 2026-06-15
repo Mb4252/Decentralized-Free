@@ -1,7 +1,7 @@
 {
-  "name": "warning-page",
+  "name": "warning-bot",
   "version": "1.0.0",
-  "description": "صفحة تحذيرية بسيطة",
+  "description": "بوت لعرض رسالة تحذيرية مع تأثيرات",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
