@@ -386,11 +386,11 @@
   <div class="navbar">
     <div class="logo">💰 <span id="logoText">CryptoInvest</span></div>
     <div class="user-actions">
-      <button class="theme-toggle" id="themeToggleBtn">🌙 <span id="themeText">وضع ليلي</span></button>
+      <button class="theme-toggle" id="themeToggleBtn"> <span id="themeText">وضع ليلي</span></button>
       <button class="lang-btn-header" id="langToggleBtn">🇸🇦 العربية</button>
-      <button class="support-btn" id="supportBtn">💬 <span id="supportText">الدعم</span></button>
+      <button class="support-btn" id="supportBtn"> <span id="supportText">الدعم</span></button>
       <span class="user-name" id="userName"></span>
-      <button class="logout-btn" id="logoutBtn">🚪 <span id="logoutText">خروج</span></button>
+      <button class="logout-btn" id="logoutBtn"> <span id="logoutText">خروج</span></button>
     </div>
   </div>
 
@@ -469,11 +469,11 @@
 
     const translations = {
       ar: {
-        logoText: '💰 CryptoInvest',
-        supportText: '💬 الدعم',
-        logoutText: '🚪 خروج',
-        themeDark: '🌙 وضع ليلي',
-        themeLight: '☀️ وضع نهاري',
+        logoText: ' CryptoInvest',
+        supportText: ' الدعم',
+        logoutText: ' خروج',
+        themeDark: ' وضع ليلي',
+        themeLight: ' وضع نهاري',
         navHome: 'البيت',
         navVip: 'VIP',
         navDeposit: 'إيداع',
@@ -551,7 +551,7 @@
       en: {
         logoText: '💰 CryptoInvest',
         supportText: '💬 Support',
-        logoutText: '🚪 Logout',
+        logoutText: ' Logout',
         themeDark: '🌙 Dark Mode',
         themeLight: '☀️ Light Mode',
         navHome: 'Home',
@@ -698,7 +698,7 @@
         const data = await res.json();
         if (data.error) { localStorage.clear(); window.location.href = '/'; return; }
         userData = data;
-        document.getElementById('userName').innerHTML = `👋 ${userData.name}`;
+        document.getElementById('userName').innerHTML = ` ${userData.name}`;
         
         const vipRes = await fetch(`${API_URL}/api/vip-packages`);
         vipPackages = await vipRes.json();
@@ -802,11 +802,11 @@
       document.getElementById('mainContent').innerHTML = `
         <div class="card">
           <div class="assets-amount">${(active+avail).toFixed(2)} USDT</div>
-          <div class="detail-row"><span>💰 ${t.activeInvestment}</span><span class="detail-value">${active.toFixed(2)} USDT</span></div>
-          <div class="detail-row"><span>💎 ${t.availableBalance}</span><span class="detail-value">${avail.toFixed(2)} USDT</span></div>
-          <div class="detail-row"><span>💼 ${t.investedAmount}</span><span class="detail-value">${totalInvested.toFixed(2)} USDT</span></div>
-          <div class="detail-row"><span>📊 ${t.totalDeposits}</span><span class="detail-value">${totalDeposit.toFixed(2)} USDT</span></div>
-          <div class="detail-row"><span>📤 ${t.totalWithdrawals}</span><span class="detail-value">${totalWithdraw.toFixed(2)} USDT</span></div>
+          <div class="detail-row"><span> ${t.activeInvestment}</span><span class="detail-value">${active.toFixed(2)} USDT</span></div>
+          <div class="detail-row"><span> ${t.availableBalance}</span><span class="detail-value">${avail.toFixed(2)} USDT</span></div>
+          <div class="detail-row"><span> ${t.investedAmount}</span><span class="detail-value">${totalInvested.toFixed(2)} USDT</span></div>
+          <div class="detail-row"><span> ${t.totalDeposits}</span><span class="detail-value">${totalDeposit.toFixed(2)} USDT</span></div>
+          <div class="detail-row"><span> ${t.totalWithdrawals}</span><span class="detail-value">${totalWithdraw.toFixed(2)} USDT</span></div>
           
           ${qualifying ? `
             <div class="current-package-info" style="margin-top:16px;">
