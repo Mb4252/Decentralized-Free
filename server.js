@@ -977,4 +977,38 @@ app.listen(PORT, () => {
 // ========================================
 
 cron.schedule('*/5 * * * *', async () => {
-  console.log('🔄 [Cron] جاري فحص الإ
+  console.log('🔄 [Cron] جاري فحص الإيداعات الجديدة...');
+  try {
+    const response = await fetch(`http://localhost:${PORT}/api/process-deposits`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const result = await response.json();
+    console.log('✅ [Cron] نتيجة فحص الإيداعات:', result);
+  } catch (error) {
+    console.error('❌ [Cron] خطأ في فحص الإيداعات:', error);
+  }
+});
+
+cron.schedule('0 0 * * *', async () => {
+  console.log('🔄 [Cron] جاري توزيع الأرباح اليومية...');
+  try {
+    const response = await fetch(`http://localhost:${PORT}/api/distribute-profits`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ secret: process.env.CRON_SECRET })
+    });
+    const result = await response.json();
+    console.log('✅ [Cron] نتيجة توزيع الأرباح:', result);
+  } catch (error) {
+    console.error('❌ [Cron] خطأ في توزيع الأرباح:', error);
+  }
+});
+
+cron.schedule('0 * * * *', async () => {
+  console.log('🔄 [Cron] جاري فحص رصيد BNB...');
+  const bnbStatus = await bsc.checkBNBBalance();
+  if (bnbStatus.isLow) {
+    await bsc.sendAlert(`⚠️ تنبيه: رصيد BNB منخفض! ${bnbStatus.balance} BNB متاح (الحد الأدنى: ${bnbStatus.minRequired} BNB)`);
+  }
+});
