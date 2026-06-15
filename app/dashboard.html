@@ -6,14 +6,179 @@
   <title>الرئيسية | منصة الاستثمار</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    /* ======================================== */
+    /* الوضع الليلي (الافتراضي) */
+    /* ======================================== */
     body {
       min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      padding-bottom: 80px;
+      transition: all 0.3s ease;
+    }
+    
+    body.dark-mode {
       background: #0a0a0f;
       background-image: linear-gradient(rgba(0,255,100,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,255,100,0.03) 1px, transparent 1px);
       background-size: 40px 40px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      padding-bottom: 80px;
+      color: #ffffff;
     }
+    
+    body.light-mode {
+      background: #f0f2f5;
+      background-image: linear-gradient(rgba(0,100,50,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0,100,50,0.05) 1px, transparent 1px);
+      background-size: 40px 40px;
+      color: #1a1a2e;
+    }
+    
+    /* وضع النهار */
+    body.light-mode .navbar {
+      background: #ffffff;
+      border-bottom: 1px solid #00aa55;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    }
+    
+    body.light-mode .navbar .logo {
+      color: #00aa55;
+    }
+    
+    body.light-mode .user-name {
+      color: #00aa55;
+    }
+    
+    body.light-mode .support-btn,
+    body.light-mode .lang-btn-header {
+      background: rgba(0,170,85,0.1);
+      border-color: #00aa55;
+      color: #00aa55;
+    }
+    
+    body.light-mode .logout-btn {
+      border-color: #ff4444;
+      color: #ff4444;
+    }
+    
+    body.light-mode .card {
+      background: #ffffff;
+      border-color: #00aa55;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    }
+    
+    body.light-mode .card-title {
+      color: #1a1a2e;
+      border-right-color: #00aa55;
+    }
+    
+    body.light-mode .detail-row {
+      color: #666666;
+    }
+    
+    body.light-mode .detail-value {
+      color: #00aa55;
+    }
+    
+    body.light-mode .stat-card {
+      background: #f8f9fa;
+      border-color: #00aa55;
+    }
+    
+    body.light-mode .stat-value {
+      color: #00aa55;
+    }
+    
+    body.light-mode .stat-label {
+      color: #666666;
+    }
+    
+    body.light-mode .action-card {
+      background: linear-gradient(135deg, #ffffff, #f0f2f5);
+      border-color: #00aa55;
+    }
+    
+    body.light-mode .action-title {
+      color: #1a1a2e;
+    }
+    
+    body.light-mode .action-sub {
+      color: #888888;
+    }
+    
+    body.light-mode .vip-item {
+      background: #f8f9fa;
+      border-color: #00aa55;
+    }
+    
+    body.light-mode .vip-name {
+      color: #00aa55;
+    }
+    
+    body.light-mode input {
+      background: #ffffff;
+      border-color: #00aa55;
+      color: #1a1a2e;
+    }
+    
+    body.light-mode input::placeholder {
+      color: #aaaaaa;
+    }
+    
+    body.light-mode .bottom-nav {
+      background: #ffffff;
+      border-top-color: #00aa55;
+    }
+    
+    body.light-mode .nav-item {
+      color: #999999;
+    }
+    
+    body.light-mode .nav-item.active {
+      color: #00aa55;
+    }
+    
+    body.light-mode .modal-content {
+      background: #ffffff;
+      border-color: #00aa55;
+    }
+    
+    body.light-mode .modal-content h3 {
+      color: #00aa55;
+    }
+    
+    body.light-mode .modal-content p {
+      color: #555555;
+    }
+    
+    body.light-mode .history-item {
+      background: #f8f9fa;
+      border-color: #00aa55;
+    }
+    
+    body.light-mode .history-type {
+      color: #00aa55;
+    }
+    
+    body.light-mode .history-amount {
+      color: #ff9900;
+    }
+    
+    body.light-mode .info-box {
+      background: rgba(0,170,85,0.08);
+      border-color: #00aa55;
+      color: #00aa55;
+    }
+    
+    body.light-mode .balance-box {
+      background: rgba(0,170,85,0.08);
+      border-color: #00aa55;
+    }
+    
+    body.light-mode .balance-label {
+      color: #00aa55;
+    }
+    
+    /* ======================================== */
+    /* الأنماط العامة */
+    /* ======================================== */
     .navbar {
       background: #1a1a2e;
       padding: 16px 20px;
@@ -23,13 +188,16 @@
       border-bottom: 1px solid #00ff66;
       flex-wrap: wrap;
       gap: 10px;
+      transition: all 0.3s ease;
     }
+    
     .logo { font-size: 22px; font-weight: bold; color: #00ff66; display: flex; align-items: center; gap: 10px; }
     .user-actions { display: flex; align-items: center; gap: 15px; }
     .user-name { color: #00ff66; font-size: 14px; }
     .support-btn { background: rgba(0,255,102,0.15); border: 1px solid #00ff66; color: #00ff66; padding: 6px 12px; border-radius: 20px; cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 5px; }
     .logout-btn { background: transparent; border: 1px solid #ff4444; color: #ff4444; padding: 6px 12px; border-radius: 20px; cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 5px; }
     .lang-btn-header { background: rgba(0,255,102,0.15); border: 1px solid #00ff66; color: #00ff66; padding: 6px 12px; border-radius: 20px; cursor: pointer; font-size: 12px; }
+    .theme-toggle { background: rgba(0,255,102,0.15); border: 1px solid #00ff66; color: #00ff66; padding: 6px 12px; border-radius: 20px; cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 5px; }
     .content { max-width: 500px; margin: 0 auto; padding: 20px; }
     
     .card {
@@ -38,13 +206,14 @@
       padding: 24px;
       margin-bottom: 20px;
       border: 1px solid #00ff66;
+      transition: all 0.3s ease;
     }
     .card-title { color: white; font-size: 18px; margin-bottom: 16px; border-right: 3px solid #00ff66; padding-right: 12px; }
     .assets-amount { font-size: 42px; font-weight: bold; color: #00ff66; text-align: center; margin: 16px 0; text-shadow: 0 0 10px rgba(0,255,102,0.3); }
     .detail-row { display: flex; justify-content: space-between; padding: 8px 0; color: #aabbcc; font-size: 14px; }
     .detail-value { color: #00ff66; font-weight: bold; }
     .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
-    .stat-card { background: #1a1a2e; border-radius: 20px; padding: 16px; text-align: center; border: 1px solid #00ff66; }
+    .stat-card { background: #1a1a2e; border-radius: 20px; padding: 16px; text-align: center; border: 1px solid #00ff66; transition: all 0.3s ease; }
     .stat-value { color: #00ff66; font-size: 24px; font-weight: bold; }
     .stat-label { color: #8899aa; font-size: 12px; }
     
@@ -87,6 +256,8 @@
     .vip-status { font-size: 12px; }
     .upgrade-btn { background: #00ff66; color: #0a0a0f; border: none; padding: 8px 16px; border-radius: 20px; cursor: pointer; font-weight: bold; }
     .upgrade-btn:hover { transform: scale(1.02); }
+    .vip-locked { opacity: 0.6; }
+    .vip-unlocked { border-color: #ffcc00; background: rgba(255,204,0,0.1); }
     
     input {
       width: 100%;
@@ -156,6 +327,7 @@
       padding: 10px;
       border-top: 2px solid #00ff66;
       z-index: 999;
+      transition: all 0.3s ease;
     }
     .nav-item {
       background: none;
@@ -217,6 +389,7 @@
       margin-bottom: 12px;
       padding: 12px;
       border: 1px solid #00ff66;
+      transition: all 0.3s ease;
     }
     .history-type { color: #00ff66; font-weight: bold; font-size: 14px; }
     .history-amount { color: #ffcc00; font-weight: bold; font-size: 16px; }
@@ -266,12 +439,27 @@
       font-size: 28px;
       font-weight: bold;
     }
+    
+    .qualify-bar {
+      background: rgba(0,0,0,0.3);
+      border-radius: 10px;
+      height: 8px;
+      margin-top: 10px;
+      overflow: hidden;
+    }
+    .qualify-progress {
+      background: linear-gradient(90deg, #00ff66, #00ccff);
+      height: 100%;
+      border-radius: 10px;
+      transition: width 0.5s ease;
+    }
   </style>
 </head>
-<body>
+<body class="dark-mode">
   <div class="navbar">
     <div class="logo">💰 <span id="logoText">CryptoInvest</span></div>
     <div class="user-actions">
+      <button class="theme-toggle" id="themeToggleBtn">🌙 <span id="themeText">وضع ليلي</span></button>
       <button class="lang-btn-header" id="langToggleBtn">🇸🇦 العربية</button>
       <button class="support-btn" id="supportBtn">💬 <span id="supportText">الدعم</span></button>
       <span class="user-name" id="userName"></span>
@@ -311,7 +499,7 @@
       <h4 id="welcomeHowWithdraw">📤 كيفية السحب:</h4>
       <p id="welcomeWithdrawText">1. اضغط على أيقونة السحب<br>2. أدخل المبلغ (الحد الأدنى 0.5 USDT)<br>3. أدخل عنوان محفظة BSC الخاص بك<br>4. اضغط "سحب USDT"</p>
       <h4 id="welcomeHowProfit">📈 الأرباح:</h4>
-      <p id="welcomeProfitText">يتم توزيع الأرباح يومياً بنسبة تصل إلى 4% حسب مستوى VIP الخاص بك</p>
+      <p id="welcomeProfitText">يتم توزيع الأرباح يومياً بنسبة تصل إلى 4% حسب مستوى VIP الخاص بك<br>⚠️ ملاحظة: لا تحصل على أرباح حتى يصل إجمالي إيداعاتك إلى 10 USDT</p>
       <h4 id="welcomeNetwork">🌐 ملاحظة هامة:</h4>
       <p id="welcomeNetworkText">⚠️ يجب استخدام شبكة BNB Smart Chain (BSC/BEP20) فقط. لا ترسل على شبكات أخرى!</p>
       <button class="close-modal" id="closeWelcomeModal">✅ فهمت</button>
@@ -323,11 +511,13 @@
     let userId = localStorage.getItem('userId');
     let userData = null;
     let currentLang = localStorage.getItem('dashboardLang') || 'ar';
+    let currentTheme = localStorage.getItem('theme') || 'dark';
     let vipPackages = [];
 
     // عنوان المحفظة الحقيقي
     const HOT_WALLET_ADDRESS = '0x9EB39A10c059877910DAff1fd8098e5DB32486F7';
     const MIN_WITHDRAW = 0.5;
+    const QUALIFY_AMOUNT = 10; // الحد الأدنى للأرباح
 
     // ========================================
     // الترجمة الكاملة
@@ -337,6 +527,8 @@
         logoText: '💰 CryptoInvest',
         supportText: '💬 الدعم',
         logoutText: '🚪 خروج',
+        themeDark: '🌙 وضع ليلي',
+        themeLight: '☀️ وضع نهاري',
         navHome: 'البيت',
         navVip: 'VIP',
         navDeposit: 'إيداع',
@@ -369,7 +561,8 @@
         warningAddress: '⚠️ تأكد من صحة عنوان المحفظة! يجب أن يكون من شبكة BSC/BEP20 ويبدأ بـ "0x"',
         vipTitle: '👑 مستويات VIP',
         vipOpen: '✅ مفتوح',
-        vipLocked: '🔒 مغلق (يجب ترقية السابق)',
+        vipLocked: '🔒 مغلق',
+        vipUnlockedByDeposit: '🔓 مفتوح بالإيداع',
         subscribe: 'اشتراك',
         yourBalance: '💰 رصيدك المتاح',
         referralTitle: '🔗 رابط الدعوة',
@@ -392,19 +585,25 @@
         welcomeHowWithdraw: '📤 كيفية السحب:',
         welcomeWithdrawText: '1. اضغط على أيقونة السحب\n2. أدخل المبلغ (الحد الأدنى 0.5 USDT)\n3. أدخل عنوان محفظة BSC الخاص بك\n4. اضغط "سحب USDT"',
         welcomeHowProfit: '📈 الأرباح:',
-        welcomeProfitText: 'يتم توزيع الأرباح يومياً بنسبة تصل إلى 4% حسب مستوى VIP الخاص بك',
+        welcomeProfitText: 'يتم توزيع الأرباح يومياً بنسبة تصل إلى 4% حسب مستوى VIP الخاص بك\n⚠️ ملاحظة: لا تحصل على أرباح حتى يصل إجمالي إيداعاتك إلى 10 USDT',
         welcomeNetwork: '🌐 ملاحظة هامة:',
         welcomeNetworkText: '⚠️ يجب استخدام شبكة BNB Smart Chain (BSC/BEP20) فقط. لا ترسل على شبكات أخرى!',
         networkModalTitle: '🌐 اختر شبكة التحويل',
         cancel: 'إلغاء',
         upgradeSuccess: '✅ تم الترقية بنجاح!',
         insufficientBalance: '⚠️ رصيد غير كافٍ',
-        mustUpgradePrevious: '⚠️ يجب ترقية المستويات السابقة أولاً'
+        mustUpgradePrevious: '⚠️ يجب ترقية المستويات السابقة أولاً',
+        qualifyMessage: '⚠️ تحتاج إلى إيداع {amount} USDT إضافية لتفعيل الأرباح اليومية',
+        qualifyProgress: 'نسبة التقدم للأرباح',
+        notQualified: '❌ غير مؤهل للأرباح',
+        qualified: '✅ مؤهل للأرباح'
       },
       en: {
         logoText: '💰 CryptoInvest',
         supportText: '💬 Support',
         logoutText: '🚪 Logout',
+        themeDark: '🌙 Dark Mode',
+        themeLight: '☀️ Light Mode',
         navHome: 'Home',
         navVip: 'VIP',
         navDeposit: 'Deposit',
@@ -437,7 +636,8 @@
         warningAddress: '⚠️ Make sure wallet address is correct! Must be on BSC/BEP20 network starting with "0x"',
         vipTitle: '👑 VIP Levels',
         vipOpen: '✅ Unlocked',
-        vipLocked: '🔒 Locked (Upgrade previous level first)',
+        vipLocked: '🔒 Locked',
+        vipUnlockedByDeposit: '🔓 Unlocked by deposit',
         subscribe: 'Subscribe',
         yourBalance: '💰 Your Balance',
         referralTitle: '🔗 Referral Link',
@@ -460,16 +660,48 @@
         welcomeHowWithdraw: '📤 How to Withdraw:',
         welcomeWithdrawText: '1. Click Withdraw icon\n2. Enter amount (minimum 0.5 USDT)\n3. Enter your BSC wallet address\n4. Click "Withdraw USDT"',
         welcomeHowProfit: '📈 Profits:',
-        welcomeProfitText: 'Daily profits are distributed up to 4% depending on your VIP level',
+        welcomeProfitText: 'Daily profits are distributed up to 4% depending on your VIP level\n⚠️ Note: You will not receive profits until your total deposits reach 10 USDT',
         welcomeNetwork: '🌐 Important Note:',
         welcomeNetworkText: '⚠️ You must use BNB Smart Chain (BSC/BEP20) network only. Do not send on other networks!',
         networkModalTitle: '🌐 Select Network',
         cancel: 'Cancel',
         upgradeSuccess: '✅ Upgrade successful!',
         insufficientBalance: '⚠️ Insufficient balance',
-        mustUpgradePrevious: '⚠️ You must upgrade previous levels first'
+        mustUpgradePrevious: '⚠️ You must upgrade previous levels first',
+        qualifyMessage: '⚠️ You need to deposit {amount} more USDT to activate daily profits',
+        qualifyProgress: 'Qualification Progress',
+        notQualified: '❌ Not qualified for profits',
+        qualified: '✅ Qualified for profits'
       }
     };
+
+    // ========================================
+    // إدارة الوضع النهاري/الليلي
+    // ========================================
+    function setTheme(theme) {
+      const body = document.body;
+      body.classList.remove('dark-mode', 'light-mode');
+      body.classList.add(theme === 'dark' ? 'dark-mode' : 'light-mode');
+      localStorage.setItem('theme', theme);
+      currentTheme = theme;
+      
+      const themeText = document.getElementById('themeText');
+      const themeToggleBtn = document.getElementById('themeToggleBtn');
+      const t = translations[currentLang];
+      
+      if (theme === 'dark') {
+        themeText.innerHTML = t.themeDark;
+        themeToggleBtn.innerHTML = '🌙 ' + t.themeDark;
+      } else {
+        themeText.innerHTML = t.themeLight;
+        themeToggleBtn.innerHTML = '☀️ ' + t.themeLight;
+      }
+    }
+    
+    function toggleTheme() {
+      const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+      setTheme(newTheme);
+    }
 
     function updateUILanguage() {
       const t = translations[currentLang];
@@ -483,6 +715,14 @@
       document.getElementById('navReferral').innerHTML = t.navReferral;
       document.getElementById('navProfile').innerHTML = t.navProfile;
       document.getElementById('langToggleBtn').innerHTML = currentLang === 'ar' ? '🇬🇧 English' : '🇸🇦 العربية';
+      
+      // تحديث نص زر الثيم
+      const themeToggleBtn = document.getElementById('themeToggleBtn');
+      if (currentTheme === 'dark') {
+        themeToggleBtn.innerHTML = '🌙 ' + t.themeDark;
+      } else {
+        themeToggleBtn.innerHTML = '☀️ ' + t.themeLight;
+      }
       
       if (document.getElementById('networkModalTitle')) 
         document.getElementById('networkModalTitle').innerHTML = t.networkModalTitle;
@@ -511,6 +751,10 @@
       localStorage.setItem('dashboardLang', currentLang);
       updateUILanguage();
     };
+    
+    document.getElementById('themeToggleBtn').onclick = () => {
+      toggleTheme();
+    };
 
     async function loadUser() {
       if (!userId) { window.location.href = '/'; return; }
@@ -525,7 +769,6 @@
         userData = data;
         document.getElementById('userName').innerHTML = `👋 ${userData.name}`;
         
-        // جلب باقات VIP
         const vipRes = await fetch(`${API_URL}/api/vip-packages`);
         vipPackages = await vipRes.json();
         
@@ -600,18 +843,24 @@
       const t = translations[currentLang];
       const active = userData?.active_deposit || 0;
       const avail = userData?.available_balance || 0;
-      const totalDeposit = userData?.total_deposited || 0;
+      const totalDeposit = userData?.total_deposits || 0;
       const totalWithdraw = userData?.total_withdrawn || 0;
       const currentVip = userData?.vip_level || 0;
+      const qualifying = userData?.qualifying_deposit || false;
       
-      // جلب نسبة الربح من الباقات
       let currentRoi = 0;
-      if (currentVip > 0 && vipPackages.length > 0) {
-        const vipPkg = vipPackages.find(p => p.level === currentVip);
-        currentRoi = vipPkg ? vipPkg.roi_percent : 0;
+      if (qualifying) {
+        if (currentVip > 0 && vipPackages.length > 0) {
+          const vipPkg = vipPackages.find(p => p.level === currentVip);
+          currentRoi = vipPkg ? vipPkg.roi_percent : 2;
+        } else {
+          currentRoi = 2;
+        }
       }
       
       const currentVipName = currentVip > 0 ? (vipPackages.find(p => p.level === currentVip)?.name || 'VIP ' + currentVip) : (currentLang === 'ar' ? 'غير مشترك' : 'Not subscribed');
+      const qualifyProgress = Math.min((totalDeposit / QUALIFY_AMOUNT) * 100, 100);
+      const remainingToQualify = Math.max(0, QUALIFY_AMOUNT - totalDeposit);
       
       document.getElementById('mainContent').innerHTML = `
         <div class="card">
@@ -620,6 +869,21 @@
           <div class="detail-row"><span>💎 ${t.availableBalance}</span><span class="detail-value">${avail.toFixed(2)} USDT</span></div>
           <div class="detail-row"><span>📊 ${t.totalDeposits}</span><span class="detail-value">${totalDeposit.toFixed(2)} USDT</span></div>
           <div class="detail-row"><span>📤 ${t.totalWithdrawals}</span><span class="detail-value">${totalWithdraw.toFixed(2)} USDT</span></div>
+          ${!qualifying ? `
+            <div class="info-box" style="margin-top:16px;">
+              <strong>⚠️ ${t.notQualified}</strong><br>
+              ${t.qualifyMessage.replace('{amount}', remainingToQualify.toFixed(2))}
+              <div class="qualify-bar">
+                <div class="qualify-progress" style="width: ${qualifyProgress}%"></div>
+              </div>
+              <div style="font-size:11px; margin-top:5px;">${t.qualifyProgress}: ${qualifyProgress.toFixed(1)}%</div>
+            </div>
+          ` : `
+            <div class="info-box" style="margin-top:16px; background:rgba(0,255,102,0.15); color:#00ff66;">
+              <strong>✅ ${t.qualified}</strong><br>
+              ${currentLang === 'ar' ? 'أنت مؤهل للحصول على أرباح يومية بنسبة ' + currentRoi + '%' : 'You are qualified for daily profits of ' + currentRoi + '%'}
+            </div>
+          `}
         </div>
         
         <div class="action-buttons">
@@ -636,7 +900,7 @@
         </div>
         
         <div class="stats-grid">
-          <div class="stat-card"><div class="stat-value">${currentRoi}%</div><div class="stat-label">${t.profitRate}</div></div>
+          <div class="stat-card"><div class="stat-value">${qualifying ? currentRoi + '%' : '0%'}</div><div class="stat-label">${t.profitRate}</div></div>
           <div class="stat-card"><div class="stat-value">${currentVipName}</div><div class="stat-label">${t.currentLevel}</div></div>
         </div>
       `;
@@ -654,6 +918,9 @@
 
     async function renderDeposit() {
       const t = translations[currentLang];
+      const totalDeposit = userData?.total_deposits || 0;
+      const remainingToQualify = Math.max(0, QUALIFY_AMOUNT - totalDeposit);
+      
       document.getElementById('mainContent').innerHTML = `
         <div class="card">
           <div class="card-title">${t.depositTitle}</div>
@@ -674,6 +941,12 @@
             ${t.step3}<br>
             ${t.step4}
           </div>
+          ${remainingToQualify > 0 ? `
+            <div class="info-box" style="margin-top:12px; background:rgba(255,170,0,0.15); color:#ffaa00;">
+              <strong>⚠️ ملاحظة:</strong><br>
+              ${currentLang === 'ar' ? 'تحتاج إلى ' + remainingToQualify.toFixed(2) + ' USDT إضافية لتفعيل الأرباح اليومية' : 'You need ' + remainingToQualify.toFixed(2) + ' more USDT to activate daily profits'}
+            </div>
+          ` : ''}
           <div id="depositMsg"></div>
         </div>
       `;
@@ -715,8 +988,8 @@
           
           const actualAmount = verifyData.verification?.amount;
           
-          if (!actualAmount || actualAmount < 10) {
-            showMessage(`⚠️ ${currentLang === 'ar' ? 'المبلغ المحول' : 'Amount sent'} (${actualAmount || 0} USDT) ${currentLang === 'ar' ? 'أقل من الحد الأدنى 10 USDT' : 'is less than minimum 10 USDT'}`, 'error', 5000);
+          if (!actualAmount || actualAmount < 1) {
+            showMessage(`⚠️ ${currentLang === 'ar' ? 'المبلغ المحول' : 'Amount sent'} (${actualAmount || 0} USDT) ${currentLang === 'ar' ? 'أقل من الحد الأدنى 1 USDT' : 'is less than minimum 1 USDT'}`, 'error', 5000);
             return;
           }
           
@@ -730,11 +1003,7 @@
           clearMessages();
           
           if (depositData.success) {
-            let message = `✅ ${currentLang === 'ar' ? 'تم إضافة' : 'Added'} ${actualAmount} USDT ${currentLang === 'ar' ? 'إلى حسابك بنجاح!' : 'to your account!'}`;
-            if (depositData.autoUpgraded) {
-              message += ` 🎉 ${currentLang === 'ar' ? 'تمت ترقيتك تلقائياً إلى مستوى VIP!' : 'You were automatically upgraded to VIP level!'}`;
-            }
-            showMessage(message, 'success', 8000);
+            showMessage(depositData.message, 'success', 8000);
             document.getElementById('depositTxHash').value = '';
             loadUser();
           } else {
@@ -808,6 +1077,7 @@
       const t = translations[currentLang];
       const currentLevel = userData?.vip_level || 0;
       const availableBalance = userData?.available_balance || 0;
+      const totalDeposits = userData?.total_deposits || 0;
       
       document.getElementById('mainContent').innerHTML = `
         <div class="card">
@@ -815,6 +1085,9 @@
           <div class="balance-box">
             <div class="balance-label">${t.yourBalance}</div>
             <div class="balance-amount">${availableBalance.toFixed(2)} USDT</div>
+          </div>
+          <div class="info-box" style="margin-bottom:16px;">
+            📌 ${currentLang === 'ar' ? 'يتم فتح الباقات تلقائياً عند الوصول إلى قيمة الإيداع المطلوبة' : 'Packages are automatically unlocked when you reach the required deposit amount'}
           </div>
           <div id="vipList"></div>
         </div>
@@ -827,20 +1100,46 @@
         return;
       }
       
-      container.innerHTML = vipPackages.map(pkg => `
-        <div class="vip-item" data-level="${pkg.level}" data-price="${pkg.price}" data-name="${pkg.name}" data-roi="${pkg.roi_percent}">
-          <div>
-            <div class="vip-name">${pkg.name}</div>
-            <div class="vip-roi">💰 ${pkg.roi_percent}% ${currentLang === 'ar' ? 'يومياً' : 'daily'}</div>
-            <div class="vip-price">💎 ${currentLang === 'ar' ? 'سعر الاشتراك' : 'Subscription price'}: ${pkg.price} USDT</div>
+      container.innerHTML = vipPackages.map(pkg => {
+        const isUnlockedByDeposit = totalDeposits >= pkg.price;
+        const isCurrentOrLower = currentLevel >= pkg.level;
+        const canUpgrade = isUnlockedByDeposit || availableBalance >= pkg.price;
+        const isNextLevel = (pkg.level === currentLevel + 1) || (currentLevel === 0 && pkg.level === 1);
+        
+        let statusHtml = '';
+        let statusClass = '';
+        
+        if (isCurrentOrLower) {
+          statusHtml = `<span class="vip-status" style="color:#00ff66;">${t.vipOpen}</span>`;
+          statusClass = 'vip-unlocked';
+        } else if (isUnlockedByDeposit) {
+          statusHtml = `<span class="vip-status" style="color:#ffcc00;">${t.vipUnlockedByDeposit}</span>
+                        <button class="upgrade-btn" data-level="${pkg.level}" data-price="${pkg.price}" data-name="${pkg.name}" data-unlocked="true">${t.subscribe} (0 USDT)</button>`;
+          statusClass = 'vip-unlocked';
+        } else if (canUpgrade && isNextLevel) {
+          statusHtml = `<button class="upgrade-btn" data-level="${pkg.level}" data-price="${pkg.price}" data-name="${pkg.name}" data-unlocked="false">${t.subscribe} (${pkg.price} USDT)</button>`;
+        } else if (!isNextLevel && currentLevel > 0) {
+          statusHtml = `<span class="vip-status" style="color:#8899aa;">${t.vipLocked} (${currentLang === 'ar' ? 'رقي السابق أولاً' : 'Upgrade previous first'})</span>`;
+          statusClass = 'vip-locked';
+        } else {
+          statusHtml = `<span class="vip-status" style="color:#8899aa;">${t.vipLocked}</span>`;
+          statusClass = 'vip-locked';
+        }
+        
+        return `
+          <div class="vip-item ${statusClass}" data-level="${pkg.level}" data-price="${pkg.price}" data-name="${pkg.name}" data-roi="${pkg.roi_percent}">
+            <div>
+              <div class="vip-name">${pkg.name}</div>
+              <div class="vip-roi">💰 ${pkg.roi_percent}% ${currentLang === 'ar' ? 'يومياً' : 'daily'}</div>
+              <div class="vip-price">💎 ${currentLang === 'ar' ? 'سعر الاشتراك' : 'Subscription price'}: ${pkg.price} USDT</div>
+              ${isUnlockedByDeposit && !isCurrentOrLower ? `<div style="font-size:11px; color:#ffcc00;">🔓 ${currentLang === 'ar' ? 'مفتوح بالإيداع' : 'Unlocked by deposit'}</div>` : ''}
+            </div>
+            <div>
+              ${statusHtml}
+            </div>
           </div>
-          <div>
-            ${currentLevel >= pkg.level ? `<span class="vip-status" style="color:#00ff66;">${t.vipOpen}</span>` : 
-              (currentLevel > 0 && currentLevel < pkg.level - 1 ? `<span class="vip-status" style="color:#8899aa;">${t.vipLocked}</span>` :
-              `<button class="upgrade-btn" data-level="${pkg.level}" data-price="${pkg.price}" data-name="${pkg.name}">${t.subscribe} (${pkg.price} USDT)</button>`)}
-          </div>
-        </div>
-      `).join('');
+        `;
+      }).join('');
       
       document.querySelectorAll('.upgrade-btn').forEach(btn => {
         btn.onclick = async (e) => {
@@ -848,6 +1147,7 @@
           const targetLevel = parseInt(btn.dataset.level);
           const price = parseFloat(btn.dataset.price);
           const name = btn.dataset.name;
+          const isUnlocked = btn.dataset.unlocked === 'true';
           
           if (currentLevel >= targetLevel) {
             showMessage(`✅ ${currentLang === 'ar' ? 'أنت بالفعل مشترك في' : 'You are already subscribed to'} ${name}`, 'success', 2000);
@@ -859,7 +1159,7 @@
             return;
           }
           
-          if (availableBalance >= price) {
+          if (isUnlocked || availableBalance >= price) {
             try {
               const res = await fetch(`${API_URL}/api/upgrade-vip`, {
                 method: 'POST',
@@ -879,7 +1179,6 @@
             }
           } else {
             showMessage(`⚠️ ${t.insufficientBalance} ${currentLang === 'ar' ? 'تحتاج' : 'need'} ${price} USDT`, 'warning', 4000);
-            // توجيه المستخدم للإيداع
             showNetworkSelection();
           }
         };
@@ -1000,6 +1299,8 @@
       };
     });
 
+    // تهيئة الثيم
+    setTheme(currentTheme);
     updateUILanguage();
     loadUser();
   </script>
