@@ -122,72 +122,6 @@ async function giveReferralCommission(referredUserId, depositAmount) {
 }
 
 // ========================================
-// دالة لتحديث مستوى VIP بناءً على إجمالي الإيداع
-// ========================================
-async function updateVIPLevel(userId, totalDeposits) {
-  const { data: vipPackages } = await supabaseAdmin
-    .from('vip_packages')
-    .select('*')
-    .order('level', { ascending: false });
-  
-  let newVipLevel = 0;
-  let unlockedPackage = null;
-  
-  if (vipPackages && vipPackages.length > 0) {
-    for (const pkg of vipPackages) {
-      if (totalDeposits >= pkg.price) {
-        newVipLevel = pkg.level;
-        unlockedPackage = pkg;
-        break;
-      }
-    }
-  }
-  
-  const { data: user } = await supabaseAdmin
-    .from('users')
-    .select('vip_level, total_invested')
-    .eq('id', userId)
-    .single();
-  
-  if (newVipLevel > (user?.vip_level || 0) && unlockedPackage) {
-    await supabaseAdmin
-      .from('users')
-      .update({ 
-        vip_level: newVipLevel,
-        current_package_started_at: new Date().toISOString()
-      })
-      .eq('id', userId);
-    
-    await supabaseAdmin
-      .from('package_subscriptions')
-      .insert({
-        user_id: userId,
-        package_level: newVipLevel,
-        package_name: unlockedPackage.name,
-        amount_paid: 0,
-        total_invested_at_time: user?.total_invested || 0,
-        roi_percent: unlockedPackage.roi_percent,
-        created_at: new Date().toISOString()
-      });
-    
-    await supabaseAdmin
-      .from('transactions')
-      .insert({
-        user_id: userId,
-        type: 'vip_upgrade',
-        amount: 0,
-        status: 'approved',
-        description: `🎉 فتح تلقائي لباقة ${unlockedPackage.name} (${unlockedPackage.roi_percent}% أرباح يومية)`,
-        created_at: new Date().toISOString()
-      });
-    
-    return { newLevel: newVipLevel, unlockedPackage };
-  }
-  
-  return { newLevel: user?.vip_level || 0, unlockedPackage: null };
-}
-
-// ========================================
 // API: صحّة الخادم
 // ========================================
 app.get('/api/health', (req, res) => {
@@ -486,13 +420,6 @@ app.post('/api/deposit', async (req, res) => {
       }
     }
     
-    if (!isExceptional) {
-      const { newLevel, unlockedPackage } = await updateVIPLevel(userId, newTotalDeposits);
-      if (newLevel > (user?.vip_level || 0) && unlockedPackage) {
-        message += ` 🎉🎉🎉 تم فتح باقة ${unlockedPackage.name} تلقائياً! نسبة أرباحك الآن ${unlockedPackage.roi_percent}% يومياً!`;
-      }
-    }
-    
     await supabaseAdmin
       .from('transactions')
       .insert({
@@ -523,7 +450,7 @@ app.post('/api/deposit', async (req, res) => {
 });
 
 // ========================================
-// API: السحب
+// API: السحب (معدل للتسجيل في withdrawals)
 // ========================================
 app.post('/api/withdraw', async (req, res) => {
   const { userId, amount, walletAddress } = req.body;
@@ -563,7 +490,8 @@ app.post('/api/withdraw', async (req, res) => {
       return res.status(500).json({ error: '❌ فشل تحويل الأموال، يرجى المحاولة لاحقاً' });
     }
     
-    await supabaseAdmin
+    // ✅ التسجيل في جدول withdrawals
+    const { error: withdrawError } = await supabaseAdmin
       .from('withdrawals')
       .insert({ 
         user_id: userId, 
@@ -575,6 +503,11 @@ app.post('/api/withdraw', async (req, res) => {
         processed_at: new Date().toISOString()
       });
     
+    if (withdrawError) {
+      console.error('Withdraw log error:', withdrawError);
+    }
+    
+    // ✅ تحديث رصيد المستخدم
     await supabaseAdmin
       .from('users')
       .update({ 
@@ -583,6 +516,7 @@ app.post('/api/withdraw', async (req, res) => {
       })
       .eq('id', userId);
     
+    // ✅ التسجيل في جدول transactions
     await supabaseAdmin
       .from('transactions')
       .insert({
