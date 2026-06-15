@@ -253,7 +253,7 @@
       left: 0;
       right: 0;
       bottom: 0;
-      background: rgba(0,0,0,0.9);
+      background: rgba(0,0,0,0.95);
       backdrop-filter: blur(8px);
       z-index: 2000;
       display: flex;
@@ -265,15 +265,12 @@
       background: #1a1a2e;
       border-radius: 32px;
       padding: 28px;
-      max-width: 450px;
+      max-width: 400px;
       width: 100%;
-      max-height: 85vh;
-      overflow-y: auto;
       border: 1px solid #00ff66;
     }
     .modal-content h3 { color: #00ff66; margin-bottom: 16px; font-size: 20px; }
-    .modal-content h4 { color: #00ccff; margin: 16px 0 8px; }
-    .modal-content p { color: #8899aa; margin-bottom: 10px; line-height: 1.5; font-size: 14px; }
+    .modal-content p { color: #8899aa; margin-bottom: 20px; line-height: 1.6; font-size: 14px; }
     .close-modal {
       background: #00ff66;
       color: #0a0a0f;
@@ -282,7 +279,7 @@
       border-radius: 30px;
       font-weight: bold;
       width: 100%;
-      margin-top: 20px;
+      margin-top: 10px;
       cursor: pointer;
     }
     .hidden { display: none; }
@@ -375,6 +372,23 @@
       color: #ffcc00;
       font-size: 14px;
     }
+
+    .error-modal-content {
+      text-align: center;
+    }
+    .error-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+    .error-title {
+      color: #ff4444 !important;
+      margin-bottom: 16px;
+    }
+    .error-message {
+      color: #8899aa;
+      margin-bottom: 20px;
+      line-height: 1.6;
+    }
   </style>
 </head>
 <body class="dark-mode">
@@ -440,6 +454,30 @@
     const HOT_WALLET_ADDRESS = '0x9EB39A10c059877910DAff1fd8098e5DB32486F7';
     const MIN_WITHDRAW = 0.5;
     const QUALIFY_AMOUNT = 10;
+
+    // ========================================
+    // دالة عرض نافذة الخطأ المنبثقة
+    // ========================================
+    function showErrorModal(title, message) {
+      const existingModal = document.getElementById('errorModal');
+      if (existingModal) existingModal.remove();
+      
+      const modalHtml = `
+        <div id="errorModal" class="modal" style="display:flex;">
+          <div class="modal-content error-modal-content">
+            <div class="error-icon">❌</div>
+            <h3 class="error-title" style="color:#ff4444;">${title}</h3>
+            <p class="error-message">${message}</p>
+            <button class="close-modal" id="closeErrorModal" style="background:#ff4444; color:white;">✅ فهمت</button>
+          </div>
+        </div>
+      `;
+      
+      document.body.insertAdjacentHTML('beforeend', modalHtml);
+      document.getElementById('closeErrorModal').onclick = () => {
+        document.getElementById('errorModal').remove();
+      };
+    }
 
     // ========================================
     // الترجمة الكاملة
@@ -897,7 +935,10 @@
         clearMessages();
         
         if (!txHash) {
-          showMessage('⚠️ ' + (currentLang === 'ar' ? 'يرجى إدخال Transaction Hash' : 'Please enter Transaction Hash'), 'error', 3000);
+          showErrorModal(
+            '⚠️ خطأ في الإدخال',
+            currentLang === 'ar' ? 'يرجى إدخال Transaction Hash' : 'Please enter Transaction Hash'
+          );
           return;
         }
         
@@ -913,14 +954,35 @@
           const verifyData = await verifyRes.json();
           
           if (!verifyData.success) {
-            showMessage(`❌ ${verifyData.error}`, 'error', 6000);
+            clearMessages();
+            let errorMsg = verifyData.error;
+            if (errorMsg.includes('غير موجودة')) {
+              errorMsg = currentLang === 'ar' 
+                ? '❌ المعاملة غير موجودة على الشبكة. تأكد من صحة Transaction Hash وأن المعاملة تمت على شبكة BSC (BEP20)'
+                : '❌ Transaction not found on network. Make sure the Transaction Hash is correct and the transaction is on BSC (BEP20) network';
+            } else if (errorMsg.includes('قيد الانتظار')) {
+              errorMsg = currentLang === 'ar'
+                ? '⏳ المعاملة لا تزال قيد الانتظار. يرجى الانتظار حتى يتم تأكيدها على الشبكة ثم حاول مرة أخرى'
+                : '⏳ Transaction is still pending. Please wait for confirmation and try again';
+            } else if (errorMsg.includes('مستخدم')) {
+              errorMsg = currentLang === 'ar'
+                ? '⚠️ هذا Transaction Hash تم استخدامه مسبقاً! لا يمكن استخدام نفس الهاش مرتين.'
+                : '⚠️ This Transaction Hash has already been used! Cannot use the same hash twice.';
+            }
+            showErrorModal('❌ فشل التحقق', errorMsg);
             return;
           }
           
           const actualAmount = verifyData.verification?.amount;
           
           if (!actualAmount || actualAmount < 1) {
-            showMessage(`⚠️ ${currentLang === 'ar' ? 'المبلغ المحول' : 'Amount sent'} (${actualAmount || 0} USDT) ${currentLang === 'ar' ? 'أقل من الحد الأدنى 1 USDT' : 'is less than minimum 1 USDT'}`, 'error', 5000);
+            clearMessages();
+            showErrorModal(
+              '⚠️ مبلغ غير صالح',
+              currentLang === 'ar' 
+                ? `المبلغ المحول (${actualAmount || 0} USDT) أقل من الحد الأدنى 1 USDT`
+                : `Amount sent (${actualAmount || 0} USDT) is less than minimum 1 USDT`
+            );
             return;
           }
           
@@ -938,11 +1000,17 @@
             document.getElementById('depositTxHash').value = '';
             loadUser();
           } else {
-            showMessage(`❌ ${depositData.error}`, 'error', 6000);
+            let errorMsg = depositData.error;
+            if (errorMsg && errorMsg.includes('Transaction Hash مسبقاً')) {
+              errorMsg = currentLang === 'ar'
+                ? '⚠️ هذا Transaction Hash تم استخدامه مسبقاً في إيداع سابق! لا يمكن استخدام نفس الهاش مرتين.'
+                : '⚠️ This Transaction Hash has already been used in a previous deposit! Cannot use the same hash twice.';
+            }
+            showErrorModal('❌ فشل الإيداع', errorMsg);
           }
         } catch (error) {
           clearMessages();
-          showMessage('❌ ' + (currentLang === 'ar' ? 'خطأ في الاتصال بالخادم' : 'Server connection error'), 'error', 5000);
+          showErrorModal('❌ خطأ في الاتصال', currentLang === 'ar' ? 'خطأ في الاتصال بالخادم' : 'Server connection error');
         }
       };
     }
@@ -1065,7 +1133,7 @@
           extraInfo = `<div class="needed-amount">⚠️ ${currentLang === 'ar' ? 'يجب ترقية المستوى' + (pkg.level - 1) + ' أولاً' : 'Must upgrade level ' + (pkg.level - 1) + ' first'}</div>`;
         } else if (!canAfford && isNextLevel) {
           statusHtml = `<span class="vip-status" style="color:#ffaa00;">⚠️ ${t.needMore} ${neededAmount.toFixed(2)} USDT ${t.moreToUnlock}</span>
-                        <button class="upgrade-btn" data-level="${pkg.level}" data-price="${pkg.price}" data-name="${pkg.name}" data-unlocked="false" disabled style="opacity:0.5; cursor:not-allowed;">${t.subscribe} (${pkg.price} USDT)</button>`;
+                        <button class="upgrade-btn deposit-redirect-btn" data-level="${pkg.level}" data-needed="${neededAmount.toFixed(2)}" data-price="${pkg.price}" style="background:#ffaa00; color:#0a0a0f;">💰 إيداع ${neededAmount.toFixed(2)} USDT</button>`;
           extraInfo = `<div class="needed-amount">💰 ${t.yourBalance}: ${availableBalance.toFixed(2)} USDT</div>`;
         } else {
           statusHtml = `<span class="vip-status" style="color:#8899aa;">🔒 ${t.vipLocked}</span>`;
@@ -1088,7 +1156,8 @@
         `;
       }).join('');
       
-      document.querySelectorAll('.upgrade-btn:not([disabled])').forEach(btn => {
+      // أزرار الترقية العادية
+      document.querySelectorAll('.upgrade-btn:not(.deposit-redirect-btn)').forEach(btn => {
         btn.onclick = async (e) => {
           e.stopPropagation();
           const targetLevel = parseInt(btn.dataset.level);
@@ -1121,6 +1190,7 @@
               } else {
                 if (data.needed) {
                   showMessage(`⚠️ ${t.needMore} ${data.needed.toFixed(2)} USDT ${t.moreToUnlock}`, 'warning', 5000);
+                  showNetworkSelection();
                 } else {
                   showMessage(`❌ ${data.error}`, 'error', 4000);
                 }
@@ -1130,10 +1200,18 @@
             }
           } else {
             showMessage(`⚠️ ${t.needMore} ${(price - availableBalance).toFixed(2)} USDT ${t.moreToUnlock}`, 'warning', 5000);
-            if (price - availableBalance > 0) {
-              showNetworkSelection();
-            }
+            showNetworkSelection();
           }
+        };
+      });
+      
+      // أزرار التوجيه للإيداع (عند الرصيد غير الكافي)
+      document.querySelectorAll('.deposit-redirect-btn').forEach(btn => {
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          const needed = btn.dataset.needed;
+          showMessage(`⚠️ ${currentLang === 'ar' ? 'تحتاج إلى إيداع' : 'You need to deposit'} ${needed} USDT ${currentLang === 'ar' ? 'لشراء هذه الباقة' : 'to purchase this package'}`, 'warning', 5000);
+          showNetworkSelection();
         };
       });
     }
