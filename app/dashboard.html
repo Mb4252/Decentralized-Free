@@ -67,6 +67,7 @@
     body.light-mode .info-box { background: rgba(0,170,85,0.08); border-color: #00aa55; color: #00aa55; }
     body.light-mode .balance-box { background: rgba(0,170,85,0.08); border-color: #00aa55; }
     body.light-mode .balance-label { color: #00aa55; }
+    body.light-mode .referral-item { background: #ffffff; border-color: #00aa55; color: #1a1a2e; }
     
     .navbar {
       background: #1a1a2e;
@@ -368,6 +369,17 @@
       color: #ffcc00;
       font-size: 14px;
     }
+
+    .referral-item {
+      background: #0a0a0f;
+      padding: 12px;
+      border-radius: 12px;
+      margin-bottom: 8px;
+    }
+    body.light-mode .referral-item {
+      background: #f0f2f5;
+      border: 1px solid #00aa55;
+    }
   </style>
 </head>
 <body class="dark-mode">
@@ -376,7 +388,7 @@
     <div class="user-actions">
       <button class="theme-toggle" id="themeToggleBtn"> <span id="themeText">وضع ليلي</span></button>
       <button class="lang-btn-header" id="langToggleBtn">🇸🇦 العربية</button>
-      <button class="support-btn" id="supportBtn">💬 <span id="supportText">الدعم</span></button>
+      <button class="support-btn" id="supportBtn"> <span id="supportText">الدعم</span></button>
       <span class="user-name" id="userName"></span>
       <button class="logout-btn" id="logoutBtn"> <span id="logoutText">خروج</span></button>
     </div>
@@ -410,9 +422,9 @@
     <div class="modal-content">
       <h3 id="welcomeTitle">📖 مرحباً بك في منصة الاستثمار</h3>
       <h4 id="welcomeHowDeposit">💰 كيفية الإيداع:</h4>
-      <p id="welcomeDepositText">1. اضغط على أيقونة الإيداع<br>2. اختر شبكة BNB Smart Chain (BSC/BEP20)<br>3. انسخ عنوان المحفظة<br>4. قم بتحويل USDT إلى هذا العنوان (الحد الأدنى 10 USDT)<br>5. اذهب إلى محفظتك وانسخ Transaction Hash<br>6. الصق Transaction Hash هنا<br>7. اضغط "تحقق وأيدع" - سيتم إضافة المبلغ تلقائياً</p>
-      <h4 id="welcomeHowToGetHash">📋 كيفية الحصول على Transaction Hash:</h4>
-      <p id="welcomeHashText">• بعد إرسال التحويل، انتظر التأكيد<br>• اذهب إلى سجل المعاملات في محفظتك<br>• اضغط على المعاملة ثم "View on BSCScan"<br>• انسخ الـ Transaction Hash (يبدأ بـ 0x)</p>
+      <p id="welcomeDepositText">1. اضغط على أيقونة الإيداع<br>2. اختر شبكة BNB Smart Chain (BSC/BEP20)<br>3. انسخ عنوان المحفظة<br>4. قم بتحويل USDT إلى هذا العنوان (الحد الأدنى 10 USDT)<br>5. اذهب إلى محفظتك وانسخ TXID<br>6. الصق TXID هنا<br>7. اضغط "تحقق وأيدع" - سيتم إضافة المبلغ تلقائياً</p>
+      <h4 id="welcomeHowToGetHash">📋 كيفية الحصول على TXID:</h4>
+      <p id="welcomeHashText">• بعد إرسال التحويل، انتظر التأكيد<br>• اذهب إلى سجل المعاملات في محفظتك<br>• اضغط على المعاملة ثم "View on BSCScan"<br>• انسخ الـ TXID (يبدأ بـ 0x)</p>
       <h4 id="welcomeHowWithdraw">📤 كيفية السحب:</h4>
       <p id="welcomeWithdrawText">1. اضغط على أيقونة السحب<br>2. أدخل المبلغ (الحد الأدنى 0.5 USDT)<br>3. أدخل عنوان محفظة BSC الخاص بك<br>4. اضغط "سحب USDT"</p>
       <h4 id="welcomeHowProfit">📈 الأرباح:</h4>
@@ -457,10 +469,10 @@
 
     const translations = {
       ar: {
-        logoText: ' CryptoInvest',
-        supportText: ' الدعم',
+        logoText: '💰 CryptoInvest',
+        supportText: '💬 الدعم',
         logoutText: ' خروج',
-        themeDark: ' وضع ليلي',
+        themeDark: '🌙 وضع ليلي',
         themeLight: '☀️ وضع نهاري',
         navHome: 'البيت',
         navVip: 'VIP',
@@ -482,13 +494,13 @@
         networkInfo: '🌐 شبكة التحويل: BNB Smart Chain (BSC / BEP20)',
         walletAddress: 'محفظة الإيداع:',
         copyWallet: '📋 نسخ العنوان',
-        txHashPlaceholder: 'Transaction Hash (0x...)',
+        txHashPlaceholder: 'TXID (0x...)',
         verifyAndDeposit: '🔍 تحقق وأيدع',
         howToDeposit: '📌 كيف يتم الإيداع؟',
         step1: '1. انسخ عنوان المحفظة أعلاه',
         step2: '2. اذهب إلى محفظتك وأرسل USDT على شبكة BSC/BEP20',
-        step3: '3. بعد التأكيد، اذهب إلى سجل المعاملات وانسخ Transaction Hash',
-        step4: '4. الصق Transaction Hash هنا',
+        step3: '3. بعد التأكيد، اذهب إلى سجل المعاملات وانسخ TXID',
+        step4: '4. الصق TXID هنا',
         step5: '5. اضغط "تحقق وأيدع" - سيتم إضافة المبلغ تلقائياً',
         withdrawTitle: '💸 سحب USDT',
         minWithdrawNote: '⚠️ الحد الأدنى للسحب: ',
@@ -497,8 +509,8 @@
         warningAddress: '⚠️ تأكد من صحة عنوان المحفظة! يجب أن يكون من شبكة BSC/BEP20 ويبدأ بـ "0x"',
         vipTitle: '👑 مستويات VIP',
         subscribe: 'اشتراك',
-        yourBalance: ' رصيدك المتاح',
-        yourInvested: ' إجمالي المستثمر',
+        yourBalance: '💰 رصيدك المتاح',
+        yourInvested: '💼 إجمالي المستثمر',
         referralTitle: '🔗 رابط الدعوة',
         copyLink: '📋 نسخ الرابط',
         referralsCount: 'المحالين',
@@ -520,9 +532,9 @@
         statusPending: '⏳ قيد الانتظار',
         welcomeTitle: '📖 مرحباً بك في منصة الاستثمار',
         welcomeHowDeposit: '💰 كيفية الإيداع:',
-        welcomeDepositText: '1. اضغط على أيقونة الإيداع\n2. اختر شبكة BNB Smart Chain (BSC/BEP20)\n3. انسخ عنوان المحفظة\n4. قم بتحويل USDT إلى هذا العنوان (الحد الأدنى 10 USDT)\n5. اذهب إلى محفظتك وانسخ Transaction Hash\n6. الصق Transaction Hash هنا\n7. اضغط "تحقق وأيدع"',
-        welcomeHowToGetHash: '📋 كيفية الحصول على Transaction Hash:',
-        welcomeHashText: '• بعد إرسال التحويل، انتظر التأكيد\n• اذهب إلى سجل المعاملات في محفظتك\n• اضغط على المعاملة ثم "View on BSCScan"\n• انسخ الـ Transaction Hash (يبدأ بـ 0x)',
+        welcomeDepositText: '1. اضغط على أيقونة الإيداع\n2. اختر شبكة BNB Smart Chain (BSC/BEP20)\n3. انسخ عنوان المحفظة\n4. قم بتحويل USDT إلى هذا العنوان (الحد الأدنى 10 USDT)\n5. اذهب إلى محفظتك وانسخ TXID\n6. الصق TXID هنا\n7. اضغط "تحقق وأيدع"',
+        welcomeHowToGetHash: '📋 كيفية الحصول على TXID:',
+        welcomeHashText: '• بعد إرسال التحويل، انتظر التأكيد\n• اذهب إلى سجل المعاملات في محفظتك\n• اضغط على المعاملة ثم "View on BSCScan"\n• انسخ الـ TXID (يبدأ بـ 0x)',
         welcomeHowWithdraw: '📤 كيفية السحب:',
         welcomeWithdrawText: '1. اضغط على أيقونة السحب\n2. أدخل المبلغ (الحد الأدنى 0.5 USDT)\n3. أدخل عنوان محفظة BSC الخاص بك\n4. اضغط "سحب USDT"',
         welcomeHowProfit: '📈 الأرباح:',
@@ -537,10 +549,10 @@
         currentProfit: 'الأرباح اليومية الحالية'
       },
       en: {
-        logoText: ' CryptoInvest',
-        supportText: ' Support',
+        logoText: '💰 CryptoInvest',
+        supportText: '💬 Support',
         logoutText: ' Logout',
-        themeDark: ' Dark Mode',
+        themeDark: '🌙 Dark Mode',
         themeLight: '☀️ Light Mode',
         navHome: 'Home',
         navVip: 'VIP',
@@ -562,13 +574,13 @@
         networkInfo: '🌐 Network: BNB Smart Chain (BSC / BEP20)',
         walletAddress: 'Deposit Wallet:',
         copyWallet: '📋 Copy Address',
-        txHashPlaceholder: 'Transaction Hash (0x...)',
+        txHashPlaceholder: 'TXID (0x...)',
         verifyAndDeposit: '🔍 Verify & Deposit',
         howToDeposit: '📌 How to Deposit?',
         step1: '1. Copy wallet address above',
         step2: '2. Go to your wallet and send USDT on BSC/BEP20 network',
-        step3: '3. After confirmation, go to transaction history and copy Transaction Hash',
-        step4: '4. Paste Transaction Hash here',
+        step3: '3. After confirmation, go to transaction history and copy TXID',
+        step4: '4. Paste TXID here',
         step5: '5. Click "Verify & Deposit" - Amount will be added automatically',
         withdrawTitle: '💸 USDT Withdrawal',
         minWithdrawNote: '⚠️ Minimum withdrawal: ',
@@ -600,9 +612,9 @@
         statusPending: '⏳ Pending',
         welcomeTitle: '📖 Welcome to CryptoInvest',
         welcomeHowDeposit: '💰 How to Deposit:',
-        welcomeDepositText: '1. Click Deposit icon\n2. Choose BNB Smart Chain (BSC/BEP20)\n3. Copy wallet address\n4. Send USDT to this address (minimum 10 USDT)\n5. Go to your wallet and copy Transaction Hash\n6. Paste Transaction Hash here\n7. Click "Verify & Deposit"',
-        welcomeHowToGetHash: '📋 How to get Transaction Hash:',
-        welcomeHashText: '• After sending, wait for confirmation\n• Go to transaction history in your wallet\n• Click on the transaction then "View on BSCScan"\n• Copy the Transaction Hash (starts with 0x)',
+        welcomeDepositText: '1. Click Deposit icon\n2. Choose BNB Smart Chain (BSC/BEP20)\n3. Copy wallet address\n4. Send USDT to this address (minimum 10 USDT)\n5. Go to your wallet and copy TXID\n6. Paste TXID here\n7. Click "Verify & Deposit"',
+        welcomeHowToGetHash: '📋 How to get TXID:',
+        welcomeHashText: '• After sending, wait for confirmation\n• Go to transaction history in your wallet\n• Click on the transaction then "View on BSCScan"\n• Copy the TXID (starts with 0x)',
         welcomeHowWithdraw: '📤 How to Withdraw:',
         welcomeWithdrawText: '1. Click Withdraw icon\n2. Enter amount (minimum 0.5 USDT)\n3. Enter your BSC wallet address\n4. Click "Withdraw USDT"',
         welcomeHowProfit: '📈 Profits:',
@@ -686,7 +698,7 @@
         const data = await res.json();
         if (data.error) { localStorage.clear(); window.location.href = '/'; return; }
         userData = data;
-        document.getElementById('userName').innerHTML = ` ${userData.name}`;
+        document.getElementById('userName').innerHTML = `👋 ${userData.name}`;
         
         const vipRes = await fetch(`${API_URL}/api/vip-packages`);
         vipPackages = await vipRes.json();
@@ -880,7 +892,7 @@
         clearMessages();
         
         if (!txHash) {
-          showErrorModal('⚠️ خطأ', currentLang === 'ar' ? 'يرجى إدخال Transaction Hash' : 'Please enter Transaction Hash');
+          showErrorModal('⚠️ خطأ', currentLang === 'ar' ? 'يرجى إدخال TXID' : 'Please enter TXID');
           return;
         }
         
@@ -898,7 +910,7 @@
             clearMessages();
             let errorMsg = verifyData.error;
             if (errorMsg.includes('مستخدم') || errorMsg.includes('used before')) {
-              errorMsg = currentLang === 'ar' ? '⚠️ هذا الـ Hash مستخدم مسبقاً!' : '⚠️ This Hash has been used before!';
+              errorMsg = currentLang === 'ar' ? '⚠️ هذا الـ TXID مستخدم مسبقاً!' : '⚠️ This TXID has been used before!';
             } else if (errorMsg.includes('غير موجودة')) {
               errorMsg = currentLang === 'ar' ? '❌ المعاملة غير موجودة على الشبكة' : '❌ Transaction not found on network';
             } else if (errorMsg.includes('قيد الانتظار')) {
@@ -1104,7 +1116,7 @@
         <div class="card"><div class="card-title">📋 ${t.referralsList}</div><div id="referralsList"></div></div>
         ${commissionsData.commissions.length > 0 ? `
         <div class="card"><div class="card-title">💰 ${t.commissionsHistory}</div>
-          ${commissionsData.commissions.map(c => `<div style="background:#0a0a0f; padding:12px; border-radius:12px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+          ${commissionsData.commissions.map(c => `<div class="referral-item" style="display:flex; justify-content:space-between; align-items:center;">
             <div><div style="color:#00ff66; font-weight:bold;">💰 ${c.commission_amount.toFixed(2)} USDT</div><div style="font-size:11px; color:#8899aa;">${new Date(c.created_at).toLocaleDateString()}</div></div>
             <div style="font-size:12px; color:#ffcc00;">${t.fromDepositOf} ${c.deposit_amount.toFixed(2)} USDT</div>
           </div>`).join('')}
@@ -1120,7 +1132,7 @@
       if (!data.referrals || data.referrals.length === 0) {
         listDiv.innerHTML = `<p style="color:#8899aa;">${t.noReferrals}</p>`;
       } else {
-        listDiv.innerHTML = data.referrals.map(u => `<div style="background:#0a0a0f; padding:12px; border-radius:12px; margin-bottom:8px;">${u.name}<br><span style="font-size:12px;">💰 ${u.active_deposit || 0} USDT</span></div>`).join('');
+        listDiv.innerHTML = data.referrals.map(u => `<div class="referral-item">${u.name}<br><span style="font-size:12px;">💰 ${u.active_deposit || 0} USDT</span></div>`).join('');
       }
     }
 
@@ -1138,27 +1150,108 @@
       `;
       
       try {
-        const response = await fetch(`${API_URL}/api/my-transactions`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId })
+        // جلب جميع المعاملات من قاعدة البيانات
+        const [depositsRes, withdrawalsRes, profitsRes, commissionsRes, vipUpgradesRes] = await Promise.all([
+          fetch(`${API_URL}/api/my-deposits`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId }) }),
+          fetch(`${API_URL}/api/my-withdrawals`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId }) }),
+          fetch(`${API_URL}/api/transactions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId }) }),
+          fetch(`${API_URL}/api/my-commissions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId }) }),
+          fetch(`${API_URL}/api/package-subscriptions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId }) })
+        ]);
+        
+        let deposits = await depositsRes.json();
+        let withdrawals = await withdrawalsRes.json();
+        let profits = await profitsRes.json();
+        let commissions = await commissionsRes.json();
+        let vipUpgrades = await vipUpgradesRes.json();
+        
+        if (!Array.isArray(deposits)) deposits = [];
+        if (!Array.isArray(withdrawals)) withdrawals = [];
+        if (!Array.isArray(profits)) profits = [];
+        
+        const commissionsList = commissions.commissions || [];
+        const vipUpgradesList = vipUpgrades.data || [];
+        
+        const allTransactions = [];
+        
+        deposits.forEach(d => {
+          allTransactions.push({
+            id: d.id,
+            type: 'deposit',
+            type_ar: '💰 إيداع',
+            type_en: '💰 Deposit',
+            amount: d.amount,
+            date: d.created_at,
+            status: d.status || 'approved',
+            reference: d.transaction_hash
+          });
         });
         
-        let transactions = await response.json();
-        if (!Array.isArray(transactions)) {
-          transactions = [];
-        }
+        withdrawals.forEach(w => {
+          allTransactions.push({
+            id: w.id,
+            type: 'withdraw',
+            type_ar: '📤 سحب',
+            type_en: '📤 Withdrawal',
+            amount: w.amount,
+            date: w.created_at,
+            status: w.status || 'approved',
+            reference: w.wallet_address
+          });
+        });
+        
+        profits.forEach(p => {
+          if (p.type === 'profit') {
+            allTransactions.push({
+              id: p.id,
+              type: 'profit',
+              type_ar: '📈 ربح',
+              type_en: '📈 Profit',
+              amount: p.amount,
+              date: p.created_at,
+              status: p.status || 'approved',
+              reference: null
+            });
+          }
+        });
+        
+        commissionsList.forEach(c => {
+          allTransactions.push({
+            id: c.id,
+            type: 'commission',
+            type_ar: '🎁 عمولة إحالة',
+            type_en: '🎁 Referral Commission',
+            amount: c.commission_amount,
+            date: c.created_at,
+            status: 'approved',
+            reference: `من إيداع ${c.deposit_amount} USDT`
+          });
+        });
+        
+        vipUpgradesList.forEach(v => {
+          allTransactions.push({
+            id: v.id,
+            type: 'vip_upgrade',
+            type_ar: '👑 ترقية VIP',
+            type_en: '👑 VIP Upgrade',
+            amount: v.amount_paid,
+            date: v.created_at,
+            status: 'approved',
+            reference: `${v.package_name}`
+          });
+        });
+        
+        allTransactions.sort((a, b) => new Date(b.date) - new Date(a.date));
         
         const listDiv = document.getElementById('transactionsList');
-        
-        if (transactions.length === 0) {
+        if (allTransactions.length === 0) {
           listDiv.innerHTML = `<p style="color:#8899aa; text-align:center;">${t.noTransactions}</p>`;
           return;
         }
         
         const typeText = currentLang === 'ar' ? 'type_ar' : 'type_en';
         
-        listDiv.innerHTML = transactions.map(txn => `
+        listDiv.innerHTML = allTransactions.map(txn => `
           <div class="history-item ${txn.type}">
             <div style="display:flex; justify-content:space-between; align-items:center;">
               <div>
