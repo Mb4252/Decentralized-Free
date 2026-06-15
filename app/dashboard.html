@@ -351,20 +351,6 @@
       font-weight: bold;
     }
     
-    .qualify-bar {
-      background: rgba(0,0,0,0.3);
-      border-radius: 10px;
-      height: 8px;
-      margin-top: 10px;
-      overflow: hidden;
-    }
-    .qualify-progress {
-      background: linear-gradient(90deg, #00ff66, #00ccff);
-      height: 100%;
-      border-radius: 10px;
-      transition: width 0.5s ease;
-    }
-    
     .current-package-info {
       background: rgba(0,255,102,0.15);
       border-radius: 16px;
@@ -430,7 +416,7 @@
       <h4 id="welcomeHowWithdraw">📤 كيفية السحب:</h4>
       <p id="welcomeWithdrawText">1. اضغط على أيقونة السحب<br>2. أدخل المبلغ (الحد الأدنى 0.5 USDT)<br>3. أدخل عنوان محفظة BSC الخاص بك<br>4. اضغط "سحب USDT"</p>
       <h4 id="welcomeHowProfit">📈 الأرباح:</h4>
-      <p id="welcomeProfitText">يتم توزيع الأرباح يومياً بنسبة تصل إلى 4% حسب مستوى VIP الخاص بك<br>⚠️ ملاحظة: لا تحصل على أرباح حتى يصل إجمالي إيداعاتك إلى 10 USDT</p>
+      <p id="welcomeProfitText">يتم توزيع الأرباح يومياً بنسبة تصل إلى 4% حسب مستوى VIP الخاص بك</p>
       <h4 id="welcomeNetwork">🌐 ملاحظة هامة:</h4>
       <p id="welcomeNetworkText">⚠️ يجب استخدام شبكة BNB Smart Chain (BSC/BEP20) فقط. لا ترسل على شبكات أخرى!</p>
       <button class="close-modal" id="closeWelcomeModal">✅ فهمت</button>
@@ -447,7 +433,6 @@
 
     const HOT_WALLET_ADDRESS = '0x9EB39A10c059877910DAff1fd8098e5DB32486F7';
     const MIN_WITHDRAW = 0.5;
-    const MIN_DEPOSIT_TO_QUALIFY = 10;
 
     function showErrorModal(title, message) {
       const existingModal = document.getElementById('errorModal');
@@ -541,7 +526,7 @@
         welcomeHowWithdraw: '📤 كيفية السحب:',
         welcomeWithdrawText: '1. اضغط على أيقونة السحب\n2. أدخل المبلغ (الحد الأدنى 0.5 USDT)\n3. أدخل عنوان محفظة BSC الخاص بك\n4. اضغط "سحب USDT"',
         welcomeHowProfit: '📈 الأرباح:',
-        welcomeProfitText: 'يتم توزيع الأرباح يومياً بنسبة تصل إلى 4% حسب مستوى VIP الخاص بك\n⚠️ ملاحظة: لا تحصل على أرباح حتى يصل إجمالي إيداعاتك إلى 10 USDT',
+        welcomeProfitText: 'يتم توزيع الأرباح يومياً بنسبة تصل إلى 4% حسب مستوى VIP الخاص بك',
         welcomeNetwork: '🌐 ملاحظة هامة:',
         welcomeNetworkText: '⚠️ يجب استخدام شبكة BNB Smart Chain (BSC/BEP20) فقط. لا ترسل على شبكات أخرى!',
         networkModalTitle: '🌐 اختر شبكة التحويل',
@@ -549,10 +534,6 @@
         upgradeSuccess: '✅ تم الترقية بنجاح!',
         needToDeposit: '⚠️ تحتاج إلى إيداع',
         moreToUnlock: 'إضافية لتفعيل هذه الباقة',
-        qualifyMessage: '⚠️ تحتاج إلى إيداع {amount} USDT إضافية لتفعيل الأرباح اليومية',
-        qualifyProgress: 'نسبة التقدم للأرباح',
-        notQualified: '❌ غير مؤهل للأرباح',
-        qualified: '✅ مؤهل للأرباح',
         currentProfit: 'الأرباح اليومية الحالية'
       },
       en: {
@@ -625,7 +606,7 @@
         welcomeHowWithdraw: '📤 How to Withdraw:',
         welcomeWithdrawText: '1. Click Withdraw icon\n2. Enter amount (minimum 0.5 USDT)\n3. Enter your BSC wallet address\n4. Click "Withdraw USDT"',
         welcomeHowProfit: '📈 Profits:',
-        welcomeProfitText: 'Daily profits are distributed up to 4% depending on your VIP level\n⚠️ Note: You will not receive profits until your total deposits reach 10 USDT',
+        welcomeProfitText: 'Daily profits are distributed up to 4% depending on your VIP level',
         welcomeNetwork: '🌐 Important Note:',
         welcomeNetworkText: '⚠️ You must use BNB Smart Chain (BSC/BEP20) network only. Do not send on other networks!',
         networkModalTitle: '🌐 Select Network',
@@ -633,10 +614,6 @@
         upgradeSuccess: '✅ Upgrade successful!',
         needToDeposit: '⚠️ You need to deposit',
         moreToUnlock: 'more to unlock this package',
-        qualifyMessage: '⚠️ You need to deposit {amount} more USDT to activate daily profits',
-        qualifyProgress: 'Qualification Progress',
-        notQualified: '❌ Not qualified for profits',
-        qualified: '✅ Qualified for profits',
         currentProfit: 'Current Daily Profit'
       }
     };
@@ -810,9 +787,6 @@
         currentPackageName = 'VIP 0';
       }
       
-      const qualifyProgress = Math.min((totalDeposit / MIN_DEPOSIT_TO_QUALIFY) * 100, 100);
-      const remainingToQualify = Math.max(0, MIN_DEPOSIT_TO_QUALIFY - totalDeposit);
-      
       document.getElementById('mainContent').innerHTML = `
         <div class="card">
           <div class="assets-amount">${(active+avail).toFixed(2)} USDT</div>
@@ -822,22 +796,13 @@
           <div class="detail-row"><span>📊 ${t.totalDeposits}</span><span class="detail-value">${totalDeposit.toFixed(2)} USDT</span></div>
           <div class="detail-row"><span>📤 ${t.totalWithdrawals}</span><span class="detail-value">${totalWithdraw.toFixed(2)} USDT</span></div>
           
-          ${!qualifying ? `
-            <div class="info-box" style="margin-top:16px; background:rgba(255,170,0,0.15); color:#ffaa00;">
-              <strong>⚠️ ${t.notQualified}</strong><br>
-              ${t.qualifyMessage.replace('{amount}', remainingToQualify.toFixed(2))}
-              <div class="qualify-bar">
-                <div class="qualify-progress" style="width: ${qualifyProgress}%"></div>
-              </div>
-              <div style="font-size:11px; margin-top:5px;">${t.qualifyProgress}: ${qualifyProgress.toFixed(1)}%</div>
-            </div>
-          ` : `
-            <div class="current-package-info">
+          ${qualifying ? `
+            <div class="current-package-info" style="margin-top:16px;">
               <div class="current-package-name">${currentPackageName}</div>
               <div class="current-package-roi">${t.currentProfit}: ${currentRoi}%</div>
               <div style="font-size:12px; margin-top:5px;">💰 ${((totalInvested * currentRoi) / 100).toFixed(2)} USDT ${currentLang === 'ar' ? 'يومياً' : 'daily'}</div>
             </div>
-          `}
+          ` : ''}
         </div>
         
         <div class="action-buttons">
@@ -869,10 +834,6 @@
 
     async function renderDeposit() {
       const t = translations[currentLang];
-      const totalDeposit = userData?.total_deposits || 0;
-      const remainingToQualify = Math.max(0, MIN_DEPOSIT_TO_QUALIFY - totalDeposit);
-      
-      // ✅ تحديد الحد الأدنى للمستخدم
       const minDeposit = userData?.custom_min_deposit || 10;
       const isExceptional = userData?.is_exceptional || false;
       
@@ -898,15 +859,9 @@
           <div class="info-box" style="margin-top:12px; background:rgba(0,255,102,0.1);">
             <strong>📌 ملاحظة:</strong><br>
             ${currentLang === 'ar' 
-              ? `الحد الأدنى للإيداع هو ${minDeposit} USDT${isExceptional ? ' (حساب تجريبي - يمكنك إيداع 1 دولار للتجربة)' : ''}. ستحصل على أرباح يومية فقط عندما يصل إجمالي إيداعاتك إلى 10 USDT.` 
-              : `Minimum deposit is ${minDeposit} USDT${isExceptional ? ' (Test account - you can deposit 1 USDT for testing)' : ''}. You will only receive daily profits when your total deposits reach 10 USDT.`}
+              ? `الحد الأدنى للإيداع هو ${minDeposit} USDT${isExceptional ? ' (حساب تجريبي - يمكنك إيداع 1 دولار للتجربة)' : ''}.` 
+              : `Minimum deposit is ${minDeposit} USDT${isExceptional ? ' (Test account - you can deposit 1 USDT for testing)' : ''}.`}
           </div>
-          ${remainingToQualify > 0 && totalDeposit < MIN_DEPOSIT_TO_QUALIFY && !isExceptional ? `
-            <div class="info-box" style="margin-top:12px; background:rgba(255,170,0,0.15); color:#ffaa00;">
-              <strong>⚠️ ${t.notQualified}</strong><br>
-              ${t.qualifyMessage.replace('{amount}', remainingToQualify.toFixed(2))}
-            </div>
-          ` : ''}
           <div id="depositMsg"></div>
         </div>
       `;
@@ -1065,17 +1020,16 @@
       
       container.innerHTML = vipPackages.map(pkg => {
         const isCurrentOrHigher = currentLevel >= pkg.level;
-        const neededAmount = pkg.price - totalDeposits;
         
         return `
-          <div class="vip-item" data-level="${pkg.level}" data-price="${pkg.price}" data-name="${pkg.name}" data-needed="${neededAmount > 0 ? neededAmount : 0}">
+          <div class="vip-item" data-level="${pkg.level}" data-price="${pkg.price}" data-name="${pkg.name}">
             <div>
               <div class="vip-name">${pkg.name} ${isCurrentOrHigher ? '✅' : ''}</div>
               <div class="vip-roi">💰 ${pkg.roi_percent}% ${currentLang === 'ar' ? 'يومياً' : 'daily'}</div>
               <div class="vip-price">💎 ${currentLang === 'ar' ? 'السعر' : 'Price'}: ${pkg.price} USDT</div>
             </div>
             <div>
-              <button class="upgrade-btn" data-level="${pkg.level}" data-price="${pkg.price}" data-name="${pkg.name}" data-needed="${neededAmount}">
+              <button class="upgrade-btn" data-level="${pkg.level}" data-price="${pkg.price}" data-name="${pkg.name}">
                 ${t.subscribe} (${pkg.price} USDT)
               </button>
             </div>
@@ -1189,15 +1143,21 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId })
         });
-        const transactions = await response.json();
+        
+        let transactions = await response.json();
+        if (!Array.isArray(transactions)) {
+          transactions = [];
+        }
+        
         const listDiv = document.getElementById('transactionsList');
         
-        if (!transactions || transactions.length === 0) {
+        if (transactions.length === 0) {
           listDiv.innerHTML = `<p style="color:#8899aa; text-align:center;">${t.noTransactions}</p>`;
           return;
         }
         
         const typeText = currentLang === 'ar' ? 'type_ar' : 'type_en';
+        
         listDiv.innerHTML = transactions.map(txn => `
           <div class="history-item ${txn.type}">
             <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -1215,8 +1175,9 @@
             </div>
           </div>
         `).join('');
+        
       } catch (error) {
-        console.error(error);
+        console.error('Error loading transactions:', error);
         document.getElementById('transactionsList').innerHTML = `<p style="color:#8899aa; text-align:center;">${currentLang === 'ar' ? 'خطأ في تحميل المعاملات' : 'Error loading transactions'}</p>`;
       }
     }
