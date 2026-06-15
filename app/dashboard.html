@@ -67,7 +67,6 @@
     body.light-mode .info-box { background: rgba(0,170,85,0.08); border-color: #00aa55; color: #00aa55; }
     body.light-mode .balance-box { background: rgba(0,170,85,0.08); border-color: #00aa55; }
     body.light-mode .balance-label { color: #00aa55; }
-    body.light-mode .referral-item { background: #ffffff; border-color: #00aa55; color: #1a1a2e; }
     
     .navbar {
       background: #1a1a2e;
@@ -377,8 +376,9 @@
       margin-bottom: 8px;
     }
     body.light-mode .referral-item {
-      background: #f0f2f5;
-      border: 1px solid #00aa55;
+      background: #e9ecef;
+      border: 1px solid #dee2e6;
+      color: #1a1a2e;
     }
   </style>
 </head>
@@ -386,11 +386,11 @@
   <div class="navbar">
     <div class="logo">💰 <span id="logoText">CryptoInvest</span></div>
     <div class="user-actions">
-      <button class="theme-toggle" id="themeToggleBtn"> <span id="themeText">وضع ليلي</span></button>
+      <button class="theme-toggle" id="themeToggleBtn">🌙 <span id="themeText">وضع ليلي</span></button>
       <button class="lang-btn-header" id="langToggleBtn">🇸🇦 العربية</button>
-      <button class="support-btn" id="supportBtn"> <span id="supportText">الدعم</span></button>
+      <button class="support-btn" id="supportBtn">💬 <span id="supportText">الدعم</span></button>
       <span class="user-name" id="userName"></span>
-      <button class="logout-btn" id="logoutBtn"> <span id="logoutText">خروج</span></button>
+      <button class="logout-btn" id="logoutBtn">🚪 <span id="logoutText">خروج</span></button>
     </div>
   </div>
 
@@ -471,7 +471,7 @@
       ar: {
         logoText: '💰 CryptoInvest',
         supportText: '💬 الدعم',
-        logoutText: ' خروج',
+        logoutText: '🚪 خروج',
         themeDark: '🌙 وضع ليلي',
         themeLight: '☀️ وضع نهاري',
         navHome: 'البيت',
@@ -551,7 +551,7 @@
       en: {
         logoText: '💰 CryptoInvest',
         supportText: '💬 Support',
-        logoutText: ' Logout',
+        logoutText: '🚪 Logout',
         themeDark: '🌙 Dark Mode',
         themeLight: '☀️ Light Mode',
         navHome: 'Home',
@@ -802,11 +802,11 @@
       document.getElementById('mainContent').innerHTML = `
         <div class="card">
           <div class="assets-amount">${(active+avail).toFixed(2)} USDT</div>
-          <div class="detail-row"><span> ${t.activeInvestment}</span><span class="detail-value">${active.toFixed(2)} USDT</span></div>
-          <div class="detail-row"><span> ${t.availableBalance}</span><span class="detail-value">${avail.toFixed(2)} USDT</span></div>
-          <div class="detail-row"><span> ${t.investedAmount}</span><span class="detail-value">${totalInvested.toFixed(2)} USDT</span></div>
-          <div class="detail-row"><span> ${t.totalDeposits}</span><span class="detail-value">${totalDeposit.toFixed(2)} USDT</span></div>
-          <div class="detail-row"><span> ${t.totalWithdrawals}</span><span class="detail-value">${totalWithdraw.toFixed(2)} USDT</span></div>
+          <div class="detail-row"><span>💰 ${t.activeInvestment}</span><span class="detail-value">${active.toFixed(2)} USDT</span></div>
+          <div class="detail-row"><span>💎 ${t.availableBalance}</span><span class="detail-value">${avail.toFixed(2)} USDT</span></div>
+          <div class="detail-row"><span>💼 ${t.investedAmount}</span><span class="detail-value">${totalInvested.toFixed(2)} USDT</span></div>
+          <div class="detail-row"><span>📊 ${t.totalDeposits}</span><span class="detail-value">${totalDeposit.toFixed(2)} USDT</span></div>
+          <div class="detail-row"><span>📤 ${t.totalWithdrawals}</span><span class="detail-value">${totalWithdraw.toFixed(2)} USDT</span></div>
           
           ${qualifying ? `
             <div class="current-package-info" style="margin-top:16px;">
@@ -1150,108 +1150,27 @@
       `;
       
       try {
-        // جلب جميع المعاملات من قاعدة البيانات
-        const [depositsRes, withdrawalsRes, profitsRes, commissionsRes, vipUpgradesRes] = await Promise.all([
-          fetch(`${API_URL}/api/my-deposits`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId }) }),
-          fetch(`${API_URL}/api/my-withdrawals`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId }) }),
-          fetch(`${API_URL}/api/transactions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId }) }),
-          fetch(`${API_URL}/api/my-commissions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId }) }),
-          fetch(`${API_URL}/api/package-subscriptions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId }) })
-        ]);
-        
-        let deposits = await depositsRes.json();
-        let withdrawals = await withdrawalsRes.json();
-        let profits = await profitsRes.json();
-        let commissions = await commissionsRes.json();
-        let vipUpgrades = await vipUpgradesRes.json();
-        
-        if (!Array.isArray(deposits)) deposits = [];
-        if (!Array.isArray(withdrawals)) withdrawals = [];
-        if (!Array.isArray(profits)) profits = [];
-        
-        const commissionsList = commissions.commissions || [];
-        const vipUpgradesList = vipUpgrades.data || [];
-        
-        const allTransactions = [];
-        
-        deposits.forEach(d => {
-          allTransactions.push({
-            id: d.id,
-            type: 'deposit',
-            type_ar: '💰 إيداع',
-            type_en: '💰 Deposit',
-            amount: d.amount,
-            date: d.created_at,
-            status: d.status || 'approved',
-            reference: d.transaction_hash
-          });
+        const response = await fetch(`${API_URL}/api/my-transactions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId })
         });
         
-        withdrawals.forEach(w => {
-          allTransactions.push({
-            id: w.id,
-            type: 'withdraw',
-            type_ar: '📤 سحب',
-            type_en: '📤 Withdrawal',
-            amount: w.amount,
-            date: w.created_at,
-            status: w.status || 'approved',
-            reference: w.wallet_address
-          });
-        });
-        
-        profits.forEach(p => {
-          if (p.type === 'profit') {
-            allTransactions.push({
-              id: p.id,
-              type: 'profit',
-              type_ar: '📈 ربح',
-              type_en: '📈 Profit',
-              amount: p.amount,
-              date: p.created_at,
-              status: p.status || 'approved',
-              reference: null
-            });
-          }
-        });
-        
-        commissionsList.forEach(c => {
-          allTransactions.push({
-            id: c.id,
-            type: 'commission',
-            type_ar: '🎁 عمولة إحالة',
-            type_en: '🎁 Referral Commission',
-            amount: c.commission_amount,
-            date: c.created_at,
-            status: 'approved',
-            reference: `من إيداع ${c.deposit_amount} USDT`
-          });
-        });
-        
-        vipUpgradesList.forEach(v => {
-          allTransactions.push({
-            id: v.id,
-            type: 'vip_upgrade',
-            type_ar: '👑 ترقية VIP',
-            type_en: '👑 VIP Upgrade',
-            amount: v.amount_paid,
-            date: v.created_at,
-            status: 'approved',
-            reference: `${v.package_name}`
-          });
-        });
-        
-        allTransactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+        let transactions = await response.json();
+        if (!Array.isArray(transactions)) {
+          transactions = [];
+        }
         
         const listDiv = document.getElementById('transactionsList');
-        if (allTransactions.length === 0) {
+        
+        if (transactions.length === 0) {
           listDiv.innerHTML = `<p style="color:#8899aa; text-align:center;">${t.noTransactions}</p>`;
           return;
         }
         
         const typeText = currentLang === 'ar' ? 'type_ar' : 'type_en';
         
-        listDiv.innerHTML = allTransactions.map(txn => `
+        listDiv.innerHTML = transactions.map(txn => `
           <div class="history-item ${txn.type}">
             <div style="display:flex; justify-content:space-between; align-items:center;">
               <div>
