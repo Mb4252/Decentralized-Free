@@ -35,6 +35,108 @@ function generateUUID() {
 }
 
 // ========================================
+// دالة لتحديث حالة التأهيل للأرباح
+// ========================================
+async function updateQualifyingStatus(userId) {
+  // جلب إجمالي إيداعات المستخدم
+  const { data: user } = await supabaseAdmin
+    .from('users')
+    .select('total_deposits, qualifying_deposit')
+    .eq('id', userId)
+    .single();
+  
+  const qualifies = (user?.total_deposits || 0) >= 10;
+  
+  if (qualifies !== (user?.qualifying_deposit || false)) {
+    await supabaseAdmin
+      .from('users')
+      .update({ qualifying_deposit: qualifies })
+      .eq('id', userId);
+    
+    // إذا أصبح مؤهلاً ولديه استثمار نشط، سجل أول يوم ربح
+    if (qualifies) {
+      const { data: activeData } = await supabaseAdmin
+        .from('users')
+        .select('active_deposit')
+        .eq('id', userId)
+        .single();
+      
+      if (activeData?.active_deposit > 0) {
+        await supabaseAdmin
+          .from('users')
+          .update({ last_profit_date: new Date().toISOString().split('T')[0] })
+          .eq('id', userId);
+      }
+    }
+  }
+  
+  return qualifies;
+}
+
+// ========================================
+// دالة لفتح VIP تلقائياً بناءً على إجمالي الإيداع
+// ========================================
+async function updateVIPLevel(userId, totalDeposits) {
+  // جلب باقات VIP
+  const { data: vipPackages } = await supabaseAdmin
+    .from('vip_packages')
+    .select('*')
+    .order('level', { ascending: false });
+  
+  let newVipLevel = 0;
+  
+  if (vipPackages && vipPackages.length > 0) {
+    for (const pkg of vipPackages) {
+      if (totalDeposits >= pkg.price) {
+        newVipLevel = pkg.level;
+        break;
+      }
+    }
+  }
+  
+  // جلب المستوى الحالي
+  const { data: user } = await supabaseAdmin
+    .from('users')
+    .select('vip_level')
+    .eq('id', userId)
+    .single();
+  
+  if (newVipLevel > (user?.vip_level || 0)) {
+    await supabaseAdmin
+      .from('users')
+      .update({ vip_level: newVipLevel })
+      .eq('id', userId);
+    
+    // تسجيل الترقية التلقائية
+    const upgradedPackage = vipPackages.find(p => p.level === newVipLevel);
+    if (upgradedPackage) {
+      await supabaseAdmin
+        .from('vip_upgrades')
+        .insert({
+          user_id: userId,
+          old_level: user?.vip_level || 0,
+          new_level: newVipLevel,
+          amount_paid: 0,
+          created_at: new Date().toISOString()
+        });
+      
+      await supabaseAdmin
+        .from('transactions')
+        .insert({
+          user_id: userId,
+          type: 'vip_upgrade',
+          amount: 0,
+          status: 'approved',
+          description: `ترقية تلقائية إلى ${upgradedPackage.name} (${upgradedPackage.roi_percent}% أرباح يومية)`,
+          created_at: new Date().toISOString()
+        });
+    }
+  }
+  
+  return newVipLevel;
+}
+
+// ========================================
 // API: صحّة الخادم
 // ========================================
 app.get('/api/health', (req, res) => {
@@ -80,7 +182,7 @@ app.get('/api/vip-packages', async (req, res) => {
 });
 
 // ========================================
-// API: ترقية VIP
+// API: ترقية VIP يدوياً
 // ========================================
 app.post('/api/upgrade-vip', async (req, res) => {
   const { userId, packageLevel } = req.body;
@@ -98,7 +200,7 @@ app.post('/api/upgrade-vip', async (req, res) => {
     
     const { data: user, error: userError } = await supabaseAdmin
       .from('users')
-      .select('available_balance, vip_level')
+      .select('available_balance, vip_level, total_deposits')
       .eq('id', userId)
       .single();
     
@@ -106,30 +208,38 @@ app.post('/api/upgrade-vip', async (req, res) => {
       return res.status(404).json({ error: 'المستخدم غير موجود' });
     }
     
+    // التحقق: إذا كان إجمالي الإيداع أكبر أو يساوي سعر الباقة، تكون مفتوحة
+    const isUnlockedByDeposit = (user.total_deposits || 0) >= package.price;
+    
     if (user.vip_level >= packageLevel) {
       return res.status(400).json({ error: 'أنت بالفعل في هذا المستوى أو أعلى' });
     }
     
-    if (packageLevel > user.vip_level + 1) {
-      return res.status(400).json({ error: 'يجب ترقية المستويات السابقة أولاً' });
-    }
-    
-    if (user.available_balance < package.price) {
+    // السماح بالترقية إذا كانت الباقة مفتوحة بالإيداع أو الرصيد كافٍ
+    if (!isUnlockedByDeposit && user.available_balance < package.price) {
       return res.status(400).json({ error: `الرصيد غير كافٍ. تحتاج ${package.price} USDT` });
     }
     
-    const newBalance = user.available_balance - package.price;
+    let newBalance = user.available_balance;
+    let amountPaid = 0;
     
-    const { error: updateError } = await supabaseAdmin
+    if (!isUnlockedByDeposit) {
+      newBalance = user.available_balance - package.price;
+      amountPaid = package.price;
+      
+      await supabaseAdmin
+        .from('users')
+        .update({ available_balance: newBalance })
+        .eq('id', userId);
+    }
+    
+    await supabaseAdmin
       .from('users')
       .update({
         vip_level: packageLevel,
-        available_balance: newBalance,
         last_vip_upgrade: new Date().toISOString()
       })
       .eq('id', userId);
-    
-    if (updateError) throw updateError;
     
     await supabaseAdmin
       .from('vip_upgrades')
@@ -137,7 +247,7 @@ app.post('/api/upgrade-vip', async (req, res) => {
         user_id: userId,
         old_level: user.vip_level,
         new_level: packageLevel,
-        amount_paid: package.price,
+        amount_paid: amountPaid,
         created_at: new Date().toISOString()
       });
     
@@ -146,7 +256,7 @@ app.post('/api/upgrade-vip', async (req, res) => {
       .insert({
         user_id: userId,
         type: 'vip_upgrade',
-        amount: package.price,
+        amount: amountPaid,
         status: 'approved',
         description: `ترقية إلى ${package.name} - ${package.roi_percent}% أرباح يومية`,
         created_at: new Date().toISOString()
@@ -157,7 +267,8 @@ app.post('/api/upgrade-vip', async (req, res) => {
       message: `✅ تم الترقية إلى ${package.name} بنجاح!`,
       newLevel: packageLevel,
       newBalance: newBalance,
-      roiPercent: package.roi_percent
+      roiPercent: package.roi_percent,
+      unlockedByDeposit: isUnlockedByDeposit
     });
     
   } catch (error) {
@@ -167,13 +278,13 @@ app.post('/api/upgrade-vip', async (req, res) => {
 });
 
 // ========================================
-// API: الإيداع مع التحقق التلقائي وتفعيل VIP تلقائياً
+// API: الإيداع (يتم قبول أي مبلغ، ولكن الأرباح فقط بعد 10$)
 // ========================================
 app.post('/api/deposit', async (req, res) => {
   const { userId, amount, transactionHash } = req.body;
   
-  if (!amount || amount < 10) {
-    return res.status(400).json({ error: 'الحد الأدنى للإيداع 10 USDT' });
+  if (!amount || amount < 1) {
+    return res.status(400).json({ error: 'الحد الأدنى للإيداع 1 USDT' });
   }
   
   if (!transactionHash || transactionHash.length < 10) {
@@ -216,69 +327,65 @@ app.post('/api/deposit', async (req, res) => {
     
     const { data: user } = await supabaseAdmin
       .from('users')
-      .select('active_deposit, total_deposited, available_balance, vip_level')
+      .select('active_deposit, total_deposits, available_balance, vip_level, qualifying_deposit')
       .eq('id', userId)
       .single();
     
-    const newActiveDeposit = (user?.active_deposit || 0) + amount;
-    const newTotalDeposited = (user?.total_deposited || 0) + amount;
+    const newTotalDeposits = (user?.total_deposits || 0) + amount;
     
+    // تحديث إجمالي الإيداعات فقط (لا يضاف إلى الاستثمار النشط إلا إذا كان مؤهلاً)
     await supabaseAdmin
       .from('users')
       .update({ 
-        active_deposit: newActiveDeposit,
-        total_deposited: newTotalDeposited
+        total_deposits: newTotalDeposits
       })
       .eq('id', userId);
     
-    // تفعيل VIP تلقائياً بناءً على إجمالي الإيداع
-    const { data: vipPackages } = await supabaseAdmin
-      .from('vip_packages')
-      .select('*')
-      .order('level', { ascending: false });
+    // التحقق من التأهيل للأرباح
+    const qualifies = newTotalDeposits >= 10;
+    let message = `✅ تم إضافة ${amount} USDT إلى رصيدك!`;
     
-    let newVipLevel = user?.vip_level || 0;
-    let autoUpgraded = false;
+    if (!qualifies) {
+      message += ` ⚠️ تحتاج إلى إيداع ${(10 - newTotalDeposits).toFixed(2)} USDT إضافية لتفعيل الأرباح اليومية.`;
+    } else if (qualifies && !user?.qualifying_deposit) {
+      // أصبح مؤهلاً الآن - أضف المبلغ إلى الاستثمار النشط
+      const newActiveDeposit = (user?.active_deposit || 0) + newTotalDeposits;
+      await supabaseAdmin
+        .from('users')
+        .update({ 
+          active_deposit: newActiveDeposit,
+          qualifying_deposit: true,
+          last_profit_date: new Date().toISOString().split('T')[0]
+        })
+        .eq('id', userId);
+      message += ` 🎉 تهانينا! أصبحت مؤهلاً للأرباح اليومية بنسبة 2%!`;
+    } else if (qualifies && user?.qualifying_deposit) {
+      // مستخدم مؤهل بالفعل - أضف المبلغ إلى الاستثمار النشط
+      const newActiveDeposit = (user?.active_deposit || 0) + amount;
+      await supabaseAdmin
+        .from('users')
+        .update({ 
+          active_deposit: newActiveDeposit
+        })
+        .eq('id', userId);
+      message += ` 💰 تم إضافة المبلغ إلى استثمارك النشط.`;
+    }
     
-    if (vipPackages && vipPackages.length > 0) {
-      for (const pkg of vipPackages) {
-        if (newTotalDeposited >= pkg.price && pkg.level > newVipLevel) {
-          if (pkg.level === newVipLevel + 1 || newVipLevel === 0) {
-            newVipLevel = pkg.level;
-            autoUpgraded = true;
-            
-            await supabaseAdmin
-              .from('vip_upgrades')
-              .insert({
-                user_id: userId,
-                old_level: user?.vip_level || 0,
-                new_level: pkg.level,
-                amount_paid: 0,
-                created_at: new Date().toISOString()
-              });
-            
-            await supabaseAdmin
-              .from('transactions')
-              .insert({
-                user_id: userId,
-                type: 'vip_upgrade',
-                amount: 0,
-                status: 'approved',
-                description: `ترقية تلقائية إلى ${pkg.name} (${pkg.roi_percent}% أرباح يومية)`,
-                created_at: new Date().toISOString()
-              });
-          }
-        }
+    // تحديث مستوى VIP تلقائياً
+    const newVipLevel = await updateVIPLevel(userId, newTotalDeposits);
+    
+    if (newVipLevel > (user?.vip_level || 0)) {
+      const { data: vipPackages } = await supabaseAdmin
+        .from('vip_packages')
+        .select('*')
+        .eq('level', newVipLevel)
+        .single();
+      if (vipPackages) {
+        message += ` 🎉 تمت ترقيتك تلقائياً إلى ${vipPackages.name} مع نسبة ربح ${vipPackages.roi_percent}% يومياً!`;
       }
     }
     
-    if (newVipLevel > (user?.vip_level || 0)) {
-      await supabaseAdmin
-        .from('users')
-        .update({ vip_level: newVipLevel })
-        .eq('id', userId);
-    }
-    
+    // تسجيل معاملة الإيداع
     await supabaseAdmin
       .from('transactions')
       .insert({
@@ -287,22 +394,18 @@ app.post('/api/deposit', async (req, res) => {
         amount: amount,
         status: 'approved',
         reference_id: deposit.id,
-        description: `إيداع عبر البوت - Tx: ${transactionHash.substring(0, 15)}...`,
+        description: `إيداع - Tx: ${transactionHash.substring(0, 15)}...`,
         created_at: new Date().toISOString()
       });
-    
-    let message = `✅ تم إضافة ${amount} USDT إلى حسابك بنجاح!`;
-    if (autoUpgraded) {
-      const upgradedPackage = vipPackages.find(p => p.level === newVipLevel);
-      message += ` 🎉 تمت ترقيتك تلقائياً إلى ${upgradedPackage?.name} مع نسبة ربح ${upgradedPackage?.roi_percent}% يومياً!`;
-    }
     
     res.json({ 
       success: true, 
       message: message,
       depositId: deposit.id,
       verification: verification,
-      autoUpgraded: autoUpgraded,
+      qualifies: qualifies,
+      totalDeposits: newTotalDeposits,
+      remainingToQualify: qualifies ? 0 : (10 - newTotalDeposits),
       newVipLevel: newVipLevel
     });
     
@@ -329,7 +432,7 @@ app.post('/api/withdraw', async (req, res) => {
   try {
     const { data: user } = await supabaseAdmin
       .from('users')
-      .select('available_balance, total_withdrawn')
+      .select('available_balance, total_withdrawn, qualifying_deposit')
       .eq('id', userId)
       .single();
     
@@ -457,7 +560,7 @@ app.post('/api/login', async (req, res) => {
 });
 
 // ========================================
-// API: إنشاء حساب جديد (مع UUID صحيح)
+// API: إنشاء حساب جديد
 // ========================================
 app.post('/api/register', async (req, res) => {
   const { email, password, name, referralCode } = req.body;
@@ -495,7 +598,6 @@ app.post('/api/register', async (req, res) => {
   const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'mb425262@gmail.com';
   const isAdmin = (email === ADMIN_EMAIL);
   
-  // ✅ استخدام UUID صحيح
   const userId = generateUUID();
   
   const { error: insertError } = await supabaseAdmin
@@ -511,8 +613,10 @@ app.post('/api/register', async (req, res) => {
       vip_level: 0,
       available_balance: 0,
       active_deposit: 0,
+      total_deposits: 0,
       total_withdrawn: 0,
       total_deposited: 0,
+      qualifying_deposit: false,
       created_at: new Date().toISOString()
     });
   
@@ -567,7 +671,7 @@ app.post('/api/update-user', async (req, res) => {
 });
 
 // ========================================
-// API: توزيع الأرباح اليومية
+// API: توزيع الأرباح اليومية (للمستخدمين المؤهلين فقط)
 // ========================================
 app.post('/api/distribute-profits', async (req, res) => {
   const { secret } = req.body;
@@ -589,23 +693,17 @@ app.post('/api/distribute-profits', async (req, res) => {
     
     const { data: users } = await supabaseAdmin
       .from('users')
-      .select('id, active_deposit, vip_level, available_balance');
+      .select('id, active_deposit, vip_level, available_balance, qualifying_deposit, last_profit_date')
+      .eq('qualifying_deposit', true)  // فقط المستخدمين المؤهلين
+      .gt('active_deposit', 0);
     
     const today = new Date().toISOString().split('T')[0];
     let totalDistributed = 0;
     let usersProcessed = 0;
     
     for (const user of users) {
-      if (!user.active_deposit || user.active_deposit <= 0) continue;
-      
-      const { data: existingProfit } = await supabaseAdmin
-        .from('daily_profit_log')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('calculated_date', today)
-        .single();
-      
-      if (existingProfit) continue;
+      // التحقق من عدم تكرار الأرباح لليوم
+      if (user.last_profit_date === today) continue;
       
       let roi = 2;
       if (user.vip_level > 0 && vipRoiMap[user.vip_level]) {
@@ -618,7 +716,10 @@ app.post('/api/distribute-profits', async (req, res) => {
       
       await supabaseAdmin
         .from('users')
-        .update({ available_balance: (user.available_balance || 0) + profit })
+        .update({ 
+          available_balance: (user.available_balance || 0) + profit,
+          last_profit_date: today
+        })
         .eq('id', user.id);
       
       await supabaseAdmin
@@ -838,6 +939,24 @@ app.post('/api/admin/users', async (req, res) => {
 });
 
 // ========================================
+// API: جلب إعدادات التطبيق
+// ========================================
+app.get('/api/app-settings', async (req, res) => {
+  const { data } = await supabaseAdmin
+    .from('app_settings')
+    .select('*');
+  
+  const settings = {};
+  if (data) {
+    data.forEach(item => {
+      settings[item.setting_key] = item.setting_value;
+    });
+  }
+  
+  res.json(settings);
+});
+
+// ========================================
 // تشغيل الخادم
 // ========================================
 const PORT = process.env.PORT || 3000;
@@ -858,38 +977,4 @@ app.listen(PORT, () => {
 // ========================================
 
 cron.schedule('*/5 * * * *', async () => {
-  console.log('🔄 [Cron] جاري فحص الإيداعات الجديدة...');
-  try {
-    const response = await fetch(`http://localhost:${PORT}/api/process-deposits`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' }
-    });
-    const result = await response.json();
-    console.log('✅ [Cron] نتيجة فحص الإيداعات:', result);
-  } catch (error) {
-    console.error('❌ [Cron] خطأ في فحص الإيداعات:', error);
-  }
-});
-
-cron.schedule('0 0 * * *', async () => {
-  console.log('🔄 [Cron] جاري توزيع الأرباح اليومية...');
-  try {
-    const response = await fetch(`http://localhost:${PORT}/api/distribute-profits`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ secret: process.env.CRON_SECRET })
-    });
-    const result = await response.json();
-    console.log('✅ [Cron] نتيجة توزيع الأرباح:', result);
-  } catch (error) {
-    console.error('❌ [Cron] خطأ في توزيع الأرباح:', error);
-  }
-});
-
-cron.schedule('0 * * * *', async () => {
-  console.log('🔄 [Cron] جاري فحص رصيد BNB...');
-  const bnbStatus = await bsc.checkBNBBalance();
-  if (bnbStatus.isLow) {
-    await bsc.sendAlert(`⚠️ تنبيه: رصيد BNB منخفض! ${bnbStatus.balance} BNB متاح (الحد الأدنى: ${bnbStatus.minRequired} BNB)`);
-  }
-});
+  console.log('🔄 [Cron] جاري فحص الإ
