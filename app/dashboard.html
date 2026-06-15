@@ -283,7 +283,6 @@
       cursor: pointer;
     }
     .error-title { color: #ff4444 !important; }
-    .error-modal-content { text-align: center; }
     .error-icon { font-size: 48px; margin-bottom: 16px; }
     .hidden { display: none; }
     
@@ -470,10 +469,10 @@
     // ========================================
     const translations = {
       ar: {
-        logoText: ' CryptoInvest',
-        supportText: ' الدعم',
+        logoText: '💰 CryptoInvest',
+        supportText: '💬 الدعم',
         logoutText: '🚪 خروج',
-        themeDark: ' وضع ليلي',
+        themeDark: '🌙 وضع ليلي',
         themeLight: '☀️ وضع نهاري',
         navHome: 'البيت',
         navVip: 'VIP',
@@ -520,11 +519,16 @@
         groupVolume: 'حجم الفريق',
         referralsList: '📋 قائمة المحالين',
         noReferrals: 'لا يوجد محالين',
+        totalCommissions: '💰 إجمالي العمولات',
+        commissionsCount: '🎁 عدد العمولات',
+        commissionsHistory: '💰 سجل العمولات',
+        fromDepositOf: 'من إيداع',
         profileTitle: '📋 سجل العمليات',
         noTransactions: 'لا توجد معاملات بعد',
         typeDeposit: '💰 إيداع',
         typeWithdraw: '📤 سحب',
         typeProfit: '📈 ربح',
+        typeCommission: '🎁 عمولة إحالة',
         typeVipUpgrade: '👑 ترقية VIP',
         statusApproved: '✅ مقبول',
         statusPending: '⏳ قيد الانتظار',
@@ -601,11 +605,16 @@
         groupVolume: 'Group Volume',
         referralsList: '📋 Referrals List',
         noReferrals: 'No referrals yet',
+        totalCommissions: '💰 Total Commissions',
+        commissionsCount: '🎁 Commissions Count',
+        commissionsHistory: '💰 Commissions History',
+        fromDepositOf: 'from deposit of',
         profileTitle: '📋 Transaction History',
         noTransactions: 'No transactions yet',
         typeDeposit: '💰 Deposit',
         typeWithdraw: '📤 Withdrawal',
         typeProfit: '📈 Profit',
+        typeCommission: '🎁 Referral Commission',
         typeVipUpgrade: '👑 VIP Upgrade',
         statusApproved: '✅ Approved',
         statusPending: '⏳ Pending',
@@ -782,6 +791,24 @@
           btn.classList.add('active');
         }
       });
+    }
+
+    // ========================================
+    // دالة جلب العمولات
+    // ========================================
+    async function loadCommissions() {
+      try {
+        const res = await fetch(`${API_URL}/api/my-commissions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId })
+        });
+        const data = await res.json();
+        return data;
+      } catch (error) {
+        console.error('Error loading commissions:', error);
+        return { commissions: [], total_earned: 0 };
+      }
     }
 
     async function renderDashboard() {
@@ -1204,23 +1231,70 @@
 
     async function renderReferrals() {
       const t = translations[currentLang];
+      
+      // جلب بيانات الإحالات
       const res = await fetch(`${API_URL}/api/referrals`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId })
       });
       const data = await res.json();
+      
+      // جلب بيانات العمولات
+      const commissionsData = await loadCommissions();
+      
       document.getElementById('mainContent').innerHTML = `
         <div class="card">
-          <div class="card-title">${t.referralTitle}</div>
+          <div class="card-title">🔗 ${t.referralTitle}</div>
           <code style="color:#00ff66; word-break:break-all;">${window.location.origin}?ref=${userData?.referral_code}</code>
-          <button class="btn-copy" id="copyLinkBtn">${t.copyLink}</button>
+          <button class="btn-copy" id="copyLinkBtn">📋 ${t.copyLink}</button>
         </div>
+        
         <div class="stats-grid">
-          <div class="stat-card"><div class="stat-value">${data.count || 0}</div><div class="stat-label">${t.referralsCount}</div></div>
-          <div class="stat-card"><div class="stat-value">${(data.groupBalance || 0).toFixed(2)} USDT</div><div class="stat-label">${t.groupVolume}</div></div>
+          <div class="stat-card">
+            <div class="stat-value">${data.count || 0}</div>
+            <div class="stat-label">👥 ${t.referralsCount}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">${(data.groupBalance || 0).toFixed(2)} USDT</div>
+            <div class="stat-label">📊 ${t.groupVolume}</div>
+          </div>
         </div>
-        <div class="card"><div class="card-title">${t.referralsList}</div><div id="referralsList"></div></div>
+        
+        <div class="stats-grid">
+          <div class="stat-card" style="border-color:#ffcc00;">
+            <div class="stat-value" style="color:#ffcc00;">${commissionsData.total_earned.toFixed(2)} USDT</div>
+            <div class="stat-label">💰 ${t.totalCommissions}</div>
+          </div>
+          <div class="stat-card" style="border-color:#ffcc00;">
+            <div class="stat-value" style="color:#ffcc00;">${commissionsData.commissions.length || 0}</div>
+            <div class="stat-label">🎁 ${t.commissionsCount}</div>
+          </div>
+        </div>
+        
+        <div class="card">
+          <div class="card-title">📋 ${t.referralsList}</div>
+          <div id="referralsList"></div>
+        </div>
+        
+        ${commissionsData.commissions.length > 0 ? `
+        <div class="card">
+          <div class="card-title">💰 ${t.commissionsHistory}</div>
+          <div id="commissionsList">
+            ${commissionsData.commissions.map(c => `
+              <div style="background:#0a0a0f; padding:12px; border-radius:12px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                  <div style="color:#00ff66; font-weight:bold;">💰 ${c.commission_amount.toFixed(2)} USDT</div>
+                  <div style="font-size:11px; color:#8899aa;">${new Date(c.created_at).toLocaleDateString(currentLang === 'ar' ? 'ar' : 'en')}</div>
+                </div>
+                <div style="text-align:left; font-size:12px; color:#ffcc00;">
+                  ${t.fromDepositOf} ${c.deposit_amount.toFixed(2)} USDT
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+        ` : ''}
       `;
       
       document.getElementById('copyLinkBtn').onclick = () => {
@@ -1282,6 +1356,7 @@
                     (txn.type === 'deposit' ? '✅ تم الإيداع' : 
                      txn.type === 'withdraw' ? '✅ تم السحب' : 
                      txn.type === 'vip_upgrade' ? '👑 تم الترقية' :
+                     txn.type === 'commission' ? '🎁 عمولة إحالة' :
                      '✅ تم الربح') : 
                     '⏳ قيد الانتظار'}
                 </div>
