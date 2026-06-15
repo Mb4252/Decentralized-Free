@@ -686,7 +686,7 @@
         const data = await res.json();
         if (data.error) { localStorage.clear(); window.location.href = '/'; return; }
         userData = data;
-        document.getElementById('userName').innerHTML = `👋 ${userData.name}`;
+        document.getElementById('userName').innerHTML = ` ${userData.name}`;
         
         const vipRes = await fetch(`${API_URL}/api/vip-packages`);
         vipPackages = await vipRes.json();
