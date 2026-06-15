@@ -95,21 +95,10 @@
     <div class="message">
       يا ابراهيم<br>
       دا حرام عديل<br>
-      <small>وربا ودا اكل مال ناس الله بينا وبينو</small>
+      <small>وربا واكل اموال ناس بي الباطل الله بينا وبينو</small>
     </div>
-    <button class="button" onclick="window.close()">فهمت</button>
+    <button class="button" onclick="window.location.href='/'">فهمت</button>
     <div class="footer">هذه رسالة تحذيرية</div>
   </div>
-
-  <script>
-    // يمكن إغلاق النافذة أو العودة للصفحة السابقة
-    document.querySelector('.button').onclick = function() {
-      if (window.history.length > 1) {
-        window.history.back();
-      } else {
-        window.close();
-      }
-    };
-  </script>
 </body>
 </html>
