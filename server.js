@@ -35,6 +35,109 @@ function generateUUID() {
 }
 
 // ========================================
+// دالة منح العمولة للمحيل (10% من أول إيداع)
+// ========================================
+async function giveReferralCommission(referredUserId, depositAmount) {
+  try {
+    // 1. جلب بيانات المحال
+    const { data: referredUser } = await supabaseAdmin
+      .from('users')
+      .select('id, name, referrer_id, first_deposit_commission_paid, first_deposit_amount')
+      .eq('id', referredUserId)
+      .single();
+    
+    if (!referredUser) {
+      return { success: false, message: 'المستخدم غير موجود' };
+    }
+    
+    // 2. التحقق من وجود محيل
+    if (!referredUser.referrer_id) {
+      console.log('❌ لا يوجد محيل لهذا المستخدم');
+      return { success: false, message: 'لا يوجد محيل' };
+    }
+    
+    // 3. التحقق من عدم دفع العمولة مسبقاً
+    if (referredUser.first_deposit_commission_paid) {
+      console.log('⚠️ تم دفع العمولة بالفعل لهذا المستخدم');
+      return { success: false, message: 'تم دفع العمولة مسبقاً' };
+    }
+    
+    // 4. جلب بيانات المحيل
+    const { data: referrer } = await supabaseAdmin
+      .from('users')
+      .select('id, name, available_balance, total_commissions_earned')
+      .eq('id', referredUser.referrer_id)
+      .single();
+    
+    if (!referrer) {
+      return { success: false, message: 'المحيل غير موجود' };
+    }
+    
+    // 5. حساب العمولة (10%)
+    const commissionPercent = 10;
+    const commissionAmount = depositAmount * (commissionPercent / 100);
+    
+    // 6. تحديث رصيد المحيل
+    const newBalance = (referrer.available_balance || 0) + commissionAmount;
+    const newTotalCommissions = (referrer.total_commissions_earned || 0) + commissionAmount;
+    
+    await supabaseAdmin
+      .from('users')
+      .update({ 
+        available_balance: newBalance,
+        total_commissions_earned: newTotalCommissions
+      })
+      .eq('id', referrer.id);
+    
+    // 7. تحديث حالة المحال (تم دفع العمولة)
+    await supabaseAdmin
+      .from('users')
+      .update({ 
+        first_deposit_amount: depositAmount,
+        first_deposit_commission_paid: true 
+      })
+      .eq('id', referredUserId);
+    
+    // 8. تسجيل العمولة في جدول commissions
+    await supabaseAdmin
+      .from('referral_commissions')
+      .insert({
+        referrer_id: referrer.id,
+        referred_id: referredUserId,
+        deposit_amount: depositAmount,
+        commission_amount: commissionAmount,
+        commission_percent: commissionPercent,
+        created_at: new Date().toISOString()
+      });
+    
+    // 9. تسجيل معاملة العمولة
+    await supabaseAdmin
+      .from('transactions')
+      .insert({
+        user_id: referrer.id,
+        type: 'commission',
+        amount: commissionAmount,
+        status: 'approved',
+        description: `💰 عمولة 10% من أول إيداع للمستخدم ${referredUser.name} (${depositAmount} USDT)`,
+        created_at: new Date().toISOString()
+      });
+    
+    console.log(`✅ تم منح ${commissionAmount.toFixed(2)} USDT عمولة للمحيل ${referrer.name}`);
+    
+    return { 
+      success: true, 
+      commissionAmount: commissionAmount,
+      referrerName: referrer.name,
+      message: `تم منح ${commissionAmount.toFixed(2)} USDT عمولة للمحيل ${referrer.name}`
+    };
+    
+  } catch (error) {
+    console.error('خطأ في منح العمولة:', error);
+    return { success: false, message: error.message };
+  }
+}
+
+// ========================================
 // دالة لتحديث مستوى VIP بناءً على إجمالي الإيداع
 // ========================================
 async function updateVIPLevel(userId, totalDeposits) {
@@ -365,6 +468,22 @@ app.post('/api/deposit', async (req, res) => {
       message += ` 💰 تم إضافة المبلغ إلى استثمارك النشط.`;
     }
     
+    // ========================================
+    // منح العمولة للمحيل (10% من أول إيداع)
+    // ========================================
+    const { data: depositCount, count } = await supabaseAdmin
+      .from('deposit_requests')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId);
+    
+    // إذا كان هذا هو أول إيداع (عدد الإيداعات قبل هذا = 0)
+    if (count === 1) {
+      const commissionResult = await giveReferralCommission(userId, actualAmount);
+      if (commissionResult.success) {
+        message += ` 🎉 تم منح ${commissionResult.commissionAmount.toFixed(2)} USDT عمولة للمحيل الذي دعاك!`;
+      }
+    }
+    
     const { newLevel, unlockedPackage } = await updateVIPLevel(userId, newTotalDeposits);
     
     if (newLevel > (user?.vip_level || 0) && unlockedPackage) {
@@ -485,18 +604,16 @@ app.post('/api/withdraw', async (req, res) => {
 });
 
 // ========================================
-// API: التحقق من الإيداع (معدل)
+// API: التحقق من الإيداع
 // ========================================
 app.post('/api/verify-deposit', async (req, res) => {
   const { userId, transactionHash, amount } = req.body;
   
-  // تعديل: جعل amount اختيارياً للتحقق فقط
   if (!userId || !transactionHash) {
     return res.status(400).json({ error: 'userId و transactionHash مطلوبان' });
   }
   
   try {
-    // التحقق من عدم استخدام الهاش مسبقاً
     const { data: existingHash } = await supabaseAdmin
       .from('deposit_requests')
       .select('id, amount, transaction_hash')
@@ -512,7 +629,6 @@ app.post('/api/verify-deposit', async (req, res) => {
       });
     }
     
-    // التحقق من صحة المعاملة على الشبكة
     const verification = await bsc.verifyTransaction(transactionHash, amount || 0, bsc.HOT_WALLET_ADDRESS);
     
     if (!verification.success) {
@@ -617,6 +733,9 @@ app.post('/api/register', async (req, res) => {
       total_invested: 0,
       total_withdrawn: 0,
       qualifying_deposit: false,
+      first_deposit_amount: 0,
+      first_deposit_commission_paid: false,
+      total_commissions_earned: 0,
       created_at: new Date().toISOString()
     });
   
@@ -785,6 +904,38 @@ app.post('/api/referrals', async (req, res) => {
 });
 
 // ========================================
+// API: جلب عمولات المستخدم
+// ========================================
+app.post('/api/my-commissions', async (req, res) => {
+  const { userId } = req.body;
+  
+  if (!userId) {
+    return res.status(400).json({ error: 'userId مطلوب' });
+  }
+  
+  const { data, error } = await supabaseAdmin
+    .from('referral_commissions')
+    .select('*')
+    .eq('referrer_id', userId)
+    .order('created_at', { ascending: false });
+  
+  if (error) {
+    return res.status(500).json({ error: error.message });
+  }
+  
+  const { data: user } = await supabaseAdmin
+    .from('users')
+    .select('total_commissions_earned')
+    .eq('id', userId)
+    .single();
+  
+  res.json({ 
+    commissions: data || [], 
+    total_earned: user?.total_commissions_earned || 0 
+  });
+});
+
+// ========================================
 // API: جلب سجل المعاملات
 // ========================================
 app.post('/api/transactions', async (req, res) => {
@@ -828,6 +979,11 @@ app.post('/api/my-transactions', async (req, res) => {
     .select('id, amount, created_at, status, description')
     .eq('user_id', userId)
     .eq('type', 'profit');
+  
+  const { data: commissions } = await supabaseAdmin
+    .from('referral_commissions')
+    .select('*')
+    .eq('referrer_id', userId);
   
   const { data: vipUpgrades } = await supabaseAdmin
     .from('package_subscriptions')
@@ -877,6 +1033,21 @@ app.post('/api/my-transactions', async (req, res) => {
         date: p.created_at,
         status: p.status || 'approved',
         reference: null
+      });
+    });
+  }
+  
+  if (commissions) {
+    commissions.forEach(c => {
+      transactions.push({
+        id: c.id,
+        type: 'commission',
+        type_ar: '🎁 عمولة إحالة',
+        type_en: '🎁 Referral Commission',
+        amount: c.commission_amount,
+        date: c.created_at,
+        status: 'approved',
+        reference: `من إيداع ${c.deposit_amount} USDT`
       });
     });
   }
