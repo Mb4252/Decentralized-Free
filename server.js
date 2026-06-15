@@ -39,30 +39,20 @@ function generateUUID() {
 // ========================================
 async function giveReferralCommission(referredUserId, depositAmount) {
   try {
-    // 1. جلب بيانات المحال
     const { data: referredUser } = await supabaseAdmin
       .from('users')
       .select('id, name, referrer_id, first_deposit_commission_paid, first_deposit_amount')
       .eq('id', referredUserId)
       .single();
     
-    if (!referredUser) {
-      return { success: false, message: 'المستخدم غير موجود' };
-    }
-    
-    // 2. التحقق من وجود محيل
-    if (!referredUser.referrer_id) {
-      console.log('❌ لا يوجد محيل لهذا المستخدم');
+    if (!referredUser || !referredUser.referrer_id) {
       return { success: false, message: 'لا يوجد محيل' };
     }
     
-    // 3. التحقق من عدم دفع العمولة مسبقاً
     if (referredUser.first_deposit_commission_paid) {
-      console.log('⚠️ تم دفع العمولة بالفعل لهذا المستخدم');
       return { success: false, message: 'تم دفع العمولة مسبقاً' };
     }
     
-    // 4. جلب بيانات المحيل
     const { data: referrer } = await supabaseAdmin
       .from('users')
       .select('id, name, available_balance, total_commissions_earned')
@@ -73,11 +63,9 @@ async function giveReferralCommission(referredUserId, depositAmount) {
       return { success: false, message: 'المحيل غير موجود' };
     }
     
-    // 5. حساب العمولة (10%)
     const commissionPercent = 10;
     const commissionAmount = depositAmount * (commissionPercent / 100);
     
-    // 6. تحديث رصيد المحيل
     const newBalance = (referrer.available_balance || 0) + commissionAmount;
     const newTotalCommissions = (referrer.total_commissions_earned || 0) + commissionAmount;
     
@@ -89,7 +77,6 @@ async function giveReferralCommission(referredUserId, depositAmount) {
       })
       .eq('id', referrer.id);
     
-    // 7. تحديث حالة المحال (تم دفع العمولة)
     await supabaseAdmin
       .from('users')
       .update({ 
@@ -98,7 +85,6 @@ async function giveReferralCommission(referredUserId, depositAmount) {
       })
       .eq('id', referredUserId);
     
-    // 8. تسجيل العمولة في جدول commissions
     await supabaseAdmin
       .from('referral_commissions')
       .insert({
@@ -110,7 +96,6 @@ async function giveReferralCommission(referredUserId, depositAmount) {
         created_at: new Date().toISOString()
       });
     
-    // 9. تسجيل معاملة العمولة
     await supabaseAdmin
       .from('transactions')
       .insert({
@@ -127,8 +112,7 @@ async function giveReferralCommission(referredUserId, depositAmount) {
     return { 
       success: true, 
       commissionAmount: commissionAmount,
-      referrerName: referrer.name,
-      message: `تم منح ${commissionAmount.toFixed(2)} USDT عمولة للمحيل ${referrer.name}`
+      referrerName: referrer.name
     };
     
   } catch (error) {
@@ -161,7 +145,7 @@ async function updateVIPLevel(userId, totalDeposits) {
   
   const { data: user } = await supabaseAdmin
     .from('users')
-    .select('vip_level, total_invested, current_package_started_at')
+    .select('vip_level, total_invested')
     .eq('id', userId)
     .single();
   
@@ -197,10 +181,10 @@ async function updateVIPLevel(userId, totalDeposits) {
         created_at: new Date().toISOString()
       });
     
-    return { newLevel: newVipLevel, unlockedPackage, byDeposit: true };
+    return { newLevel: newVipLevel, unlockedPackage };
   }
   
-  return { newLevel: user?.vip_level || 0, unlockedPackage: null, byDeposit: false };
+  return { newLevel: user?.vip_level || 0, unlockedPackage: null };
 }
 
 // ========================================
@@ -279,7 +263,7 @@ app.post('/api/upgrade-vip', async (req, res) => {
       return res.status(400).json({ error: 'أنت بالفعل في هذا المستوى أو أعلى' });
     }
     
-    if (packageLevel > user.vip_level + 1) {
+    if (packageLevel > user.vip_level + 1 && user.vip_level > 0) {
       return res.status(400).json({ error: '⚠️ يجب ترقية المستويات السابقة أولاً!' });
     }
     
@@ -362,7 +346,7 @@ app.post('/api/upgrade-vip', async (req, res) => {
 });
 
 // ========================================
-// API: الإيداع
+// API: الإيداع (معدل للقبول بأقل من 10$ مع رصيد ولكن بدون أرباح)
 // ========================================
 app.post('/api/deposit', async (req, res) => {
   const { userId, amount, transactionHash } = req.body;
@@ -376,6 +360,28 @@ app.post('/api/deposit', async (req, res) => {
   }
   
   try {
+    // جلب بيانات المستخدم
+    const { data: user } = await supabaseAdmin
+      .from('users')
+      .select('*')
+      .eq('id', userId)
+      .single();
+    
+    if (!user) {
+      return res.status(404).json({ error: 'المستخدم غير موجود' });
+    }
+    
+    // تحديد الحد الأدنى للمستخدم (استثنائي أو عادي)
+    const minDeposit = user.custom_min_deposit || 10;
+    const isExceptional = user.is_exceptional || false;
+    
+    // التحقق من المبلغ بالنسبة للحد الأدنى للمستخدم
+    if (amount < minDeposit) {
+      return res.status(400).json({ 
+        error: `⚠️ الحد الأدنى للإيداع هو ${minDeposit} USDT${isExceptional ? ' (حساب تجريبي)' : ''}` 
+      });
+    }
+    
     // التحقق من عدم استخدام الهاش مسبقاً
     const { data: existingHash } = await supabaseAdmin
       .from('deposit_requests')
@@ -386,11 +392,11 @@ app.post('/api/deposit', async (req, res) => {
     if (existingHash) {
       return res.status(400).json({ 
         error: '⚠️ هذا Transaction Hash تم استخدامه مسبقاً في إيداع سابق! لا يمكن استخدام نفس الهاش مرتين.',
-        usedBefore: true,
-        previousAmount: existingHash.amount
+        usedBefore: true
       });
     }
     
+    // التحقق من صحة المعاملة على الشبكة
     const verification = await bsc.verifyTransaction(transactionHash, amount, bsc.HOT_WALLET_ADDRESS);
     
     if (!verification.success) {
@@ -399,6 +405,7 @@ app.post('/api/deposit', async (req, res) => {
     
     const actualAmount = verification.amount || amount;
     
+    // إنشاء سجل الإيداع
     const { data: deposit, error: depositError } = await supabaseAdmin
       .from('deposit_requests')
       .insert({ 
@@ -416,47 +423,58 @@ app.post('/api/deposit', async (req, res) => {
       return res.status(500).json({ error: depositError.message });
     }
     
-    const { data: user } = await supabaseAdmin
-      .from('users')
-      .select('active_deposit, total_deposits, available_balance, vip_level, total_invested, qualifying_deposit')
-      .eq('id', userId)
-      .single();
-    
     const newTotalDeposits = (user?.total_deposits || 0) + actualAmount;
     
+    // تحديث إجمالي الإيداعات
     await supabaseAdmin
       .from('users')
       .update({ total_deposits: newTotalDeposits })
       .eq('id', userId);
     
-    const qualifies = newTotalDeposits >= 10;
+    // التحقق من التأهيل للأرباح (10 دولار للمستخدم العادي، أو تلقائي للمستخدم الاستثنائي)
+    const qualifies = (newTotalDeposits >= 10) || isExceptional;
     let message = `✅ تم إضافة ${actualAmount} USDT إلى حسابك!`;
     
-    if (!qualifies) {
+    // الحالة 1: المستخدم غير مؤهل بعد (أقل من 10$ وليس استثنائياً)
+    if (!qualifies && !isExceptional) {
       const remaining = 10 - newTotalDeposits;
       message += ` ⚠️ تحتاج إلى إيداع ${remaining.toFixed(2)} USDT إضافية لتفعيل الأرباح اليومية.`;
       
       await supabaseAdmin
         .from('users')
-        .update({ available_balance: (user?.available_balance || 0) + actualAmount })
+        .update({ 
+          available_balance: (user?.available_balance || 0) + actualAmount 
+        })
         .eq('id', userId);
         
-    } else if (qualifies && !user?.qualifying_deposit) {
-      const newActiveDeposit = newTotalDeposits;
+    } 
+    // الحالة 2: أصبح مؤهلاً الآن (وصل لـ10$ أو استثنائي)
+    else if (qualifies && !user?.qualifying_deposit) {
+      const newActiveDeposit = (user?.active_deposit || 0) + (isExceptional ? newTotalDeposits : actualAmount);
+      const newTotalInvested = (user?.total_invested || 0) + (isExceptional ? newTotalDeposits : actualAmount);
+      
       await supabaseAdmin
         .from('users')
         .update({ 
           qualifying_deposit: true,
           active_deposit: newActiveDeposit,
-          total_invested: newActiveDeposit,
+          total_invested: newTotalInvested,
           available_balance: (user?.available_balance || 0) + actualAmount,
           last_profit_date: new Date().toISOString().split('T')[0]
         })
         .eq('id', userId);
-      message += ` 🎉 تهانينا! أصبحت مؤهلاً للأرباح اليومية بنسبة 2%!`;
-    } else if (qualifies && user?.qualifying_deposit) {
+      
+      if (isExceptional) {
+        message += ` 🎉 مرحباً بك في الحساب التجريبي! يمكنك الآن سحب أرباحك وتجربة النظام.`;
+      } else {
+        message += ` 🎉 تهانينا! أصبحت مؤهلاً للأرباح اليومية بنسبة 2%!`;
+      }
+    } 
+    // الحالة 3: مستخدم مؤهل بالفعل
+    else if (user?.qualifying_deposit) {
       const newActiveDeposit = (user?.active_deposit || 0) + actualAmount;
       const newTotalInvested = (user?.total_invested || 0) + actualAmount;
+      
       await supabaseAdmin
         .from('users')
         .update({ 
@@ -465,31 +483,32 @@ app.post('/api/deposit', async (req, res) => {
           available_balance: (user?.available_balance || 0) + actualAmount
         })
         .eq('id', userId);
+      
       message += ` 💰 تم إضافة المبلغ إلى استثمارك النشط.`;
     }
     
-    // ========================================
-    // منح العمولة للمحيل (10% من أول إيداع)
-    // ========================================
+    // منح العمولة للمحيل (فقط للإيداعات التي تزيد عن 10$ أو للمستخدم الاستثنائي)
     const { data: depositCount, count } = await supabaseAdmin
       .from('deposit_requests')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId);
     
-    // إذا كان هذا هو أول إيداع (عدد الإيداعات قبل هذا = 0)
-    if (count === 1) {
+    if (count === 1 && (actualAmount >= 10 || isExceptional)) {
       const commissionResult = await giveReferralCommission(userId, actualAmount);
       if (commissionResult.success) {
         message += ` 🎉 تم منح ${commissionResult.commissionAmount.toFixed(2)} USDT عمولة للمحيل الذي دعاك!`;
       }
     }
     
-    const { newLevel, unlockedPackage } = await updateVIPLevel(userId, newTotalDeposits);
-    
-    if (newLevel > (user?.vip_level || 0) && unlockedPackage) {
-      message += ` 🎉🎉🎉 تم فتح باقة ${unlockedPackage.name} تلقائياً! نسبة أرباحك الآن ${unlockedPackage.roi_percent}% يومياً!`;
+    // تحديث مستوى VIP تلقائياً (للمستخدم العادي فقط)
+    if (!isExceptional) {
+      const { newLevel, unlockedPackage } = await updateVIPLevel(userId, newTotalDeposits);
+      if (newLevel > (user?.vip_level || 0) && unlockedPackage) {
+        message += ` 🎉🎉🎉 تم فتح باقة ${unlockedPackage.name} تلقائياً! نسبة أرباحك الآن ${unlockedPackage.roi_percent}% يومياً!`;
+      }
     }
     
+    // تسجيل معاملة الإيداع
     await supabaseAdmin
       .from('transactions')
       .insert({
@@ -498,7 +517,7 @@ app.post('/api/deposit', async (req, res) => {
         amount: actualAmount,
         status: 'approved',
         reference_id: deposit.id,
-        description: `💰 إيداع ${actualAmount} USDT`,
+        description: `💰 إيداع ${actualAmount} USDT${isExceptional ? ' (حساب تجريبي)' : ''}`,
         created_at: new Date().toISOString()
       });
     
@@ -509,8 +528,8 @@ app.post('/api/deposit', async (req, res) => {
       verification: verification,
       qualifies: qualifies,
       totalDeposits: newTotalDeposits,
-      remainingToQualify: qualifies ? 0 : (10 - newTotalDeposits),
-      newVipLevel: newLevel
+      isExceptional: isExceptional,
+      remainingToQualify: qualifies ? 0 : (10 - newTotalDeposits)
     });
     
   } catch (error) {
@@ -624,8 +643,7 @@ app.post('/api/verify-deposit', async (req, res) => {
       return res.status(400).json({ 
         success: false, 
         error: '⚠️ هذا Transaction Hash تم استخدامه مسبقاً في إيداع سابق! لا يمكن استخدام نفس الهاش مرتين.',
-        usedBefore: true,
-        previousAmount: existingHash.amount
+        usedBefore: true
       });
     }
     
@@ -733,6 +751,8 @@ app.post('/api/register', async (req, res) => {
       total_invested: 0,
       total_withdrawn: 0,
       qualifying_deposit: false,
+      custom_min_deposit: 10,
+      is_exceptional: false,
       first_deposit_amount: 0,
       first_deposit_commission_paid: false,
       total_commissions_earned: 0,
