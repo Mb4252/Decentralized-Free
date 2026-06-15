@@ -374,7 +374,7 @@
   <div class="navbar">
     <div class="logo">💰 <span id="logoText">CryptoInvest</span></div>
     <div class="user-actions">
-      <button class="theme-toggle" id="themeToggleBtn">🌙 <span id="themeText">وضع ليلي</span></button>
+      <button class="theme-toggle" id="themeToggleBtn"> <span id="themeText">وضع ليلي</span></button>
       <button class="lang-btn-header" id="langToggleBtn">🇸🇦 العربية</button>
       <button class="support-btn" id="supportBtn">💬 <span id="supportText">الدعم</span></button>
       <span class="user-name" id="userName"></span>
@@ -790,11 +790,11 @@
       document.getElementById('mainContent').innerHTML = `
         <div class="card">
           <div class="assets-amount">${(active+avail).toFixed(2)} USDT</div>
-          <div class="detail-row"><span>💰 ${t.activeInvestment}</span><span class="detail-value">${active.toFixed(2)} USDT</span></div>
-          <div class="detail-row"><span>💎 ${t.availableBalance}</span><span class="detail-value">${avail.toFixed(2)} USDT</span></div>
-          <div class="detail-row"><span>💼 ${t.investedAmount}</span><span class="detail-value">${totalInvested.toFixed(2)} USDT</span></div>
-          <div class="detail-row"><span>📊 ${t.totalDeposits}</span><span class="detail-value">${totalDeposit.toFixed(2)} USDT</span></div>
-          <div class="detail-row"><span>📤 ${t.totalWithdrawals}</span><span class="detail-value">${totalWithdraw.toFixed(2)} USDT</span></div>
+          <div class="detail-row"><span> ${t.activeInvestment}</span><span class="detail-value">${active.toFixed(2)} USDT</span></div>
+          <div class="detail-row"><span> ${t.availableBalance}</span><span class="detail-value">${avail.toFixed(2)} USDT</span></div>
+          <div class="detail-row"><span> ${t.investedAmount}</span><span class="detail-value">${totalInvested.toFixed(2)} USDT</span></div>
+          <div class="detail-row"><span> ${t.totalDeposits}</span><span class="detail-value">${totalDeposit.toFixed(2)} USDT</span></div>
+          <div class="detail-row"><span> ${t.totalWithdrawals}</span><span class="detail-value">${totalWithdraw.toFixed(2)} USDT</span></div>
           
           ${qualifying ? `
             <div class="current-package-info" style="margin-top:16px;">
