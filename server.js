@@ -346,7 +346,7 @@ app.post('/api/upgrade-vip', async (req, res) => {
 });
 
 // ========================================
-// API: الإيداع (معدل للقبول بأقل من 10$ مع رصيد ولكن بدون أرباح)
+// API: الإيداع
 // ========================================
 app.post('/api/deposit', async (req, res) => {
   const { userId, amount, transactionHash } = req.body;
@@ -356,11 +356,10 @@ app.post('/api/deposit', async (req, res) => {
   }
   
   if (!transactionHash || transactionHash.length < 10) {
-    return res.status(400).json({ error: '⚠️ Transaction Hash مطلوب' });
+    return res.status(400).json({ error: '⚠️ TXID مطلوب' });
   }
   
   try {
-    // جلب بيانات المستخدم
     const { data: user } = await supabaseAdmin
       .from('users')
       .select('*')
@@ -371,18 +370,15 @@ app.post('/api/deposit', async (req, res) => {
       return res.status(404).json({ error: 'المستخدم غير موجود' });
     }
     
-    // تحديد الحد الأدنى للمستخدم (استثنائي أو عادي)
     const minDeposit = user.custom_min_deposit || 10;
     const isExceptional = user.is_exceptional || false;
     
-    // التحقق من المبلغ بالنسبة للحد الأدنى للمستخدم
     if (amount < minDeposit) {
       return res.status(400).json({ 
         error: `⚠️ الحد الأدنى للإيداع هو ${minDeposit} USDT${isExceptional ? ' (حساب تجريبي)' : ''}` 
       });
     }
     
-    // التحقق من عدم استخدام الهاش مسبقاً
     const { data: existingHash } = await supabaseAdmin
       .from('deposit_requests')
       .select('id, amount, transaction_hash')
@@ -391,12 +387,11 @@ app.post('/api/deposit', async (req, res) => {
     
     if (existingHash) {
       return res.status(400).json({ 
-        error: '⚠️ هذا Transaction Hash تم استخدامه مسبقاً في إيداع سابق! لا يمكن استخدام نفس الهاش مرتين.',
+        error: '⚠️ هذا الـ TXID تم استخدامه مسبقاً في إيداع سابق! لا يمكن استخدام نفس TXID مرتين.',
         usedBefore: true
       });
     }
     
-    // التحقق من صحة المعاملة على الشبكة
     const verification = await bsc.verifyTransaction(transactionHash, amount, bsc.HOT_WALLET_ADDRESS);
     
     if (!verification.success) {
@@ -405,7 +400,6 @@ app.post('/api/deposit', async (req, res) => {
     
     const actualAmount = verification.amount || amount;
     
-    // إنشاء سجل الإيداع
     const { data: deposit, error: depositError } = await supabaseAdmin
       .from('deposit_requests')
       .insert({ 
@@ -425,17 +419,14 @@ app.post('/api/deposit', async (req, res) => {
     
     const newTotalDeposits = (user?.total_deposits || 0) + actualAmount;
     
-    // تحديث إجمالي الإيداعات
     await supabaseAdmin
       .from('users')
       .update({ total_deposits: newTotalDeposits })
       .eq('id', userId);
     
-    // التحقق من التأهيل للأرباح (10 دولار للمستخدم العادي، أو تلقائي للمستخدم الاستثنائي)
     const qualifies = (newTotalDeposits >= 10) || isExceptional;
     let message = `✅ تم إضافة ${actualAmount} USDT إلى حسابك!`;
     
-    // الحالة 1: المستخدم غير مؤهل بعد (أقل من 10$ وليس استثنائياً)
     if (!qualifies && !isExceptional) {
       const remaining = 10 - newTotalDeposits;
       message += ` ⚠️ تحتاج إلى إيداع ${remaining.toFixed(2)} USDT إضافية لتفعيل الأرباح اليومية.`;
@@ -447,9 +438,7 @@ app.post('/api/deposit', async (req, res) => {
         })
         .eq('id', userId);
         
-    } 
-    // الحالة 2: أصبح مؤهلاً الآن (وصل لـ10$ أو استثنائي)
-    else if (qualifies && !user?.qualifying_deposit) {
+    } else if (qualifies && !user?.qualifying_deposit) {
       const newActiveDeposit = (user?.active_deposit || 0) + (isExceptional ? newTotalDeposits : actualAmount);
       const newTotalInvested = (user?.total_invested || 0) + (isExceptional ? newTotalDeposits : actualAmount);
       
@@ -469,9 +458,7 @@ app.post('/api/deposit', async (req, res) => {
       } else {
         message += ` 🎉 تهانينا! أصبحت مؤهلاً للأرباح اليومية بنسبة 2%!`;
       }
-    } 
-    // الحالة 3: مستخدم مؤهل بالفعل
-    else if (user?.qualifying_deposit) {
+    } else if (user?.qualifying_deposit) {
       const newActiveDeposit = (user?.active_deposit || 0) + actualAmount;
       const newTotalInvested = (user?.total_invested || 0) + actualAmount;
       
@@ -487,7 +474,6 @@ app.post('/api/deposit', async (req, res) => {
       message += ` 💰 تم إضافة المبلغ إلى استثمارك النشط.`;
     }
     
-    // منح العمولة للمحيل (فقط للإيداعات التي تزيد عن 10$ أو للمستخدم الاستثنائي)
     const { data: depositCount, count } = await supabaseAdmin
       .from('deposit_requests')
       .select('id', { count: 'exact', head: true })
@@ -500,7 +486,6 @@ app.post('/api/deposit', async (req, res) => {
       }
     }
     
-    // تحديث مستوى VIP تلقائياً (للمستخدم العادي فقط)
     if (!isExceptional) {
       const { newLevel, unlockedPackage } = await updateVIPLevel(userId, newTotalDeposits);
       if (newLevel > (user?.vip_level || 0) && unlockedPackage) {
@@ -508,7 +493,6 @@ app.post('/api/deposit', async (req, res) => {
       }
     }
     
-    // تسجيل معاملة الإيداع
     await supabaseAdmin
       .from('transactions')
       .insert({
@@ -629,7 +613,7 @@ app.post('/api/verify-deposit', async (req, res) => {
   const { userId, transactionHash, amount } = req.body;
   
   if (!userId || !transactionHash) {
-    return res.status(400).json({ error: 'userId و transactionHash مطلوبان' });
+    return res.status(400).json({ error: 'userId و TXID مطلوبان' });
   }
   
   try {
@@ -642,7 +626,7 @@ app.post('/api/verify-deposit', async (req, res) => {
     if (existingHash) {
       return res.status(400).json({ 
         success: false, 
-        error: '⚠️ هذا Transaction Hash تم استخدامه مسبقاً في إيداع سابق! لا يمكن استخدام نفس الهاش مرتين.',
+        error: '⚠️ هذا الـ TXID تم استخدامه مسبقاً في إيداع سابق! لا يمكن استخدام نفس TXID مرتين.',
         usedBefore: true
       });
     }
@@ -661,6 +645,58 @@ app.post('/api/verify-deposit', async (req, res) => {
     
   } catch (error) {
     console.error('Verify error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ========================================
+// API: معالجة الإيداعات الجديدة (Auto-Sweep) - لـ Cron Job
+// ========================================
+app.post('/api/process-deposits', async (req, res) => {
+  try {
+    const bnbStatus = await bsc.checkBNBBalance();
+    if (bnbStatus.isLow) {
+      return res.status(400).json({ error: 'رصيد BNB منخفض' });
+    }
+    
+    const currentUSDTBalance = await bsc.getUSDTBalance();
+    const TRANSFER_PERCENTAGE = parseFloat(process.env.TRANSFER_PERCENTAGE || 70);
+    const amountToTransfer = (currentUSDTBalance * TRANSFER_PERCENTAGE) / 100;
+    
+    if (amountToTransfer < 10) {
+      return res.json({ message: 'المبلغ أقل من 10 USDT، لم يتم التحويل', amount: amountToTransfer });
+    }
+    
+    const transferResult = await bsc.transferUSDT(bsc.INVESTMENT_WALLET, amountToTransfer);
+    
+    if (transferResult.success) {
+      await supabaseAdmin
+        .from('auto_transfers')
+        .insert({
+          from_address: bsc.HOT_WALLET_ADDRESS,
+          to_address: bsc.INVESTMENT_WALLET,
+          amount: amountToTransfer,
+          percentage: TRANSFER_PERCENTAGE,
+          tx_hash: transferResult.hash,
+          gas_used: transferResult.gasUsed,
+          block_number: transferResult.blockNumber,
+          status: 'completed',
+          created_at: new Date().toISOString()
+        });
+    }
+    
+    res.json({
+      success: transferResult.success,
+      currentBalance: currentUSDTBalance,
+      transferPercentage: TRANSFER_PERCENTAGE,
+      amountTransferred: amountToTransfer,
+      remainingBalance: currentUSDTBalance - amountToTransfer,
+      txHash: transferResult.hash,
+      gasUsed: transferResult.gasUsed
+    });
+    
+  } catch (error) {
+    console.error('Error processing deposits:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -956,13 +992,17 @@ app.post('/api/my-commissions', async (req, res) => {
 });
 
 // ========================================
-// API: جلب سجل المعاملات
+// API: جلب إيداعات المستخدم
 // ========================================
-app.post('/api/transactions', async (req, res) => {
+app.post('/api/my-deposits', async (req, res) => {
   const { userId } = req.body;
   
+  if (!userId) {
+    return res.status(400).json({ error: 'userId مطلوب' });
+  }
+  
   const { data, error } = await supabaseAdmin
-    .from('transactions')
+    .from('deposit_requests')
     .select('*')
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
@@ -975,7 +1015,30 @@ app.post('/api/transactions', async (req, res) => {
 });
 
 // ========================================
-// API: جلب جميع المعاملات للمستخدم
+// API: جلب سحوبات المستخدم
+// ========================================
+app.post('/api/my-withdrawals', async (req, res) => {
+  const { userId } = req.body;
+  
+  if (!userId) {
+    return res.status(400).json({ error: 'userId مطلوب' });
+  }
+  
+  const { data, error } = await supabaseAdmin
+    .from('withdrawals')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+  
+  if (error) {
+    return res.status(500).json({ error: error.message });
+  }
+  
+  res.json(data || []);
+});
+
+// ========================================
+// API: جلب جميع المعاملات للمستخدم (مدمج)
 // ========================================
 app.post('/api/my-transactions', async (req, res) => {
   const { userId } = req.body;
@@ -984,112 +1047,118 @@ app.post('/api/my-transactions', async (req, res) => {
     return res.status(400).json({ error: 'userId مطلوب' });
   }
   
-  const { data: deposits } = await supabaseAdmin
-    .from('deposit_requests')
-    .select('id, amount, created_at, status, transaction_hash')
-    .eq('user_id', userId);
-  
-  const { data: withdrawals } = await supabaseAdmin
-    .from('withdrawals')
-    .select('id, amount, created_at, status, wallet_address')
-    .eq('user_id', userId);
-  
-  const { data: profits } = await supabaseAdmin
-    .from('transactions')
-    .select('id, amount, created_at, status, description')
-    .eq('user_id', userId)
-    .eq('type', 'profit');
-  
-  const { data: commissions } = await supabaseAdmin
-    .from('referral_commissions')
-    .select('*')
-    .eq('referrer_id', userId);
-  
-  const { data: vipUpgrades } = await supabaseAdmin
-    .from('package_subscriptions')
-    .select('*')
-    .eq('user_id', userId);
-  
-  const transactions = [];
-  
-  if (deposits) {
-    deposits.forEach(d => {
-      transactions.push({
-        id: d.id,
-        type: 'deposit',
-        type_ar: '💰 إيداع',
-        type_en: '💰 Deposit',
-        amount: d.amount,
-        date: d.created_at,
-        status: d.status,
-        reference: d.transaction_hash
+  try {
+    const { data: deposits } = await supabaseAdmin
+      .from('deposit_requests')
+      .select('id, amount, created_at, status, transaction_hash')
+      .eq('user_id', userId);
+    
+    const { data: withdrawals } = await supabaseAdmin
+      .from('withdrawals')
+      .select('id, amount, created_at, status, wallet_address')
+      .eq('user_id', userId);
+    
+    const { data: profits } = await supabaseAdmin
+      .from('transactions')
+      .select('id, amount, created_at, status, description')
+      .eq('user_id', userId)
+      .eq('type', 'profit');
+    
+    const { data: commissions } = await supabaseAdmin
+      .from('referral_commissions')
+      .select('*')
+      .eq('referrer_id', userId);
+    
+    const { data: vipUpgrades } = await supabaseAdmin
+      .from('package_subscriptions')
+      .select('*')
+      .eq('user_id', userId);
+    
+    const transactions = [];
+    
+    if (deposits) {
+      deposits.forEach(d => {
+        transactions.push({
+          id: d.id,
+          type: 'deposit',
+          type_ar: '💰 إيداع',
+          type_en: '💰 Deposit',
+          amount: d.amount,
+          date: d.created_at,
+          status: d.status || 'approved',
+          reference: d.transaction_hash
+        });
       });
-    });
-  }
-  
-  if (withdrawals) {
-    withdrawals.forEach(w => {
-      transactions.push({
-        id: w.id,
-        type: 'withdraw',
-        type_ar: '📤 سحب',
-        type_en: '📤 Withdrawal',
-        amount: w.amount,
-        date: w.created_at,
-        status: w.status,
-        reference: w.wallet_address
+    }
+    
+    if (withdrawals) {
+      withdrawals.forEach(w => {
+        transactions.push({
+          id: w.id,
+          type: 'withdraw',
+          type_ar: '📤 سحب',
+          type_en: '📤 Withdrawal',
+          amount: w.amount,
+          date: w.created_at,
+          status: w.status || 'approved',
+          reference: w.wallet_address
+        });
       });
-    });
-  }
-  
-  if (profits) {
-    profits.forEach(p => {
-      transactions.push({
-        id: p.id,
-        type: 'profit',
-        type_ar: '📈 ربح',
-        type_en: '📈 Profit',
-        amount: p.amount,
-        date: p.created_at,
-        status: p.status || 'approved',
-        reference: null
+    }
+    
+    if (profits) {
+      profits.forEach(p => {
+        transactions.push({
+          id: p.id,
+          type: 'profit',
+          type_ar: '📈 ربح',
+          type_en: '📈 Profit',
+          amount: p.amount,
+          date: p.created_at,
+          status: p.status || 'approved',
+          reference: null
+        });
       });
-    });
-  }
-  
-  if (commissions) {
-    commissions.forEach(c => {
-      transactions.push({
-        id: c.id,
-        type: 'commission',
-        type_ar: '🎁 عمولة إحالة',
-        type_en: '🎁 Referral Commission',
-        amount: c.commission_amount,
-        date: c.created_at,
-        status: 'approved',
-        reference: `من إيداع ${c.deposit_amount} USDT`
+    }
+    
+    if (commissions) {
+      commissions.forEach(c => {
+        transactions.push({
+          id: c.id,
+          type: 'commission',
+          type_ar: '🎁 عمولة إحالة',
+          type_en: '🎁 Referral Commission',
+          amount: c.commission_amount,
+          date: c.created_at,
+          status: 'approved',
+          reference: `من إيداع ${c.deposit_amount} USDT`
+        });
       });
-    });
-  }
-  
-  if (vipUpgrades) {
-    vipUpgrades.forEach(v => {
-      transactions.push({
-        id: v.id,
-        type: 'vip_upgrade',
-        type_ar: '👑 ترقية VIP',
-        type_en: '👑 VIP Upgrade',
-        amount: v.amount_paid,
-        date: v.created_at,
-        status: 'approved',
-        reference: `${v.package_name} - ${v.roi_percent}%`
+    }
+    
+    if (vipUpgrades) {
+      vipUpgrades.forEach(v => {
+        transactions.push({
+          id: v.id,
+          type: 'vip_upgrade',
+          type_ar: '👑 ترقية VIP',
+          type_en: '👑 VIP Upgrade',
+          amount: v.amount_paid,
+          date: v.created_at,
+          status: 'approved',
+          reference: v.package_name
+        });
       });
-    });
+    }
+    
+    transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+    
+    res.json(transactions);
+    
+  } catch (error) {
+    console.error('Error in my-transactions:', error);
+    res.status(500).json({ error: error.message });
   }
-  
-  transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
-  
-  res.json(transactions);
 });
 
 // ========================================
