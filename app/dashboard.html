@@ -268,6 +268,7 @@
       max-width: 400px;
       width: 100%;
       border: 1px solid #00ff66;
+      text-align: center;
     }
     .modal-content h3 { color: #00ff66; margin-bottom: 16px; font-size: 20px; }
     .modal-content p { color: #8899aa; margin-bottom: 20px; line-height: 1.6; font-size: 14px; }
@@ -279,9 +280,11 @@
       border-radius: 30px;
       font-weight: bold;
       width: 100%;
-      margin-top: 10px;
       cursor: pointer;
     }
+    .error-title { color: #ff4444 !important; }
+    .error-modal-content { text-align: center; }
+    .error-icon { font-size: 48px; margin-bottom: 16px; }
     .hidden { display: none; }
     
     .history-item {
@@ -372,23 +375,6 @@
       color: #ffcc00;
       font-size: 14px;
     }
-
-    .error-modal-content {
-      text-align: center;
-    }
-    .error-icon {
-      font-size: 48px;
-      margin-bottom: 16px;
-    }
-    .error-title {
-      color: #ff4444 !important;
-      margin-bottom: 16px;
-    }
-    .error-message {
-      color: #8899aa;
-      margin-bottom: 20px;
-      line-height: 1.6;
-    }
   </style>
 </head>
 <body class="dark-mode">
@@ -464,10 +450,10 @@
       
       const modalHtml = `
         <div id="errorModal" class="modal" style="display:flex;">
-          <div class="modal-content error-modal-content">
-            <div class="error-icon">❌</div>
-            <h3 class="error-title" style="color:#ff4444;">${title}</h3>
-            <p class="error-message">${message}</p>
+          <div class="modal-content" style="text-align:center;">
+            <div style="font-size:48px; margin-bottom:16px;">❌</div>
+            <h3 style="color:#ff4444; margin-bottom:16px;">${title}</h3>
+            <p style="color:#8899aa; margin-bottom:20px; line-height:1.6;">${message}</p>
             <button class="close-modal" id="closeErrorModal" style="background:#ff4444; color:white;">✅ فهمت</button>
           </div>
         </div>
@@ -484,10 +470,10 @@
     // ========================================
     const translations = {
       ar: {
-        logoText: '💰 CryptoInvest',
-        supportText: '💬 الدعم',
+        logoText: ' CryptoInvest',
+        supportText: ' الدعم',
         logoutText: '🚪 خروج',
-        themeDark: '🌙 وضع ليلي',
+        themeDark: ' وضع ليلي',
         themeLight: '☀️ وضع نهاري',
         navHome: 'البيت',
         navVip: 'VIP',
@@ -956,7 +942,11 @@
           if (!verifyData.success) {
             clearMessages();
             let errorMsg = verifyData.error;
-            if (errorMsg.includes('غير موجودة')) {
+            if (errorMsg.includes('مستخدم') || errorMsg.includes('used before')) {
+              errorMsg = currentLang === 'ar'
+                ? '⚠️ هذا Transaction Hash تم استخدامه مسبقاً في إيداع سابق! لا يمكن استخدام نفس الهاش مرتين.'
+                : '⚠️ This Transaction Hash has already been used in a previous deposit! Cannot use the same hash twice.';
+            } else if (errorMsg.includes('غير موجودة')) {
               errorMsg = currentLang === 'ar' 
                 ? '❌ المعاملة غير موجودة على الشبكة. تأكد من صحة Transaction Hash وأن المعاملة تمت على شبكة BSC (BEP20)'
                 : '❌ Transaction not found on network. Make sure the Transaction Hash is correct and the transaction is on BSC (BEP20) network';
@@ -964,10 +954,6 @@
               errorMsg = currentLang === 'ar'
                 ? '⏳ المعاملة لا تزال قيد الانتظار. يرجى الانتظار حتى يتم تأكيدها على الشبكة ثم حاول مرة أخرى'
                 : '⏳ Transaction is still pending. Please wait for confirmation and try again';
-            } else if (errorMsg.includes('مستخدم')) {
-              errorMsg = currentLang === 'ar'
-                ? '⚠️ هذا Transaction Hash تم استخدامه مسبقاً! لا يمكن استخدام نفس الهاش مرتين.'
-                : '⚠️ This Transaction Hash has already been used! Cannot use the same hash twice.';
             }
             showErrorModal('❌ فشل التحقق', errorMsg);
             return;
@@ -1001,7 +987,7 @@
             loadUser();
           } else {
             let errorMsg = depositData.error;
-            if (errorMsg && errorMsg.includes('Transaction Hash مسبقاً')) {
+            if (errorMsg && (errorMsg.includes('Transaction Hash مسبقاً') || errorMsg.includes('already been used'))) {
               errorMsg = currentLang === 'ar'
                 ? '⚠️ هذا Transaction Hash تم استخدامه مسبقاً في إيداع سابق! لا يمكن استخدام نفس الهاش مرتين.'
                 : '⚠️ This Transaction Hash has already been used in a previous deposit! Cannot use the same hash twice.';
@@ -1133,7 +1119,7 @@
           extraInfo = `<div class="needed-amount">⚠️ ${currentLang === 'ar' ? 'يجب ترقية المستوى' + (pkg.level - 1) + ' أولاً' : 'Must upgrade level ' + (pkg.level - 1) + ' first'}</div>`;
         } else if (!canAfford && isNextLevel) {
           statusHtml = `<span class="vip-status" style="color:#ffaa00;">⚠️ ${t.needMore} ${neededAmount.toFixed(2)} USDT ${t.moreToUnlock}</span>
-                        <button class="upgrade-btn deposit-redirect-btn" data-level="${pkg.level}" data-needed="${neededAmount.toFixed(2)}" data-price="${pkg.price}" style="background:#ffaa00; color:#0a0a0f;">💰 إيداع ${neededAmount.toFixed(2)} USDT</button>`;
+                        <button class="deposit-redirect-btn" data-needed="${neededAmount.toFixed(2)}" style="background:#ffaa00; color:#0a0a0f; border:none; padding:8px 16px; border-radius:20px; cursor:pointer; font-weight:bold;">💰 إيداع ${neededAmount.toFixed(2)} USDT</button>`;
           extraInfo = `<div class="needed-amount">💰 ${t.yourBalance}: ${availableBalance.toFixed(2)} USDT</div>`;
         } else {
           statusHtml = `<span class="vip-status" style="color:#8899aa;">🔒 ${t.vipLocked}</span>`;
