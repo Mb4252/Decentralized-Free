@@ -107,7 +107,8 @@
     .assets-amount { font-size: 42px; font-weight: bold; color: #00ff66; text-align: center; margin: 16px 0; text-shadow: 0 0 10px rgba(0,255,102,0.3); }
     .detail-row { display: flex; justify-content: space-between; padding: 8px 0; color: #aabbcc; font-size: 14px; }
     .detail-value { color: #00ff66; font-weight: bold; }
-    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    
     .stat-card { background: #1a1a2e; border-radius: 20px; padding: 16px; text-align: center; border: 1px solid #00ff66; transition: all 0.3s ease; }
     .stat-value { color: #00ff66; font-size: 24px; font-weight: bold; }
     .stat-label { color: #8899aa; font-size: 12px; }
@@ -203,10 +204,11 @@
       background: #1a1a2e;
       border-radius: 32px;
       padding: 28px;
-      max-width: 400px;
+      max-width: 450px;
       width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
       border: 1px solid #00ff66;
-      text-align: center;
     }
     .modal-content h3 { color: #00ff66; margin-bottom: 16px; font-size: 20px; }
     .modal-content p { color: #8899aa; margin-bottom: 20px; line-height: 1.6; font-size: 14px; }
@@ -222,11 +224,116 @@
     .loading { background: rgba(0,204,255,0.15); border: 1px solid #00ccff; color: #00ccff; }
     
     .info-box { background: rgba(0,204,255,0.1); border: 1px solid #00ccff; border-radius: 16px; padding: 12px; margin-top: 12px; font-size: 12px; color: #00ccff; }
+    .info-box-warning { background: rgba(255,170,0,0.15); border: 1px solid #ffaa00; border-radius: 16px; padding: 12px; margin-top: 12px; font-size: 12px; color: #ffaa00; }
+    .info-box-success { background: rgba(0,255,102,0.15); border: 1px solid #00ff66; border-radius: 16px; padding: 12px; margin-top: 12px; font-size: 12px; color: #00ff66; }
     .network-btn { background: rgba(0,255,102,0.1); border: 1px solid #00ff66; color: #00ff66; padding: 10px; border-radius: 16px; cursor: pointer; width: 100%; margin-bottom: 12px; text-align: center; }
     .deposit-btn, .withdraw-btn { width: 100%; padding: 12px; border-radius: 30px; font-weight: bold; cursor: pointer; border: none; }
     .deposit-btn { background: linear-gradient(135deg, #00ff66, #00ccff); color: #0a0a0f; }
     .withdraw-btn { background: linear-gradient(135deg, #ff4444, #ff6680); color: white; }
     .btn-copy { background: rgba(0,255,102,0.15); border: 1px solid #00ff66; color: #00ff66; padding: 8px; border-radius: 20px; cursor: pointer; width: 100%; margin-top: 8px; }
+    
+    .welcome-message {
+      background: linear-gradient(135deg, rgba(0,255,102,0.1), rgba(0,204,255,0.05));
+      border: 1px solid #00ff66;
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 16px;
+      text-align: center;
+    }
+    .welcome-message h2 {
+      color: #00ff66;
+      font-size: 20px;
+      margin-bottom: 8px;
+    }
+    .welcome-message p {
+      color: #8899aa;
+      font-size: 14px;
+      line-height: 1.8;
+    }
+    
+    .terms-box {
+      background: rgba(255,170,0,0.08);
+      border: 1px solid #ffaa00;
+      border-radius: 12px;
+      padding: 12px;
+      margin: 12px 0;
+      text-align: right;
+    }
+    .terms-box label {
+      color: #ffaa00;
+      font-size: 13px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .terms-box label input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+    }
+    
+    .admin-btn {
+      background: linear-gradient(135deg, #7c3aed, #6d28d9);
+      color: white;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: bold;
+      transition: all 0.3s;
+    }
+    .admin-btn:hover { transform: scale(1.02); box-shadow: 0 5px 15px rgba(124,58,237,0.3); }
+    .admin-btn-danger { background: linear-gradient(135deg, #dc2626, #b91c1c); }
+    .admin-btn-danger:hover { box-shadow: 0 5px 15px rgba(220,38,38,0.3); }
+    .admin-btn-success { background: linear-gradient(135deg, #059669, #047857); }
+    .admin-btn-success:hover { box-shadow: 0 5px 15px rgba(5,150,105,0.3); }
+    
+    .admin-panel {
+      background: rgba(124,58,237,0.08);
+      border: 1px solid #7c3aed;
+      border-radius: 16px;
+      padding: 16px;
+      margin-top: 12px;
+    }
+    .admin-panel-title {
+      color: #7c3aed;
+      font-weight: bold;
+      font-size: 14px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .order-item-admin {
+      background: rgba(0,0,0,0.2);
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .order-item-admin .user-name { color: #00ff66; font-weight: bold; }
+    .order-item-admin .order-amount { color: #ffcc00; }
+    .order-item-admin .order-location { color: #8899aa; font-size: 12px; }
+    
+    .admin-status-badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 20px;
+      font-size: 10px;
+      font-weight: bold;
+    }
+    .admin-status-pending { background: rgba(255,170,0,0.2); color: #ffaa00; }
+    .admin-status-confirmed { background: rgba(0,255,102,0.2); color: #00ff66; }
+    .admin-status-shipped { background: rgba(0,204,255,0.2); color: #00ccff; }
+    .admin-status-in_location { background: rgba(124,58,237,0.2); color: #7c3aed; }
+    .admin-status-delivered { background: rgba(5,150,105,0.2); color: #059669; }
   </style>
 </head>
 <body class="dark-mode">
@@ -256,14 +363,27 @@
   <div id="productModal" class="modal hidden">
     <div class="modal-content">
       <h3 id="modalProductTitle">اسم المنتج</h3>
-      <p id="modalProductDesc">وصف المنتج</p>
-      <p style="color:#ffcc00;" id="modalProductPrice">السعر: 0 USDT</p>
-      <p style="color:#8899aa; font-size:12px;" id="modalProductProgress">التقدم: 0 من 10</p>
+      <div id="modalProductImage" style="margin:12px 0;"></div>
+      <p id="modalProductDesc" style="color:#8899aa; font-size:14px; line-height:1.6; text-align:right;">وصف المنتج</p>
+      <hr style="border-color:#00ff66; margin:12px 0;">
+      <p style="color:#ffcc00;" id="modalProductPrice">💰 السعر: 0 USDT</p>
+      <p style="color:#8899aa; font-size:12px;" id="modalProductWholesale">� wholesale price: 0 USDT</p>
+      <p style="color:#8899aa; font-size:12px;" id="modalProductProgress">📊 التقدم: 0 من 10</p>
       <div class="progress-bar"><div class="progress-fill" id="modalProgressFill" style="width:0%"></div></div>
-      <p style="color:#8899aa; font-size:12px; margin-top:8px;" id="modalProductLocations">مناطق الاستلام: -</p>
-      <p style="color:#8899aa; font-size:12px;" id="modalProductDelivery">موعد التسليم: سيُحدد لاحقاً</p>
+      <p style="color:#8899aa; font-size:12px; margin-top:8px;" id="modalProductRemaining">📦 المتبقي: 10 قطعة</p>
+      <p style="color:#8899aa; font-size:12px;" id="modalProductLocations">📍 مناطق الاستلام: -</p>
+      <p style="color:#8899aa; font-size:12px;" id="modalProductDelivery">📅 موعد التسليم: سيُحدد لاحقاً</p>
+      <p style="color:#8899aa; font-size:12px;" id="modalProductPickup">🕐 وقت الاستلام: سيُحدد لاحقاً</p>
+      
+      <div class="terms-box">
+        <label>
+          <input type="checkbox" id="acceptTerms">
+          <span style="color:#ffaa00; font-size:13px;">⚠️ أوافق على أن المنتج لا يمكن استرجاعه أو استرداد الأموال بعد الشراء</span>
+        </label>
+      </div>
+      
       <input type="number" id="modalQuantity" class="input-field" value="1" min="1" placeholder="الكمية">
-      <input type="text" id="modalLocation" class="input-field" placeholder="منطقة الاستلام (مثال: الخرطوم)">
+      <input type="text" id="modalLocation" class="input-field" placeholder="📍 منطقة الاستلام (مثال: الخرطوم)">
       <button class="btn-order" id="modalOrderBtn" style="width:100%;">🛒 شراء المنتج</button>
       <button class="close-modal" id="closeProductModal" style="margin-top:12px; background:#ff4444; color:white;">إلغاء</button>
     </div>
@@ -272,10 +392,26 @@
   <!-- مودال تأكيد السحب -->
   <div id="withdrawModal" class="modal hidden">
     <div class="modal-content">
-      <h3 style="color:#ffaa00;">⚠️ تحذير</h3>
-      <p id="withdrawWarningText">أنت على وشك سحب طلبك. إذا قمت بالسحب مرة أخرى، سيتم استبعادك من هذا المنتج نهائياً.</p>
+      <h3 style="color:#ffaa00;">⚠️ تحذير مهم</h3>
+      <p id="withdrawWarningText" style="color:#ffaa00;">أنت على وشك سحب طلبك. إذا قمت بالسحب مرة أخرى، سيتم استبعادك من هذا المنتج نهائياً ولا يمكنك المشاركة فيه مجدداً.</p>
+      <div class="info-box-warning" style="margin:12px 0;">
+        ⚠️ ملاحظة: بعد سحب الطلب، سيتم خصم طلبك من العدد الإجمالي وقد يؤثر ذلك على اكتمال الطلب.
+      </div>
       <button class="btn-withdraw-order" id="confirmWithdrawBtn" style="width:100%; padding:12px; font-size:16px;">✅ تأكيد السحب</button>
       <button class="close-modal" id="closeWithdrawModal" style="margin-top:12px; background:#ff4444; color:white;">إلغاء</button>
+    </div>
+  </div>
+
+  <!-- مودال الأدمن لفحص الهاش -->
+  <div id="adminVerifyModal" class="modal hidden">
+    <div class="modal-content">
+      <h3 style="color:#7c3aed;">🔍 فحص TXID</h3>
+      <p style="color:#8899aa; font-size:14px;">أدخل Transaction Hash للتحقق من صحة الإيداع</p>
+      <input type="text" id="adminVerifyHash" class="input-field" placeholder="TXID (0x...)" style="direction:ltr;">
+      <input type="number" id="adminVerifyAmount" class="input-field" placeholder="المبلغ المتوقع (USDT)" step="0.01">
+      <button id="adminVerifyBtn" style="background:#7c3aed; color:white; border:none; padding:12px; border-radius:30px; font-weight:bold; width:100%; cursor:pointer;">🔍 فحص</button>
+      <div id="adminVerifyResult" style="margin-top:12px;"></div>
+      <button class="close-modal" id="closeAdminVerifyModal" style="margin-top:12px; background:#ff4444; color:white;">إغلاق</button>
     </div>
   </div>
 
@@ -290,6 +426,7 @@
 
     const HOT_WALLET_ADDRESS = '0x9EB39A10c059877910DAff1fd8098e5DB32486F7';
     const MIN_WITHDRAW = 0.5;
+    const ADMIN_SECRET = localStorage.getItem('adminSecret') || '';
 
     function showErrorModal(title, message) {
       const existingModal = document.getElementById('errorModal');
@@ -350,19 +487,40 @@
         orderWithdraw: 'سحب الطلب',
         orderBanned: '🚫 مستبعد',
         orderPending: '⏳ قيد الانتظار',
+        orderConfirmed: '✅ تم التأكيد',
+        orderShipped: '📦 تم الشحن',
+        orderInLocation: '📍 في منطقة الاستلام',
         orderDelivered: '✅ تم التوصيل',
         orderWithdrawn: '📤 تم السحب',
         productBuy: '🛒 شراء المنتج',
         productProgress: 'التقدم: {current} من {min}',
+        productRemaining: 'المتبقي: {remaining} قطعة',
         productLocations: 'مناطق الاستلام: {locations}',
         productDelivery: 'موعد التسليم: {date}',
+        productPickup: 'وقت الاستلام: {time}',
         enterQuantity: 'الكمية',
         enterLocation: 'منطقة الاستلام (مثال: الخرطوم)',
         cancel: 'إلغاء',
         confirm: 'تأكيد',
         warning: '⚠️ تحذير',
         withdrawWarning: 'أنت على وشك سحب طلبك. إذا قمت بالسحب مرة أخرى، سيتم استبعادك من هذا المنتج نهائياً.',
-        depositNote: 'الحد الأدنى للإيداع هو 1 USDT. تأكد من إرسال المبلغ على شبكة BSC (BEP20).'
+        depositNote: 'الحد الأدنى للإيداع هو 1 USDT. تأكد من إرسال المبلغ على شبكة BSC (BEP20).',
+        welcomeTitle: '🌟 مرحباً بك في منصة الشراء الجماعي',
+        welcomeText: 'نحن نؤمن بأن التجزئة باهظة الثمن، لذلك نشتري بالجملة لتوفير أفضل الأسعار لك. هدفنا هو تسهيل الحياة على المستخدمين وتحقيق الرخاء في وطننا الحبيب. 🤲',
+        productCannotReturn: '⚠️ المنتج لا يمكن استرجاعه أو استرداد الأموال بعد الشراء.',
+        acceptTerms: 'أوافق على أن المنتج لا يمكن استرجاعه أو استرداد الأموال بعد الشراء',
+        adminPanel: '🛠️ لوحة الأدمن',
+        adminVerifyHash: '🔍 فحص TXID',
+        adminOrders: '📋 طلبات المنتج',
+        adminStatusPending: '⏳ قيد الانتظار',
+        adminStatusConfirmed: '✅ تم التأكيد',
+        adminStatusShipped: '📦 تم الشحن',
+        adminStatusInLocation: '📍 في منطقة الاستلام',
+        adminStatusDelivered: '✅ تم التوصيل',
+        adminUpdateStatus: 'تحديث الحالة',
+        adminDeleteProduct: '🗑️ حذف المنتج',
+        adminAddProduct: '➕ إضافة منتج',
+        adminNoOrders: 'لا توجد طلبات لهذا المنتج'
       },
       en: {
         logoText: '🛍️ CryptoShop',
@@ -404,19 +562,40 @@
         orderWithdraw: 'Withdraw Order',
         orderBanned: '🚫 Banned',
         orderPending: '⏳ Pending',
+        orderConfirmed: '✅ Confirmed',
+        orderShipped: '📦 Shipped',
+        orderInLocation: '📍 In Location',
         orderDelivered: '✅ Delivered',
         orderWithdrawn: '📤 Withdrawn',
         productBuy: '🛒 Buy Product',
         productProgress: 'Progress: {current} of {min}',
+        productRemaining: 'Remaining: {remaining} items',
         productLocations: 'Locations: {locations}',
         productDelivery: 'Delivery Date: {date}',
+        productPickup: 'Pickup Time: {time}',
         enterQuantity: 'Quantity',
         enterLocation: 'Location (e.g. Khartoum)',
         cancel: 'Cancel',
         confirm: 'Confirm',
         warning: '⚠️ Warning',
         withdrawWarning: 'You are about to withdraw your order. If you withdraw again, you will be banned from this product.',
-        depositNote: 'Minimum deposit is 1 USDT. Make sure to send on BSC (BEP20) network.'
+        depositNote: 'Minimum deposit is 1 USDT. Make sure to send on BSC (BEP20) network.',
+        welcomeTitle: '🌟 Welcome to Group Buying Platform',
+        welcomeText: 'We believe retail is expensive, so we buy wholesale to offer you the best prices. Our goal is to make life easier for users and bring prosperity to our beloved homeland. 🤲',
+        productCannotReturn: '⚠️ This product cannot be returned or refunded after purchase.',
+        acceptTerms: 'I agree that this product cannot be returned or refunded',
+        adminPanel: '🛠️ Admin Panel',
+        adminVerifyHash: '🔍 Verify TXID',
+        adminOrders: '📋 Product Orders',
+        adminStatusPending: '⏳ Pending',
+        adminStatusConfirmed: '✅ Confirmed',
+        adminStatusShipped: '📦 Shipped',
+        adminStatusInLocation: '📍 In Location',
+        adminStatusDelivered: '✅ Delivered',
+        adminUpdateStatus: 'Update Status',
+        adminDeleteProduct: '🗑️ Delete Product',
+        adminAddProduct: '➕ Add Product',
+        adminNoOrders: 'No orders for this product'
       }
     };
 
@@ -446,10 +625,6 @@
       document.getElementById('langToggleBtn').innerHTML = currentLang === 'ar' ? '🇬🇧 English' : '🇸🇦 العربية';
       document.getElementById('themeToggleBtn').innerHTML = currentTheme === 'dark' ? '🌙 ' + t.themeDark : '☀️ ' + t.themeLight;
       
-      if (document.getElementById('modalProductTitle')) {
-        // تحديث النصوص في المودال
-      }
-      
       if (typeof currentPage === 'string' && pages[currentPage]) pages[currentPage]();
     }
 
@@ -474,8 +649,9 @@
         userData = data;
         document.getElementById('userName').innerHTML = `👋 ${userData.name}`;
         
-        if (!localStorage.getItem('welcomeShown')) {
-          localStorage.setItem('welcomeShown', 'true');
+        // تخزين adminSecret مؤقتاً إذا كان المستخدم أدمن
+        if (userData.is_admin) {
+          localStorage.setItem('isAdmin', 'true');
         }
         
         currentPage = 'dashboard';
@@ -521,6 +697,11 @@
       const totalSpent = userData?.total_spent || 0;
       
       document.getElementById('mainContent').innerHTML = `
+        <div class="welcome-message">
+          <h2>${t.welcomeTitle}</h2>
+          <p>${t.welcomeText}</p>
+        </div>
+        
         <div class="card">
           <div class="assets-amount">${avail.toFixed(2)} USDT</div>
           <div class="detail-row"><span>💰 ${t.availableBalance}</span><span class="detail-value">${avail.toFixed(2)} USDT</span></div>
@@ -544,8 +725,8 @@
         <div class="info-box">
           <strong>📌 ${currentLang === 'ar' ? 'نظام الشراء الجماعي' : 'Group Buying System'}</strong><br>
           ${currentLang === 'ar' 
-            ? 'يمكنك شراء المنتجات بأسعار الجملة. يتم تجميع الطلبات حتى اكتمال العدد المطلوب، ثم يتم شراء المنتجات وتوزيعها.'
-            : 'You can buy products at wholesale prices. Orders are collected until the required quantity is met, then products are purchased and distributed.'}
+            ? 'نحن نشتري المنتجات بالجملة لنوفر لك أفضل الأسعار. يتم تجميع الطلبات حتى اكتمال العدد المطلوب، ثم يتم شراء المنتجات وتوزيعها.'
+            : 'We buy products wholesale to offer you the best prices. Orders are collected until the required quantity is met, then products are purchased and distributed.'}
         </div>
       `;
       
@@ -561,9 +742,26 @@
       };
     }
 
+    // ==========================================
+    // المنتجات
+    // ==========================================
     async function renderProducts() {
       const t = translations[currentLang];
-      document.getElementById('mainContent').innerHTML = `<div class="card"><div class="card-title">📦 ${t.navProducts}</div><div id="productsList"></div></div>`;
+      const isAdmin = userData?.is_admin || false;
+      
+      document.getElementById('mainContent').innerHTML = `
+        <div class="card">
+          <div class="card-title">📦 ${t.navProducts}</div>
+          ${isAdmin ? `
+            <div class="admin-panel">
+              <div class="admin-panel-title">🛠️ ${t.adminPanel}</div>
+              <button class="admin-btn" onclick="showAddProductModal()" style="margin-bottom:8px;">${t.adminAddProduct}</button>
+              <button class="admin-btn admin-btn-success" onclick="showAdminVerifyModal()" style="margin-right:8px;">${t.adminVerifyHash}</button>
+            </div>
+          ` : ''}
+          <div id="productsList"></div>
+        </div>
+      `;
       
       try {
         const res = await fetch(`${API_URL}/api/products`);
@@ -578,22 +776,30 @@
         container.innerHTML = products.map(p => {
           const progress = Math.min((p.current_orders / p.min_quantity) * 100, 100);
           const isCompleted = p.status === 'completed';
+          const remaining = Math.max(0, p.min_quantity - p.current_orders);
           return `
             <div class="product-card" data-id="${p.id}">
               <div class="product-name">${p.name} ${isCompleted ? '✅' : ''}</div>
               <div class="product-price">💰 ${p.group_price} USDT ${currentLang === 'ar' ? '(سعر المجموعة)' : '(Group Price)'}</div>
               <div class="product-meta">📊 ${t.productProgress.replace('{current}', p.current_orders).replace('{min}', p.min_quantity)}</div>
               <div class="progress-bar"><div class="progress-fill" style="width:${progress}%"></div></div>
-              <div class="product-meta" style="margin-top:8px;">📍 ${t.productLocations.replace('{locations}', p.delivery_locations?.join(', ') || '-')}</div>
+              <div class="product-meta" style="margin-top:8px;">📦 ${t.productRemaining.replace('{remaining}', remaining)}</div>
+              <div class="product-meta">📍 ${t.productLocations.replace('{locations}', p.delivery_locations?.join(', ') || '-')}</div>
               <div class="product-meta">📅 ${t.productDelivery.replace('{date}', p.delivery_date ? new Date(p.delivery_date).toLocaleDateString() : (currentLang === 'ar' ? 'سيُحدد لاحقاً' : 'To be determined'))}</div>
               ${!isCompleted ? `<button class="btn-order" style="margin-top:12px;" onclick="openProductModal(${p.id})">${t.productBuy}</button>` : `<span style="color:#00ff66;">✅ ${currentLang === 'ar' ? 'اكتمل العدد' : 'Completed'}</span>`}
+              ${isAdmin ? `
+                <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
+                  <button class="admin-btn admin-btn-success" onclick="showAdminProductOrders(${p.id})">${t.adminOrders}</button>
+                  <button class="admin-btn admin-btn-danger" onclick="deleteProduct(${p.id})">${t.adminDeleteProduct}</button>
+                </div>
+              ` : ''}
             </div>
           `;
         }).join('');
         
         document.querySelectorAll('.product-card').forEach(card => {
           card.addEventListener('click', (e) => {
-            if (e.target.classList.contains('btn-order')) return;
+            if (e.target.classList.contains('btn-order') || e.target.classList.contains('admin-btn')) return;
             const id = card.dataset.id;
             if (id) openProductModal(parseInt(id));
           });
@@ -604,6 +810,9 @@
       }
     }
 
+    // ==========================================
+    // فتح مودال المنتج
+    // ==========================================
     async function openProductModal(productId) {
       const t = translations[currentLang];
       try {
@@ -615,13 +824,19 @@
         document.getElementById('modalProductTitle').textContent = product.name;
         document.getElementById('modalProductDesc').textContent = product.description || '';
         document.getElementById('modalProductPrice').textContent = `💰 ${product.group_price} USDT (${currentLang === 'ar' ? 'سعر المجموعة' : 'Group Price'})`;
+        document.getElementById('modalProductWholesale').textContent = `💰 ${currentLang === 'ar' ? 'سعر الجملة' : 'Wholesale'}: ${product.wholesale_price} USDT`;
         document.getElementById('modalProductProgress').textContent = t.productProgress.replace('{current}', product.current_orders).replace('{min}', product.min_quantity);
         document.getElementById('modalProgressFill').style.width = Math.min((product.current_orders / product.min_quantity) * 100, 100) + '%';
+        const remaining = Math.max(0, product.min_quantity - product.current_orders);
+        document.getElementById('modalProductRemaining').textContent = t.productRemaining.replace('{remaining}', remaining);
         document.getElementById('modalProductLocations').textContent = t.productLocations.replace('{locations}', product.delivery_locations?.join(', ') || '-');
         document.getElementById('modalProductDelivery').textContent = t.productDelivery.replace('{date}', product.delivery_date ? new Date(product.delivery_date).toLocaleDateString() : (currentLang === 'ar' ? 'سيُحدد لاحقاً' : 'To be determined'));
+        document.getElementById('modalProductPickup').textContent = t.productPickup.replace('{time}', product.pickup_time || (currentLang === 'ar' ? 'سيُحدد لاحقاً' : 'To be determined'));
         document.getElementById('modalQuantity').value = 1;
         document.getElementById('modalQuantity').min = 1;
+        document.getElementById('modalQuantity').max = remaining;
         document.getElementById('modalLocation').value = '';
+        document.getElementById('acceptTerms').checked = false;
         document.getElementById('modalOrderBtn').textContent = t.productBuy;
         document.getElementById('modalOrderBtn').onclick = () => placeOrder(productId);
         document.getElementById('productModal').classList.remove('hidden');
@@ -631,13 +846,22 @@
       }
     }
 
+    // ==========================================
+    // شراء المنتج
+    // ==========================================
     async function placeOrder(productId) {
       const t = translations[currentLang];
       const quantity = parseInt(document.getElementById('modalQuantity').value) || 1;
       const location = document.getElementById('modalLocation').value.trim();
+      const acceptTerms = document.getElementById('acceptTerms').checked;
       
       if (!location) {
         showMessage('⚠️ ' + (currentLang === 'ar' ? 'يرجى إدخال منطقة الاستلام' : 'Please enter your location'), 'error');
+        return;
+      }
+      
+      if (!acceptTerms) {
+        showMessage('⚠️ ' + (currentLang === 'ar' ? 'يجب الموافقة على شروط الشراء' : 'You must accept the terms'), 'error');
         return;
       }
       
@@ -645,7 +869,7 @@
         const res = await fetch(`${API_URL}/api/order-product`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId, productId, quantity, location })
+          body: JSON.stringify({ userId, productId, quantity, location, acceptTerms })
         });
         const data = await res.json();
         
@@ -662,6 +886,9 @@
       }
     }
 
+    // ==========================================
+    // طلباتي
+    // ==========================================
     async function renderOrders() {
       const t = translations[currentLang];
       document.getElementById('mainContent').innerHTML = `<div class="card"><div class="card-title">📋 ${t.navOrders}</div><div id="ordersList"></div></div>`;
@@ -683,9 +910,11 @@
         container.innerHTML = orders.map(o => {
           const statusMap = {
             'pending': t.orderPending,
-            'confirmed': t.orderPending,
-            'withdrawn': t.orderWithdrawn,
-            'delivered': t.orderDelivered
+            'confirmed': t.orderConfirmed,
+            'shipped': t.orderShipped,
+            'in_location': t.orderInLocation,
+            'delivered': t.orderDelivered,
+            'withdrawn': t.orderWithdrawn
           };
           const statusText = statusMap[o.status] || o.status;
           const isBanned = o.is_banned;
@@ -697,6 +926,7 @@
               <div class="order-amount">${t.orderAmount} ${o.total_amount.toFixed(2)} USDT</div>
               <div class="order-location">📍 ${t.orderLocation} ${o.location || '-'}</div>
               <div class="order-location">📅 ${new Date(o.created_at).toLocaleDateString()}</div>
+              <div class="order-location">📦 الكمية: ${o.quantity}</div>
               ${isBanned ? `<span class="btn-banned">${t.orderBanned}</span>` : ''}
               ${canWithdraw ? `<button class="btn-withdraw-order" onclick="openWithdrawModal(${o.id})">${t.orderWithdraw}</button>` : ''}
               ${o.status === 'delivered' ? `<span style="color:#00ff66;">✅ ${t.orderDelivered}</span>` : ''}
@@ -709,6 +939,9 @@
       }
     }
 
+    // ==========================================
+    // سحب الطلب
+    // ==========================================
     function openWithdrawModal(orderId) {
       const t = translations[currentLang];
       currentOrderId = orderId;
@@ -739,6 +972,9 @@
       }
     }
 
+    // ==========================================
+    // الإيداع
+    // ==========================================
     async function renderDeposit() {
       const t = translations[currentLang];
       document.getElementById('mainContent').innerHTML = `
@@ -838,6 +1074,9 @@
       };
     }
 
+    // ==========================================
+    // السحب
+    // ==========================================
     async function renderWithdraw() {
       const t = translations[currentLang];
       const avail = userData?.available_balance || 0;
@@ -893,6 +1132,9 @@
       };
     }
 
+    // ==========================================
+    // الملف الشخصي
+    // ==========================================
     async function renderProfile() {
       const t = translations[currentLang];
       const avail = userData?.available_balance || 0;
@@ -904,6 +1146,7 @@
           <div style="color:#00ff66; font-size:28px; margin-top:16px;">${avail.toFixed(2)} USDT</div>
           <div style="color:#8899aa; font-size:14px; margin-top:8px;">📦 ${t.totalOrders}: ${userData.total_orders || 0}</div>
           <div style="color:#8899aa; font-size:14px;">💳 ${t.totalSpent}: ${(userData.total_spent || 0).toFixed(2)} USDT</div>
+          ${userData.is_admin ? `<div style="color:#7c3aed; font-size:14px; margin-top:8px;">🛠️ ${currentLang === 'ar' ? 'مدير النظام' : 'Admin'}</div>` : ''}
         </div>
         <div class="card"><div class="card-title">📋 ${t.profileTitle}</div><div id="profileInfo"></div></div>
       `;
@@ -915,7 +1158,266 @@
       `;
     }
 
+    // ==========================================
+    // دوال الأدمن
+    // ==========================================
+    
+    // عرض طلبات المنتج للأدمن
+    async function showAdminProductOrders(productId) {
+      const t = translations[currentLang];
+      const adminSecret = prompt('أدخل كلمة سر الأدمن:');
+      if (!adminSecret) return;
+      
+      try {
+        const res = await fetch(`${API_URL}/api/admin/product-orders`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ adminSecret, productId })
+        });
+        const orders = await res.json();
+        
+        if (!orders || orders.length === 0) {
+          showMessage(t.adminNoOrders, 'warning');
+          return;
+        }
+        
+        const statusOptions = ['pending', 'confirmed', 'shipped', 'in_location', 'delivered'];
+        const statusLabels = {
+          'pending': t.adminStatusPending,
+          'confirmed': t.adminStatusConfirmed,
+          'shipped': t.adminStatusShipped,
+          'in_location': t.adminStatusInLocation,
+          'delivered': t.adminStatusDelivered
+        };
+        
+        let html = `
+          <div class="card">
+            <div class="card-title">📋 ${t.adminOrders}</div>
+            <div style="max-height:400px; overflow-y:auto;">
+        `;
+        
+        orders.forEach(o => {
+          html += `
+            <div class="order-item-admin">
+              <div>
+                <div class="user-name">${o.users?.name || 'مستخدم'}</div>
+                <div class="order-amount">💰 ${o.total_amount} USDT</div>
+                <div class="order-location">📍 ${o.location || '-'}</div>
+                <div class="order-location">📦 ${o.quantity} قطعة</div>
+              </div>
+              <div style="text-align:left;">
+                <span class="admin-status-badge admin-status-${o.status}">${statusLabels[o.status] || o.status}</span>
+                <div style="margin-top:8px;">
+                  <select id="statusSelect_${o.id}" style="background:#0a0a0f; color:white; border:1px solid #00ff66; border-radius:8px; padding:4px 8px; font-size:11px;">
+                    ${statusOptions.map(s => `<option value="${s}" ${s === o.status ? 'selected' : ''}>${statusLabels[s] || s}</option>`).join('')}
+                  </select>
+                  <button class="admin-btn admin-btn-success" onclick="updateOrderStatus(${o.id})" style="font-size:10px;">${t.adminUpdateStatus}</button>
+                </div>
+              </div>
+            </div>
+          `;
+        });
+        
+        html += `</div></div>`;
+        
+        // عرض النافذة المنبثقة
+        const modalHtml = `
+          <div id="adminOrdersModal" class="modal" style="display:flex;">
+            <div class="modal-content">
+              <h3 style="color:#7c3aed;">📋 ${t.adminOrders}</h3>
+              ${html}
+              <button class="close-modal" onclick="document.getElementById('adminOrdersModal').remove()" style="margin-top:12px; background:#ff4444; color:white;">إغلاق</button>
+            </div>
+          </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        
+        // جعل updateOrderStatus متاحة في النطاق العام
+        window.updateOrderStatus = async function(orderId) {
+          const select = document.getElementById(`statusSelect_${orderId}`);
+          const status = select.value;
+          
+          try {
+            const res = await fetch(`${API_URL}/api/admin/update-order-status`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ adminSecret, orderId, status })
+            });
+            const data = await res.json();
+            if (data.success) {
+              showMessage(data.message, 'success', 3000);
+              showAdminProductOrders(productId);
+            } else {
+              showMessage('❌ ' + data.error, 'error');
+            }
+          } catch (error) {
+            showMessage('❌ ' + (currentLang === 'ar' ? 'خطأ في الاتصال' : 'Connection error'), 'error');
+          }
+        };
+        
+      } catch (error) {
+        showMessage('❌ ' + (currentLang === 'ar' ? 'خطأ في تحميل الطلبات' : 'Error loading orders'), 'error');
+      }
+    }
+
+    // حذف منتج
+    async function deleteProduct(productId) {
+      const t = translations[currentLang];
+      if (!confirm(currentLang === 'ar' ? 'هل أنت متأكد من حذف هذا المنتج؟' : 'Are you sure you want to delete this product?')) return;
+      
+      const adminSecret = prompt('أدخل كلمة سر الأدمن:');
+      if (!adminSecret) return;
+      
+      try {
+        const res = await fetch(`${API_URL}/api/admin/delete-product`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ adminSecret, productId })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showMessage(data.message, 'success');
+          renderProducts();
+        } else {
+          showMessage('❌ ' + data.error, 'error');
+        }
+      } catch (error) {
+        showMessage('❌ ' + (currentLang === 'ar' ? 'خطأ في الاتصال' : 'Connection error'), 'error');
+      }
+    }
+
+    // عرض مودال إضافة منتج
+    function showAddProductModal() {
+      const t = translations[currentLang];
+      const modalHtml = `
+        <div id="addProductModal" class="modal" style="display:flex;">
+          <div class="modal-content">
+            <h3 style="color:#7c3aed;">➕ ${t.adminAddProduct}</h3>
+            <input type="text" id="apName" class="input-field" placeholder="${currentLang === 'ar' ? 'اسم المنتج' : 'Product Name'}">
+            <textarea id="apDescription" class="input-field" placeholder="${currentLang === 'ar' ? 'وصف المنتج' : 'Product Description'}" rows="3"></textarea>
+            <input type="text" id="apImage" class="input-field" placeholder="${currentLang === 'ar' ? 'رابط الصورة (اختياري)' : 'Image URL (Optional)'}">
+            <input type="number" id="apWholesalePrice" class="input-field" placeholder="${currentLang === 'ar' ? 'سعر الجملة (USDT)' : 'Wholesale Price (USDT)'}" step="0.01">
+            <input type="number" id="apGroupPrice" class="input-field" placeholder="${currentLang === 'ar' ? 'سعر المجموعة (USDT)' : 'Group Price (USDT)'}" step="0.01">
+            <input type="number" id="apMinQuantity" class="input-field" placeholder="${currentLang === 'ar' ? 'العدد المطلوب' : 'Required Quantity'}" min="1">
+            <input type="text" id="apLocations" class="input-field" placeholder="${currentLang === 'ar' ? 'مناطق الاستلام (مفصولة بفاصلة)' : 'Locations (comma separated)'}">
+            <input type="date" id="apDeliveryDate" class="input-field">
+            <input type="time" id="apPickupTime" class="input-field">
+            <input type="password" id="apAdminSecret" class="input-field" placeholder="${currentLang === 'ar' ? 'كلمة سر الأدمن' : 'Admin Secret'}" style="direction:ltr;">
+            <button class="btn-order" id="apSubmitBtn" style="width:100%;">✅ ${currentLang === 'ar' ? 'إضافة المنتج' : 'Add Product'}</button>
+            <button class="close-modal" onclick="document.getElementById('addProductModal').remove()" style="margin-top:12px; background:#ff4444; color:white;">${t.cancel}</button>
+          </div>
+        </div>
+      `;
+      document.body.insertAdjacentHTML('beforeend', modalHtml);
+      
+      document.getElementById('apSubmitBtn').onclick = async function() {
+        const adminSecret = document.getElementById('apAdminSecret').value;
+        if (!adminSecret) {
+          showMessage('⚠️ ' + (currentLang === 'ar' ? 'كلمة سر الأدمن مطلوبة' : 'Admin secret required'), 'error');
+          return;
+        }
+        
+        const name = document.getElementById('apName').value;
+        const description = document.getElementById('apDescription').value;
+        const imageUrl = document.getElementById('apImage').value;
+        const wholesalePrice = parseFloat(document.getElementById('apWholesalePrice').value);
+        const groupPrice = parseFloat(document.getElementById('apGroupPrice').value);
+        const minQuantity = parseInt(document.getElementById('apMinQuantity').value);
+        const locations = document.getElementById('apLocations').value.split(',').map(s => s.trim()).filter(s => s);
+        const deliveryDate = document.getElementById('apDeliveryDate').value;
+        const pickupTime = document.getElementById('apPickupTime').value;
+        
+        if (!name || !description || !wholesalePrice || !groupPrice || !minQuantity) {
+          showMessage('⚠️ ' + (currentLang === 'ar' ? 'جميع الحقول الأساسية مطلوبة' : 'All required fields are mandatory'), 'error');
+          return;
+        }
+        
+        try {
+          const res = await fetch(`${API_URL}/api/admin/add-product`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              adminSecret,
+              name,
+              description,
+              imageUrl,
+              wholesalePrice,
+              groupPrice,
+              minQuantity,
+              deliveryLocations: locations.length ? locations : ['الخرطوم', 'أم درمان', 'بحري'],
+              deliveryDate: deliveryDate || null,
+              pickupTime: pickupTime || null
+            })
+          });
+          const data = await res.json();
+          if (data.success) {
+            showMessage(data.message, 'success');
+            document.getElementById('addProductModal').remove();
+            renderProducts();
+          } else {
+            showMessage('❌ ' + data.error, 'error');
+          }
+        } catch (error) {
+          showMessage('❌ ' + (currentLang === 'ar' ? 'خطأ في الاتصال' : 'Connection error'), 'error');
+        }
+      };
+    }
+
+    // مودال فحص الهاش للأدمن
+    function showAdminVerifyModal() {
+      document.getElementById('adminVerifyModal').classList.remove('hidden');
+      document.getElementById('adminVerifyHash').value = '';
+      document.getElementById('adminVerifyAmount').value = '';
+      document.getElementById('adminVerifyResult').innerHTML = '';
+    }
+
+    document.getElementById('adminVerifyBtn').onclick = async function() {
+      const txHash = document.getElementById('adminVerifyHash').value.trim();
+      const amount = parseFloat(document.getElementById('adminVerifyAmount').value) || 0;
+      const adminSecret = prompt('أدخل كلمة سر الأدمن:');
+      
+      if (!adminSecret) return;
+      if (!txHash) {
+        document.getElementById('adminVerifyResult').innerHTML = `<p style="color:#ff4444;">⚠️ ${currentLang === 'ar' ? 'يرجى إدخال TXID' : 'Please enter TXID'}</p>`;
+        return;
+      }
+      
+      document.getElementById('adminVerifyResult').innerHTML = `<p style="color:#00ccff;">⏳ ${currentLang === 'ar' ? 'جاري التحقق...' : 'Verifying...'}</p>`;
+      
+      try {
+        const res = await fetch(`${API_URL}/api/admin/verify-deposit`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ adminSecret, transactionHash: txHash, amount })
+        });
+        const data = await res.json();
+        
+        if (data.success) {
+          document.getElementById('adminVerifyResult').innerHTML = `
+            <div style="background:rgba(0,255,102,0.15); border:1px solid #00ff66; border-radius:12px; padding:12px; color:#00ff66;">
+              ✅ ${currentLang === 'ar' ? 'المعاملة صالحة' : 'Transaction valid'}
+              <br>💰 ${currentLang === 'ar' ? 'المبلغ' : 'Amount'}: ${data.verification?.amount || amount} USDT
+              <br>📤 ${currentLang === 'ar' ? 'المرسل' : 'From'}: ${data.verification?.from?.substring(0, 16) || '-'}...
+              <br>📥 ${currentLang === 'ar' ? 'المستلم' : 'To'}: ${data.verification?.to?.substring(0, 16) || '-'}...
+              <br>🔢 ${currentLang === 'ar' ? 'رقم الكتلة' : 'Block'}: ${data.verification?.blockNumber || '-'}
+            </div>
+          `;
+        } else {
+          document.getElementById('adminVerifyResult').innerHTML = `<p style="color:#ff4444;">❌ ${data.error}</p>`;
+        }
+      } catch (error) {
+        document.getElementById('adminVerifyResult').innerHTML = `<p style="color:#ff4444;">❌ ${currentLang === 'ar' ? 'خطأ في الاتصال' : 'Connection error'}</p>`;
+      }
+    };
+
+    // إغلاق مودال فحص الهاش
+    document.getElementById('closeAdminVerifyModal').onclick = () => {
+      document.getElementById('adminVerifyModal').classList.add('hidden');
+    };
+
+    // ==========================================
     // إغلاق المودالات
+    // ==========================================
     document.getElementById('closeProductModal').onclick = () => document.getElementById('productModal').classList.add('hidden');
     document.getElementById('closeWithdrawModal').onclick = () => document.getElementById('withdrawModal').classList.add('hidden');
     document.getElementById('confirmWithdrawBtn').onclick = confirmWithdraw;
@@ -926,6 +1428,9 @@
       });
     });
 
+    // ==========================================
+    // تهيئة الصفحات
+    // ==========================================
     const pages = {
       dashboard: renderDashboard,
       products: renderProducts,
