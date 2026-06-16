@@ -168,7 +168,7 @@
     }
     .nav-item.active { color: #00aa55; }
     .nav-label { font-size: 10px; margin-top: 2px; }
-    .hidden { display: none; }
+    .hidden { display: none !important; }
     .modal {
       position: fixed;
       top: 0;
@@ -182,6 +182,7 @@
       justify-content: center;
       padding: 20px;
     }
+    .modal.hidden { display: none !important; }
     .modal-content {
       background: white;
       border-radius: 24px;
@@ -205,6 +206,7 @@
       cursor: pointer;
       margin-top: 12px;
     }
+    .close-modal:hover { background: #cc0000; }
     .input-field {
       width: 100%;
       padding: 12px;
@@ -251,6 +253,7 @@
       font-weight: bold;
       margin: 4px;
     }
+    .admin-btn:hover { opacity: 0.8; }
     .admin-btn-danger { background: linear-gradient(135deg, #dc2626, #b91c1c); }
     .admin-btn-success { background: linear-gradient(135deg, #059669, #047857); }
     .message {
@@ -375,7 +378,7 @@
       <p>أدخل Transaction Hash للتحقق</p>
       <input type="text" id="adminVerifyHash" class="input-field" placeholder="TXID (0x...)" style="direction:ltr;">
       <div id="adminVerifyResult" style="margin-top:12px;"></div>
-      <button id="adminVerifyBtn" style="background:#7c3aed; color:white; border:none; padding:12px; border-radius:30px; font-weight:bold; width:100%; cursor:pointer;">🔍 فحص</button>
+      <button id="adminVerifyBtn" style="background:#7c3aed; color:white; border:none; padding:12px; border-radius:30px; font-weight:bold; width:100%; cursor:pointer; margin-top:12px;">🔍 فحص</button>
       <button class="close-modal" id="closeAdminVerifyModal">إغلاق</button>
     </div>
   </div>
@@ -406,7 +409,7 @@
             'Content-Type': 'application/json',
             ...options.headers
           },
-          credentials: 'include' // ⭐ إرسال الكوكيز تلقائياً
+          credentials: 'include'
         });
 
         if (res.status === 401 || res.status === 403) {
@@ -988,7 +991,7 @@
     }
 
     // ==========================================
-    // دوال الأدمن
+    // ============ دوال الأدمن ============
     // ==========================================
 
     async function showAdminProductOrders(productId) {
@@ -1182,63 +1185,144 @@
       };
     }
 
+    // ==========================================
+    // فحص TXID (مودال الأدمن) - الإصلاح الكامل
+    // ==========================================
+
     function showAdminVerifyModal() {
+      // إخفاء أي مودال مفتوح أولاً
+      document.querySelectorAll('.modal').forEach(m => {
+        if (m.id !== 'adminVerifyModal') {
+          m.classList.add('hidden');
+        }
+      });
+      
       document.getElementById('adminVerifyModal').classList.remove('hidden');
       document.getElementById('adminVerifyHash').value = '';
       document.getElementById('adminVerifyResult').innerHTML = '';
+      
+      // إعادة تعيين الزر
+      const btn = document.getElementById('adminVerifyBtn');
+      btn.disabled = false;
+      btn.textContent = '🔍 فحص';
     }
 
+    // إغلاق مودال TXID يدوياً
+    function closeAdminVerifyModal() {
+      document.getElementById('adminVerifyModal').classList.add('hidden');
+      document.getElementById('adminVerifyHash').value = '';
+      document.getElementById('adminVerifyResult').innerHTML = '';
+      
+      // إعادة تعيين الزر
+      const btn = document.getElementById('adminVerifyBtn');
+      btn.disabled = false;
+      btn.textContent = '🔍 فحص';
+    }
+
+    document.getElementById('closeAdminVerifyModal').onclick = function() {
+      closeAdminVerifyModal();
+    };
+
+    // إغلاق عند الضغط على الخلفية
+    document.getElementById('adminVerifyModal').addEventListener('click', function(e) {
+      if (e.target === this) {
+        closeAdminVerifyModal();
+      }
+    });
+
+    // زر فحص TXID
     document.getElementById('adminVerifyBtn').onclick = async function() {
       const txHash = document.getElementById('adminVerifyHash').value.trim();
+      const resultDiv = document.getElementById('adminVerifyResult');
 
       if (!txHash) {
-        document.getElementById('adminVerifyResult').innerHTML = '<p style="color:#ff4444;">⚠️ يرجى إدخال TXID</p>';
+        resultDiv.innerHTML = '<p style="color:#ff4444;">⚠️ يرجى إدخال TXID</p>';
         return;
       }
 
-      document.getElementById('adminVerifyResult').innerHTML = '<p style="color:#00ccff;">⏳ جاري التحقق...</p>';
+      // تعطيل الزر أثناء التحقق
+      this.disabled = true;
+      this.textContent = '⏳ جاري...';
+      resultDiv.innerHTML = '<p style="color:#00ccff;">⏳ جاري التحقق...</p>';
 
       try {
         const res = await fetchWithAuth(`${API_URL}/api/admin/verify-deposit`, {
           method: 'POST',
           body: JSON.stringify({ transactionHash: txHash, amount: 0 })
         });
-        if (!res) return;
+
+        if (!res) {
+          this.disabled = false;
+          this.textContent = '🔍 فحص';
+          return;
+        }
+
         const data = await res.json();
 
         if (data.success) {
           const v = data.verification;
-          document.getElementById('adminVerifyResult').innerHTML = `
+          resultDiv.innerHTML = `
             <div style="background:rgba(0,170,85,0.15);border:1px solid #00aa55;border-radius:12px;padding:12px;color:#00aa55;">
               ✅ المعاملة صالحة
               <br>💰 المبلغ: ${v?.amount || 'غير معروف'} USDT
               <br>📤 المرسل: ${v?.from?.substring(0, 16) || '-'}...
               <br>📥 المستلم: ${v?.to?.substring(0, 16) || '-'}...
               <br>🔢 رقم الكتلة: ${v?.blockNumber || '-'}
+              <br><br>
+              <button onclick="closeAdminVerifyModal()" 
+                      style="background:#00aa55;color:white;border:none;padding:10px 20px;border-radius:20px;cursor:pointer;width:100%;font-weight:bold;font-size:14px;">
+                ✅ تم، إغلاق
+              </button>
             </div>
           `;
         } else {
-          document.getElementById('adminVerifyResult').innerHTML = `<p style="color:#ff4444;">❌ ${data.error}</p>`;
+          resultDiv.innerHTML = `
+            <div style="background:rgba(255,68,68,0.15);border:1px solid #ff4444;border-radius:12px;padding:12px;color:#ff4444;">
+              ❌ ${data.error}
+              <br><br>
+              <button onclick="document.getElementById('adminVerifyResult').innerHTML = ''" 
+                      style="background:#ff4444;color:white;border:none;padding:8px 16px;border-radius:20px;cursor:pointer;">
+                مسح
+              </button>
+            </div>
+          `;
         }
       } catch (error) {
-        document.getElementById('adminVerifyResult').innerHTML = '<p style="color:#ff4444;">❌ خطأ في الاتصال</p>';
+        resultDiv.innerHTML = `
+          <div style="background:rgba(255,68,68,0.15);border:1px solid #ff4444;border-radius:12px;padding:12px;color:#ff4444;">
+            ❌ خطأ في الاتصال
+            <br><br>
+            <button onclick="document.getElementById('adminVerifyResult').innerHTML = ''" 
+                    style="background:#ff4444;color:white;border:none;padding:8px 16px;border-radius:20px;cursor:pointer;">
+              مسح
+            </button>
+          </div>
+        `;
       }
-    };
 
-    document.getElementById('closeAdminVerifyModal').onclick = () => {
-      document.getElementById('adminVerifyModal').classList.add('hidden');
+      // إعادة تفعيل الزر
+      this.disabled = false;
+      this.textContent = '🔍 فحص';
     };
 
     // ==========================================
-    // إغلاق المودالات
+    // إغلاق المودالات الأخرى
     // ==========================================
 
-    document.getElementById('closeProductModal').onclick = () => document.getElementById('productModal').classList.add('hidden');
-    document.getElementById('closeWithdrawModal').onclick = () => document.getElementById('withdrawModal').classList.add('hidden');
+    document.getElementById('closeProductModal').onclick = () => {
+      document.getElementById('productModal').classList.add('hidden');
+    };
 
+    document.getElementById('closeWithdrawModal').onclick = () => {
+      document.getElementById('withdrawModal').classList.add('hidden');
+    };
+
+    // إغلاق المودالات عند الضغط على الخلفية
     document.querySelectorAll('.modal').forEach(modal => {
       modal.addEventListener('click', (e) => {
-        if (e.target === modal) modal.classList.add('hidden');
+        if (e.target === modal) {
+          modal.classList.add('hidden');
+        }
       });
     });
 
