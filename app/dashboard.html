@@ -11,7 +11,7 @@
       min-height: 100vh;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       padding-bottom: 80px;
-      transition: all 0.3s ease;
+      transition: background-color 0.3s ease, color 0.3s ease;
     }
     
     /* الوضع النهاري (الأساسي) */
@@ -39,7 +39,7 @@
       align-items: center;
       flex-wrap: wrap;
       gap: 10px;
-      transition: all 0.3s ease;
+      transition: background-color 0.3s ease, border-color 0.3s ease;
     }
     body.dark-mode .navbar {
       background: #1a1a2e;
@@ -256,6 +256,7 @@
       display: flex;
       flex-direction: column;
       align-items: center;
+      transition: color 0.3s ease;
     }
     body.dark-mode .nav-item { color: #8899aa; }
     .nav-item.active { color: #00aa55; }
@@ -285,6 +286,7 @@
       max-height: 90vh;
       overflow-y: auto;
       border: 1px solid #00aa55;
+      transition: background-color 0.3s ease, border-color 0.3s ease;
     }
     body.dark-mode .modal-content {
       background: #1a1a2e;
@@ -318,6 +320,7 @@
       background: #ffffff;
       color: #1a1a2e;
       margin-bottom: 12px;
+      transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
     }
     body.dark-mode .input-field {
       background: #0a0a0f;
@@ -640,29 +643,26 @@
     }
 
     // ==========================================
-    // إدارة الوضع النهاري/الليلي
+    // إدارة الوضع النهاري/الليلي - الإصلاح
     // ==========================================
     function setTheme(theme) {
       const body = document.body;
       body.classList.remove('dark-mode');
       if (theme === 'dark') {
         body.classList.add('dark-mode');
-        document.getElementById('themeToggleBtn').innerHTML = '🌙 وضع ليلي';
-        document.getElementById('themeText').innerHTML = 'وضع ليلي';
+        document.getElementById('themeToggleBtn').innerHTML = '🌙 <span id="themeText">وضع ليلي</span>';
+        document.getElementById('themeText').textContent = 'وضع ليلي';
       } else {
-        document.getElementById('themeToggleBtn').innerHTML = '☀️ وضع نهاري';
-        document.getElementById('themeText').innerHTML = 'وضع نهاري';
+        document.getElementById('themeToggleBtn').innerHTML = '☀️ <span id="themeText">وضع نهاري</span>';
+        document.getElementById('themeText').textContent = 'وضع نهاري';
       }
       localStorage.setItem('theme', theme);
       currentTheme = theme;
     }
     
     function toggleTheme() {
-      if (currentTheme === 'light') {
-        setTheme('dark');
-      } else {
-        setTheme('light');
-      }
+      const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+      setTheme(newTheme);
     }
 
     // ==========================================
@@ -692,11 +692,6 @@
         isAdmin = data.is_admin === true;
         
         document.getElementById('userName').innerHTML = `👋 ${userData.name}`;
-        
-        // إظهار رسالة ترحيبية
-        if (!localStorage.getItem('welcomeShown')) {
-          localStorage.setItem('welcomeShown', 'true');
-        }
         
         // تهيئة الصفحة الرئيسية
         currentPage = 'dashboard';
@@ -874,7 +869,7 @@
         document.getElementById('modalProductDesc').textContent = product.description || '';
         document.getElementById('modalProductPrice').textContent = `💰 سعر الحبة: ${product.group_price} USDT`;
         document.getElementById('modalProductWholesale').textContent = `📦 سعر الجملة: ${product.wholesale_price} USDT`;
-        document.getElementById('modalProductProgress').textContent = `📊 التقدم: ${product.current_orders} ${product.min_quantity}`;
+        document.getElementById('modalProductProgress').textContent = `📊 التقدم: ${product.current_orders} من ${product.min_quantity}`;
         document.getElementById('modalProgressFill').style.width = Math.min((product.current_orders / product.min_quantity) * 100, 100) + '%';
         const remaining = Math.max(0, product.min_quantity - product.current_orders);
         document.getElementById('modalProductRemaining').textContent = `📦 المتبقي: ${remaining} قطعة`;
