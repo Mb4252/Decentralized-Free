@@ -29,7 +29,6 @@
       color: #ffffff;
     }
     
-    /* أنماط النهار */
     .navbar {
       background: #ffffff;
       border-bottom: 1px solid #00aa55;
@@ -54,7 +53,7 @@
     .user-name { color: #00aa55; font-size: 14px; }
     body.dark-mode .user-name { color: #00ff66; }
     
-    .support-btn, .lang-btn-header, .theme-toggle {
+    .support-btn, .theme-toggle {
       background: rgba(0,170,85,0.1);
       border: 1px solid #00aa55;
       color: #00aa55;
@@ -68,7 +67,6 @@
       transition: all 0.3s ease;
     }
     body.dark-mode .support-btn,
-    body.dark-mode .lang-btn-header,
     body.dark-mode .theme-toggle {
       background: rgba(0,255,102,0.15);
       border-color: #00ff66;
@@ -618,6 +616,7 @@
     let currentTheme = localStorage.getItem('theme') || 'light';
     let currentProductId = null;
     let currentOrderId = null;
+    let isAdmin = false;
 
     const HOT_WALLET_ADDRESS = '0x9EB39A10c059877910DAff1fd8098e5DB32486F7';
     const MIN_WITHDRAW = 0.5;
@@ -670,11 +669,8 @@
         const data = await res.json();
         if (data.error) { localStorage.clear(); window.location.href = '/'; return; }
         userData = data;
+        isAdmin = userData.is_admin || false;
         document.getElementById('userName').innerHTML = `👋 ${userData.name}`;
-        
-        if (userData.is_admin) {
-          localStorage.setItem('isAdmin', 'true');
-        }
         
         // إظهار رسالة ترحيبية
         if (!localStorage.getItem('welcomeShown')) {
@@ -683,7 +679,10 @@
         
         currentPage = 'dashboard';
         renderDashboard();
-      } catch(e) { console.error(e); }
+      } catch(e) { 
+        console.error(e); 
+        showErrorModal('❌ خطأ', 'حدث خطأ في تحميل البيانات');
+      }
     }
 
     document.getElementById('logoutBtn').onclick = () => {
@@ -735,6 +734,7 @@
           <div class="detail-row"><span>💰 الرصيد المتاح</span><span class="detail-value">${avail.toFixed(2)} USDT</span></div>
           <div class="detail-row"><span>📦 إجمالي الطلبات</span><span class="detail-value">${totalOrders}</span></div>
           <div class="detail-row"><span>💳 إجمالي المنفق</span><span class="detail-value">${totalSpent.toFixed(2)} USDT</span></div>
+          ${isAdmin ? `<div style="margin-top:12px; padding:8px; background:rgba(124,58,237,0.1); border-radius:12px; color:#7c3aed; text-align:center; font-weight:bold;">🛠️ أنت مدير النظام</div>` : ''}
         </div>
         
         <div class="stats-grid">
@@ -772,8 +772,6 @@
     // المنتجات
     // ==========================================
     async function renderProducts() {
-      const isAdmin = userData?.is_admin || false;
-      
       document.getElementById('mainContent').innerHTML = `
         <div class="card">
           <div class="card-title">📦 المنتجات</div>
@@ -1159,7 +1157,7 @@
     }
 
     // ==========================================
-    // الملف الشخصي
+    // الملف الشخصي (أنا)
     // ==========================================
     async function renderProfile() {
       const avail = userData?.available_balance || 0;
@@ -1190,10 +1188,12 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId })
         });
-        const transactions = await res.json();
+        let transactions = await res.json();
+        if (!Array.isArray(transactions)) transactions = [];
+        
         const listDiv = document.getElementById('transactionsList');
         
-        if (!transactions || transactions.length === 0) {
+        if (transactions.length === 0) {
           listDiv.innerHTML = `<p style="color:#888888; text-align:center;">لا توجد معاملات</p>`;
         } else {
           const typeMap = {
@@ -1209,13 +1209,14 @@
                 <div class="transaction-date">${new Date(t.created_at).toLocaleDateString()}</div>
               </div>
               <div>
-                <div class="transaction-amount">${t.amount.toFixed(2)} USDT</div>
-                <div class="transaction-status status-${t.status}">${t.status === 'approved' ? '✅ تم' : '⏳ قيد الانتظار'}</div>
+                <div class="transaction-amount">${(t.amount || 0).toFixed(2)} USDT</div>
+                <div class="transaction-status ${t.status === 'approved' ? 'status-confirmed' : 'status-pending'}">${t.status === 'approved' ? '✅ تم' : '⏳ قيد الانتظار'}</div>
               </div>
             </div>
           `).join('');
         }
       } catch (error) {
+        console.error('Error loading transactions:', error);
         document.getElementById('transactionsList').innerHTML = `<p style="color:#ff4444;">خطأ في تحميل المعاملات</p>`;
       }
       
@@ -1226,10 +1227,12 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId })
         });
-        const orders = await res.json();
+        let orders = await res.json();
+        if (!Array.isArray(orders)) orders = [];
+        
         const listDiv = document.getElementById('profileOrdersList');
         
-        if (!orders || orders.length === 0) {
+        if (orders.length === 0) {
           listDiv.innerHTML = `<p style="color:#888888; text-align:center;">لا توجد طلبات</p>`;
         } else {
           const statusMap = {
@@ -1247,13 +1250,14 @@
                 <div class="transaction-date">${new Date(o.created_at).toLocaleDateString()}</div>
               </div>
               <div style="text-align:left;">
-                <div class="transaction-amount">${o.total_amount.toFixed(2)} USDT</div>
+                <div class="transaction-amount">${(o.total_amount || 0).toFixed(2)} USDT</div>
                 <div class="transaction-status">${statusMap[o.status] || o.status}</div>
               </div>
             </div>
           `).join('');
         }
       } catch (error) {
+        console.error('Error loading orders:', error);
         document.getElementById('profileOrdersList').innerHTML = `<p style="color:#ff4444;">خطأ في تحميل الطلبات</p>`;
       }
     }
