@@ -65,8 +65,10 @@
       background: #ffffff;
       color: #1a1a2e;
       font-size: 14px;
+      transition: border-color 0.3s, box-shadow 0.3s;
     }
     .input-wrapper input:focus { outline: none; border-color: #00cc77; box-shadow: 0 0 0 3px rgba(0,170,85,0.1); }
+    .input-wrapper input::placeholder { color: #aaaaaa; }
     
     .checkbox-group {
       display: flex;
@@ -90,6 +92,7 @@
       transition: all 0.3s;
     }
     .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 25px -5px rgba(0,170,85,0.4); }
+    .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
     
     .info-section {
       background: rgba(0,170,85,0.05);
@@ -140,9 +143,82 @@
       margin-top: 16px;
       text-align: center;
     }
+    .generated-code strong {
+      color: #00aa55;
+      font-size: 18px;
+      letter-spacing: 2px;
+    }
+
+    /* وضع ليلي */
+    body.dark-mode {
+      background: #0a0a0f;
+    }
+    body.dark-mode .card {
+      background: #1a1a2e;
+      border-color: #00ff66;
+    }
+    body.dark-mode .logo h1 { color: #00ff66; }
+    body.dark-mode .logo p { color: #8899aa; }
+    body.dark-mode .lang-btn {
+      border-color: #00ff66;
+      color: #00ff66;
+    }
+    body.dark-mode .lang-btn.active {
+      background: #00ff66;
+      color: #0a0a0f;
+    }
+    body.dark-mode .tabs { background: #1a1a2e; }
+    body.dark-mode .tab { color: #8899aa; }
+    body.dark-mode .tab.active { background: linear-gradient(135deg, #00ff66, #00ccff); color: #0a0a0f; }
+    body.dark-mode .input-wrapper input {
+      background: #0a0a0f;
+      border-color: #00ff66;
+      color: white;
+    }
+    body.dark-mode .input-wrapper input::placeholder { color: #556677; }
+    body.dark-mode .input-wrapper input:focus { border-color: #00ccff; box-shadow: 0 0 0 3px rgba(0,255,102,0.1); }
+    body.dark-mode .checkbox-group label { color: #8899aa; }
+    body.dark-mode .info-section { background: rgba(0,255,102,0.05); border-color: rgba(0,255,102,0.2); }
+    body.dark-mode .info-title { color: #00ff66; }
+    body.dark-mode .info-list li { color: #8899aa; }
+    body.dark-mode .info-list li::before { color: #00ff66; }
+    body.dark-mode .highlight { color: #00ff66; }
+    body.dark-mode .generated-code { background: rgba(0,255,102,0.1); border-color: #00ff66; }
+    body.dark-mode .generated-code strong { color: #00ff66; }
+
+    /* زر تبديل الوضع في صفحة تسجيل الدخول */
+    .theme-toggle-login {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      background: rgba(0,170,85,0.1);
+      border: 1px solid #00aa55;
+      color: #00aa55;
+      padding: 8px 14px;
+      border-radius: 30px;
+      cursor: pointer;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.3s ease;
+      z-index: 100;
+    }
+    body.dark-mode .theme-toggle-login {
+      background: rgba(0,255,102,0.15);
+      border-color: #00ff66;
+      color: #00ff66;
+    }
+    .theme-toggle-login:hover {
+      transform: scale(1.05);
+    }
   </style>
 </head>
 <body>
+
+  <!-- زر تبديل الوضع النهاري/الليلي -->
+  <button class="theme-toggle-login" id="themeToggleLogin">☀️ <span id="themeTextLogin">وضع نهاري</span></button>
+
   <div class="container">
     <div class="card">
       <div class="lang-switch">
@@ -165,13 +241,13 @@
         <div class="input-group">
           <label>📧 البريد الإلكتروني</label>
           <div class="input-wrapper">
-            <input type="email" id="loginEmail" placeholder="example@email.com">
+            <input type="email" id="loginEmail" placeholder="example@email.com" autocomplete="email">
           </div>
         </div>
         <div class="input-group">
           <label>🔒 كلمة المرور</label>
           <div class="input-wrapper">
-            <input type="password" id="loginPassword" placeholder="********">
+            <input type="password" id="loginPassword" placeholder="********" autocomplete="current-password">
           </div>
         </div>
         <div class="checkbox-group">
@@ -186,31 +262,31 @@
         <div class="input-group">
           <label>👤 اسم المستخدم</label>
           <div class="input-wrapper">
-            <input type="text" id="regName" placeholder="أدخل اسمك">
+            <input type="text" id="regName" placeholder="أدخل اسمك" autocomplete="name">
           </div>
         </div>
         <div class="input-group">
           <label>📧 البريد الإلكتروني</label>
           <div class="input-wrapper">
-            <input type="email" id="regEmail" placeholder="example@email.com">
+            <input type="email" id="regEmail" placeholder="example@email.com" autocomplete="email">
           </div>
         </div>
         <div class="input-group">
           <label>🔒 كلمة المرور</label>
           <div class="input-wrapper">
-            <input type="password" id="regPassword" placeholder="********">
+            <input type="password" id="regPassword" placeholder="********" autocomplete="new-password">
           </div>
         </div>
         <div class="input-group">
           <label>✔️ تأكيد كلمة المرور</label>
           <div class="input-wrapper">
-            <input type="password" id="regConfirmPassword" placeholder="********">
+            <input type="password" id="regConfirmPassword" placeholder="********" autocomplete="new-password">
           </div>
         </div>
         <div class="input-group">
           <label>🎁 رمز الدعوة (اختياري)</label>
           <div class="input-wrapper">
-            <input type="text" id="regReferral" placeholder="XXXXXX">
+            <input type="text" id="regReferral" placeholder="XXXXXX" autocomplete="off">
           </div>
         </div>
         <button class="btn-primary" id="doRegisterBtn">إنشاء حساب</button>
@@ -233,9 +309,9 @@
   </div>
   
   <script>
-    const API_URL = window.location.origin;
-    let currentLang = localStorage.getItem('loginLang') || 'ar';
-    
+    // ==========================================
+    // الترجمة
+    // ==========================================
     const translations = {
       ar: {
         errorFillFields: '⚠️ يرجى ملء جميع الحقول',
@@ -247,7 +323,9 @@
         successRegister: '✅ تم إنشاء الحساب بنجاح!',
         redirecting: 'جاري التحويل...',
         yourReferralCode: '✨ رمز الدعوة الخاص بك:',
-        emailExists: '❌ هذا البريد مسجل بالفعل'
+        emailExists: '❌ هذا البريد مسجل بالفعل',
+        loginTitle: 'تسجيل الدخول',
+        registerTitle: 'إنشاء حساب'
       },
       en: {
         errorFillFields: '⚠️ Please fill in all fields',
@@ -259,16 +337,53 @@
         successRegister: '✅ Account created successfully!',
         redirecting: 'Redirecting...',
         yourReferralCode: '✨ Your referral code:',
-        emailExists: '❌ This email is already registered'
+        emailExists: '❌ This email is already registered',
+        loginTitle: 'Login',
+        registerTitle: 'Register'
       }
     };
-    
+
+    const API_URL = window.location.origin;
+    let currentLang = localStorage.getItem('loginLang') || 'ar';
+    let currentTheme = localStorage.getItem('theme') || 'light';
+
+    // ==========================================
+    // إدارة الوضع النهاري/الليلي
+    // ==========================================
+
+    function setTheme(theme) {
+      const body = document.body;
+      body.classList.remove('dark-mode');
+      if (theme === 'dark') {
+        body.classList.add('dark-mode');
+        document.getElementById('themeToggleLogin').innerHTML = '🌙 <span id="themeTextLogin">وضع ليلي</span>';
+        document.getElementById('themeTextLogin').textContent = 'وضع ليلي';
+      } else {
+        document.getElementById('themeToggleLogin').innerHTML = '☀️ <span id="themeTextLogin">وضع نهاري</span>';
+        document.getElementById('themeTextLogin').textContent = 'وضع نهاري';
+      }
+      localStorage.setItem('theme', theme);
+      currentTheme = theme;
+    }
+
+    function toggleTheme() {
+      const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+      setTheme(newTheme);
+    }
+
+    document.getElementById('themeToggleLogin').onclick = toggleTheme;
+    setTheme(currentTheme);
+
+    // ==========================================
+    // إدارة اللغة
+    // ==========================================
+
     function updateUILanguage() {
       document.querySelectorAll('.lang-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.lang === currentLang);
       });
     }
-    
+
     document.querySelectorAll('.lang-btn').forEach(btn => {
       btn.onclick = () => {
         currentLang = btn.dataset.lang;
@@ -276,37 +391,67 @@
         updateUILanguage();
       };
     });
-    
+
+    // ==========================================
+    // دوال مساعدة
+    // ==========================================
+
     function showMessage(msg, type) {
       const div = document.getElementById('message');
       div.innerHTML = `<div class="message ${type}">${msg}</div>`;
-      setTimeout(() => div.innerHTML = '', 5000);
+      setTimeout(() => div.innerHTML = '', 6000);
     }
-    
+
+    function setLoading(button, loading) {
+      if (loading) {
+        button.disabled = true;
+        button.textContent = '⏳ جاري...';
+      } else {
+        button.disabled = false;
+        const isLogin = button.id === 'doLoginBtn';
+        const t = translations[currentLang];
+        button.textContent = isLogin ? t.loginTitle : t.registerTitle;
+      }
+    }
+
+    // ==========================================
+    // تبديل التبويبات
+    // ==========================================
+
     document.getElementById('loginTab').onclick = () => {
       document.getElementById('loginTab').classList.add('active');
       document.getElementById('registerTab').classList.remove('active');
       document.getElementById('loginForm').classList.remove('hidden');
       document.getElementById('registerForm').classList.add('hidden');
+      document.getElementById('message').innerHTML = '';
     };
+
     document.getElementById('registerTab').onclick = () => {
       document.getElementById('registerTab').classList.add('active');
       document.getElementById('loginTab').classList.remove('active');
       document.getElementById('loginForm').classList.add('hidden');
       document.getElementById('registerForm').classList.remove('hidden');
+      document.getElementById('message').innerHTML = '';
     };
-    
+
+    // ==========================================
+    // تسجيل الدخول
+    // ==========================================
+
     document.getElementById('doLoginBtn').onclick = async () => {
       const t = translations[currentLang];
-      const email = document.getElementById('loginEmail').value;
+      const email = document.getElementById('loginEmail').value.trim();
       const password = document.getElementById('loginPassword').value;
       const rememberMe = document.getElementById('rememberMe').checked;
-      
+      const btn = document.getElementById('doLoginBtn');
+
       if (!email || !password) {
         showMessage(t.errorFillFields, 'error');
         return;
       }
-      
+
+      setLoading(btn, true);
+
       try {
         const res = await fetch(`${API_URL}/api/login`, {
           method: 'POST',
@@ -314,49 +459,66 @@
           body: JSON.stringify({ email, password })
         });
         const data = await res.json();
-        
+
         if (data.success) {
-          localStorage.setItem('userId', data.user.id);
+          // تخزين JWT token
+          localStorage.setItem('token', data.token);
           localStorage.setItem('user', JSON.stringify(data.user));
           localStorage.setItem('dashboardLang', currentLang);
+
           if (rememberMe) {
             localStorage.setItem('rememberMe', 'true');
           } else {
             localStorage.removeItem('rememberMe');
           }
-          // تعيين الوضع النهاري كأساسي
-          localStorage.setItem('theme', 'light');
+
+          localStorage.setItem('theme', currentTheme);
           showMessage(`${t.successLogin} ${t.redirecting}`, 'success');
-          setTimeout(() => { window.location.href = '/dashboard.html'; }, 1500);
+
+          setTimeout(() => {
+            window.location.href = '/dashboard.html';
+          }, 1500);
         } else {
           showMessage(t.errorLogin, 'error');
+          setLoading(btn, false);
         }
       } catch (error) {
+        console.error('Login error:', error);
         showMessage(t.errorConnection, 'error');
+        setLoading(btn, false);
       }
     };
-    
+
+    // ==========================================
+    // إنشاء حساب جديد
+    // ==========================================
+
     document.getElementById('doRegisterBtn').onclick = async () => {
       const t = translations[currentLang];
-      const name = document.getElementById('regName').value;
-      const email = document.getElementById('regEmail').value;
+      const name = document.getElementById('regName').value.trim();
+      const email = document.getElementById('regEmail').value.trim();
       const password = document.getElementById('regPassword').value;
       const confirm = document.getElementById('regConfirmPassword').value;
-      const referralCode = document.getElementById('regReferral').value;
-      
+      const referralCode = document.getElementById('regReferral').value.trim().toUpperCase();
+      const btn = document.getElementById('doRegisterBtn');
+
       if (!name || !email || !password || !confirm) {
         showMessage(t.errorFillFields, 'error');
         return;
       }
+
       if (password !== confirm) {
         showMessage(t.errorPasswordMatch, 'error');
         return;
       }
+
       if (password.length < 4) {
         showMessage(t.errorPasswordLength, 'error');
         return;
       }
-      
+
+      setLoading(btn, true);
+
       try {
         const res = await fetch(`${API_URL}/api/register`, {
           method: 'POST',
@@ -364,40 +526,86 @@
           body: JSON.stringify({ name, email, password, referralCode })
         });
         const data = await res.json();
-        
+
         if (data.success) {
-          localStorage.setItem('userId', data.user.id);
+          // تخزين JWT token
+          localStorage.setItem('token', data.token);
           localStorage.setItem('user', JSON.stringify(data.user));
           localStorage.setItem('dashboardLang', currentLang);
-          // تعيين الوضع النهاري كأساسي
-          localStorage.setItem('theme', 'light');
-          
+          localStorage.setItem('theme', currentTheme);
+
           const generatedDiv = document.getElementById('generatedReferral');
           generatedDiv.innerHTML = `${t.yourReferralCode} <strong>${data.referral_code}</strong>`;
           generatedDiv.classList.remove('hidden');
-          
+
           showMessage(`${t.successRegister} ${t.redirecting}`, 'success');
-          setTimeout(() => { window.location.href = '/dashboard.html'; }, 2000);
+
+          setTimeout(() => {
+            window.location.href = '/dashboard.html';
+          }, 2000);
         } else {
-          if (data.error && data.error.includes('مسجل')) {
+          if (data.error && (data.error.includes('مسجل') || data.error.includes('registered'))) {
             showMessage(t.emailExists, 'error');
           } else {
             showMessage(`❌ ${data.error}`, 'error');
           }
+          setLoading(btn, false);
         }
       } catch (error) {
+        console.error('Register error:', error);
         showMessage(t.errorConnection, 'error');
+        setLoading(btn, false);
       }
     };
-    
-    const savedUserId = localStorage.getItem('userId');
-    const rememberMe = localStorage.getItem('rememberMe');
-    if (savedUserId && rememberMe === 'true') {
-      localStorage.setItem('theme', 'light');
-      window.location.href = '/dashboard.html';
-    }
-    
+
+    // ==========================================
+    // Enter key support
+    // ==========================================
+
+    document.getElementById('loginPassword').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') document.getElementById('doLoginBtn').click();
+    });
+
+    document.getElementById('regConfirmPassword').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') document.getElementById('doRegisterBtn').click();
+    });
+
+    // ==========================================
+    // التحقق من الجلسة الحالية
+    // ==========================================
+
+    (function checkSession() {
+      const token = localStorage.getItem('token');
+      const rememberMe = localStorage.getItem('rememberMe');
+
+      if (token && rememberMe === 'true') {
+        // التحقق من صحة token
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          const exp = payload.exp * 1000;
+          if (Date.now() < exp) {
+            // token صالح - توجيه إلى dashboard
+            localStorage.setItem('theme', currentTheme);
+            window.location.href = '/dashboard.html';
+            return;
+          }
+        } catch (e) {
+          // token غير صالح - حذفه
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+        }
+      }
+    })();
+
+    // ==========================================
+    // تهيئة اللغة
+    // ==========================================
+
     updateUILanguage();
+
+    console.log('🛍️ منصة الشراء الجماعي - صفحة تسجيل الدخول');
+    console.log('🔐 نظام مصادقة آمن مع JWT');
+    console.log('🌐 تم التحميل بنجاح');
   </script>
 </body>
 </html>
