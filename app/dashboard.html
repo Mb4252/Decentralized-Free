@@ -614,7 +614,6 @@
 
   <script>
     const API_URL = window.location.origin;
-    let userId = localStorage.getItem('userId');
     let userData = null;
     let currentTheme = localStorage.getItem('theme') || 'light';
     let currentProductId = null;
@@ -624,27 +623,72 @@
     const HOT_WALLET_ADDRESS = '0x9EB39A10c059877910DAff1fd8098e5DB32486F7';
     const MIN_WITHDRAW = 0.5;
 
-    function showErrorModal(title, message) {
-      const existingModal = document.getElementById('errorModal');
-      if (existingModal) existingModal.remove();
-      
-      const modalHtml = `
-        <div id="errorModal" class="modal" style="display:flex;">
-          <div class="modal-content" style="text-align:center;">
-            <div style="font-size:48px; margin-bottom:16px;">❌</div>
-            <h3 style="color:#ff4444; margin-bottom:16px;">${title}</h3>
-            <p style="color:#555555; margin-bottom:20px; line-height:1.6;">${message}</p>
-            <button class="close-modal" id="closeErrorModal" style="background:#ff4444; color:white;">✅ فهمت</button>
-          </div>
-        </div>
-      `;
-      document.body.insertAdjacentHTML('beforeend', modalHtml);
-      document.getElementById('closeErrorModal').onclick = () => document.getElementById('errorModal').remove();
+    // ==========================================
+    // دوال المصادقة (JWT)
+    // ==========================================
+
+    function getToken() {
+      return localStorage.getItem('token');
+    }
+
+    function getUserId() {
+      const token = getToken();
+      if (!token) return null;
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        return payload.userId;
+      } catch {
+        return null;
+      }
+    }
+
+    function isTokenValid() {
+      const token = getToken();
+      if (!token) return false;
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        const exp = payload.exp * 1000;
+        return Date.now() < exp;
+      } catch {
+        return false;
+      }
+    }
+
+    async function fetchWithAuth(url, options = {}) {
+      const token = getToken();
+      if (!token || !isTokenValid()) {
+        localStorage.clear();
+        window.location.href = '/';
+        return null;
+      }
+
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        ...options.headers
+      };
+
+      try {
+        const response = await fetch(url, { ...options, headers });
+
+        if (response.status === 401 || response.status === 403) {
+          localStorage.clear();
+          window.location.href = '/';
+          return null;
+        }
+
+        return response;
+      } catch (error) {
+        console.error('Fetch error:', error);
+        showMessage('❌ خطأ في الاتصال بالخادم', 'error');
+        return null;
+      }
     }
 
     // ==========================================
-    // إدارة الوضع النهاري/الليلي - الإصلاح
+    // إدارة الوضع النهاري/الليلي
     // ==========================================
+
     function setTheme(theme) {
       const body = document.body;
       body.classList.remove('dark-mode');
@@ -659,57 +703,33 @@
       localStorage.setItem('theme', theme);
       currentTheme = theme;
     }
-    
+
     function toggleTheme() {
       const newTheme = currentTheme === 'light' ? 'dark' : 'light';
       setTheme(newTheme);
     }
 
     // ==========================================
-    // تحميل المستخدم
+    // دوال مساعدة
     // ==========================================
-    async function loadUser() {
-      if (!userId) { 
-        window.location.href = '/'; 
-        return; 
-      }
-      
-      try {
-        const res = await fetch(`${API_URL}/api/user`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId })
-        });
-        const data = await res.json();
-        
-        if (data.error) { 
-          localStorage.clear(); 
-          window.location.href = '/'; 
-          return; 
-        }
-        
-        userData = data;
-        isAdmin = data.is_admin === true;
-        
-        document.getElementById('userName').innerHTML = `👋 ${userData.name}`;
-        
-        // تهيئة الصفحة الرئيسية
-        currentPage = 'dashboard';
-        renderDashboard();
-        
-      } catch(e) { 
-        console.error('Load user error:', e); 
-        showErrorModal('❌ خطأ', 'حدث خطأ في تحميل البيانات');
-      }
-    }
 
-    document.getElementById('logoutBtn').onclick = () => {
-      localStorage.clear();
-      window.location.href = '/';
-    };
-    
-    document.getElementById('supportBtn').onclick = () => window.open('https://t.me/cryptoenvset', '_blank');
-    document.getElementById('themeToggleBtn').onclick = toggleTheme;
+    function showErrorModal(title, message) {
+      const existingModal = document.getElementById('errorModal');
+      if (existingModal) existingModal.remove();
+
+      const modalHtml = `
+        <div id="errorModal" class="modal" style="display:flex;">
+          <div class="modal-content" style="text-align:center;">
+            <div style="font-size:48px; margin-bottom:16px;">❌</div>
+            <h3 style="color:#ff4444; margin-bottom:16px;">${title}</h3>
+            <p style="color:#555555; margin-bottom:20px; line-height:1.6;">${message}</p>
+            <button class="close-modal" id="closeErrorModal" style="background:#ff4444; color:white;">✅ فهمت</button>
+          </div>
+        </div>
+      `;
+      document.body.insertAdjacentHTML('beforeend', modalHtml);
+      document.getElementById('closeErrorModal').onclick = () => document.getElementById('errorModal').remove();
+    }
 
     function showMessage(msg, type, duration = 5000) {
       const container = document.getElementById('mainContent');
@@ -734,20 +754,73 @@
     }
 
     // ==========================================
+    // تحميل المستخدم
+    // ==========================================
+
+    async function loadUser() {
+      const token = getToken();
+      if (!token || !isTokenValid()) {
+        localStorage.clear();
+        window.location.href = '/';
+        return;
+      }
+
+      try {
+        const res = await fetchWithAuth(`${API_URL}/api/user`, {
+          method: 'POST'
+        });
+
+        if (!res) return;
+
+        const data = await res.json();
+
+        if (data.error) {
+          localStorage.clear();
+          window.location.href = '/';
+          return;
+        }
+
+        userData = data;
+        isAdmin = data.is_admin === true;
+
+        document.getElementById('userName').innerHTML = `👋 ${userData.name}`;
+
+        currentPage = 'dashboard';
+        renderDashboard();
+
+      } catch (e) {
+        console.error('Load user error:', e);
+        showErrorModal('❌ خطأ', 'حدث خطأ في تحميل البيانات');
+      }
+    }
+
+    // ==========================================
+    // أحداث الأزرار
+    // ==========================================
+
+    document.getElementById('logoutBtn').onclick = () => {
+      localStorage.clear();
+      window.location.href = '/';
+    };
+
+    document.getElementById('supportBtn').onclick = () => window.open('https://t.me/cryptoenvset', '_blank');
+    document.getElementById('themeToggleBtn').onclick = toggleTheme;
+
+    // ==========================================
     // الصفحات
     // ==========================================
-    
+
     async function renderDashboard() {
       const avail = userData?.available_balance || 0;
       const totalOrders = userData?.total_orders || 0;
       const totalSpent = userData?.total_spent || 0;
-      
+
       document.getElementById('mainContent').innerHTML = `
         <div class="welcome-message">
           <h2>🌟 مرحباً بك في منصة الشراء الجماعي</h2>
           <p>نحن نؤمن بأن التجزئة باهظة الثمن، لذلك نشتري بالجملة لتوفير أفضل الأسعار لك. هدفنا هو تسهيل الحياة على المستخدمين وتحقيق الرخاء في وطننا الحبيب. 🤲</p>
         </div>
-        
+
         <div class="card">
           <div class="assets-amount">${avail.toFixed(2)} USDT</div>
           <div class="detail-row"><span>💰 الرصيد المتاح</span><span class="detail-value">${avail.toFixed(2)} USDT</span></div>
@@ -755,7 +828,7 @@
           <div class="detail-row"><span>💳 إجمالي المنفق</span><span class="detail-value">${totalSpent.toFixed(2)} USDT</span></div>
           ${isAdmin ? `<div style="margin-top:12px; padding:8px; background:rgba(124,58,237,0.1); border-radius:12px; color:#7c3aed; text-align:center; font-weight:bold;">🛠️ أنت مدير النظام</div>` : ''}
         </div>
-        
+
         <div class="stats-grid">
           <div class="action-card" id="quickProductsBtn">
             <div class="action-icon">📦</div>
@@ -768,13 +841,13 @@
             <div class="action-sub">عرض طلباتك السابقة</div>
           </div>
         </div>
-        
+
         <div class="info-box">
           <strong>📌 نظام الشراء الجماعي</strong><br>
           نحن نشتري المنتجات بالجملة لنوفر لك أفضل الأسعار. يتم تجميع الطلبات حتى اكتمال العدد المطلوب، ثم يتم شراء المنتجات وتوزيعها.
         </div>
       `;
-      
+
       document.getElementById('quickProductsBtn').onclick = () => {
         currentPage = 'products';
         highlightNav('products');
@@ -790,6 +863,7 @@
     // ==========================================
     // المنتجات
     // ==========================================
+
     async function renderProducts() {
       document.getElementById('mainContent').innerHTML = `
         <div class="card">
@@ -804,17 +878,17 @@
           <div id="productsList"></div>
         </div>
       `;
-      
+
       try {
         const res = await fetch(`${API_URL}/api/products`);
         const products = await res.json();
         const container = document.getElementById('productsList');
-        
+
         if (!products || products.length === 0) {
           container.innerHTML = `<p style="color:#888888; text-align:center;">لا توجد منتجات متاحة حالياً</p>`;
           return;
         }
-        
+
         container.innerHTML = products.map(p => {
           const progress = Math.min((p.current_orders / p.min_quantity) * 100, 100);
           const isCompleted = p.status === 'completed';
@@ -841,7 +915,7 @@
             </div>
           `;
         }).join('');
-        
+
         document.querySelectorAll('.product-card').forEach(card => {
           card.addEventListener('click', (e) => {
             if (e.target.classList.contains('btn-order') || e.target.classList.contains('admin-btn')) return;
@@ -849,7 +923,7 @@
             if (id) openProductModal(parseInt(id));
           });
         });
-        
+
       } catch (error) {
         document.getElementById('productsList').innerHTML = `<p style="color:#ff4444;">خطأ في تحميل المنتجات</p>`;
       }
@@ -858,12 +932,13 @@
     // ==========================================
     // فتح مودال المنتج
     // ==========================================
+
     async function openProductModal(productId) {
       try {
         const res = await fetch(`${API_URL}/api/product/${productId}`);
         const product = await res.json();
         if (!product) return;
-        
+
         currentProductId = productId;
         document.getElementById('modalProductTitle').textContent = product.name;
         document.getElementById('modalProductDesc').textContent = product.description || '';
@@ -885,7 +960,7 @@
         document.getElementById('modalOrderBtn').textContent = '🛒 شراء المنتج';
         document.getElementById('modalOrderBtn').onclick = () => placeOrder(productId);
         document.getElementById('productModal').classList.remove('hidden');
-        
+
       } catch (error) {
         showMessage('❌ خطأ في تحميل المنتج', 'error');
       }
@@ -894,29 +969,32 @@
     // ==========================================
     // شراء المنتج
     // ==========================================
+
     async function placeOrder(productId) {
       const quantity = parseInt(document.getElementById('modalQuantity').value) || 1;
       const location = document.getElementById('modalLocation').value.trim();
       const acceptTerms = document.getElementById('acceptTerms').checked;
-      
+
       if (!location) {
         showMessage('⚠️ يرجى إدخال منطقة الاستلام', 'error');
         return;
       }
-      
+
       if (!acceptTerms) {
         showMessage('⚠️ يجب الموافقة على شروط الشراء', 'error');
         return;
       }
-      
+
       try {
-        const res = await fetch(`${API_URL}/api/order-product`, {
+        const res = await fetchWithAuth(`${API_URL}/api/order-product`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId, productId, quantity, location, acceptTerms })
+          body: JSON.stringify({ productId, quantity, location, acceptTerms })
         });
+
+        if (!res) return;
+
         const data = await res.json();
-        
+
         if (data.success) {
           document.getElementById('productModal').classList.add('hidden');
           showMessage(data.message, 'success', 6000);
@@ -933,23 +1011,25 @@
     // ==========================================
     // طلباتي
     // ==========================================
+
     async function renderOrders() {
       document.getElementById('mainContent').innerHTML = `<div class="card"><div class="card-title">📋 طلباتي</div><div id="ordersList"></div></div>`;
-      
+
       try {
-        const res = await fetch(`${API_URL}/api/my-orders`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId })
+        const res = await fetchWithAuth(`${API_URL}/api/my-orders`, {
+          method: 'POST'
         });
+
+        if (!res) return;
+
         const orders = await res.json();
         const container = document.getElementById('ordersList');
-        
+
         if (!orders || orders.length === 0) {
           container.innerHTML = `<p style="color:#888888; text-align:center;">لا توجد طلبات بعد</p>`;
           return;
         }
-        
+
         const statusMap = {
           'pending': { text: '⏳ قيد الانتظار - انتظر موعد الاستلام', class: 'status-pending' },
           'confirmed': { text: '✅ تم التأكيد', class: 'status-confirmed' },
@@ -958,12 +1038,12 @@
           'delivered': { text: '✅ تم التوصيل', class: 'status-delivered' },
           'withdrawn': { text: '📤 تم السحب', class: 'status-withdrawn' }
         };
-        
+
         container.innerHTML = orders.map(o => {
           const status = statusMap[o.status] || { text: o.status, class: '' };
           const isBanned = o.is_banned;
           const canWithdraw = o.status === 'pending' && !isBanned && o.products?.status !== 'completed';
-          
+
           return `
             <div class="order-card">
               <div class="order-status">${o.products?.name || 'منتج'}</div>
@@ -980,7 +1060,7 @@
             </div>
           `;
         }).join('');
-        
+
       } catch (error) {
         document.getElementById('ordersList').innerHTML = `<p style="color:#ff4444;">خطأ في تحميل الطلبات</p>`;
       }
@@ -989,6 +1069,7 @@
     // ==========================================
     // سحب الطلب
     // ==========================================
+
     function openWithdrawModal(orderId) {
       currentOrderId = orderId;
       document.getElementById('withdrawModal').classList.remove('hidden');
@@ -996,13 +1077,15 @@
 
     async function confirmWithdraw() {
       try {
-        const res = await fetch(`${API_URL}/api/withdraw-order`, {
+        const res = await fetchWithAuth(`${API_URL}/api/withdraw-order`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId, orderId: currentOrderId })
+          body: JSON.stringify({ orderId: currentOrderId })
         });
+
+        if (!res) return;
+
         const data = await res.json();
-        
+
         if (data.success) {
           document.getElementById('withdrawModal').classList.add('hidden');
           showMessage(data.message, data.isBanned ? 'error' : 'warning', 6000);
@@ -1019,6 +1102,7 @@
     // ==========================================
     // الإيداع
     // ==========================================
+
     async function renderDeposit() {
       document.getElementById('mainContent').innerHTML = `
         <div class="card">
@@ -1027,10 +1111,10 @@
           <p style="color:#888888; font-size:12px; margin-bottom:8px;">محفظة الإيداع:</p>
           <code style="color:#00aa55; word-break:break-all;">${HOT_WALLET_ADDRESS}</code>
           <button class="btn-copy" id="copyWalletBtn">📋 نسخ العنوان</button>
-          
+
           <input type="text" id="depositTxHash" class="input-field" placeholder="TXID (0x...)" style="direction:ltr; font-family: monospace; margin-top:16px;">
           <button class="deposit-btn" id="doDepositBtn">🔍 تحقق وأيدع</button>
-          
+
           <div class="info-box">
             <strong>📌 كيف يتم الإيداع؟</strong><br>
             1. انسخ عنوان المحفظة أعلاه<br>
@@ -1045,7 +1129,7 @@
           <div id="depositMsg"></div>
         </div>
       `;
-      
+
       document.getElementById('copyWalletBtn').onclick = () => {
         navigator.clipboard.writeText(HOT_WALLET_ADDRESS);
         showMessage('✅ تم نسخ عنوان المحفظة!', 'success', 2000);
@@ -1054,26 +1138,28 @@
         navigator.clipboard.writeText('BSC BEP20');
         showMessage('✅ تم نسخ اسم الشبكة: BSC (BEP20)', 'success', 2000);
       };
-      
+
       document.getElementById('doDepositBtn').onclick = async () => {
         const txHash = document.getElementById('depositTxHash').value.trim();
         clearMessages();
-        
+
         if (!txHash) {
           showMessage('⚠️ يرجى إدخال TXID', 'error');
           return;
         }
-        
+
         showMessage('⏳ جاري التحقق...', 'loading', 15000);
-        
+
         try {
-          const verifyRes = await fetch(`${API_URL}/api/verify-deposit`, {
+          const verifyRes = await fetchWithAuth(`${API_URL}/api/verify-deposit`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId, transactionHash: txHash, amount: 0 })
+            body: JSON.stringify({ transactionHash: txHash, amount: 0 })
           });
+
+          if (!verifyRes) return;
+
           const verifyData = await verifyRes.json();
-          
+
           if (!verifyData.success) {
             clearMessages();
             let errorMsg = verifyData.error;
@@ -1087,22 +1173,24 @@
             showMessage('❌ ' + errorMsg, 'error');
             return;
           }
-          
+
           const actualAmount = verifyData.verification?.amount;
           if (!actualAmount || actualAmount < 1) {
             clearMessages();
             showMessage('⚠️ الحد الأدنى للإيداع هو 1 USDT', 'error');
             return;
           }
-          
-          const depositRes = await fetch(`${API_URL}/api/deposit`, {
+
+          const depositRes = await fetchWithAuth(`${API_URL}/api/deposit`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId, amount: actualAmount, transactionHash: txHash })
+            body: JSON.stringify({ amount: actualAmount, transactionHash: txHash })
           });
+
+          if (!depositRes) return;
+
           const depositData = await depositRes.json();
           clearMessages();
-          
+
           if (depositData.success) {
             showMessage(depositData.message, 'success', 8000);
             document.getElementById('depositTxHash').value = '';
@@ -1120,6 +1208,7 @@
     // ==========================================
     // السحب
     // ==========================================
+
     async function renderWithdraw() {
       const avail = userData?.available_balance || 0;
       document.getElementById('mainContent').innerHTML = `
@@ -1136,11 +1225,11 @@
           <div id="withdrawMsg"></div>
         </div>
       `;
-      
+
       document.getElementById('doWithdrawBtn').onclick = async () => {
         const amount = parseFloat(document.getElementById('withdrawAmount').value);
         const address = document.getElementById('walletAddress').value;
-        
+
         if (!amount || amount < MIN_WITHDRAW) {
           showMessage(`⚠️ الحد الأدنى للسحب ${MIN_WITHDRAW} USDT`, 'error');
           return;
@@ -1153,13 +1242,15 @@
           showMessage('⚠️ الرصيد غير كافٍ', 'error');
           return;
         }
-        
+
         try {
-          const res = await fetch(`${API_URL}/api/withdraw`, {
+          const res = await fetchWithAuth(`${API_URL}/api/withdraw`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId, amount, walletAddress: address })
+            body: JSON.stringify({ amount, walletAddress: address })
           });
+
+          if (!res) return;
+
           const data = await res.json();
           if (data.success) {
             showMessage(`✅ ${data.message}`, 'success', 5000);
@@ -1176,11 +1267,12 @@
     }
 
     // ==========================================
-    // الملف الشخصي (أنا) - إصلاح كامل
+    // الملف الشخصي (أنا)
     // ==========================================
+
     async function renderProfile() {
       const avail = userData?.available_balance || 0;
-      
+
       document.getElementById('mainContent').innerHTML = `
         <div class="card" style="text-align:center;">
           <div style="font-size:60px;">👤</div>
@@ -1200,19 +1292,20 @@
           <div id="profileOrdersList"></div>
         </div>
       `;
-      
+
       // جلب المعاملات
       try {
-        const res = await fetch(`${API_URL}/api/transactions`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId })
+        const res = await fetchWithAuth(`${API_URL}/api/transactions`, {
+          method: 'POST'
         });
+
+        if (!res) return;
+
         let transactions = await res.json();
         if (!Array.isArray(transactions)) transactions = [];
-        
+
         const listDiv = document.getElementById('transactionsList');
-        
+
         if (transactions.length === 0) {
           listDiv.innerHTML = `<p style="color:#888888; text-align:center;">لا توجد معاملات</p>`;
         } else {
@@ -1239,19 +1332,20 @@
         console.error('Error loading transactions:', error);
         document.getElementById('transactionsList').innerHTML = `<p style="color:#ff4444;">خطأ في تحميل المعاملات</p>`;
       }
-      
+
       // جلب الطلبات
       try {
-        const res = await fetch(`${API_URL}/api/my-orders`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId })
+        const res = await fetchWithAuth(`${API_URL}/api/my-orders`, {
+          method: 'POST'
         });
+
+        if (!res) return;
+
         let orders = await res.json();
         if (!Array.isArray(orders)) orders = [];
-        
+
         const listDiv = document.getElementById('profileOrdersList');
-        
+
         if (orders.length === 0) {
           listDiv.innerHTML = `<p style="color:#888888; text-align:center;">لا توجد طلبات</p>`;
         } else {
@@ -1285,24 +1379,26 @@
     // ==========================================
     // دوال الأدمن
     // ==========================================
-    
+
     async function showAdminProductOrders(productId) {
       const adminSecret = prompt('أدخل كلمة سر الأدمن:');
       if (!adminSecret) return;
-      
+
       try {
-        const res = await fetch(`${API_URL}/api/admin/product-orders`, {
+        const res = await fetchWithAuth(`${API_URL}/api/admin/product-orders`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ adminSecret, productId })
+          body: JSON.stringify({ productId })
         });
+
+        if (!res) return;
+
         const orders = await res.json();
-        
+
         if (!orders || orders.length === 0) {
           showMessage('لا توجد طلبات لهذا المنتج', 'warning');
           return;
         }
-        
+
         const statusOptions = ['pending', 'confirmed', 'shipped', 'in_location', 'delivered'];
         const statusLabels = {
           'pending': '⏳ قيد الانتظار',
@@ -1318,13 +1414,13 @@
           'in_location': 'admin-status-in_location',
           'delivered': 'admin-status-delivered'
         };
-        
+
         let html = `
           <div class="card">
             <div class="card-title">📋 طلبات المنتج</div>
             <div style="max-height:400px; overflow-y:auto;">
         `;
-        
+
         orders.forEach(o => {
           const isWithdrawn = o.status === 'withdrawn' || o.is_banned;
           html += `
@@ -1350,9 +1446,9 @@
             </div>
           `;
         });
-        
+
         html += `</div></div>`;
-        
+
         const modalHtml = `
           <div id="adminOrdersModal" class="modal" style="display:flex;">
             <div class="modal-content">
@@ -1363,17 +1459,19 @@
           </div>
         `;
         document.body.insertAdjacentHTML('beforeend', modalHtml);
-        
+
         window.updateOrderStatus = async function(orderId) {
           const select = document.getElementById(`statusSelect_${orderId}`);
           const status = select.value;
-          
+
           try {
-            const res = await fetch(`${API_URL}/api/admin/update-order-status`, {
+            const res = await fetchWithAuth(`${API_URL}/api/admin/update-order-status`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ adminSecret, orderId, status })
+              body: JSON.stringify({ orderId, status })
             });
+
+            if (!res) return;
+
             const data = await res.json();
             if (data.success) {
               showMessage(data.message, 'success', 3000);
@@ -1385,7 +1483,7 @@
             showMessage('❌ خطأ في الاتصال', 'error');
           }
         };
-        
+
       } catch (error) {
         showMessage('❌ خطأ في تحميل الطلبات', 'error');
       }
@@ -1393,16 +1491,15 @@
 
     async function deleteProduct(productId) {
       if (!confirm('هل أنت متأكد من حذف هذا المنتج؟')) return;
-      
-      const adminSecret = prompt('أدخل كلمة سر الأدمن:');
-      if (!adminSecret) return;
-      
+
       try {
-        const res = await fetch(`${API_URL}/api/admin/delete-product`, {
+        const res = await fetchWithAuth(`${API_URL}/api/admin/delete-product`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ adminSecret, productId })
+          body: JSON.stringify({ productId })
         });
+
+        if (!res) return;
+
         const data = await res.json();
         if (data.success) {
           showMessage(data.message, 'success');
@@ -1429,21 +1526,14 @@
             <input type="text" id="apLocations" class="input-field" placeholder="مناطق الاستلام (مفصولة بفاصلة)">
             <input type="date" id="apDeliveryDate" class="input-field">
             <input type="time" id="apPickupTime" class="input-field">
-            <input type="password" id="apAdminSecret" class="input-field" placeholder="كلمة سر الأدمن" style="direction:ltr;">
             <button class="btn-order" id="apSubmitBtn" style="width:100%;">✅ إضافة المنتج</button>
             <button class="close-modal" onclick="document.getElementById('addProductModal').remove()" style="margin-top:12px; background:#ff4444; color:white;">إلغاء</button>
           </div>
         </div>
       `;
       document.body.insertAdjacentHTML('beforeend', modalHtml);
-      
+
       document.getElementById('apSubmitBtn').onclick = async function() {
-        const adminSecret = document.getElementById('apAdminSecret').value;
-        if (!adminSecret) {
-          showMessage('⚠️ كلمة سر الأدمن مطلوبة', 'error');
-          return;
-        }
-        
         const name = document.getElementById('apName').value;
         const description = document.getElementById('apDescription').value;
         const imageUrl = document.getElementById('apImage').value;
@@ -1453,18 +1543,16 @@
         const locations = document.getElementById('apLocations').value.split(',').map(s => s.trim()).filter(s => s);
         const deliveryDate = document.getElementById('apDeliveryDate').value;
         const pickupTime = document.getElementById('apPickupTime').value;
-        
+
         if (!name || !description || !wholesalePrice || !groupPrice || !minQuantity) {
           showMessage('⚠️ جميع الحقول الأساسية مطلوبة', 'error');
           return;
         }
-        
+
         try {
-          const res = await fetch(`${API_URL}/api/admin/add-product`, {
+          const res = await fetchWithAuth(`${API_URL}/api/admin/add-product`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              adminSecret,
               name,
               description,
               imageUrl,
@@ -1476,6 +1564,9 @@
               pickupTime: pickupTime || null
             })
           });
+
+          if (!res) return;
+
           const data = await res.json();
           if (data.success) {
             showMessage(data.message, 'success');
@@ -1498,24 +1589,24 @@
 
     document.getElementById('adminVerifyBtn').onclick = async function() {
       const txHash = document.getElementById('adminVerifyHash').value.trim();
-      const adminSecret = prompt('أدخل كلمة سر الأدمن:');
-      
-      if (!adminSecret) return;
+
       if (!txHash) {
         document.getElementById('adminVerifyResult').innerHTML = `<p style="color:#ff4444;">⚠️ يرجى إدخال TXID</p>`;
         return;
       }
-      
+
       document.getElementById('adminVerifyResult').innerHTML = `<p style="color:#00ccff;">⏳ جاري التحقق...</p>`;
-      
+
       try {
-        const res = await fetch(`${API_URL}/api/admin/verify-deposit`, {
+        const res = await fetchWithAuth(`${API_URL}/api/admin/verify-deposit`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ adminSecret, transactionHash: txHash, amount: 0 })
+          body: JSON.stringify({ transactionHash: txHash, amount: 0 })
         });
+
+        if (!res) return;
+
         const data = await res.json();
-        
+
         if (data.success) {
           const v = data.verification;
           document.getElementById('adminVerifyResult').innerHTML = `
@@ -1543,10 +1634,11 @@
     // ==========================================
     // إغلاق المودالات
     // ==========================================
+
     document.getElementById('closeProductModal').onclick = () => document.getElementById('productModal').classList.add('hidden');
     document.getElementById('closeWithdrawModal').onclick = () => document.getElementById('withdrawModal').classList.add('hidden');
     document.getElementById('confirmWithdrawBtn').onclick = confirmWithdraw;
-    
+
     document.querySelectorAll('.modal').forEach(modal => {
       modal.addEventListener('click', (e) => {
         if (e.target === modal) modal.classList.add('hidden');
@@ -1556,6 +1648,7 @@
     // ==========================================
     // تهيئة الصفحات
     // ==========================================
+
     const pages = {
       dashboard: renderDashboard,
       products: renderProducts,
@@ -1578,13 +1671,10 @@
     // ==========================================
     // بدء التشغيل
     // ==========================================
-    
-    // تهيئة الوضع النهاري كأساسي
+
     setTheme(localStorage.getItem('theme') || 'light');
-    
-    // تحميل المستخدم
     loadUser();
-    
+
   </script>
 </body>
 </html>
