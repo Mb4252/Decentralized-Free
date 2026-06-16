@@ -75,7 +75,7 @@ app.get('/api/product/:id', async (req, res) => {
 });
 
 // ==========================================
-// API: طلب منتج (شراء)
+// API: طلب منتج (شراء) - إصلاح
 // ==========================================
 app.post('/api/order-product', async (req, res) => {
   const { userId, productId, quantity, location, acceptTerms } = req.body;
@@ -132,12 +132,13 @@ app.post('/api/order-product', async (req, res) => {
       });
     }
 
-    // خصم المبلغ
+    // خصم المبلغ - الطريقة الصحيحة
+    const newBalance = user.available_balance - totalAmount;
     const { error: updateError } = await supabaseAdmin
       .from('users')
       .update({ 
-        available_balance: supabaseAdmin.raw('available_balance - ?', [totalAmount]),
-        platform_balance: supabaseAdmin.raw('platform_balance + ?', [totalAmount])
+        available_balance: newBalance,
+        platform_balance: supabaseAdmin.raw('platform_balance + ?', totalAmount)
       })
       .eq('id', userId);
 
@@ -165,8 +166,8 @@ app.post('/api/order-product', async (req, res) => {
       await supabaseAdmin
         .from('users')
         .update({ 
-          available_balance: supabaseAdmin.raw('available_balance + ?', [totalAmount]),
-          platform_balance: supabaseAdmin.raw('platform_balance - ?', [totalAmount])
+          available_balance: user.available_balance,
+          platform_balance: supabaseAdmin.raw('platform_balance - ?', totalAmount)
         })
         .eq('id', userId);
       throw orderError;
@@ -184,7 +185,7 @@ app.post('/api/order-product', async (req, res) => {
       .from('users')
       .update({ 
         total_orders: supabaseAdmin.raw('total_orders + 1'),
-        total_spent: supabaseAdmin.raw('total_spent + ?', [totalAmount])
+        total_spent: supabaseAdmin.raw('total_spent + ?', totalAmount)
       })
       .eq('id', userId);
 
@@ -217,7 +218,7 @@ app.post('/api/order-product', async (req, res) => {
 });
 
 // ==========================================
-// API: سحب الطلب (قبل اكتمال العدد)
+// API: سحب الطلب (قبل اكتمال العدد) - إصلاح
 // ==========================================
 app.post('/api/withdraw-order', async (req, res) => {
   const { userId, orderId } = req.body;
@@ -265,19 +266,29 @@ app.post('/api/withdraw-order', async (req, res) => {
         .eq('id', orderId);
     }
 
-    // إعادة المبلغ
+    // جلب المستخدم للحصول على الرصيد الحالي
+    const { data: user, error: userError } = await supabaseAdmin
+      .from('users')
+      .select('available_balance')
+      .eq('id', userId)
+      .single();
+
+    if (userError) throw userError;
+
+    // إعادة المبلغ - الطريقة الصحيحة
+    const newBalance = (user.available_balance || 0) + order.total_amount;
     await supabaseAdmin
       .from('users')
       .update({ 
-        available_balance: supabaseAdmin.raw('available_balance + ?', [order.total_amount]),
-        platform_balance: supabaseAdmin.raw('platform_balance - ?', [order.total_amount])
+        available_balance: newBalance,
+        platform_balance: supabaseAdmin.raw('platform_balance - ?', order.total_amount)
       })
       .eq('id', userId);
 
     // تقليل عدد الطلبات
     await supabaseAdmin
       .from('products')
-      .update({ current_orders: supabaseAdmin.raw('current_orders - ?', [order.quantity]) })
+      .update({ current_orders: supabaseAdmin.raw('current_orders - ?', order.quantity) })
       .eq('id', order.product_id);
 
     await supabaseAdmin
@@ -347,13 +358,13 @@ app.post('/api/deposit', async (req, res) => {
   }
 
   try {
-    const { data: user } = await supabaseAdmin
+    const { data: user, error: userError } = await supabaseAdmin
       .from('users')
       .select('*')
       .eq('id', userId)
       .single();
 
-    if (!user) {
+    if (userError || !user) {
       return res.status(404).json({ error: 'المستخدم غير موجود' });
     }
 
@@ -395,12 +406,11 @@ app.post('/api/deposit', async (req, res) => {
       return res.status(500).json({ error: 'حدث خطأ في تسجيل الإيداع' });
     }
 
-    // تحديث رصيد المستخدم
+    // تحديث رصيد المستخدم - الطريقة الصحيحة
+    const newBalance = (user.available_balance || 0) + actualAmount;
     const { error: updateError } = await supabaseAdmin
       .from('users')
-      .update({ 
-        available_balance: supabaseAdmin.raw('available_balance + ?', [actualAmount])
-      })
+      .update({ available_balance: newBalance })
       .eq('id', userId);
 
     if (updateError) {
@@ -437,7 +447,7 @@ app.post('/api/deposit', async (req, res) => {
 });
 
 // ==========================================
-// API: التحقق من الإيداع (للمستخدم) - إصلاح
+// API: التحقق من الإيداع (للمستخدم)
 // ==========================================
 app.post('/api/verify-deposit', async (req, res) => {
   const { userId, transactionHash, amount } = req.body;
@@ -567,10 +577,11 @@ app.post('/api/withdraw', async (req, res) => {
       return res.status(400).json({ error: '⚠️ الرصيد غير كافٍ' });
     }
 
-    // خصم الرصيد
+    // خصم الرصيد - الطريقة الصحيحة
+    const newBalance = user.available_balance - amount;
     const { error: updateError } = await supabaseAdmin
       .from('users')
-      .update({ available_balance: supabaseAdmin.raw('available_balance - ?', [amount]) })
+      .update({ available_balance: newBalance })
       .eq('id', userId);
 
     if (updateError) {
@@ -596,7 +607,7 @@ app.post('/api/withdraw', async (req, res) => {
       // استرجاع الرصيد إذا فشل التسجيل
       await supabaseAdmin
         .from('users')
-        .update({ available_balance: supabaseAdmin.raw('available_balance + ?', [amount]) })
+        .update({ available_balance: user.available_balance })
         .eq('id', userId);
       return res.status(500).json({ error: 'حدث خطأ في تسجيل السحب' });
     }
@@ -781,16 +792,6 @@ app.post('/api/transactions', async (req, res) => {
 // ============ APIs الأدمن ============
 // ==========================================
 
-// التحقق من صلاحية الأدمن
-async function isAdmin(userId) {
-  const { data } = await supabaseAdmin
-    .from('users')
-    .select('is_admin')
-    .eq('id', userId)
-    .single();
-  return data?.is_admin === true;
-}
-
 // ==========================================
 // API: عرض جميع المنتجات (للأدمن)
 // ==========================================
@@ -815,7 +816,7 @@ app.post('/api/admin/products', async (req, res) => {
 });
 
 // ==========================================
-// API: إضافة منتج جديد (للأدمن) - إصلاح
+// API: إضافة منتج جديد (للأدمن)
 // ==========================================
 app.post('/api/admin/add-product', async (req, res) => {
   const { adminSecret, name, description, imageUrl, wholesalePrice, groupPrice, minQuantity, deliveryLocations, deliveryDate, pickupTime } = req.body;
@@ -899,7 +900,7 @@ app.post('/api/admin/update-product', async (req, res) => {
 });
 
 // ==========================================
-// API: حذف منتج (للأدمن) - إصلاح
+// API: حذف منتج (للأدمن)
 // ==========================================
 app.post('/api/admin/delete-product', async (req, res) => {
   const { adminSecret, productId } = req.body;
