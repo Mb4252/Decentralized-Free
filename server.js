@@ -89,7 +89,6 @@ app.post('/api/order-product', async (req, res) => {
   }
 
   try {
-    // جلب المنتج
     const { data: product, error: productError } = await supabaseAdmin
       .from('products')
       .select('*')
@@ -104,7 +103,6 @@ app.post('/api/order-product', async (req, res) => {
       return res.status(400).json({ error: '⚠️ العدد المطلوب اكتمل' });
     }
 
-    // التحقق من العدد المتبقي
     const remaining = product.min_quantity - product.current_orders;
     if (quantity > remaining) {
       return res.status(400).json({ 
@@ -114,7 +112,6 @@ app.post('/api/order-product', async (req, res) => {
 
     const totalAmount = product.group_price * quantity;
 
-    // جلب المستخدم
     const { data: user, error: userError } = await supabaseAdmin
       .from('users')
       .select('available_balance')
@@ -125,14 +122,12 @@ app.post('/api/order-product', async (req, res) => {
       return res.status(404).json({ error: 'المستخدم غير موجود' });
     }
 
-    // التحقق من الرصيد
     if (user.available_balance < totalAmount) {
       return res.status(400).json({ 
         error: `⚠️ رصيدك غير كافٍ. المطلوب: ${totalAmount} USDT، المتاح: ${user.available_balance} USDT` 
       });
     }
 
-    // خصم المبلغ
     const newBalance = user.available_balance - totalAmount;
     const { error: updateError } = await supabaseAdmin
       .from('users')
@@ -144,7 +139,6 @@ app.post('/api/order-product', async (req, res) => {
 
     if (updateError) throw updateError;
 
-    // تسجيل الطلب
     const { data: order, error: orderError } = await supabaseAdmin
       .from('product_orders')
       .insert({
@@ -162,7 +156,6 @@ app.post('/api/order-product', async (req, res) => {
       .single();
 
     if (orderError) {
-      // استرجاع المبلغ إذا فشل الطلب
       await supabaseAdmin
         .from('users')
         .update({ 
@@ -173,14 +166,12 @@ app.post('/api/order-product', async (req, res) => {
       throw orderError;
     }
 
-    // تحديث عدد الطلبات
     const newCurrentOrders = product.current_orders + quantity;
     await supabaseAdmin
       .from('products')
       .update({ current_orders: newCurrentOrders })
       .eq('id', productId);
 
-    // تحديث إحصائيات المستخدم
     await supabaseAdmin
       .from('users')
       .update({ 
@@ -266,7 +257,6 @@ app.post('/api/withdraw-order', async (req, res) => {
         .eq('id', orderId);
     }
 
-    // جلب المستخدم للحصول على الرصيد الحالي
     const { data: user, error: userError } = await supabaseAdmin
       .from('users')
       .select('available_balance')
@@ -275,7 +265,6 @@ app.post('/api/withdraw-order', async (req, res) => {
 
     if (userError) throw userError;
 
-    // إعادة المبلغ
     const newBalance = (user.available_balance || 0) + order.total_amount;
     await supabaseAdmin
       .from('users')
@@ -285,7 +274,6 @@ app.post('/api/withdraw-order', async (req, res) => {
       })
       .eq('id', userId);
 
-    // تقليل عدد الطلبات
     await supabaseAdmin
       .from('products')
       .update({ current_orders: supabaseAdmin.raw('current_orders - ?', order.quantity) })
@@ -368,7 +356,6 @@ app.post('/api/deposit', async (req, res) => {
       return res.status(404).json({ error: 'المستخدم غير موجود' });
     }
 
-    // التحقق من الهاش
     const { data: existingHash } = await supabaseAdmin
       .from('deposit_requests')
       .select('id')
@@ -379,7 +366,6 @@ app.post('/api/deposit', async (req, res) => {
       return res.status(400).json({ error: '⚠️ هذا الـ TXID مستخدم مسبقاً' });
     }
 
-    // التحقق من المعاملة على الشبكة
     const verification = await bsc.verifyTransaction(transactionHash, amount, bsc.HOT_WALLET_ADDRESS);
 
     if (!verification.success) {
@@ -406,7 +392,6 @@ app.post('/api/deposit', async (req, res) => {
       return res.status(500).json({ error: 'حدث خطأ في تسجيل الإيداع' });
     }
 
-    // تحديث رصيد المستخدم
     const newBalance = (user.available_balance || 0) + actualAmount;
     const { error: updateError } = await supabaseAdmin
       .from('users')
@@ -418,8 +403,7 @@ app.post('/api/deposit', async (req, res) => {
       return res.status(500).json({ error: 'حدث خطأ في تحديث الرصيد' });
     }
 
-    // تسجيل المعاملة
-    const { error: txError } = await supabaseAdmin
+    await supabaseAdmin
       .from('transactions')
       .insert({
         user_id: userId,
@@ -430,10 +414,6 @@ app.post('/api/deposit', async (req, res) => {
         description: `💰 إيداع ${actualAmount} USDT`,
         created_at: new Date().toISOString()
       });
-
-    if (txError) {
-      console.error('Transaction insert error:', txError);
-    }
 
     res.json({ 
       success: true, 
@@ -459,7 +439,6 @@ app.post('/api/verify-deposit', async (req, res) => {
   }
 
   try {
-    // التحقق من الهاش في قاعدة البيانات
     const { data: existingHash } = await supabaseAdmin
       .from('deposit_requests')
       .select('id')
@@ -473,7 +452,6 @@ app.post('/api/verify-deposit', async (req, res) => {
       });
     }
 
-    // التحقق من المعاملة على الشبكة
     const verification = await bsc.verifyTransaction(transactionHash, amount || 0, bsc.HOT_WALLET_ADDRESS);
 
     console.log('Verification result:', verification);
@@ -563,7 +541,6 @@ app.post('/api/withdraw', async (req, res) => {
   }
 
   try {
-    // جلب بيانات المستخدم
     const { data: user, error: userError } = await supabaseAdmin
       .from('users')
       .select('available_balance, name, email')
@@ -574,12 +551,10 @@ app.post('/api/withdraw', async (req, res) => {
       return res.status(404).json({ error: 'المستخدم غير موجود' });
     }
 
-    // التحقق من الرصيد
     if (user.available_balance < amount) {
       return res.status(400).json({ error: '⚠️ الرصيد غير كافٍ' });
     }
 
-    // التحقق من وجود طلبات سحب معلقة (لمنع التكرار)
     const { data: pendingWithdrawals, error: pendingError } = await supabaseAdmin
       .from('withdrawals')
       .select('id')
@@ -593,7 +568,6 @@ app.post('/api/withdraw', async (req, res) => {
       });
     }
 
-    // التحقق من رصيد محفظة البوت (تحذير فقط)
     let botBalance = 0;
     let botBalanceWarning = '';
     try {
@@ -605,7 +579,6 @@ app.post('/api/withdraw', async (req, res) => {
       console.warn('⚠️ Could not check bot balance:', e.message);
     }
 
-    // 🔒 لا يتم خصم الرصيد هنا - فقط تسجيل الطلب
     const { data: withdrawal, error: wError } = await supabaseAdmin
       .from('withdrawals')
       .insert({
@@ -624,7 +597,6 @@ app.post('/api/withdraw', async (req, res) => {
       return res.status(500).json({ error: 'حدث خطأ في تسجيل طلب السحب' });
     }
 
-    // تسجيل المعاملة بحالة "pending"
     await supabaseAdmin
       .from('transactions')
       .insert({
@@ -637,7 +609,6 @@ app.post('/api/withdraw', async (req, res) => {
         created_at: new Date().toISOString()
       });
 
-    // إشعار للأدمن (في console)
     console.log(`
     📢 طلب سحب جديد!
     👤 المستخدم: ${user.name} (${user.email})
@@ -669,10 +640,9 @@ app.post('/api/admin/process-withdrawal', async (req, res) => {
   }
 
   try {
-    // جلب طلب السحب
     const { data: withdrawal, error: wError } = await supabaseAdmin
       .from('withdrawals')
-      .select('*, users(available_balance, name, email)')
+      .select('*, users!withdrawals_user_id_fkey(available_balance, name, email)')
       .eq('id', withdrawalId)
       .single();
 
@@ -688,7 +658,6 @@ app.post('/api/admin/process-withdrawal', async (req, res) => {
     const amount = withdrawal.amount;
     const walletAddress = withdrawal.wallet_address;
 
-    // التحقق من رصيد محفظة البوت
     const botBalance = await bsc.getUSDTBalance();
     if (botBalance < amount) {
       return res.status(400).json({ 
@@ -696,31 +665,28 @@ app.post('/api/admin/process-withdrawal', async (req, res) => {
       });
     }
 
-    // تنفيذ التحويل الفعلي
     const transferResult = await bsc.transferUSDT(walletAddress, amount);
 
     if (!transferResult.success) {
       return res.status(500).json({ error: 'فشل التحويل: ' + transferResult.error });
     }
 
-    // تحديث حالة طلب السحب
     await supabaseAdmin
       .from('withdrawals')
       .update({
         status: 'completed',
         processed_at: new Date().toISOString(),
-        tx_hash: transferResult.hash
+        tx_hash: transferResult.hash,
+        processed_by: 'admin'
       })
       .eq('id', withdrawalId);
 
-    // خصم الرصيد من المستخدم (بعد نجاح التحويل)
     const newBalance = withdrawal.users.available_balance - amount;
     await supabaseAdmin
       .from('users')
       .update({ available_balance: newBalance })
       .eq('id', userId);
 
-    // تحديث حالة المعاملة
     await supabaseAdmin
       .from('transactions')
       .update({
@@ -755,7 +721,7 @@ app.post('/api/admin/cancel-withdrawal', async (req, res) => {
   try {
     const { data: withdrawal, error: wError } = await supabaseAdmin
       .from('withdrawals')
-      .select('*, users(available_balance)')
+      .select('*, users!withdrawals_user_id_fkey(available_balance)')
       .eq('id', withdrawalId)
       .single();
 
@@ -767,7 +733,6 @@ app.post('/api/admin/cancel-withdrawal', async (req, res) => {
       return res.status(400).json({ error: 'هذا الطلب تم معالجته بالفعل' });
     }
 
-    // إلغاء الطلب (الرصيد لم يخصم، لذلك لا داعي لإعادته)
     await supabaseAdmin
       .from('withdrawals')
       .update({
@@ -777,7 +742,6 @@ app.post('/api/admin/cancel-withdrawal', async (req, res) => {
       })
       .eq('id', withdrawalId);
 
-    // تحديث حالة المعاملة
     await supabaseAdmin
       .from('transactions')
       .update({
@@ -811,7 +775,7 @@ app.post('/api/admin/withdrawals', async (req, res) => {
   try {
     let query = supabaseAdmin
       .from('withdrawals')
-      .select('*, users(name, email, available_balance)')
+      .select('*, users!withdrawals_user_id_fkey(name, email, available_balance)')
       .order('created_at', { ascending: false });
 
     if (status) {
@@ -828,17 +792,15 @@ app.post('/api/admin/withdrawals', async (req, res) => {
 });
 
 // ==========================================
-// ============ المهمة التلقائية ============
-// معالجة طلبات السحب المعلقة كل 5 دقائق
+// المهمة التلقائية - معالجة الطلبات المعلقة كل 5 دقائق
 // ==========================================
 async function processPendingWithdrawals() {
   console.log('🔄 جاري معالجة طلبات السحب المعلقة...');
   
   try {
-    // جلب جميع طلبات السحب المعلقة
     const { data: pendingWithdrawals, error } = await supabaseAdmin
       .from('withdrawals')
-      .select('*, users(available_balance, name, email)')
+      .select('*, users!withdrawals_user_id_fkey(available_balance, name, email)')
       .eq('status', 'pending')
       .order('created_at', { ascending: true });
 
@@ -851,7 +813,6 @@ async function processPendingWithdrawals() {
 
     console.log(`📋 عدد الطلبات المعلقة: ${pendingWithdrawals.length}`);
 
-    // التحقق من رصيد محفظة البوت
     const botBalance = await bsc.getUSDTBalance();
     console.log(`💰 رصيد محفظة البوت: ${botBalance} USDT`);
 
@@ -864,7 +825,6 @@ async function processPendingWithdrawals() {
       const withdrawalId = withdrawal.id;
       const userId = withdrawal.user_id;
 
-      // التحقق من كفاية الرصيد
       if (botBalance < amount) {
         console.log(`⚠️ رصيد غير كافٍ للطلب ${withdrawalId}: يحتاج ${amount} USDT، المتاح ${botBalance} USDT`);
         continue;
@@ -872,21 +832,19 @@ async function processPendingWithdrawals() {
 
       console.log(`🔄 جاري معالجة الطلب ${withdrawalId}: ${amount} USDT إلى ${walletAddress.substring(0, 10)}...`);
 
-      // تنفيذ التحويل
       const transferResult = await bsc.transferUSDT(walletAddress, amount);
 
       if (transferResult.success) {
-        // تحديث حالة الطلب
         await supabaseAdmin
           .from('withdrawals')
           .update({
             status: 'completed',
             processed_at: new Date().toISOString(),
-            tx_hash: transferResult.hash
+            tx_hash: transferResult.hash,
+            processed_by: 'auto'
           })
           .eq('id', withdrawalId);
 
-        // تحديث حالة المعاملة
         await supabaseAdmin
           .from('transactions')
           .update({
@@ -896,7 +854,6 @@ async function processPendingWithdrawals() {
           .eq('reference_id', withdrawalId)
           .eq('type', 'withdraw');
 
-        // خصم الرصيد من المستخدم
         const newBalance = withdrawal.users.available_balance - amount;
         await supabaseAdmin
           .from('users')
@@ -925,8 +882,74 @@ setInterval(processPendingWithdrawals, 5 * 60 * 1000);
 setTimeout(processPendingWithdrawals, 5000);
 
 // ==========================================
-// ============ APIs الأدمن الأخرى ============
+// ============ APIs الأدمن ============
 // ==========================================
+
+// ==========================================
+// API: إضافة منتج جديد (للأدمن) - مع إصلاح pickup_time
+// ==========================================
+app.post('/api/admin/add-product', async (req, res) => {
+  const { adminSecret, name, description, imageUrl, wholesalePrice, groupPrice, minQuantity, deliveryLocations, deliveryDate, pickupTime } = req.body;
+
+  console.log('📦 Add product request:', { adminSecret, name, description });
+
+  if (adminSecret !== process.env.ADMIN_SECRET) {
+    console.log('❌ Invalid admin secret');
+    return res.status(401).json({ error: 'غير مصرح به - كلمة سر غير صحيحة' });
+  }
+
+  if (!name || !description || !wholesalePrice || !groupPrice || !minQuantity) {
+    return res.status(400).json({ error: 'جميع الحقول الأساسية مطلوبة' });
+  }
+
+  try {
+    const productData = {
+      name: name,
+      description: description,
+      image_url: imageUrl || '',
+      wholesale_price: parseFloat(wholesalePrice),
+      group_price: parseFloat(groupPrice),
+      min_quantity: parseInt(minQuantity),
+      current_orders: 0,
+      delivery_locations: deliveryLocations || ['الخرطوم', 'أم درمان', 'بحري'],
+      status: 'active',
+      created_at: new Date().toISOString()
+    };
+
+    // إضافة الحقول فقط إذا كانت موجودة
+    if (deliveryDate) {
+      productData.delivery_date = deliveryDate;
+    }
+    if (pickupTime) {
+      productData.pickup_time = pickupTime;
+    }
+
+    console.log('📝 Product data:', productData);
+
+    const { data, error } = await supabaseAdmin
+      .from('products')
+      .insert(productData)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Insert error:', error);
+      throw error;
+    }
+
+    console.log('✅ Product added successfully:', data);
+
+    res.json({
+      success: true,
+      message: `✅ تم إضافة المنتج ${name} بنجاح`,
+      product: data
+    });
+
+  } catch (error) {
+    console.error('Add product error:', error);
+    res.status(500).json({ error: 'حدث خطأ داخلي: ' + error.message });
+  }
+});
 
 // ==========================================
 // API: عرض جميع المنتجات (للأدمن)
@@ -948,62 +971,6 @@ app.post('/api/admin/products', async (req, res) => {
     res.json(data || []);
   } catch (error) {
     res.status(500).json({ error: error.message });
-  }
-});
-
-// ==========================================
-// API: إضافة منتج جديد (للأدمن)
-// ==========================================
-app.post('/api/admin/add-product', async (req, res) => {
-  const { adminSecret, name, description, imageUrl, wholesalePrice, groupPrice, minQuantity, deliveryLocations, deliveryDate, pickupTime } = req.body;
-
-  console.log('📦 Add product request:', { adminSecret, name, description });
-
-  if (adminSecret !== process.env.ADMIN_SECRET) {
-    console.log('❌ Invalid admin secret');
-    return res.status(401).json({ error: 'غير مصرح به - كلمة سر غير صحيحة' });
-  }
-
-  if (!name || !description || !wholesalePrice || !groupPrice || !minQuantity) {
-    return res.status(400).json({ error: 'جميع الحقول الأساسية مطلوبة' });
-  }
-
-  try {
-    const { data, error } = await supabaseAdmin
-      .from('products')
-      .insert({
-        name: name,
-        description: description,
-        image_url: imageUrl || '',
-        wholesale_price: parseFloat(wholesalePrice),
-        group_price: parseFloat(groupPrice),
-        min_quantity: parseInt(minQuantity),
-        current_orders: 0,
-        delivery_locations: deliveryLocations || ['الخرطوم', 'أم درمان', 'بحري'],
-        delivery_date: deliveryDate || null,
-        pickup_time: pickupTime || null,
-        status: 'active',
-        created_at: new Date().toISOString()
-      })
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Insert error:', error);
-      throw error;
-    }
-
-    console.log('✅ Product added successfully:', data);
-
-    res.json({
-      success: true,
-      message: `✅ تم إضافة المنتج ${name} بنجاح`,
-      product: data
-    });
-
-  } catch (error) {
-    console.error('Add product error:', error);
-    res.status(500).json({ error: 'حدث خطأ داخلي: ' + error.message });
   }
 });
 
@@ -1049,7 +1016,6 @@ app.post('/api/admin/delete-product', async (req, res) => {
   }
 
   try {
-    // التحقق من عدم وجود طلبات معلقة
     const { data: orders, error: ordersError } = await supabaseAdmin
       .from('product_orders')
       .select('id')
@@ -1126,7 +1092,7 @@ app.post('/api/admin/product-orders', async (req, res) => {
   try {
     const { data, error } = await supabaseAdmin
       .from('product_orders')
-      .select('*, users(name, email)')
+      .select('*, users!withdrawals_user_id_fkey(name, email)')
       .eq('product_id', productId)
       .order('created_at', { ascending: false });
 
