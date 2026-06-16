@@ -8,7 +8,7 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       min-height: 100vh;
-      background: linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 100%);
+      background: #f0f2f5;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       display: flex;
       align-items: center;
@@ -20,16 +20,15 @@
       width: 100%;
     }
     .card {
-      background: rgba(26, 26, 46, 0.95);
-      backdrop-filter: blur(12px);
+      background: #ffffff;
       border-radius: 32px;
       padding: 32px 28px;
-      border: 1px solid #00ff66;
-      box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+      border: 1px solid #00aa55;
+      box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15);
     }
     .logo { text-align: center; margin-bottom: 24px; }
-    .logo h1 { font-size: 28px; background: linear-gradient(135deg, #00ff66, #00ccff); -webkit-background-clip: text; background-clip: text; color: transparent; }
-    .logo p { color: #8899aa; font-size: 13px; margin-top: 6px; }
+    .logo h1 { font-size: 28px; color: #00aa55; }
+    .logo p { color: #666666; font-size: 13px; margin-top: 6px; }
     
     .lang-switch {
       display: flex;
@@ -39,8 +38,8 @@
     }
     .lang-btn {
       background: transparent;
-      border: 1px solid #00ff66;
-      color: #00ff66;
+      border: 1px solid #00aa55;
+      color: #00aa55;
       padding: 5px 12px;
       border-radius: 20px;
       cursor: pointer;
@@ -48,26 +47,26 @@
       transition: all 0.3s;
     }
     .lang-btn.active {
-      background: #00ff66;
-      color: #0a0a0f;
+      background: #00aa55;
+      color: white;
     }
     
-    .tabs { display: flex; gap: 12px; margin-bottom: 24px; background: rgba(10,10,20,0.8); padding: 5px; border-radius: 60px; }
-    .tab { flex: 1; padding: 12px; text-align: center; background: transparent; border: none; border-radius: 50px; color: #8899aa; cursor: pointer; font-size: 15px; font-weight: 600; transition: all 0.3s; }
-    .tab.active { background: linear-gradient(135deg, #00ff66, #00ccff); color: #0a0a0f; box-shadow: 0 4px 15px rgba(0,255,102,0.3); }
+    .tabs { display: flex; gap: 12px; margin-bottom: 24px; background: #f8f9fa; padding: 5px; border-radius: 60px; }
+    .tab { flex: 1; padding: 12px; text-align: center; background: transparent; border: none; border-radius: 50px; color: #666666; cursor: pointer; font-size: 15px; font-weight: 600; transition: all 0.3s; }
+    .tab.active { background: linear-gradient(135deg, #00aa55, #00cc77); color: white; box-shadow: 0 4px 15px rgba(0,170,85,0.3); }
     
     .input-group { margin-bottom: 18px; }
-    .input-group label { display: block; color: #8899aa; margin-bottom: 6px; font-size: 13px; }
+    .input-group label { display: block; color: #666666; margin-bottom: 6px; font-size: 13px; }
     .input-wrapper input {
       width: 100%;
       padding: 14px 16px;
       border-radius: 16px;
-      border: 1px solid #00ff66;
-      background: rgba(10,10,20,0.8);
-      color: white;
+      border: 1px solid #00aa55;
+      background: #ffffff;
+      color: #1a1a2e;
       font-size: 14px;
     }
-    .input-wrapper input:focus { outline: none; border-color: #00ff66; box-shadow: 0 0 0 3px rgba(0,255,102,0.2); }
+    .input-wrapper input:focus { outline: none; border-color: #00cc77; box-shadow: 0 0 0 3px rgba(0,170,85,0.1); }
     
     .checkbox-group {
       display: flex;
@@ -75,14 +74,14 @@
       gap: 10px;
       margin: 16px 0;
     }
-    .checkbox-group input { width: 18px; height: 18px; cursor: pointer; }
-    .checkbox-group label { color: #8899aa; font-size: 13px; cursor: pointer; }
+    .checkbox-group input { width: 18px; height: 18px; cursor: pointer; accent-color: #00aa55; }
+    .checkbox-group label { color: #666666; font-size: 13px; cursor: pointer; }
     
     .btn-primary {
       width: 100%;
       padding: 14px;
-      background: linear-gradient(135deg, #00ff66, #00ccff);
-      color: #0a0a0f;
+      background: linear-gradient(135deg, #00aa55, #00cc77);
+      color: white;
       border: none;
       border-radius: 60px;
       font-size: 15px;
@@ -90,17 +89,17 @@
       cursor: pointer;
       transition: all 0.3s;
     }
-    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 25px -5px rgba(0,255,102,0.4); }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 25px -5px rgba(0,170,85,0.4); }
     
     .info-section {
-      background: rgba(0,255,102,0.05);
+      background: rgba(0,170,85,0.05);
       border-radius: 24px;
       padding: 20px;
       margin-top: 20px;
-      border: 1px solid rgba(0,255,102,0.2);
+      border: 1px solid rgba(0,170,85,0.2);
     }
     .info-title {
-      color: #00ff66;
+      color: #00aa55;
       font-size: 18px;
       margin-bottom: 16px;
       display: flex;
@@ -112,7 +111,7 @@
       padding: 0;
     }
     .info-list li {
-      color: #8899aa;
+      color: #666666;
       font-size: 13px;
       margin-bottom: 12px;
       padding-right: 20px;
@@ -123,19 +122,19 @@
       content: "✅";
       position: absolute;
       right: 0;
-      color: #00ff66;
+      color: #00aa55;
     }
-    .highlight { color: #00ff66; font-weight: bold; }
+    .highlight { color: #00aa55; font-weight: bold; }
     
     .message { margin-top: 16px; padding: 12px; border-radius: 16px; text-align: center; font-size: 13px; }
-    .error { background: rgba(255,68,68,0.15); border: 1px solid #ff4444; color: #ff4444; }
-    .success { background: rgba(0,255,102,0.15); border: 1px solid #00ff66; color: #00ff66; }
-    .warning { background: rgba(255,170,0,0.15); border: 1px solid #ffaa00; color: #ffaa00; }
+    .error { background: rgba(255,68,68,0.1); border: 1px solid #ff4444; color: #ff4444; }
+    .success { background: rgba(0,170,85,0.1); border: 1px solid #00aa55; color: #00aa55; }
+    .warning { background: rgba(255,170,0,0.1); border: 1px solid #ffaa00; color: #ffaa00; }
     
     .hidden { display: none; }
     .generated-code {
-      background: rgba(0,255,102,0.1);
-      border: 1px solid #00ff66;
+      background: rgba(0,170,85,0.1);
+      border: 1px solid #00aa55;
       border-radius: 16px;
       padding: 12px;
       margin-top: 16px;
@@ -152,8 +151,8 @@
       </div>
       
       <div class="logo">
-        <h1 id="siteTitle">🛍️ CryptoShop</h1>
-        <p id="siteSub">شراء جماعي | أسعار الجملة</p>
+        <h1>🛍️ CryptoShop</h1>
+        <p>شراء جماعي | أسعار الجملة</p>
       </div>
       
       <div class="tabs">
@@ -164,20 +163,20 @@
       <!-- Login Form -->
       <div id="loginForm">
         <div class="input-group">
-          <label id="emailLabel">📧 البريد الإلكتروني</label>
+          <label>📧 البريد الإلكتروني</label>
           <div class="input-wrapper">
             <input type="email" id="loginEmail" placeholder="example@email.com">
           </div>
         </div>
         <div class="input-group">
-          <label id="passwordLabel">🔒 كلمة المرور</label>
+          <label>🔒 كلمة المرور</label>
           <div class="input-wrapper">
             <input type="password" id="loginPassword" placeholder="********">
           </div>
         </div>
         <div class="checkbox-group">
           <input type="checkbox" id="rememberMe">
-          <label id="rememberLabel">تذكرني (البقاء مسجل الدخول)</label>
+          <label>تذكرني (البقاء مسجل الدخول)</label>
         </div>
         <button class="btn-primary" id="doLoginBtn">تسجيل الدخول</button>
       </div>
@@ -185,31 +184,31 @@
       <!-- Register Form -->
       <div id="registerForm" class="hidden">
         <div class="input-group">
-          <label id="regNameLabel">👤 اسم المستخدم</label>
+          <label>👤 اسم المستخدم</label>
           <div class="input-wrapper">
             <input type="text" id="regName" placeholder="أدخل اسمك">
           </div>
         </div>
         <div class="input-group">
-          <label id="regEmailLabel">📧 البريد الإلكتروني</label>
+          <label>📧 البريد الإلكتروني</label>
           <div class="input-wrapper">
             <input type="email" id="regEmail" placeholder="example@email.com">
           </div>
         </div>
         <div class="input-group">
-          <label id="regPasswordLabel">🔒 كلمة المرور</label>
+          <label>🔒 كلمة المرور</label>
           <div class="input-wrapper">
             <input type="password" id="regPassword" placeholder="********">
           </div>
         </div>
         <div class="input-group">
-          <label id="regConfirmLabel">✔️ تأكيد كلمة المرور</label>
+          <label>✔️ تأكيد كلمة المرور</label>
           <div class="input-wrapper">
             <input type="password" id="regConfirmPassword" placeholder="********">
           </div>
         </div>
         <div class="input-group">
-          <label id="regReferralLabel">🎁 رمز الدعوة (اختياري)</label>
+          <label>🎁 رمز الدعوة (اختياري)</label>
           <div class="input-wrapper">
             <input type="text" id="regReferral" placeholder="XXXXXX">
           </div>
@@ -222,15 +221,13 @@
     </div>
     
     <div class="info-section">
-      <div class="info-title">
-        <span>📖</span> <span id="infoTitle">عن المنصة</span>
-      </div>
-      <ul class="info-list" id="infoList">
-        <li>📦 <span>نظام <strong class="highlight">الشراء الجماعي</strong> - اشترِ بأسعار الجملة</span></li>
-        <li>💰 <span>الحد الأدنى للإيداع: <strong class="highlight">1 USDT</strong></span></li>
-        <li>📤 <span>الحد الأدنى للسحب: <strong class="highlight">0.5 USDT</strong></span></li>
-        <li>🌐 <span>شبكة التحويل: <strong class="highlight">BNB Smart Chain (BSC/BEP20)</strong></span></li>
-        <li>🤲 <span>نظام <strong class="highlight">متوافق مع الشريعة الإسلامية</strong></span></li>
+      <div class="info-title">📖 عن المنصة</div>
+      <ul class="info-list">
+        <li>📦 نظام <strong class="highlight">الشراء الجماعي</strong> - اشترِ بأسعار الجملة</li>
+        <li>💰 الحد الأدنى للإيداع: <strong class="highlight">1 USDT</strong></li>
+        <li>📤 الحد الأدنى للسحب: <strong class="highlight">0.5 USDT</strong></li>
+        <li>🌐 شبكة التحويل: <strong class="highlight">BNB Smart Chain (BSC/BEP20)</strong></li>
+        <li>🤲 نظام <strong class="highlight">متوافق مع الشريعة الإسلامية</strong></li>
       </ul>
     </div>
   </div>
@@ -241,28 +238,6 @@
     
     const translations = {
       ar: {
-        siteTitle: '🛍️ CryptoShop',
-        siteSub: 'شراء جماعي | أسعار الجملة',
-        loginTab: 'تسجيل الدخول',
-        registerTab: 'إنشاء حساب',
-        emailLabel: '📧 البريد الإلكتروني',
-        passwordLabel: '🔒 كلمة المرور',
-        rememberLabel: 'تذكرني (البقاء مسجل الدخول)',
-        loginBtn: 'تسجيل الدخول',
-        regNameLabel: '👤 اسم المستخدم',
-        regEmailLabel: '📧 البريد الإلكتروني',
-        regPasswordLabel: '🔒 كلمة المرور',
-        regConfirmLabel: '✔️ تأكيد كلمة المرور',
-        regReferralLabel: '🎁 رمز الدعوة (اختياري)',
-        registerBtn: 'إنشاء حساب',
-        infoTitle: '📖 عن المنصة',
-        infoList: [
-          'نظام <strong class="highlight">الشراء الجماعي</strong> - اشترِ بأسعار الجملة',
-          'الحد الأدنى للإيداع: <strong class="highlight">1 USDT</strong>',
-          'الحد الأدنى للسحب: <strong class="highlight">0.5 USDT</strong>',
-          'شبكة التحويل: <strong class="highlight">BNB Smart Chain (BSC/BEP20)</strong>',
-          'نظام <strong class="highlight">متوافق مع الشريعة الإسلامية</strong>'
-        ],
         errorFillFields: '⚠️ يرجى ملء جميع الحقول',
         errorPasswordMatch: '⚠️ كلمة المرور غير متطابقة',
         errorPasswordLength: '⚠️ كلمة المرور يجب أن تكون 4 أحرف على الأقل',
@@ -275,28 +250,6 @@
         emailExists: '❌ هذا البريد مسجل بالفعل'
       },
       en: {
-        siteTitle: '🛍️ CryptoShop',
-        siteSub: 'Group Buying | Wholesale Prices',
-        loginTab: 'Login',
-        registerTab: 'Sign Up',
-        emailLabel: '📧 Email',
-        passwordLabel: '🔒 Password',
-        rememberLabel: 'Remember Me (Stay logged in)',
-        loginBtn: 'Login',
-        regNameLabel: '👤 Username',
-        regEmailLabel: '📧 Email',
-        regPasswordLabel: '🔒 Password',
-        regConfirmLabel: '✔️ Confirm Password',
-        regReferralLabel: '🎁 Referral Code (Optional)',
-        registerBtn: 'Sign Up',
-        infoTitle: '📖 About Platform',
-        infoList: [
-          '<strong class="highlight">Group Buying</strong> - Buy at wholesale prices',
-          'Minimum deposit: <strong class="highlight">1 USDT</strong>',
-          'Minimum withdrawal: <strong class="highlight">0.5 USDT</strong>',
-          'Network: <strong class="highlight">BNB Smart Chain (BSC/BEP20)</strong>',
-          '<strong class="highlight">Sharia-compliant</strong> system'
-        ],
         errorFillFields: '⚠️ Please fill in all fields',
         errorPasswordMatch: '⚠️ Passwords do not match',
         errorPasswordLength: '⚠️ Password must be at least 4 characters',
@@ -311,26 +264,6 @@
     };
     
     function updateUILanguage() {
-      const t = translations[currentLang];
-      document.getElementById('siteTitle').innerHTML = t.siteTitle;
-      document.getElementById('siteSub').innerHTML = t.siteSub;
-      document.getElementById('loginTab').innerHTML = t.loginTab;
-      document.getElementById('registerTab').innerHTML = t.registerTab;
-      document.getElementById('emailLabel').innerHTML = t.emailLabel;
-      document.getElementById('passwordLabel').innerHTML = t.passwordLabel;
-      document.getElementById('rememberLabel').innerHTML = t.rememberLabel;
-      document.getElementById('doLoginBtn').innerHTML = t.loginBtn;
-      document.getElementById('regNameLabel').innerHTML = t.regNameLabel;
-      document.getElementById('regEmailLabel').innerHTML = t.regEmailLabel;
-      document.getElementById('regPasswordLabel').innerHTML = t.regPasswordLabel;
-      document.getElementById('regConfirmLabel').innerHTML = t.regConfirmLabel;
-      document.getElementById('regReferralLabel').innerHTML = t.regReferralLabel;
-      document.getElementById('doRegisterBtn').innerHTML = t.registerBtn;
-      document.getElementById('infoTitle').innerHTML = t.infoTitle;
-      
-      const infoList = document.getElementById('infoList');
-      infoList.innerHTML = t.infoList.map(item => `<li><span>${item}</span></li>`).join('');
-      
       document.querySelectorAll('.lang-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.lang === currentLang);
       });
@@ -391,6 +324,8 @@
           } else {
             localStorage.removeItem('rememberMe');
           }
+          // تعيين الوضع النهاري كأساسي
+          localStorage.setItem('theme', 'light');
           showMessage(`${t.successLogin} ${t.redirecting}`, 'success');
           setTimeout(() => { window.location.href = '/dashboard.html'; }, 1500);
         } else {
@@ -434,6 +369,8 @@
           localStorage.setItem('userId', data.user.id);
           localStorage.setItem('user', JSON.stringify(data.user));
           localStorage.setItem('dashboardLang', currentLang);
+          // تعيين الوضع النهاري كأساسي
+          localStorage.setItem('theme', 'light');
           
           const generatedDiv = document.getElementById('generatedReferral');
           generatedDiv.innerHTML = `${t.yourReferralCode} <strong>${data.referral_code}</strong>`;
@@ -456,6 +393,7 @@
     const savedUserId = localStorage.getItem('userId');
     const rememberMe = localStorage.getItem('rememberMe');
     if (savedUserId && rememberMe === 'true') {
+      localStorage.setItem('theme', 'light');
       window.location.href = '/dashboard.html';
     }
     
