@@ -2,192 +2,78 @@
 <html dir="rtl" lang="ar">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>تسجيل الدخول | منصة الشراء الجماعي</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       min-height: 100vh;
       background: #f0f2f5;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-family: Arial, sans-serif;
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 16px;
+      padding: 20px;
     }
-    .container {
-      max-width: 450px;
-      width: 100%;
-    }
+    .container { max-width: 400px; width: 100%; }
     .card {
       background: #ffffff;
-      border-radius: 32px;
-      padding: 32px 28px;
+      border-radius: 24px;
+      padding: 32px;
       border: 1px solid #00aa55;
-      box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
     }
     .logo { text-align: center; margin-bottom: 24px; }
     .logo h1 { font-size: 28px; color: #00aa55; }
-    .logo p { color: #666666; font-size: 13px; margin-top: 6px; }
-    
-    .lang-switch {
-      display: flex;
-      justify-content: flex-end;
-      gap: 10px;
-      margin-bottom: 20px;
-    }
-    .lang-btn {
-      background: transparent;
-      border: 1px solid #00aa55;
-      color: #00aa55;
-      padding: 5px 12px;
-      border-radius: 20px;
-      cursor: pointer;
-      font-size: 12px;
-      transition: all 0.3s;
-    }
-    .lang-btn.active {
-      background: #00aa55;
-      color: white;
-    }
-    
-    .tabs { display: flex; gap: 12px; margin-bottom: 24px; background: #f8f9fa; padding: 5px; border-radius: 60px; }
-    .tab { flex: 1; padding: 12px; text-align: center; background: transparent; border: none; border-radius: 50px; color: #666666; cursor: pointer; font-size: 15px; font-weight: 600; transition: all 0.3s; }
-    .tab.active { background: linear-gradient(135deg, #00aa55, #00cc77); color: white; box-shadow: 0 4px 15px rgba(0,170,85,0.3); }
-    
-    .input-group { margin-bottom: 18px; }
-    .input-group label { display: block; color: #666666; margin-bottom: 6px; font-size: 13px; }
-    .input-wrapper input {
+    .logo p { color: #666; font-size: 14px; }
+    .input-group { margin-bottom: 16px; }
+    .input-group label { display: block; color: #666; font-size: 13px; margin-bottom: 4px; }
+    .input-group input {
       width: 100%;
-      padding: 14px 16px;
-      border-radius: 16px;
-      border: 1px solid #00aa55;
-      background: #ffffff;
-      color: #1a1a2e;
+      padding: 12px 16px;
+      border-radius: 12px;
+      border: 1px solid #ddd;
       font-size: 14px;
-      transition: border-color 0.3s, box-shadow 0.3s;
     }
-    .input-wrapper input:focus { outline: none; border-color: #00cc77; box-shadow: 0 0 0 3px rgba(0,170,85,0.1); }
-    .input-wrapper input::placeholder { color: #aaaaaa; }
-    
-    .checkbox-group {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin: 16px 0;
-    }
-    .checkbox-group input { width: 18px; height: 18px; cursor: pointer; accent-color: #00aa55; }
-    .checkbox-group label { color: #666666; font-size: 13px; cursor: pointer; }
-    
-    .btn-primary {
+    .input-group input:focus { outline: none; border-color: #00aa55; }
+    .btn {
       width: 100%;
       padding: 14px;
-      background: linear-gradient(135deg, #00aa55, #00cc77);
+      background: #00aa55;
       color: white;
       border: none;
-      border-radius: 60px;
-      font-size: 15px;
+      border-radius: 30px;
+      font-size: 16px;
       font-weight: bold;
       cursor: pointer;
-      transition: all 0.3s;
     }
-    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 25px -5px rgba(0,170,85,0.4); }
-    .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
-    
-    .info-section {
-      background: rgba(0,170,85,0.05);
-      border-radius: 24px;
-      padding: 20px;
-      margin-top: 20px;
-      border: 1px solid rgba(0,170,85,0.2);
-    }
-    .info-title {
-      color: #00aa55;
-      font-size: 18px;
-      margin-bottom: 16px;
+    .btn:hover { background: #008844; }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    .tabs {
       display: flex;
-      align-items: center;
       gap: 8px;
+      margin-bottom: 20px;
+      background: #f5f5f5;
+      padding: 4px;
+      border-radius: 30px;
     }
-    .info-list {
-      list-style: none;
-      padding: 0;
-    }
-    .info-list li {
-      color: #666666;
-      font-size: 13px;
-      margin-bottom: 12px;
-      padding-right: 20px;
-      position: relative;
-      line-height: 1.5;
-    }
-    .info-list li::before {
-      content: "✅";
-      position: absolute;
-      right: 0;
-      color: #00aa55;
-    }
-    .highlight { color: #00aa55; font-weight: bold; }
-    
-    .message { margin-top: 16px; padding: 12px; border-radius: 16px; text-align: center; font-size: 13px; }
-    .error { background: rgba(255,68,68,0.1); border: 1px solid #ff4444; color: #ff4444; }
-    .success { background: rgba(0,170,85,0.1); border: 1px solid #00aa55; color: #00aa55; }
-    .warning { background: rgba(255,170,0,0.1); border: 1px solid #ffaa00; color: #ffaa00; }
-    
-    .hidden { display: none; }
-    .generated-code {
-      background: rgba(0,170,85,0.1);
-      border: 1px solid #00aa55;
-      border-radius: 16px;
-      padding: 12px;
-      margin-top: 16px;
+    .tab {
+      flex: 1;
+      padding: 10px;
       text-align: center;
+      background: transparent;
+      border: none;
+      border-radius: 30px;
+      cursor: pointer;
+      font-weight: bold;
+      color: #666;
     }
-    .generated-code strong {
-      color: #00aa55;
-      font-size: 18px;
-      letter-spacing: 2px;
-    }
-
-    /* وضع ليلي */
-    body.dark-mode {
-      background: #0a0a0f;
-    }
-    body.dark-mode .card {
-      background: #1a1a2e;
-      border-color: #00ff66;
-    }
-    body.dark-mode .logo h1 { color: #00ff66; }
-    body.dark-mode .logo p { color: #8899aa; }
-    body.dark-mode .lang-btn {
-      border-color: #00ff66;
-      color: #00ff66;
-    }
-    body.dark-mode .lang-btn.active {
-      background: #00ff66;
-      color: #0a0a0f;
-    }
-    body.dark-mode .tabs { background: #1a1a2e; }
-    body.dark-mode .tab { color: #8899aa; }
-    body.dark-mode .tab.active { background: linear-gradient(135deg, #00ff66, #00ccff); color: #0a0a0f; }
-    body.dark-mode .input-wrapper input {
-      background: #0a0a0f;
-      border-color: #00ff66;
-      color: white;
-    }
-    body.dark-mode .input-wrapper input::placeholder { color: #556677; }
-    body.dark-mode .input-wrapper input:focus { border-color: #00ccff; box-shadow: 0 0 0 3px rgba(0,255,102,0.1); }
-    body.dark-mode .checkbox-group label { color: #8899aa; }
-    body.dark-mode .info-section { background: rgba(0,255,102,0.05); border-color: rgba(0,255,102,0.2); }
-    body.dark-mode .info-title { color: #00ff66; }
-    body.dark-mode .info-list li { color: #8899aa; }
-    body.dark-mode .info-list li::before { color: #00ff66; }
-    body.dark-mode .highlight { color: #00ff66; }
-    body.dark-mode .generated-code { background: rgba(0,255,102,0.1); border-color: #00ff66; }
-    body.dark-mode .generated-code strong { color: #00ff66; }
-
-    /* زر تبديل الوضع في صفحة تسجيل الدخول */
-    .theme-toggle-login {
+    .tab.active { background: #00aa55; color: white; }
+    .hidden { display: none; }
+    .message { margin-top: 16px; padding: 12px; border-radius: 12px; text-align: center; font-size: 14px; }
+    .error { background: #fee; border: 1px solid #ff4444; color: #ff4444; }
+    .success { background: #efe; border: 1px solid #00aa55; color: #00aa55; }
+    .theme-toggle {
       position: fixed;
       top: 16px;
       left: 16px;
@@ -198,226 +84,103 @@
       border-radius: 30px;
       cursor: pointer;
       font-size: 13px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      transition: all 0.3s ease;
       z-index: 100;
     }
-    body.dark-mode .theme-toggle-login {
-      background: rgba(0,255,102,0.15);
+    body.dark-mode {
+      background: #0a0a0f;
+    }
+    body.dark-mode .card {
+      background: #1a1a2e;
+      border-color: #00ff66;
+    }
+    body.dark-mode .logo h1 { color: #00ff66; }
+    body.dark-mode .input-group input {
+      background: #0a0a0f;
+      border-color: #00ff66;
+      color: white;
+    }
+    body.dark-mode .tabs { background: #1a1a2e; }
+    body.dark-mode .tab { color: #8899aa; }
+    body.dark-mode .tab.active { background: #00ff66; color: #0a0a0f; }
+    body.dark-mode .theme-toggle {
       border-color: #00ff66;
       color: #00ff66;
-    }
-    .theme-toggle-login:hover {
-      transform: scale(1.05);
     }
   </style>
 </head>
 <body>
 
-  <!-- زر تبديل الوضع النهاري/الليلي -->
-  <button class="theme-toggle-login" id="themeToggleLogin">☀️ <span id="themeTextLogin">وضع نهاري</span></button>
+  <button class="theme-toggle" id="themeToggle">☀️ وضع نهاري</button>
 
   <div class="container">
     <div class="card">
-      <div class="lang-switch">
-        <button class="lang-btn active" data-lang="ar">🇸🇦 العربية</button>
-        <button class="lang-btn" data-lang="en">🇬🇧 English</button>
-      </div>
-      
       <div class="logo">
         <h1>🛍️ CryptoShop</h1>
         <p>شراء جماعي | أسعار الجملة</p>
       </div>
-      
+
       <div class="tabs">
         <button class="tab active" id="loginTab">تسجيل الدخول</button>
         <button class="tab" id="registerTab">إنشاء حساب</button>
       </div>
-      
-      <!-- Login Form -->
+
       <div id="loginForm">
         <div class="input-group">
           <label>📧 البريد الإلكتروني</label>
-          <div class="input-wrapper">
-            <input type="email" id="loginEmail" placeholder="example@email.com" autocomplete="email">
-          </div>
+          <input type="email" id="loginEmail" placeholder="example@email.com">
         </div>
         <div class="input-group">
           <label>🔒 كلمة المرور</label>
-          <div class="input-wrapper">
-            <input type="password" id="loginPassword" placeholder="********" autocomplete="current-password">
-          </div>
+          <input type="password" id="loginPassword" placeholder="********">
         </div>
-        <div class="checkbox-group">
-          <input type="checkbox" id="rememberMe">
-          <label>تذكرني (البقاء مسجل الدخول)</label>
-        </div>
-        <button class="btn-primary" id="doLoginBtn">تسجيل الدخول</button>
+        <button class="btn" id="doLoginBtn">تسجيل الدخول</button>
       </div>
-      
-      <!-- Register Form -->
+
       <div id="registerForm" class="hidden">
         <div class="input-group">
           <label>👤 اسم المستخدم</label>
-          <div class="input-wrapper">
-            <input type="text" id="regName" placeholder="أدخل اسمك" autocomplete="name">
-          </div>
+          <input type="text" id="regName" placeholder="أدخل اسمك">
         </div>
         <div class="input-group">
           <label>📧 البريد الإلكتروني</label>
-          <div class="input-wrapper">
-            <input type="email" id="regEmail" placeholder="example@email.com" autocomplete="email">
-          </div>
+          <input type="email" id="regEmail" placeholder="example@email.com">
         </div>
         <div class="input-group">
           <label>🔒 كلمة المرور</label>
-          <div class="input-wrapper">
-            <input type="password" id="regPassword" placeholder="********" autocomplete="new-password">
-          </div>
+          <input type="password" id="regPassword" placeholder="********">
         </div>
         <div class="input-group">
           <label>✔️ تأكيد كلمة المرور</label>
-          <div class="input-wrapper">
-            <input type="password" id="regConfirmPassword" placeholder="********" autocomplete="new-password">
-          </div>
+          <input type="password" id="regConfirmPassword" placeholder="********">
         </div>
         <div class="input-group">
           <label>🎁 رمز الدعوة (اختياري)</label>
-          <div class="input-wrapper">
-            <input type="text" id="regReferral" placeholder="XXXXXX" autocomplete="off">
-          </div>
+          <input type="text" id="regReferral" placeholder="XXXXXX">
         </div>
-        <button class="btn-primary" id="doRegisterBtn">إنشاء حساب</button>
-        <div id="generatedReferral" class="generated-code hidden"></div>
+        <button class="btn" id="doRegisterBtn">إنشاء حساب</button>
       </div>
-      
+
       <div id="message"></div>
     </div>
-    
-    <div class="info-section">
-      <div class="info-title">📖 عن المنصة</div>
-      <ul class="info-list">
-        <li>📦 نظام <strong class="highlight">الشراء الجماعي</strong> - اشترِ بأسعار الجملة</li>
-        <li>💰 الحد الأدنى للإيداع: <strong class="highlight">1 USDT</strong></li>
-        <li>📤 الحد الأدنى للسحب: <strong class="highlight">0.5 USDT</strong></li>
-        <li>🌐 شبكة التحويل: <strong class="highlight">BNB Smart Chain (BSC/BEP20)</strong></li>
-        <li>🤲 نظام <strong class="highlight">متوافق مع الشريعة الإسلامية</strong></li>
-      </ul>
-    </div>
   </div>
-  
-  <script>
-    // ==========================================
-    // الترجمة
-    // ==========================================
-    const translations = {
-      ar: {
-        errorFillFields: '⚠️ يرجى ملء جميع الحقول',
-        errorPasswordMatch: '⚠️ كلمة المرور غير متطابقة',
-        errorPasswordLength: '⚠️ كلمة المرور يجب أن تكون 4 أحرف على الأقل',
-        errorLogin: '❌ البريد الإلكتروني أو كلمة المرور غير صحيحة',
-        errorConnection: '❌ خطأ في الاتصال بالخادم',
-        successLogin: '✅ تم تسجيل الدخول بنجاح!',
-        successRegister: '✅ تم إنشاء الحساب بنجاح!',
-        redirecting: 'جاري التحويل...',
-        yourReferralCode: '✨ رمز الدعوة الخاص بك:',
-        emailExists: '❌ هذا البريد مسجل بالفعل',
-        loginTitle: 'تسجيل الدخول',
-        registerTitle: 'إنشاء حساب'
-      },
-      en: {
-        errorFillFields: '⚠️ Please fill in all fields',
-        errorPasswordMatch: '⚠️ Passwords do not match',
-        errorPasswordLength: '⚠️ Password must be at least 4 characters',
-        errorLogin: '❌ Invalid email or password',
-        errorConnection: '❌ Server connection error',
-        successLogin: '✅ Login successful!',
-        successRegister: '✅ Account created successfully!',
-        redirecting: 'Redirecting...',
-        yourReferralCode: '✨ Your referral code:',
-        emailExists: '❌ This email is already registered',
-        loginTitle: 'Login',
-        registerTitle: 'Register'
-      }
-    };
 
+  <script>
     const API_URL = window.location.origin;
-    let currentLang = localStorage.getItem('loginLang') || 'ar';
     let currentTheme = localStorage.getItem('theme') || 'light';
 
-    // ==========================================
-    // إدارة الوضع النهاري/الليلي
-    // ==========================================
-
     function setTheme(theme) {
-      const body = document.body;
-      body.classList.remove('dark-mode');
-      if (theme === 'dark') {
-        body.classList.add('dark-mode');
-        document.getElementById('themeToggleLogin').innerHTML = '🌙 <span id="themeTextLogin">وضع ليلي</span>';
-        document.getElementById('themeTextLogin').textContent = 'وضع ليلي';
-      } else {
-        document.getElementById('themeToggleLogin').innerHTML = '☀️ <span id="themeTextLogin">وضع نهاري</span>';
-        document.getElementById('themeTextLogin').textContent = 'وضع نهاري';
-      }
+      document.body.classList.toggle('dark-mode', theme === 'dark');
+      document.getElementById('themeToggle').innerHTML = theme === 'dark' ? '🌙 وضع ليلي' : '☀️ وضع نهاري';
       localStorage.setItem('theme', theme);
       currentTheme = theme;
     }
 
-    function toggleTheme() {
-      const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-      setTheme(newTheme);
-    }
-
-    document.getElementById('themeToggleLogin').onclick = toggleTheme;
+    document.getElementById('themeToggle').onclick = () => {
+      setTheme(currentTheme === 'light' ? 'dark' : 'light');
+    };
     setTheme(currentTheme);
 
-    // ==========================================
-    // إدارة اللغة
-    // ==========================================
-
-    function updateUILanguage() {
-      document.querySelectorAll('.lang-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.lang === currentLang);
-      });
-    }
-
-    document.querySelectorAll('.lang-btn').forEach(btn => {
-      btn.onclick = () => {
-        currentLang = btn.dataset.lang;
-        localStorage.setItem('loginLang', currentLang);
-        updateUILanguage();
-      };
-    });
-
-    // ==========================================
-    // دوال مساعدة
-    // ==========================================
-
-    function showMessage(msg, type) {
-      const div = document.getElementById('message');
-      div.innerHTML = `<div class="message ${type}">${msg}</div>`;
-      setTimeout(() => div.innerHTML = '', 6000);
-    }
-
-    function setLoading(button, loading) {
-      if (loading) {
-        button.disabled = true;
-        button.textContent = '⏳ جاري...';
-      } else {
-        button.disabled = false;
-        const isLogin = button.id === 'doLoginBtn';
-        const t = translations[currentLang];
-        button.textContent = isLogin ? t.loginTitle : t.registerTitle;
-      }
-    }
-
-    // ==========================================
-    // تبديل التبويبات
-    // ==========================================
-
+    // التبويبات
     document.getElementById('loginTab').onclick = () => {
       document.getElementById('loginTab').classList.add('active');
       document.getElementById('registerTab').classList.remove('active');
@@ -425,7 +188,6 @@
       document.getElementById('registerForm').classList.add('hidden');
       document.getElementById('message').innerHTML = '';
     };
-
     document.getElementById('registerTab').onclick = () => {
       document.getElementById('registerTab').classList.add('active');
       document.getElementById('loginTab').classList.remove('active');
@@ -434,19 +196,25 @@
       document.getElementById('message').innerHTML = '';
     };
 
-    // ==========================================
-    // تسجيل الدخول
-    // ==========================================
+    function showMessage(msg, type) {
+      const div = document.getElementById('message');
+      div.innerHTML = `<div class="message ${type}">${msg}</div>`;
+      setTimeout(() => div.innerHTML = '', 5000);
+    }
 
+    function setLoading(btn, loading) {
+      btn.disabled = loading;
+      btn.textContent = loading ? '⏳ جاري...' : btn.id === 'doLoginBtn' ? 'تسجيل الدخول' : 'إنشاء حساب';
+    }
+
+    // تسجيل الدخول
     document.getElementById('doLoginBtn').onclick = async () => {
-      const t = translations[currentLang];
       const email = document.getElementById('loginEmail').value.trim();
       const password = document.getElementById('loginPassword').value;
-      const rememberMe = document.getElementById('rememberMe').checked;
       const btn = document.getElementById('doLoginBtn');
 
       if (!email || !password) {
-        showMessage(t.errorFillFields, 'error');
+        showMessage('⚠️ يرجى ملء جميع الحقول', 'error');
         return;
       }
 
@@ -461,59 +229,39 @@
         const data = await res.json();
 
         if (data.success) {
-          // تخزين JWT token
           localStorage.setItem('token', data.token);
           localStorage.setItem('user', JSON.stringify(data.user));
-          localStorage.setItem('dashboardLang', currentLang);
-
-          if (rememberMe) {
-            localStorage.setItem('rememberMe', 'true');
-          } else {
-            localStorage.removeItem('rememberMe');
-          }
-
-          localStorage.setItem('theme', currentTheme);
-          showMessage(`${t.successLogin} ${t.redirecting}`, 'success');
-
-          setTimeout(() => {
-            window.location.href = '/dashboard.html';
-          }, 1500);
+          showMessage('✅ تم تسجيل الدخول بنجاح!', 'success');
+          setTimeout(() => { window.location.href = '/dashboard.html'; }, 1000);
         } else {
-          showMessage(t.errorLogin, 'error');
+          showMessage(data.error || '❌ فشل تسجيل الدخول', 'error');
           setLoading(btn, false);
         }
       } catch (error) {
-        console.error('Login error:', error);
-        showMessage(t.errorConnection, 'error');
+        showMessage('❌ خطأ في الاتصال بالخادم', 'error');
         setLoading(btn, false);
       }
     };
 
-    // ==========================================
-    // إنشاء حساب جديد
-    // ==========================================
-
+    // إنشاء حساب
     document.getElementById('doRegisterBtn').onclick = async () => {
-      const t = translations[currentLang];
       const name = document.getElementById('regName').value.trim();
       const email = document.getElementById('regEmail').value.trim();
       const password = document.getElementById('regPassword').value;
       const confirm = document.getElementById('regConfirmPassword').value;
-      const referralCode = document.getElementById('regReferral').value.trim().toUpperCase();
+      const referralCode = document.getElementById('regReferral').value.trim();
       const btn = document.getElementById('doRegisterBtn');
 
       if (!name || !email || !password || !confirm) {
-        showMessage(t.errorFillFields, 'error');
+        showMessage('⚠️ يرجى ملء جميع الحقول', 'error');
         return;
       }
-
       if (password !== confirm) {
-        showMessage(t.errorPasswordMatch, 'error');
+        showMessage('⚠️ كلمة المرور غير متطابقة', 'error');
         return;
       }
-
       if (password.length < 4) {
-        showMessage(t.errorPasswordLength, 'error');
+        showMessage('⚠️ كلمة المرور يجب أن تكون 4 أحرف على الأقل', 'error');
         return;
       }
 
@@ -528,84 +276,40 @@
         const data = await res.json();
 
         if (data.success) {
-          // تخزين JWT token
           localStorage.setItem('token', data.token);
           localStorage.setItem('user', JSON.stringify(data.user));
-          localStorage.setItem('dashboardLang', currentLang);
-          localStorage.setItem('theme', currentTheme);
-
-          const generatedDiv = document.getElementById('generatedReferral');
-          generatedDiv.innerHTML = `${t.yourReferralCode} <strong>${data.referral_code}</strong>`;
-          generatedDiv.classList.remove('hidden');
-
-          showMessage(`${t.successRegister} ${t.redirecting}`, 'success');
-
-          setTimeout(() => {
-            window.location.href = '/dashboard.html';
-          }, 2000);
+          showMessage('✅ تم إنشاء الحساب بنجاح!', 'success');
+          setTimeout(() => { window.location.href = '/dashboard.html'; }, 1000);
         } else {
-          if (data.error && (data.error.includes('مسجل') || data.error.includes('registered'))) {
-            showMessage(t.emailExists, 'error');
-          } else {
-            showMessage(`❌ ${data.error}`, 'error');
-          }
+          showMessage(data.error || '❌ فشل إنشاء الحساب', 'error');
           setLoading(btn, false);
         }
       } catch (error) {
-        console.error('Register error:', error);
-        showMessage(t.errorConnection, 'error');
+        showMessage('❌ خطأ في الاتصال بالخادم', 'error');
         setLoading(btn, false);
       }
     };
 
-    // ==========================================
-    // Enter key support
-    // ==========================================
-
+    // Enter key
     document.getElementById('loginPassword').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') document.getElementById('doLoginBtn').click();
     });
-
     document.getElementById('regConfirmPassword').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') document.getElementById('doRegisterBtn').click();
     });
 
-    // ==========================================
-    // التحقق من الجلسة الحالية
-    // ==========================================
-
-    (function checkSession() {
+    // التحقق من الجلسة
+    (function() {
       const token = localStorage.getItem('token');
-      const rememberMe = localStorage.getItem('rememberMe');
-
-      if (token && rememberMe === 'true') {
-        // التحقق من صحة token
+      if (token) {
         try {
           const payload = JSON.parse(atob(token.split('.')[1]));
-          const exp = payload.exp * 1000;
-          if (Date.now() < exp) {
-            // token صالح - توجيه إلى dashboard
-            localStorage.setItem('theme', currentTheme);
+          if (Date.now() < payload.exp * 1000) {
             window.location.href = '/dashboard.html';
-            return;
           }
-        } catch (e) {
-          // token غير صالح - حذفه
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-        }
+        } catch(e) {}
       }
     })();
-
-    // ==========================================
-    // تهيئة اللغة
-    // ==========================================
-
-    updateUILanguage();
-
-    console.log('🛍️ منصة الشراء الجماعي - صفحة تسجيل الدخول');
-    console.log('🔐 نظام مصادقة آمن مع JWT');
-    console.log('🌐 تم التحميل بنجاح');
   </script>
 </body>
 </html>
