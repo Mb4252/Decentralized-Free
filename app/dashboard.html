@@ -2,58 +2,40 @@
 <html dir="rtl" lang="ar">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>الرئيسية | منصة الشراء الجماعي</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    
     body {
-      min-height: 100vh;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      padding-bottom: 80px;
-      transition: background-color 0.3s ease, color 0.3s ease;
-    }
-    
-    /* الوضع النهاري (الأساسي) */
-    body {
+      font-family: Arial, sans-serif;
       background: #f0f2f5;
-      background-image: linear-gradient(rgba(0,100,50,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0,100,50,0.05) 1px, transparent 1px);
-      background-size: 40px 40px;
       color: #1a1a2e;
+      padding-bottom: 80px;
     }
-    
-    body.dark-mode {
-      background: #0a0a0f;
-      background-image: linear-gradient(rgba(0,255,100,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,255,100,0.03) 1px, transparent 1px);
-      background-size: 40px 40px;
-      color: #ffffff;
-    }
-    
     .navbar {
-      background: #ffffff;
-      border-bottom: 1px solid #00aa55;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+      background: white;
       padding: 16px 20px;
       display: flex;
       justify-content: space-between;
       align-items: center;
+      border-bottom: 2px solid #00aa55;
       flex-wrap: wrap;
       gap: 10px;
-      transition: background-color 0.3s ease, border-color 0.3s ease;
     }
-    body.dark-mode .navbar {
-      background: #1a1a2e;
-      border-bottom: 1px solid #00ff66;
-    }
-    
-    .logo { font-size: 22px; font-weight: bold; color: #00aa55; display: flex; align-items: center; gap: 10px; }
-    body.dark-mode .logo { color: #00ff66; }
-    
+    .logo { font-size: 22px; font-weight: bold; color: #00aa55; }
     .user-actions { display: flex; align-items: center; gap: 15px; flex-wrap: wrap; }
     .user-name { color: #00aa55; font-size: 14px; }
-    body.dark-mode .user-name { color: #00ff66; }
-    
-    .support-btn, .theme-toggle {
+    .btn-logout {
+      background: #ff4444;
+      color: white;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .btn-logout:hover { background: #cc0000; }
+    .theme-toggle {
       background: rgba(0,170,85,0.1);
       border: 1px solid #00aa55;
       color: #00aa55;
@@ -61,208 +43,132 @@
       border-radius: 20px;
       cursor: pointer;
       font-size: 12px;
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      transition: all 0.3s ease;
     }
-    body.dark-mode .support-btn,
-    body.dark-mode .theme-toggle {
-      background: rgba(0,255,102,0.15);
-      border-color: #00ff66;
-      color: #00ff66;
-    }
-    
-    .logout-btn {
-      background: transparent;
-      border: 1px solid #ff4444;
-      color: #ff4444;
-      padding: 6px 12px;
-      border-radius: 20px;
-      cursor: pointer;
-      font-size: 12px;
-      display: flex;
-      align-items: center;
-      gap: 5px;
-    }
-    
     .content { max-width: 500px; margin: 0 auto; padding: 20px; }
-    
     .card {
-      background: #ffffff;
-      border-radius: 24px;
-      padding: 24px;
-      margin-bottom: 20px;
+      background: white;
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 16px;
       border: 1px solid #00aa55;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-      transition: all 0.3s ease;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
     }
-    body.dark-mode .card {
-      background: #1a1a2e;
-      border-color: #00ff66;
-    }
-    
     .card-title {
       color: #1a1a2e;
       font-size: 18px;
-      margin-bottom: 16px;
+      margin-bottom: 12px;
       border-right: 3px solid #00aa55;
       padding-right: 12px;
     }
-    body.dark-mode .card-title {
-      color: white;
-      border-right-color: #00ff66;
-    }
-    
-    .assets-amount { font-size: 42px; font-weight: bold; color: #00aa55; text-align: center; margin: 16px 0; }
-    body.dark-mode .assets-amount { color: #00ff66; text-shadow: 0 0 10px rgba(0,255,102,0.3); }
-    
-    .detail-row { display: flex; justify-content: space-between; padding: 8px 0; color: #666666; font-size: 14px; }
-    body.dark-mode .detail-row { color: #aabbcc; }
-    
-    .detail-value { color: #00aa55; font-weight: bold; }
-    body.dark-mode .detail-value { color: #00ff66; }
-    
-    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-    .stat-card { background: #f8f9fa; border-radius: 20px; padding: 16px; text-align: center; border: 1px solid #00aa55; transition: all 0.3s ease; }
-    body.dark-mode .stat-card { background: #1a1a2e; border-color: #00ff66; }
-    .stat-value { color: #00aa55; font-size: 24px; font-weight: bold; }
-    body.dark-mode .stat-value { color: #00ff66; }
-    .stat-label { color: #666666; font-size: 12px; }
-    body.dark-mode .stat-label { color: #8899aa; }
-    
-    .action-card {
-      background: linear-gradient(135deg, #ffffff, #f0f2f5);
-      border-radius: 20px;
-      padding: 20px;
+    .balance {
+      font-size: 36px;
+      font-weight: bold;
+      color: #00aa55;
       text-align: center;
-      border: 1px solid #00aa55;
-      cursor: pointer;
-      transition: all 0.3s;
+      padding: 16px 0;
     }
-    body.dark-mode .action-card {
-      background: linear-gradient(135deg, #1a1a2e, #0f0f1a);
-      border-color: #00ff66;
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      color: #666;
+      font-size: 14px;
     }
-    .action-card:hover { transform: translateY(-3px); border-color: #00aa55; box-shadow: 0 10px 20px rgba(0,170,85,0.2); }
-    body.dark-mode .action-card:hover { border-color: #00ff66; box-shadow: 0 10px 20px rgba(0,255,102,0.2); }
-    .action-icon { font-size: 40px; margin-bottom: 10px; }
-    .action-title { color: #1a1a2e; font-size: 18px; font-weight: bold; }
-    body.dark-mode .action-title { color: white; }
-    .action-sub { color: #888888; font-size: 12px; margin-top: 5px; }
-    body.dark-mode .action-sub { color: #8899aa; }
-    
+    .detail-value { color: #00aa55; font-weight: bold; }
     .product-card {
-      background: #ffffff;
-      border-radius: 20px;
-      padding: 16px;
-      margin-bottom: 16px;
-      border: 1px solid #00aa55;
-      transition: all 0.3s;
-      cursor: pointer;
-    }
-    body.dark-mode .product-card {
-      background: #1a1a2e;
-      border-color: #00ff66;
-    }
-    .product-card:hover { transform: translateY(-3px); border-color: #00aa55; box-shadow: 0 10px 20px rgba(0,170,85,0.15); }
-    body.dark-mode .product-card:hover { border-color: #00ccff; box-shadow: 0 10px 20px rgba(0,255,102,0.15); }
-    .product-name { color: #00aa55; font-size: 18px; font-weight: bold; }
-    body.dark-mode .product-name { color: #00ff66; }
-    .product-price { color: #cc8800; font-size: 16px; }
-    body.dark-mode .product-price { color: #ffcc00; }
-    .product-meta { color: #888888; font-size: 12px; margin-top: 5px; }
-    body.dark-mode .product-meta { color: #8899aa; }
-    
-    .progress-bar { background: #e9ecef; border-radius: 10px; height: 8px; margin-top: 10px; overflow: hidden; }
-    body.dark-mode .progress-bar { background: rgba(255,255,255,0.1); }
-    .progress-fill { background: linear-gradient(90deg, #00aa55, #00cc77); height: 100%; border-radius: 10px; transition: width 0.5s ease; }
-    body.dark-mode .progress-fill { background: linear-gradient(90deg, #00ff66, #00ccff); }
-    
-    .btn-order {
-      background: linear-gradient(135deg, #00aa55, #00cc77);
-      color: white;
-      border: none;
-      padding: 10px 20px;
-      border-radius: 30px;
-      font-weight: bold;
-      cursor: pointer;
-      transition: all 0.3s;
-    }
-    body.dark-mode .btn-order {
-      background: linear-gradient(135deg, #00ff66, #00ccff);
-      color: #0a0a0f;
-    }
-    .btn-order:hover { transform: scale(1.02); box-shadow: 0 5px 15px rgba(0,170,85,0.3); }
-    body.dark-mode .btn-order:hover { box-shadow: 0 5px 15px rgba(0,255,102,0.3); }
-    
-    .btn-withdraw-order {
-      background: linear-gradient(135deg, #ffaa00, #ff6600);
-      color: white;
-      border: none;
-      padding: 6px 14px;
-      border-radius: 20px;
-      font-weight: bold;
-      cursor: pointer;
-      transition: all 0.3s;
-      font-size: 12px;
-    }
-    body.dark-mode .btn-withdraw-order { color: #0a0a0f; }
-    .btn-withdraw-order:hover { transform: scale(1.02); }
-    .btn-banned { background: #ff4444; color: white; border: none; padding: 6px 14px; border-radius: 20px; font-weight: bold; cursor: not-allowed; font-size: 12px; opacity: 0.7; }
-    
-    .order-card {
-      background: #ffffff;
-      border-radius: 16px;
-      padding: 16px;
+      background: #f8f9fa;
+      border-radius: 12px;
+      padding: 12px;
       margin-bottom: 12px;
       border: 1px solid #00aa55;
+      cursor: pointer;
     }
-    body.dark-mode .order-card {
-      background: #1a1a2e;
-      border-color: #00ff66;
+    .product-card:hover { border-color: #00cc77; }
+    .product-name { color: #00aa55; font-size: 16px; font-weight: bold; }
+    .product-price { color: #cc8800; font-size: 14px; }
+    .product-meta { color: #888; font-size: 12px; margin-top: 4px; }
+    .progress-bar {
+      background: #e9ecef;
+      border-radius: 10px;
+      height: 6px;
+      margin-top: 8px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      background: linear-gradient(90deg, #00aa55, #00cc77);
+      height: 100%;
+      border-radius: 10px;
+      transition: width 0.5s;
+    }
+    .btn-order {
+      background: #00aa55;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-weight: bold;
+      margin-top: 8px;
+    }
+    .btn-order:hover { background: #008844; }
+    .btn-withdraw {
+      background: #ffaa00;
+      color: white;
+      border: none;
+      padding: 4px 12px;
+      border-radius: 16px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .btn-withdraw:hover { background: #cc8800; }
+    .order-card {
+      background: #f8f9fa;
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 10px;
+      border: 1px solid #00aa55;
     }
     .order-status { color: #00aa55; font-weight: bold; font-size: 14px; }
-    body.dark-mode .order-status { color: #00ff66; }
-    .order-amount { color: #cc8800; font-weight: bold; font-size: 16px; }
-    body.dark-mode .order-amount { color: #ffcc00; }
-    .order-location { color: #888888; font-size: 12px; }
-    body.dark-mode .order-location { color: #8899aa; }
-    
+    .order-amount { color: #cc8800; font-weight: bold; }
+    .order-location { color: #888; font-size: 12px; }
+    .status-badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: bold;
+    }
+    .status-pending { background: rgba(255,170,0,0.2); color: #ffaa00; }
+    .status-confirmed { background: rgba(0,170,85,0.2); color: #00aa55; }
+    .status-shipped { background: rgba(0,204,255,0.2); color: #00ccff; }
+    .status-delivered { background: rgba(5,150,105,0.2); color: #059669; }
+    .status-withdrawn { background: rgba(255,68,68,0.2); color: #ff4444; }
     .bottom-nav {
       position: fixed;
       bottom: 0;
       left: 0;
       right: 0;
-      background: #ffffff;
+      background: white;
       display: flex;
       justify-content: space-around;
       padding: 10px;
       border-top: 2px solid #00aa55;
       z-index: 999;
-      transition: all 0.3s ease;
-    }
-    body.dark-mode .bottom-nav {
-      background: #1a1a2e;
-      border-top-color: #00ff66;
     }
     .nav-item {
       background: none;
       border: none;
-      color: #999999;
+      color: #999;
       cursor: pointer;
       padding: 8px;
       font-size: 20px;
       display: flex;
       flex-direction: column;
       align-items: center;
-      transition: color 0.3s ease;
     }
-    body.dark-mode .nav-item { color: #8899aa; }
     .nav-item.active { color: #00aa55; }
-    body.dark-mode .nav-item.active { color: #00ff66; }
     .nav-label { font-size: 10px; margin-top: 2px; }
-    
+    .hidden { display: none; }
     .modal {
       position: fixed;
       top: 0;
@@ -270,7 +176,6 @@
       right: 0;
       bottom: 0;
       background: rgba(0,0,0,0.95);
-      backdrop-filter: blur(8px);
       z-index: 2000;
       display: flex;
       align-items: center;
@@ -278,27 +183,19 @@
       padding: 20px;
     }
     .modal-content {
-      background: #ffffff;
-      border-radius: 32px;
-      padding: 28px;
+      background: white;
+      border-radius: 24px;
+      padding: 24px;
       max-width: 450px;
       width: 100%;
       max-height: 90vh;
       overflow-y: auto;
       border: 1px solid #00aa55;
-      transition: background-color 0.3s ease, border-color 0.3s ease;
     }
-    body.dark-mode .modal-content {
-      background: #1a1a2e;
-      border-color: #00ff66;
-    }
-    .modal-content h3 { color: #00aa55; margin-bottom: 16px; font-size: 20px; }
-    body.dark-mode .modal-content h3 { color: #00ff66; }
-    .modal-content p { color: #555555; margin-bottom: 20px; line-height: 1.6; font-size: 14px; }
-    body.dark-mode .modal-content p { color: #8899aa; }
-    
+    .modal-content h3 { color: #00aa55; margin-bottom: 16px; }
+    .modal-content p { color: #555; margin-bottom: 12px; line-height: 1.6; }
     .close-modal {
-      background: #00aa55;
+      background: #ff4444;
       color: white;
       border: none;
       padding: 12px;
@@ -306,74 +203,17 @@
       font-weight: bold;
       width: 100%;
       cursor: pointer;
+      margin-top: 12px;
     }
-    body.dark-mode .close-modal {
-      background: #00ff66;
-      color: #0a0a0f;
-    }
-    
     .input-field {
       width: 100%;
       padding: 12px;
       border-radius: 12px;
       border: 1px solid #00aa55;
-      background: #ffffff;
-      color: #1a1a2e;
       margin-bottom: 12px;
-      transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
-    }
-    body.dark-mode .input-field {
-      background: #0a0a0f;
-      border-color: #00ff66;
-      color: white;
+      font-size: 14px;
     }
     .input-field:focus { outline: none; border-color: #00cc77; }
-    body.dark-mode .input-field:focus { border-color: #00ccff; }
-    .input-field::placeholder { color: #aaaaaa; }
-    body.dark-mode .input-field::placeholder { color: #556677; }
-    
-    .hidden { display: none; }
-    
-    .message { padding: 12px; border-radius: 12px; margin-bottom: 16px; text-align: center; font-size: 14px; }
-    .success { background: rgba(0,170,85,0.15); border: 1px solid #00aa55; color: #00aa55; }
-    body.dark-mode .success { background: rgba(0,255,102,0.15); border-color: #00ff66; color: #00ff66; }
-    .error { background: rgba(255,68,68,0.15); border: 1px solid #ff4444; color: #ff4444; }
-    .warning { background: rgba(255,170,0,0.15); border: 1px solid #ffaa00; color: #ffaa00; }
-    .loading { background: rgba(0,204,255,0.15); border: 1px solid #00ccff; color: #00ccff; }
-    
-    .info-box { background: rgba(0,204,255,0.08); border: 1px solid #00ccff; border-radius: 16px; padding: 12px; margin-top: 12px; font-size: 12px; color: #00ccff; }
-    body.dark-mode .info-box { background: rgba(0,204,255,0.1); }
-    .info-box-warning { background: rgba(255,170,0,0.15); border: 1px solid #ffaa00; border-radius: 16px; padding: 12px; margin-top: 12px; font-size: 12px; color: #ffaa00; }
-    .info-box-success { background: rgba(0,170,85,0.15); border: 1px solid #00aa55; border-radius: 16px; padding: 12px; margin-top: 12px; font-size: 12px; color: #00aa55; }
-    body.dark-mode .info-box-success { background: rgba(0,255,102,0.15); border-color: #00ff66; color: #00ff66; }
-    
-    .network-btn {
-      background: rgba(0,170,85,0.1);
-      border: 1px solid #00aa55;
-      color: #00aa55;
-      padding: 10px;
-      border-radius: 16px;
-      cursor: pointer;
-      width: 100%;
-      margin-bottom: 12px;
-      text-align: center;
-    }
-    body.dark-mode .network-btn {
-      background: rgba(0,255,102,0.1);
-      border-color: #00ff66;
-      color: #00ff66;
-    }
-    .deposit-btn, .withdraw-btn {
-      width: 100%;
-      padding: 12px;
-      border-radius: 30px;
-      font-weight: bold;
-      cursor: pointer;
-      border: none;
-    }
-    .deposit-btn { background: linear-gradient(135deg, #00aa55, #00cc77); color: white; }
-    body.dark-mode .deposit-btn { background: linear-gradient(135deg, #00ff66, #00ccff); color: #0a0a0f; }
-    .withdraw-btn { background: linear-gradient(135deg, #ff4444, #ff6680); color: white; }
     .btn-copy {
       background: rgba(0,170,85,0.1);
       border: 1px solid #00aa55;
@@ -384,53 +224,22 @@
       width: 100%;
       margin-top: 8px;
     }
-    body.dark-mode .btn-copy {
-      background: rgba(0,255,102,0.15);
-      border-color: #00ff66;
-      color: #00ff66;
-    }
-    
-    .welcome-message {
-      background: linear-gradient(135deg, rgba(0,170,85,0.08), rgba(0,204,119,0.05));
-      border: 1px solid #00aa55;
-      border-radius: 16px;
-      padding: 16px;
-      margin-bottom: 16px;
-      text-align: center;
-    }
-    body.dark-mode .welcome-message {
-      background: linear-gradient(135deg, rgba(0,255,102,0.1), rgba(0,204,255,0.05));
-      border-color: #00ff66;
-    }
-    .welcome-message h2 { color: #00aa55; font-size: 20px; margin-bottom: 8px; }
-    body.dark-mode .welcome-message h2 { color: #00ff66; }
-    .welcome-message p { color: #666666; font-size: 14px; line-height: 1.8; }
-    body.dark-mode .welcome-message p { color: #8899aa; }
-    
-    .terms-box {
-      background: rgba(255,170,0,0.08);
-      border: 1px solid #ffaa00;
+    .info-box {
+      background: rgba(0,204,255,0.08);
+      border: 1px solid #00ccff;
       border-radius: 12px;
       padding: 12px;
-      margin: 12px 0;
-      text-align: right;
+      margin-top: 12px;
+      font-size: 12px;
+      color: #00ccff;
     }
-    .terms-box label {
-      color: #ffaa00;
-      font-size: 13px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 8px;
+    .admin-panel {
+      background: rgba(124,58,237,0.08);
+      border: 1px solid #7c3aed;
+      border-radius: 12px;
+      padding: 12px;
+      margin-top: 12px;
     }
-    .terms-box label input[type="checkbox"] {
-      width: 18px;
-      height: 18px;
-      cursor: pointer;
-      accent-color: #00aa55;
-    }
-    body.dark-mode .terms-box label input[type="checkbox"] { accent-color: #00ff66; }
-    
     .admin-btn {
       background: linear-gradient(135deg, #7c3aed, #6d28d9);
       color: white;
@@ -440,109 +249,75 @@
       cursor: pointer;
       font-size: 11px;
       font-weight: bold;
-      transition: all 0.3s;
+      margin: 4px;
     }
-    .admin-btn:hover { transform: scale(1.02); box-shadow: 0 5px 15px rgba(124,58,237,0.3); }
     .admin-btn-danger { background: linear-gradient(135deg, #dc2626, #b91c1c); }
-    .admin-btn-danger:hover { box-shadow: 0 5px 15px rgba(220,38,38,0.3); }
     .admin-btn-success { background: linear-gradient(135deg, #059669, #047857); }
-    .admin-btn-success:hover { box-shadow: 0 5px 15px rgba(5,150,105,0.3); }
-    
-    .admin-panel {
-      background: rgba(124,58,237,0.08);
-      border: 1px solid #7c3aed;
-      border-radius: 16px;
-      padding: 16px;
-      margin-top: 12px;
-    }
-    body.dark-mode .admin-panel {
-      background: rgba(124,58,237,0.12);
-    }
-    .admin-panel-title {
-      color: #7c3aed;
-      font-weight: bold;
-      font-size: 14px;
-      margin-bottom: 12px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    
-    .order-item-admin {
-      background: rgba(0,0,0,0.05);
-      border-radius: 12px;
+    .message {
       padding: 12px;
-      margin-bottom: 8px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 8px;
+      border-radius: 12px;
+      margin-bottom: 12px;
+      text-align: center;
+      font-size: 14px;
     }
-    body.dark-mode .order-item-admin {
-      background: rgba(0,0,0,0.3);
-    }
-    .order-item-admin .user-name { color: #00aa55; font-weight: bold; }
-    body.dark-mode .order-item-admin .user-name { color: #00ff66; }
-    .order-item-admin .order-amount { color: #cc8800; }
-    body.dark-mode .order-item-admin .order-amount { color: #ffcc00; }
-    .order-item-admin .order-location { color: #888888; font-size: 12px; }
-    body.dark-mode .order-item-admin .order-location { color: #8899aa; }
-    
-    .admin-status-badge {
-      display: inline-block;
-      padding: 2px 10px;
-      border-radius: 20px;
-      font-size: 10px;
-      font-weight: bold;
-    }
-    .admin-status-pending { background: rgba(255,170,0,0.2); color: #ffaa00; }
-    .admin-status-confirmed { background: rgba(0,170,85,0.2); color: #00aa55; }
-    body.dark-mode .admin-status-confirmed { background: rgba(0,255,102,0.2); color: #00ff66; }
-    .admin-status-shipped { background: rgba(0,204,255,0.2); color: #00ccff; }
-    .admin-status-in_location { background: rgba(124,58,237,0.2); color: #7c3aed; }
-    .admin-status-delivered { background: rgba(5,150,105,0.2); color: #059669; }
-    
-    .status-badge {
-      display: inline-block;
-      padding: 2px 10px;
-      border-radius: 20px;
-      font-size: 11px;
-      font-weight: bold;
-    }
-    .status-pending { background: rgba(255,170,0,0.2); color: #ffaa00; }
-    .status-confirmed { background: rgba(0,170,85,0.2); color: #00aa55; }
-    body.dark-mode .status-confirmed { background: rgba(0,255,102,0.2); color: #00ff66; }
-    .status-shipped { background: rgba(0,204,255,0.2); color: #00ccff; }
-    .status-in_location { background: rgba(124,58,237,0.2); color: #7c3aed; }
-    .status-delivered { background: rgba(5,150,105,0.2); color: #059669; }
-    .status-withdrawn { background: rgba(255,68,68,0.2); color: #ff4444; }
-    
+    .success { background: rgba(0,170,85,0.15); border: 1px solid #00aa55; color: #00aa55; }
+    .error { background: rgba(255,68,68,0.15); border: 1px solid #ff4444; color: #ff4444; }
+    .warning { background: rgba(255,170,0,0.15); border: 1px solid #ffaa00; color: #ffaa00; }
     .transaction-item {
       display: flex;
       justify-content: space-between;
       padding: 8px 0;
       border-bottom: 1px solid rgba(0,0,0,0.05);
     }
-    body.dark-mode .transaction-item {
-      border-bottom-color: rgba(255,255,255,0.05);
-    }
     .transaction-type { font-weight: bold; }
     .transaction-amount { color: #00aa55; }
+    .transaction-date { color: #888; font-size: 11px; }
+
+    body.dark-mode {
+      background: #0a0a0f;
+      color: #ffffff;
+    }
+    body.dark-mode .navbar { background: #1a1a2e; border-color: #00ff66; }
+    body.dark-mode .logo { color: #00ff66; }
+    body.dark-mode .user-name { color: #00ff66; }
+    body.dark-mode .theme-toggle { border-color: #00ff66; color: #00ff66; }
+    body.dark-mode .card { background: #1a1a2e; border-color: #00ff66; }
+    body.dark-mode .card-title { color: white; border-color: #00ff66; }
+    body.dark-mode .balance { color: #00ff66; }
+    body.dark-mode .detail-row { color: #aabbcc; }
+    body.dark-mode .detail-value { color: #00ff66; }
+    body.dark-mode .product-card { background: #1a1a2e; border-color: #00ff66; }
+    body.dark-mode .product-name { color: #00ff66; }
+    body.dark-mode .product-price { color: #ffcc00; }
+    body.dark-mode .product-meta { color: #8899aa; }
+    body.dark-mode .progress-bar { background: rgba(255,255,255,0.1); }
+    body.dark-mode .progress-fill { background: linear-gradient(90deg, #00ff66, #00ccff); }
+    body.dark-mode .btn-order { background: linear-gradient(135deg, #00ff66, #00ccff); color: #0a0a0f; }
+    body.dark-mode .order-card { background: #1a1a2e; border-color: #00ff66; }
+    body.dark-mode .order-status { color: #00ff66; }
+    body.dark-mode .order-amount { color: #ffcc00; }
+    body.dark-mode .order-location { color: #8899aa; }
+    body.dark-mode .bottom-nav { background: #1a1a2e; border-color: #00ff66; }
+    body.dark-mode .nav-item { color: #8899aa; }
+    body.dark-mode .nav-item.active { color: #00ff66; }
+    body.dark-mode .modal-content { background: #1a1a2e; border-color: #00ff66; }
+    body.dark-mode .modal-content h3 { color: #00ff66; }
+    body.dark-mode .modal-content p { color: #8899aa; }
+    body.dark-mode .input-field { background: #0a0a0f; border-color: #00ff66; color: white; }
+    body.dark-mode .btn-copy { border-color: #00ff66; color: #00ff66; }
+    body.dark-mode .info-box { background: rgba(0,255,102,0.05); border-color: #00ff66; color: #00ff66; }
+    body.dark-mode .admin-panel { background: rgba(124,58,237,0.12); }
     body.dark-mode .transaction-amount { color: #00ff66; }
-    .transaction-date { color: #888888; font-size: 11px; }
-    body.dark-mode .transaction-date { color: #8899aa; }
-    .transaction-status { font-size: 11px; }
   </style>
 </head>
 <body>
+
   <div class="navbar">
-    <div class="logo">🛍️ <span id="logoText">CryptoShop</span></div>
+    <div class="logo">🛍️ CryptoShop</div>
     <div class="user-actions">
-      <button class="theme-toggle" id="themeToggleBtn">☀️ <span id="themeText">وضع نهاري</span></button>
-      <button class="support-btn" id="supportBtn">💬 الدعم</button>
+      <button class="theme-toggle" id="themeToggle">☀️ وضع نهاري</button>
       <span class="user-name" id="userName"></span>
-      <button class="logout-btn" id="logoutBtn">🚪 خروج</button>
+      <button class="btn-logout" id="logoutBtn">🚪 خروج</button>
     </div>
   </div>
 
@@ -561,195 +336,124 @@
   <div id="productModal" class="modal hidden">
     <div class="modal-content">
       <h3 id="modalProductTitle">اسم المنتج</h3>
-      <p id="modalProductDesc" style="color:#555555; font-size:14px; line-height:1.6; text-align:right;">وصف المنتج</p>
+      <p id="modalProductDesc">وصف المنتج</p>
       <hr style="border-color:#00aa55; margin:12px 0;">
-      <p style="color:#cc8800;" id="modalProductPrice">💰 سعر الحبة: 0 USDT</p>
-      <p style="color:#888888; font-size:12px;" id="modalProductWholesale">📦 سعر الجملة: 0 USDT</p>
-      <p style="color:#888888; font-size:12px;" id="modalProductProgress">📊 التقدم: 0 من 10</p>
+      <p id="modalProductPrice">💰 السعر: 0 USDT</p>
+      <p id="modalProductWholesale">📦 سعر الجملة: 0 USDT</p>
+      <p id="modalProductProgress">📊 التقدم: 0 من 10</p>
       <div class="progress-bar"><div class="progress-fill" id="modalProgressFill" style="width:0%"></div></div>
-      <p style="color:#888888; font-size:12px; margin-top:8px;" id="modalProductRemaining">📦 المتبقي: 10 قطعة</p>
-      <p style="color:#888888; font-size:12px;" id="modalProductSubscribers">👥 عدد المشتركين: 0</p>
-      <p style="color:#888888; font-size:12px;" id="modalProductLocations">📍 مناطق الاستلام: -</p>
-      <p style="color:#888888; font-size:12px;" id="modalProductDelivery">📅 موعد التسليم: سيُحدد لاحقاً</p>
-      <p style="color:#888888; font-size:12px;" id="modalProductPickup">🕐 وقت الاستلام: سيُحدد لاحقاً</p>
-      
-      <div class="terms-box">
-        <label>
+      <p id="modalProductRemaining">📦 المتبقي: 10 قطعة</p>
+      <p id="modalProductLocations">📍 مناطق الاستلام: -</p>
+      <p id="modalProductDelivery">📅 موعد التسليم: سيُحدد لاحقاً</p>
+      <div style="background:rgba(255,170,0,0.08); border:1px solid #ffaa00; border-radius:12px; padding:12px; margin:12px 0;">
+        <label style="color:#ffaa00; font-size:13px; cursor:pointer; display:flex; align-items:center; gap:8px;">
           <input type="checkbox" id="acceptTerms">
-          <span style="color:#ffaa00; font-size:13px;">⚠️ أوافق على أن المنتج لا يمكن استرجاعه أو استرداد الأموال بعد الشراء</span>
+          ⚠️ أوافق على أن المنتج لا يمكن استرجاعه
         </label>
       </div>
-      
-      <input type="number" id="modalQuantity" class="input-field" value="1" min="1" placeholder="الكمية">
-      <input type="text" id="modalLocation" class="input-field" placeholder="📍 منطقة الاستلام (مثال: الخرطوم)">
-      <button class="btn-order" id="modalOrderBtn" style="width:100%;">🛒 شراء المنتج</button>
-      <button class="close-modal" id="closeProductModal" style="margin-top:12px; background:#ff4444; color:white;">إلغاء</button>
+      <input type="number" id="modalQuantity" class="input-field" value="1" min="1">
+      <input type="text" id="modalLocation" class="input-field" placeholder="📍 منطقة الاستلام">
+      <button class="btn-order" id="modalOrderBtn" style="width:100%;">🛒 شراء</button>
+      <button class="close-modal" id="closeProductModal">إلغاء</button>
     </div>
   </div>
 
-  <!-- مودال تأكيد السحب -->
+  <!-- مودال سحب الطلب -->
   <div id="withdrawModal" class="modal hidden">
     <div class="modal-content">
-      <h3 style="color:#ffaa00;">⚠️ تحذير مهم</h3>
-      <p style="color:#ffaa00;">أنت على وشك سحب طلبك. إذا قمت بالسحب مرة أخرى، سيتم استبعادك من هذا المنتج نهائياً ولا يمكنك المشاركة فيه مجدداً.</p>
-      <div class="info-box-warning" style="margin:12px 0;">
-        ⚠️ ملاحظة: بعد سحب الطلب، سيتم خصم طلبك من العدد الإجمالي وقد يؤثر ذلك على اكتمال الطلب.
-      </div>
-      <button class="btn-withdraw-order" id="confirmWithdrawBtn" style="width:100%; padding:12px; font-size:16px;">✅ تأكيد السحب</button>
-      <button class="close-modal" id="closeWithdrawModal" style="margin-top:12px; background:#ff4444; color:white;">إلغاء</button>
+      <h3 style="color:#ffaa00;">⚠️ تحذير</h3>
+      <p>أنت على وشك سحب طلبك. إذا سحبت مرتين سيتم استبعادك.</p>
+      <button class="btn-withdraw" id="confirmWithdrawBtn" style="width:100%; padding:12px; font-size:16px;">✅ تأكيد السحب</button>
+      <button class="close-modal" id="closeWithdrawModal">إلغاء</button>
     </div>
   </div>
 
-  <!-- مودال الأدمن لفحص الهاش -->
+  <!-- مودال فحص TXID للأدمن -->
   <div id="adminVerifyModal" class="modal hidden">
     <div class="modal-content">
       <h3 style="color:#7c3aed;">🔍 فحص TXID</h3>
-      <p style="color:#555555; font-size:14px;">أدخل Transaction Hash للتحقق من صحة الإيداع</p>
+      <p>أدخل Transaction Hash للتحقق</p>
       <input type="text" id="adminVerifyHash" class="input-field" placeholder="TXID (0x...)" style="direction:ltr;">
       <div id="adminVerifyResult" style="margin-top:12px;"></div>
       <button id="adminVerifyBtn" style="background:#7c3aed; color:white; border:none; padding:12px; border-radius:30px; font-weight:bold; width:100%; cursor:pointer;">🔍 فحص</button>
-      <button class="close-modal" id="closeAdminVerifyModal" style="margin-top:12px; background:#ff4444; color:white;">إغلاق</button>
+      <button class="close-modal" id="closeAdminVerifyModal">إغلاق</button>
     </div>
   </div>
 
   <script>
     const API_URL = window.location.origin;
+    const HOT_WALLET_ADDRESS = '0x9EB39A10c059877910DAff1fd8098e5DB32486F7';
     let userData = null;
+    let isAdmin = false;
     let currentTheme = localStorage.getItem('theme') || 'light';
     let currentProductId = null;
     let currentOrderId = null;
-    let isAdmin = false;
-
-    const HOT_WALLET_ADDRESS = '0x9EB39A10c059877910DAff1fd8098e5DB32486F7';
-    const MIN_WITHDRAW = 0.5;
 
     // ==========================================
-    // دوال المصادقة (JWT)
+    // دوال المصادقة (مع Cookies)
     // ==========================================
-
-    function getToken() {
-      return localStorage.getItem('token');
-    }
 
     function getUserId() {
-      const token = getToken();
-      if (!token) return null;
-      try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        return payload.userId;
-      } catch {
-        return null;
-      }
-    }
-
-    function isTokenValid() {
-      const token = getToken();
-      if (!token) return false;
-      try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        const exp = payload.exp * 1000;
-        return Date.now() < exp;
-      } catch {
-        return false;
-      }
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      return user.id || null;
     }
 
     async function fetchWithAuth(url, options = {}) {
-      const token = getToken();
-      if (!token || !isTokenValid()) {
-        localStorage.clear();
-        window.location.href = '/';
-        return null;
-      }
-
-      const headers = {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-        ...options.headers
-      };
-
       try {
-        const response = await fetch(url, { ...options, headers });
+        const res = await fetch(url, {
+          ...options,
+          headers: {
+            'Content-Type': 'application/json',
+            ...options.headers
+          },
+          credentials: 'include' // ⭐ إرسال الكوكيز تلقائياً
+        });
 
-        if (response.status === 401 || response.status === 403) {
+        if (res.status === 401 || res.status === 403) {
           localStorage.clear();
           window.location.href = '/';
           return null;
         }
 
-        return response;
+        return res;
       } catch (error) {
-        console.error('Fetch error:', error);
-        showMessage('❌ خطأ في الاتصال بالخادم', 'error');
+        showMessage('❌ خطأ في الاتصال', 'error');
         return null;
       }
     }
 
     // ==========================================
-    // إدارة الوضع النهاري/الليلي
+    // الوضع النهاري/الليلي
     // ==========================================
 
     function setTheme(theme) {
-      const body = document.body;
-      body.classList.remove('dark-mode');
-      if (theme === 'dark') {
-        body.classList.add('dark-mode');
-        document.getElementById('themeToggleBtn').innerHTML = '🌙 <span id="themeText">وضع ليلي</span>';
-        document.getElementById('themeText').textContent = 'وضع ليلي';
-      } else {
-        document.getElementById('themeToggleBtn').innerHTML = '☀️ <span id="themeText">وضع نهاري</span>';
-        document.getElementById('themeText').textContent = 'وضع نهاري';
-      }
+      document.body.classList.toggle('dark-mode', theme === 'dark');
+      document.getElementById('themeToggle').innerHTML = theme === 'dark' ? '🌙 وضع ليلي' : '☀️ وضع نهاري';
       localStorage.setItem('theme', theme);
       currentTheme = theme;
     }
 
-    function toggleTheme() {
-      const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-      setTheme(newTheme);
-    }
+    document.getElementById('themeToggle').onclick = () => {
+      setTheme(currentTheme === 'light' ? 'dark' : 'light');
+    };
+    setTheme(currentTheme);
 
     // ==========================================
     // دوال مساعدة
     // ==========================================
 
-    function showErrorModal(title, message) {
-      const existingModal = document.getElementById('errorModal');
-      if (existingModal) existingModal.remove();
-
-      const modalHtml = `
-        <div id="errorModal" class="modal" style="display:flex;">
-          <div class="modal-content" style="text-align:center;">
-            <div style="font-size:48px; margin-bottom:16px;">❌</div>
-            <h3 style="color:#ff4444; margin-bottom:16px;">${title}</h3>
-            <p style="color:#555555; margin-bottom:20px; line-height:1.6;">${message}</p>
-            <button class="close-modal" id="closeErrorModal" style="background:#ff4444; color:white;">✅ فهمت</button>
-          </div>
-        </div>
-      `;
-      document.body.insertAdjacentHTML('beforeend', modalHtml);
-      document.getElementById('closeErrorModal').onclick = () => document.getElementById('errorModal').remove();
-    }
-
     function showMessage(msg, type, duration = 5000) {
       const container = document.getElementById('mainContent');
-      const msgDiv = document.createElement('div');
-      msgDiv.className = `message ${type}`;
-      msgDiv.innerHTML = msg;
-      container.insertBefore(msgDiv, container.firstChild);
-      setTimeout(() => msgDiv.remove(), duration);
-    }
-
-    function clearMessages() {
-      const container = document.getElementById('mainContent');
-      const messages = container.querySelectorAll('.message');
-      messages.forEach(msg => msg.remove());
+      const div = document.createElement('div');
+      div.className = `message ${type}`;
+      div.textContent = msg;
+      container.insertBefore(div, container.firstChild);
+      setTimeout(() => div.remove(), duration);
     }
 
     function highlightNav(page) {
       document.querySelectorAll('.nav-item').forEach(btn => {
-        btn.classList.remove('active');
-        if (btn.dataset.page === page) btn.classList.add('active');
+        btn.classList.toggle('active', btn.dataset.page === page);
       });
     }
 
@@ -758,53 +462,42 @@
     // ==========================================
 
     async function loadUser() {
-      const token = getToken();
-      if (!token || !isTokenValid()) {
+      const userId = getUserId();
+      if (!userId) {
         localStorage.clear();
         window.location.href = '/';
         return;
       }
 
       try {
-        const res = await fetchWithAuth(`${API_URL}/api/user`, {
-          method: 'POST'
-        });
-
+        const res = await fetchWithAuth(`${API_URL}/api/user`, { method: 'POST' });
         if (!res) return;
-
         const data = await res.json();
-
-        if (data.error) {
-          localStorage.clear();
-          window.location.href = '/';
-          return;
-        }
+        if (data.error) { localStorage.clear(); window.location.href = '/'; return; }
 
         userData = data;
         isAdmin = data.is_admin === true;
-
-        document.getElementById('userName').innerHTML = `👋 ${userData.name}`;
+        document.getElementById('userName').textContent = `👋 ${data.name}`;
 
         currentPage = 'dashboard';
         renderDashboard();
-
       } catch (e) {
         console.error('Load user error:', e);
-        showErrorModal('❌ خطأ', 'حدث خطأ في تحميل البيانات');
       }
     }
 
     // ==========================================
-    // أحداث الأزرار
+    // تسجيل الخروج
     // ==========================================
 
-    document.getElementById('logoutBtn').onclick = () => {
+    document.getElementById('logoutBtn').onclick = async () => {
+      await fetch(`${API_URL}/api/logout`, {
+        method: 'POST',
+        credentials: 'include'
+      });
       localStorage.clear();
       window.location.href = '/';
     };
-
-    document.getElementById('supportBtn').onclick = () => window.open('https://t.me/cryptoenvset', '_blank');
-    document.getElementById('themeToggleBtn').onclick = toggleTheme;
 
     // ==========================================
     // الصفحات
@@ -812,52 +505,31 @@
 
     async function renderDashboard() {
       const avail = userData?.available_balance || 0;
-      const totalOrders = userData?.total_orders || 0;
-      const totalSpent = userData?.total_spent || 0;
-
       document.getElementById('mainContent').innerHTML = `
-        <div class="welcome-message">
-          <h2>🌟 مرحباً بك في منصة الشراء الجماعي</h2>
-          <p>نحن نؤمن بأن التجزئة باهظة الثمن، لذلك نشتري بالجملة لتوفير أفضل الأسعار لك. هدفنا هو تسهيل الحياة على المستخدمين وتحقيق الرخاء في وطننا الحبيب. 🤲</p>
-        </div>
-
         <div class="card">
-          <div class="assets-amount">${avail.toFixed(2)} USDT</div>
+          <div class="balance">${avail.toFixed(2)} USDT</div>
           <div class="detail-row"><span>💰 الرصيد المتاح</span><span class="detail-value">${avail.toFixed(2)} USDT</span></div>
-          <div class="detail-row"><span>📦 إجمالي الطلبات</span><span class="detail-value">${totalOrders}</span></div>
-          <div class="detail-row"><span>💳 إجمالي المنفق</span><span class="detail-value">${totalSpent.toFixed(2)} USDT</span></div>
-          ${isAdmin ? `<div style="margin-top:12px; padding:8px; background:rgba(124,58,237,0.1); border-radius:12px; color:#7c3aed; text-align:center; font-weight:bold;">🛠️ أنت مدير النظام</div>` : ''}
+          <div class="detail-row"><span>📦 الطلبات</span><span class="detail-value">${userData?.total_orders || 0}</span></div>
+          <div class="detail-row"><span>💳 المنفق</span><span class="detail-value">${(userData?.total_spent || 0).toFixed(2)} USDT</span></div>
+          ${isAdmin ? `<div style="margin-top:12px;padding:8px;background:rgba(124,58,237,0.1);border-radius:12px;color:#7c3aed;text-align:center;font-weight:bold;">🛠️ مدير النظام</div>` : ''}
         </div>
-
-        <div class="stats-grid">
-          <div class="action-card" id="quickProductsBtn">
-            <div class="action-icon">📦</div>
-            <div class="action-title">منتجات</div>
-            <div class="action-sub">تصفح المنتجات المتاحة</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+          <div class="card" id="quickProducts" style="text-align:center;cursor:pointer;">
+            <div style="font-size:40px;">📦</div>
+            <div style="font-weight:bold;">منتجات</div>
           </div>
-          <div class="action-card" id="quickOrdersBtn">
-            <div class="action-icon">📋</div>
-            <div class="action-title">طلباتي</div>
-            <div class="action-sub">عرض طلباتك السابقة</div>
+          <div class="card" id="quickOrders" style="text-align:center;cursor:pointer;">
+            <div style="font-size:40px;">📋</div>
+            <div style="font-weight:bold;">طلباتي</div>
           </div>
         </div>
-
         <div class="info-box">
           <strong>📌 نظام الشراء الجماعي</strong><br>
-          نحن نشتري المنتجات بالجملة لنوفر لك أفضل الأسعار. يتم تجميع الطلبات حتى اكتمال العدد المطلوب، ثم يتم شراء المنتجات وتوزيعها.
+          نجمع الطلبات حتى اكتمال العدد ثم نشتري بالجملة.
         </div>
       `;
-
-      document.getElementById('quickProductsBtn').onclick = () => {
-        currentPage = 'products';
-        highlightNav('products');
-        renderProducts();
-      };
-      document.getElementById('quickOrdersBtn').onclick = () => {
-        currentPage = 'orders';
-        highlightNav('orders');
-        renderOrders();
-      };
+      document.getElementById('quickProducts').onclick = () => { currentPage = 'products'; highlightNav('products'); renderProducts(); };
+      document.getElementById('quickOrders').onclick = () => { currentPage = 'orders'; highlightNav('orders'); renderOrders(); };
     }
 
     // ==========================================
@@ -870,9 +542,9 @@
           <div class="card-title">📦 المنتجات</div>
           ${isAdmin ? `
             <div class="admin-panel">
-              <div class="admin-panel-title">🛠️ لوحة الأدمن</div>
-              <button class="admin-btn" onclick="showAddProductModal()" style="margin-bottom:8px;">➕ إضافة منتج</button>
-              <button class="admin-btn admin-btn-success" onclick="showAdminVerifyModal()" style="margin-right:8px;">🔍 فحص TXID</button>
+              <div style="color:#7c3aed;font-weight:bold;font-size:14px;margin-bottom:12px;">🛠️ لوحة الأدمن</div>
+              <button class="admin-btn" onclick="showAddProductModal()">➕ إضافة منتج</button>
+              <button class="admin-btn admin-btn-success" onclick="showAdminVerifyModal()">🔍 فحص TXID</button>
             </div>
           ` : ''}
           <div id="productsList"></div>
@@ -885,7 +557,7 @@
         const container = document.getElementById('productsList');
 
         if (!products || products.length === 0) {
-          container.innerHTML = `<p style="color:#888888; text-align:center;">لا توجد منتجات متاحة حالياً</p>`;
+          container.innerHTML = '<p style="color:#888;text-align:center;">لا توجد منتجات</p>';
           return;
         }
 
@@ -893,23 +565,20 @@
           const progress = Math.min((p.current_orders / p.min_quantity) * 100, 100);
           const isCompleted = p.status === 'completed';
           const remaining = Math.max(0, p.min_quantity - p.current_orders);
-          const subscribers = p.current_orders;
           return `
             <div class="product-card" data-id="${p.id}">
               <div class="product-name">${p.name} ${isCompleted ? '✅' : ''}</div>
-              <div class="product-price">💰 سعر الحبة: ${p.group_price} USDT</div>
+              <div class="product-price">💰 ${p.group_price} USDT</div>
               <div class="product-meta">📦 سعر الجملة: ${p.wholesale_price} USDT</div>
-              <div class="product-meta">📊 التقدم: ${p.current_orders} من ${p.min_quantity}</div>
+              <div class="product-meta">📊 ${p.current_orders} من ${p.min_quantity}</div>
               <div class="progress-bar"><div class="progress-fill" style="width:${progress}%"></div></div>
               <div class="product-meta" style="margin-top:8px;">📦 المتبقي: ${remaining} قطعة</div>
-              <div class="product-meta">👥 عدد المشتركين: ${subscribers}</div>
-              <div class="product-meta">📍 مناطق الاستلام: ${p.delivery_locations?.join(', ') || '-'}</div>
-              <div class="product-meta">📅 موعد التسليم: ${p.delivery_date ? new Date(p.delivery_date).toLocaleDateString() : 'سيُحدد لاحقاً'}</div>
-              ${!isCompleted ? `<button class="btn-order" style="margin-top:12px;" onclick="openProductModal(${p.id})">🛒 شراء المنتج</button>` : `<span style="color:#00aa55;">✅ اكتمل العدد</span>`}
+              <div class="product-meta">📍 ${p.delivery_locations?.join(', ') || '-'}</div>
+              ${!isCompleted ? `<button class="btn-order" onclick="openProductModal(${p.id})">🛒 شراء</button>` : '<span style="color:#00aa55;">✅ اكتمل</span>'}
               ${isAdmin ? `
-                <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
-                  <button class="admin-btn admin-btn-success" onclick="showAdminProductOrders(${p.id})">📋 طلبات المنتج</button>
-                  <button class="admin-btn admin-btn-danger" onclick="deleteProduct(${p.id})">🗑️ حذف المنتج</button>
+                <div style="margin-top:12px;">
+                  <button class="admin-btn admin-btn-success" onclick="showAdminProductOrders(${p.id})">📋 الطلبات</button>
+                  <button class="admin-btn admin-btn-danger" onclick="deleteProduct(${p.id})">🗑️ حذف</button>
                 </div>
               ` : ''}
             </div>
@@ -925,7 +594,7 @@
         });
 
       } catch (error) {
-        document.getElementById('productsList').innerHTML = `<p style="color:#ff4444;">خطأ في تحميل المنتجات</p>`;
+        document.getElementById('productsList').innerHTML = '<p style="color:#ff4444;">خطأ في التحميل</p>';
       }
     }
 
@@ -948,21 +617,18 @@
         document.getElementById('modalProgressFill').style.width = Math.min((product.current_orders / product.min_quantity) * 100, 100) + '%';
         const remaining = Math.max(0, product.min_quantity - product.current_orders);
         document.getElementById('modalProductRemaining').textContent = `📦 المتبقي: ${remaining} قطعة`;
-        document.getElementById('modalProductSubscribers').textContent = `👥 عدد المشتركين: ${product.current_orders}`;
         document.getElementById('modalProductLocations').textContent = `📍 مناطق الاستلام: ${product.delivery_locations?.join(', ') || '-'}`;
         document.getElementById('modalProductDelivery').textContent = `📅 موعد التسليم: ${product.delivery_date ? new Date(product.delivery_date).toLocaleDateString() : 'سيُحدد لاحقاً'}`;
-        document.getElementById('modalProductPickup').textContent = `🕐 وقت الاستلام: ${product.pickup_time || 'سيُحدد لاحقاً'}`;
         document.getElementById('modalQuantity').value = 1;
         document.getElementById('modalQuantity').min = 1;
         document.getElementById('modalQuantity').max = remaining;
         document.getElementById('modalLocation').value = '';
         document.getElementById('acceptTerms').checked = false;
-        document.getElementById('modalOrderBtn').textContent = '🛒 شراء المنتج';
         document.getElementById('modalOrderBtn').onclick = () => placeOrder(productId);
         document.getElementById('productModal').classList.remove('hidden');
 
       } catch (error) {
-        showMessage('❌ خطأ في تحميل المنتج', 'error');
+        showMessage('❌ خطأ في التحميل', 'error');
       }
     }
 
@@ -976,12 +642,11 @@
       const acceptTerms = document.getElementById('acceptTerms').checked;
 
       if (!location) {
-        showMessage('⚠️ يرجى إدخال منطقة الاستلام', 'error');
+        showMessage('⚠️ يرجى إدخال المنطقة', 'error');
         return;
       }
-
       if (!acceptTerms) {
-        showMessage('⚠️ يجب الموافقة على شروط الشراء', 'error');
+        showMessage('⚠️ يجب الموافقة على الشروط', 'error');
         return;
       }
 
@@ -990,11 +655,8 @@
           method: 'POST',
           body: JSON.stringify({ productId, quantity, location, acceptTerms })
         });
-
         if (!res) return;
-
         const data = await res.json();
-
         if (data.success) {
           document.getElementById('productModal').classList.add('hidden');
           showMessage(data.message, 'success', 6000);
@@ -1016,22 +678,18 @@
       document.getElementById('mainContent').innerHTML = `<div class="card"><div class="card-title">📋 طلباتي</div><div id="ordersList"></div></div>`;
 
       try {
-        const res = await fetchWithAuth(`${API_URL}/api/my-orders`, {
-          method: 'POST'
-        });
-
+        const res = await fetchWithAuth(`${API_URL}/api/my-orders`, { method: 'POST' });
         if (!res) return;
-
         const orders = await res.json();
         const container = document.getElementById('ordersList');
 
         if (!orders || orders.length === 0) {
-          container.innerHTML = `<p style="color:#888888; text-align:center;">لا توجد طلبات بعد</p>`;
+          container.innerHTML = '<p style="color:#888;text-align:center;">لا توجد طلبات</p>';
           return;
         }
 
         const statusMap = {
-          'pending': { text: '⏳ قيد الانتظار - انتظر موعد الاستلام', class: 'status-pending' },
+          'pending': { text: '⏳ قيد الانتظار', class: 'status-pending' },
           'confirmed': { text: '✅ تم التأكيد', class: 'status-confirmed' },
           'shipped': { text: '📦 تم الشحن', class: 'status-shipped' },
           'in_location': { text: '📍 في منطقة الاستلام', class: 'status-in_location' },
@@ -1054,15 +712,15 @@
               <div style="margin-top:8px;">
                 <span class="status-badge ${status.class}">${status.text}</span>
               </div>
-              ${isBanned ? `<span class="btn-banned" style="margin-top:8px; display:inline-block;">🚫 مستبعد</span>` : ''}
-              ${canWithdraw ? `<button class="btn-withdraw-order" style="margin-top:8px;" onclick="openWithdrawModal(${o.id})">📤 سحب الطلب</button>` : ''}
-              ${o.status === 'delivered' ? `<span style="color:#00aa55; margin-top:8px; display:inline-block;">✅ تم الاستلام</span>` : ''}
+              ${isBanned ? `<span style="color:#ff4444;font-size:12px;">🚫 مستبعد</span>` : ''}
+              ${canWithdraw ? `<button class="btn-withdraw" onclick="openWithdrawModal(${o.id})">📤 سحب</button>` : ''}
+              ${o.status === 'delivered' ? `<span style="color:#00aa55;">✅ تم الاستلام</span>` : ''}
             </div>
           `;
         }).join('');
 
       } catch (error) {
-        document.getElementById('ordersList').innerHTML = `<p style="color:#ff4444;">خطأ في تحميل الطلبات</p>`;
+        document.getElementById('ordersList').innerHTML = '<p style="color:#ff4444;">خطأ في التحميل</p>';
       }
     }
 
@@ -1075,17 +733,14 @@
       document.getElementById('withdrawModal').classList.remove('hidden');
     }
 
-    async function confirmWithdraw() {
+    document.getElementById('confirmWithdrawBtn').onclick = async function() {
       try {
         const res = await fetchWithAuth(`${API_URL}/api/withdraw-order`, {
           method: 'POST',
           body: JSON.stringify({ orderId: currentOrderId })
         });
-
         if (!res) return;
-
         const data = await res.json();
-
         if (data.success) {
           document.getElementById('withdrawModal').classList.add('hidden');
           showMessage(data.message, data.isBanned ? 'error' : 'warning', 6000);
@@ -1097,7 +752,7 @@
       } catch (error) {
         showMessage('❌ خطأ في الاتصال', 'error');
       }
-    }
+    };
 
     // ==========================================
     // الإيداع
@@ -1107,24 +762,18 @@
       document.getElementById('mainContent').innerHTML = `
         <div class="card">
           <div class="card-title">💰 إيداع USDT</div>
-          <div class="network-btn" id="networkInfoBtn">🌐 شبكة التحويل: BNB Smart Chain (BSC / BEP20) 📋</div>
-          <p style="color:#888888; font-size:12px; margin-bottom:8px;">محفظة الإيداع:</p>
-          <code style="color:#00aa55; word-break:break-all;">${HOT_WALLET_ADDRESS}</code>
+          <div style="background:rgba(0,170,85,0.1);border:1px solid #00aa55;padding:10px;border-radius:16px;cursor:pointer;width:100%;margin-bottom:12px;text-align:center;" id="networkInfoBtn">🌐 شبكة التحويل: BNB Smart Chain (BSC / BEP20) 📋</div>
+          <p style="color:#888;font-size:12px;margin-bottom:8px;">محفظة الإيداع:</p>
+          <code style="color:#00aa55;word-break:break-all;">${HOT_WALLET_ADDRESS}</code>
           <button class="btn-copy" id="copyWalletBtn">📋 نسخ العنوان</button>
-
-          <input type="text" id="depositTxHash" class="input-field" placeholder="TXID (0x...)" style="direction:ltr; font-family: monospace; margin-top:16px;">
-          <button class="deposit-btn" id="doDepositBtn">🔍 تحقق وأيدع</button>
-
+          <input type="text" id="depositTxHash" class="input-field" placeholder="TXID (0x...)" style="direction:ltr;font-family:monospace;margin-top:16px;">
+          <button class="btn-order" id="doDepositBtn" style="width:100%;">🔍 تحقق وأيدع</button>
           <div class="info-box">
             <strong>📌 كيف يتم الإيداع؟</strong><br>
-            1. انسخ عنوان المحفظة أعلاه<br>
-            2. أرسل USDT على شبكة BSC/BEP20<br>
-            3. انسخ TXID من محفظتك<br>
-            4. الصق TXID هنا<br>
-            5. اضغط "تحقق وأيدع"
-          </div>
-          <div class="info-box" style="margin-top:12px;">
-            📌 الحد الأدنى للإيداع هو 1 USDT. تأكد من إرسال المبلغ على شبكة BSC (BEP20).
+            1. انسخ عنوان المحفظة<br>
+            2. أرسل USDT على BSC/BEP20<br>
+            3. الصق TXID هنا<br>
+            4. اضغط تحقق وأيدع
           </div>
           <div id="depositMsg"></div>
         </div>
@@ -1132,17 +781,15 @@
 
       document.getElementById('copyWalletBtn').onclick = () => {
         navigator.clipboard.writeText(HOT_WALLET_ADDRESS);
-        showMessage('✅ تم نسخ عنوان المحفظة!', 'success', 2000);
+        showMessage('✅ تم نسخ العنوان', 'success', 2000);
       };
       document.getElementById('networkInfoBtn').onclick = () => {
         navigator.clipboard.writeText('BSC BEP20');
-        showMessage('✅ تم نسخ اسم الشبكة: BSC (BEP20)', 'success', 2000);
+        showMessage('✅ تم نسخ اسم الشبكة', 'success', 2000);
       };
 
       document.getElementById('doDepositBtn').onclick = async () => {
         const txHash = document.getElementById('depositTxHash').value.trim();
-        clearMessages();
-
         if (!txHash) {
           showMessage('⚠️ يرجى إدخال TXID', 'error');
           return;
@@ -1155,29 +802,17 @@
             method: 'POST',
             body: JSON.stringify({ transactionHash: txHash, amount: 0 })
           });
-
           if (!verifyRes) return;
-
           const verifyData = await verifyRes.json();
 
           if (!verifyData.success) {
-            clearMessages();
-            let errorMsg = verifyData.error;
-            if (errorMsg.includes('مستخدم') || errorMsg.includes('used before')) {
-              errorMsg = '⚠️ هذا الـ TXID مستخدم مسبقاً!';
-            } else if (errorMsg.includes('غير موجودة')) {
-              errorMsg = '❌ المعاملة غير موجودة على الشبكة';
-            } else if (errorMsg.includes('قيد الانتظار')) {
-              errorMsg = '⏳ المعاملة لا تزال قيد الانتظار';
-            }
-            showMessage('❌ ' + errorMsg, 'error');
+            showMessage('❌ ' + verifyData.error, 'error');
             return;
           }
 
           const actualAmount = verifyData.verification?.amount;
           if (!actualAmount || actualAmount < 1) {
-            clearMessages();
-            showMessage('⚠️ الحد الأدنى للإيداع هو 1 USDT', 'error');
+            showMessage('⚠️ الحد الأدنى هو 1 USDT', 'error');
             return;
           }
 
@@ -1185,11 +820,8 @@
             method: 'POST',
             body: JSON.stringify({ amount: actualAmount, transactionHash: txHash })
           });
-
           if (!depositRes) return;
-
           const depositData = await depositRes.json();
-          clearMessages();
 
           if (depositData.success) {
             showMessage(depositData.message, 'success', 8000);
@@ -1199,7 +831,6 @@
             showMessage('❌ ' + depositData.error, 'error');
           }
         } catch (error) {
-          clearMessages();
           showMessage('❌ خطأ في الاتصال', 'error');
         }
       };
@@ -1214,15 +845,14 @@
       document.getElementById('mainContent').innerHTML = `
         <div class="card">
           <div class="card-title">💸 سحب USDT</div>
-          <div class="assets-amount" style="font-size:28px;">${avail.toFixed(2)} USDT</div>
-          <input type="number" id="withdrawAmount" class="input-field" placeholder="المبلغ (USDT) - الحد الأدنى ${MIN_WITHDRAW}" step="0.1">
+          <div class="balance" style="font-size:28px;">${avail.toFixed(2)} USDT</div>
+          <input type="number" id="withdrawAmount" class="input-field" placeholder="المبلغ (USDT) - الحد الأدنى 0.5" step="0.1">
           <input type="text" id="walletAddress" class="input-field" placeholder="عنوان محفظة BSC (0x...)">
-          <button class="withdraw-btn" id="doWithdrawBtn">💸 سحب USDT</button>
+          <button class="btn-order" id="doWithdrawBtn" style="width:100%;background:linear-gradient(135deg,#ff4444,#ff6680);">💸 سحب USDT</button>
           <div class="info-box">
-            ⚠️ الحد الأدنى للسحب: ${MIN_WITHDRAW} USDT<br>
-            ⚠️ تأكد من صحة عنوان المحفظة!
+            ⚠️ الحد الأدنى: 0.5 USDT<br>
+            ⚠️ تأكد من صحة عنوان المحفظة
           </div>
-          <div id="withdrawMsg"></div>
         </div>
       `;
 
@@ -1230,8 +860,8 @@
         const amount = parseFloat(document.getElementById('withdrawAmount').value);
         const address = document.getElementById('walletAddress').value;
 
-        if (!amount || amount < MIN_WITHDRAW) {
-          showMessage(`⚠️ الحد الأدنى للسحب ${MIN_WITHDRAW} USDT`, 'error');
+        if (!amount || amount < 0.5) {
+          showMessage('⚠️ الحد الأدنى 0.5 USDT', 'error');
           return;
         }
         if (!address || !address.startsWith('0x') || address.length < 30) {
@@ -1248,17 +878,15 @@
             method: 'POST',
             body: JSON.stringify({ amount, walletAddress: address })
           });
-
           if (!res) return;
-
           const data = await res.json();
           if (data.success) {
-            showMessage(`✅ ${data.message}`, 'success', 5000);
+            showMessage('✅ ' + data.message, 'success', 5000);
             document.getElementById('withdrawAmount').value = '';
             document.getElementById('walletAddress').value = '';
             loadUser();
           } else {
-            showMessage(`❌ ${data.error}`, 'error');
+            showMessage('❌ ' + data.error, 'error');
           }
         } catch (error) {
           showMessage('❌ خطأ في الاتصال', 'error');
@@ -1267,7 +895,7 @@
     }
 
     // ==========================================
-    // الملف الشخصي (أنا)
+    // الملف الشخصي
     // ==========================================
 
     async function renderProfile() {
@@ -1276,12 +904,12 @@
       document.getElementById('mainContent').innerHTML = `
         <div class="card" style="text-align:center;">
           <div style="font-size:60px;">👤</div>
-          <div style="font-size:20px; font-weight:bold; color:#1a1a2e;">${userData.name}</div>
-          <div style="color:#888888; font-size:12px;">📧 ${userData.email}</div>
-          <div style="color:#00aa55; font-size:28px; margin-top:16px;">${avail.toFixed(2)} USDT</div>
-          <div style="color:#888888; font-size:14px; margin-top:8px;">📦 إجمالي الطلبات: ${userData.total_orders || 0}</div>
-          <div style="color:#888888; font-size:14px;">💳 إجمالي المنفق: ${(userData.total_spent || 0).toFixed(2)} USDT</div>
-          ${isAdmin ? `<div style="color:#7c3aed; font-size:14px; margin-top:8px;">🛠️ مدير النظام</div>` : ''}
+          <div style="font-size:20px;font-weight:bold;">${userData.name}</div>
+          <div style="color:#888;font-size:12px;">📧 ${userData.email}</div>
+          <div style="color:#00aa55;font-size:28px;margin-top:16px;">${avail.toFixed(2)} USDT</div>
+          <div style="color:#888;font-size:14px;margin-top:8px;">📦 الطلبات: ${userData.total_orders || 0}</div>
+          <div style="color:#888;font-size:14px;">💳 المنفق: ${(userData.total_spent || 0).toFixed(2)} USDT</div>
+          ${isAdmin ? '<div style="color:#7c3aed;font-size:14px;margin-top:8px;">🛠️ مدير النظام</div>' : ''}
         </div>
         <div class="card">
           <div class="card-title">📋 سجل العمليات</div>
@@ -1295,26 +923,16 @@
 
       // جلب المعاملات
       try {
-        const res = await fetchWithAuth(`${API_URL}/api/transactions`, {
-          method: 'POST'
-        });
-
+        const res = await fetchWithAuth(`${API_URL}/api/transactions`, { method: 'POST' });
         if (!res) return;
-
         let transactions = await res.json();
         if (!Array.isArray(transactions)) transactions = [];
 
         const listDiv = document.getElementById('transactionsList');
-
         if (transactions.length === 0) {
-          listDiv.innerHTML = `<p style="color:#888888; text-align:center;">لا توجد معاملات</p>`;
+          listDiv.innerHTML = '<p style="color:#888;text-align:center;">لا توجد معاملات</p>';
         } else {
-          const typeMap = {
-            'deposit': '💰 إيداع',
-            'withdraw': '📤 سحب',
-            'profit': '📈 ربح',
-            'commission': '🎁 عمولة'
-          };
+          const typeMap = { 'deposit': '💰 إيداع', 'withdraw': '📤 سحب', 'profit': '📈 ربح', 'commission': '🎁 عمولة' };
           listDiv.innerHTML = transactions.map(t => `
             <div class="transaction-item">
               <div>
@@ -1323,31 +941,25 @@
               </div>
               <div>
                 <div class="transaction-amount">${(t.amount || 0).toFixed(2)} USDT</div>
-                <div class="transaction-status ${t.status === 'approved' ? 'status-confirmed' : 'status-pending'}">${t.status === 'approved' ? '✅ تم' : '⏳ قيد الانتظار'}</div>
+                <div style="font-size:11px;${t.status === 'approved' ? 'color:#00aa55;' : 'color:#ffaa00;'}">${t.status === 'approved' ? '✅ تم' : '⏳ قيد الانتظار'}</div>
               </div>
             </div>
           `).join('');
         }
       } catch (error) {
-        console.error('Error loading transactions:', error);
-        document.getElementById('transactionsList').innerHTML = `<p style="color:#ff4444;">خطأ في تحميل المعاملات</p>`;
+        document.getElementById('transactionsList').innerHTML = '<p style="color:#ff4444;">خطأ في التحميل</p>';
       }
 
       // جلب الطلبات
       try {
-        const res = await fetchWithAuth(`${API_URL}/api/my-orders`, {
-          method: 'POST'
-        });
-
+        const res = await fetchWithAuth(`${API_URL}/api/my-orders`, { method: 'POST' });
         if (!res) return;
-
         let orders = await res.json();
         if (!Array.isArray(orders)) orders = [];
 
         const listDiv = document.getElementById('profileOrdersList');
-
         if (orders.length === 0) {
-          listDiv.innerHTML = `<p style="color:#888888; text-align:center;">لا توجد طلبات</p>`;
+          listDiv.innerHTML = '<p style="color:#888;text-align:center;">لا توجد طلبات</p>';
         } else {
           const statusMap = {
             'pending': '⏳ قيد الانتظار',
@@ -1365,14 +977,13 @@
               </div>
               <div style="text-align:left;">
                 <div class="transaction-amount">${(o.total_amount || 0).toFixed(2)} USDT</div>
-                <div class="transaction-status">${statusMap[o.status] || o.status}</div>
+                <div style="font-size:11px;color:#888;">${statusMap[o.status] || o.status}</div>
               </div>
             </div>
           `).join('');
         }
       } catch (error) {
-        console.error('Error loading orders:', error);
-        document.getElementById('profileOrdersList').innerHTML = `<p style="color:#ff4444;">خطأ في تحميل الطلبات</p>`;
+        document.getElementById('profileOrdersList').innerHTML = '<p style="color:#ff4444;">خطأ في التحميل</p>';
       }
     }
 
@@ -1381,21 +992,17 @@
     // ==========================================
 
     async function showAdminProductOrders(productId) {
-      const adminSecret = prompt('أدخل كلمة سر الأدمن:');
-      if (!adminSecret) return;
-
       try {
         const res = await fetchWithAuth(`${API_URL}/api/admin/product-orders`, {
           method: 'POST',
           body: JSON.stringify({ productId })
         });
-
         if (!res) return;
 
         const orders = await res.json();
 
         if (!orders || orders.length === 0) {
-          showMessage('لا توجد طلبات لهذا المنتج', 'warning');
+          showMessage('لا توجد طلبات', 'warning');
           return;
         }
 
@@ -1408,40 +1015,40 @@
           'delivered': '✅ تم التوصيل'
         };
         const statusClasses = {
-          'pending': 'admin-status-pending',
-          'confirmed': 'admin-status-confirmed',
-          'shipped': 'admin-status-shipped',
-          'in_location': 'admin-status-in_location',
-          'delivered': 'admin-status-delivered'
+          'pending': 'status-pending',
+          'confirmed': 'status-confirmed',
+          'shipped': 'status-shipped',
+          'in_location': 'status-in_location',
+          'delivered': 'status-delivered'
         };
 
         let html = `
           <div class="card">
             <div class="card-title">📋 طلبات المنتج</div>
-            <div style="max-height:400px; overflow-y:auto;">
+            <div style="max-height:400px;overflow-y:auto;">
         `;
 
         orders.forEach(o => {
           const isWithdrawn = o.status === 'withdrawn' || o.is_banned;
           html += `
-            <div class="order-item-admin">
+            <div style="background:rgba(0,0,0,0.05);border-radius:12px;padding:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
               <div>
-                <div class="user-name">${o.users?.name || 'مستخدم'}</div>
-                <div class="order-amount">💰 ${o.total_amount} USDT</div>
-                <div class="order-location">📍 ${o.location || '-'}</div>
-                <div class="order-location">📦 ${o.quantity} قطعة</div>
-                ${isWithdrawn ? `<div style="color:#ff4444; font-weight:bold;">📤 تم السحب</div>` : ''}
+                <div style="color:#00aa55;font-weight:bold;">${o.users?.name || 'مستخدم'}</div>
+                <div style="color:#cc8800;">💰 ${o.total_amount} USDT</div>
+                <div style="color:#888;font-size:12px;">📍 ${o.location || '-'}</div>
+                <div style="color:#888;font-size:12px;">📦 ${o.quantity} قطعة</div>
+                ${isWithdrawn ? '<div style="color:#ff4444;font-weight:bold;">📤 تم السحب</div>' : ''}
               </div>
               <div style="text-align:left;">
                 ${!isWithdrawn ? `
-                  <span class="admin-status-badge ${statusClasses[o.status] || ''}">${statusLabels[o.status] || o.status}</span>
+                  <span class="status-badge ${statusClasses[o.status] || ''}">${statusLabels[o.status] || o.status}</span>
                   <div style="margin-top:8px;">
-                    <select id="statusSelect_${o.id}" style="background:#ffffff; color:#1a1a2e; border:1px solid #00aa55; border-radius:8px; padding:4px 8px; font-size:11px;">
+                    <select id="statusSelect_${o.id}" style="background:white;color:#1a1a2e;border:1px solid #00aa55;border-radius:8px;padding:4px 8px;font-size:11px;">
                       ${statusOptions.map(s => `<option value="${s}" ${s === o.status ? 'selected' : ''}>${statusLabels[s] || s}</option>`).join('')}
                     </select>
                     <button class="admin-btn admin-btn-success" onclick="updateOrderStatus(${o.id})" style="font-size:10px;">تحديث</button>
                   </div>
-                ` : `<span style="color:#ff4444; font-weight:bold;">📤 تم السحب</span>`}
+                ` : '<span style="color:#ff4444;font-weight:bold;">📤 تم السحب</span>'}
               </div>
             </div>
           `;
@@ -1454,7 +1061,7 @@
             <div class="modal-content">
               <h3 style="color:#7c3aed;">📋 طلبات المنتج</h3>
               ${html}
-              <button class="close-modal" onclick="document.getElementById('adminOrdersModal').remove()" style="margin-top:12px; background:#ff4444; color:white;">إغلاق</button>
+              <button class="close-modal" onclick="document.getElementById('adminOrdersModal').remove()">إغلاق</button>
             </div>
           </div>
         `;
@@ -1469,9 +1076,7 @@
               method: 'POST',
               body: JSON.stringify({ orderId, status })
             });
-
             if (!res) return;
-
             const data = await res.json();
             if (data.success) {
               showMessage(data.message, 'success', 3000);
@@ -1485,7 +1090,7 @@
         };
 
       } catch (error) {
-        showMessage('❌ خطأ في تحميل الطلبات', 'error');
+        showMessage('❌ خطأ في التحميل', 'error');
       }
     }
 
@@ -1497,9 +1102,7 @@
           method: 'POST',
           body: JSON.stringify({ productId })
         });
-
         if (!res) return;
-
         const data = await res.json();
         if (data.success) {
           showMessage(data.message, 'success');
@@ -1526,8 +1129,8 @@
             <input type="text" id="apLocations" class="input-field" placeholder="مناطق الاستلام (مفصولة بفاصلة)">
             <input type="date" id="apDeliveryDate" class="input-field">
             <input type="time" id="apPickupTime" class="input-field">
-            <button class="btn-order" id="apSubmitBtn" style="width:100%;">✅ إضافة المنتج</button>
-            <button class="close-modal" onclick="document.getElementById('addProductModal').remove()" style="margin-top:12px; background:#ff4444; color:white;">إلغاء</button>
+            <button class="btn-order" id="apSubmitBtn" style="width:100%;">✅ إضافة</button>
+            <button class="close-modal" onclick="document.getElementById('addProductModal').remove()">إلغاء</button>
           </div>
         </div>
       `;
@@ -1564,9 +1167,7 @@
               pickupTime: pickupTime || null
             })
           });
-
           if (!res) return;
-
           const data = await res.json();
           if (data.success) {
             showMessage(data.message, 'success');
@@ -1591,39 +1192,36 @@
       const txHash = document.getElementById('adminVerifyHash').value.trim();
 
       if (!txHash) {
-        document.getElementById('adminVerifyResult').innerHTML = `<p style="color:#ff4444;">⚠️ يرجى إدخال TXID</p>`;
+        document.getElementById('adminVerifyResult').innerHTML = '<p style="color:#ff4444;">⚠️ يرجى إدخال TXID</p>';
         return;
       }
 
-      document.getElementById('adminVerifyResult').innerHTML = `<p style="color:#00ccff;">⏳ جاري التحقق...</p>`;
+      document.getElementById('adminVerifyResult').innerHTML = '<p style="color:#00ccff;">⏳ جاري التحقق...</p>';
 
       try {
         const res = await fetchWithAuth(`${API_URL}/api/admin/verify-deposit`, {
           method: 'POST',
           body: JSON.stringify({ transactionHash: txHash, amount: 0 })
         });
-
         if (!res) return;
-
         const data = await res.json();
 
         if (data.success) {
           const v = data.verification;
           document.getElementById('adminVerifyResult').innerHTML = `
-            <div style="background:rgba(0,170,85,0.15); border:1px solid #00aa55; border-radius:12px; padding:12px; color:#00aa55;">
+            <div style="background:rgba(0,170,85,0.15);border:1px solid #00aa55;border-radius:12px;padding:12px;color:#00aa55;">
               ✅ المعاملة صالحة
               <br>💰 المبلغ: ${v?.amount || 'غير معروف'} USDT
               <br>📤 المرسل: ${v?.from?.substring(0, 16) || '-'}...
               <br>📥 المستلم: ${v?.to?.substring(0, 16) || '-'}...
               <br>🔢 رقم الكتلة: ${v?.blockNumber || '-'}
-              <br>✅ الحالة: ${v?.success ? 'تم التأكيد' : 'قيد الانتظار'}
             </div>
           `;
         } else {
           document.getElementById('adminVerifyResult').innerHTML = `<p style="color:#ff4444;">❌ ${data.error}</p>`;
         }
       } catch (error) {
-        document.getElementById('adminVerifyResult').innerHTML = `<p style="color:#ff4444;">❌ خطأ في الاتصال</p>`;
+        document.getElementById('adminVerifyResult').innerHTML = '<p style="color:#ff4444;">❌ خطأ في الاتصال</p>';
       }
     };
 
@@ -1637,7 +1235,6 @@
 
     document.getElementById('closeProductModal').onclick = () => document.getElementById('productModal').classList.add('hidden');
     document.getElementById('closeWithdrawModal').onclick = () => document.getElementById('withdrawModal').classList.add('hidden');
-    document.getElementById('confirmWithdrawBtn').onclick = confirmWithdraw;
 
     document.querySelectorAll('.modal').forEach(modal => {
       modal.addEventListener('click', (e) => {
@@ -1674,7 +1271,6 @@
 
     setTheme(localStorage.getItem('theme') || 'light');
     loadUser();
-
   </script>
 </body>
 </html>
