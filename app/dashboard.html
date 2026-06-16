@@ -639,6 +639,9 @@
       document.getElementById('closeErrorModal').onclick = () => document.getElementById('errorModal').remove();
     }
 
+    // ==========================================
+    // إدارة الوضع النهاري/الليلي
+    // ==========================================
     function setTheme(theme) {
       const body = document.body;
       body.classList.remove('dark-mode');
@@ -655,11 +658,22 @@
     }
     
     function toggleTheme() {
-      setTheme(currentTheme === 'light' ? 'dark' : 'light');
+      if (currentTheme === 'light') {
+        setTheme('dark');
+      } else {
+        setTheme('light');
+      }
     }
 
+    // ==========================================
+    // تحميل المستخدم
+    // ==========================================
     async function loadUser() {
-      if (!userId) { window.location.href = '/'; return; }
+      if (!userId) { 
+        window.location.href = '/'; 
+        return; 
+      }
+      
       try {
         const res = await fetch(`${API_URL}/api/user`, {
           method: 'POST',
@@ -667,9 +681,16 @@
           body: JSON.stringify({ userId })
         });
         const data = await res.json();
-        if (data.error) { localStorage.clear(); window.location.href = '/'; return; }
+        
+        if (data.error) { 
+          localStorage.clear(); 
+          window.location.href = '/'; 
+          return; 
+        }
+        
         userData = data;
-        isAdmin = userData.is_admin || false;
+        isAdmin = data.is_admin === true;
+        
         document.getElementById('userName').innerHTML = `👋 ${userData.name}`;
         
         // إظهار رسالة ترحيبية
@@ -677,10 +698,12 @@
           localStorage.setItem('welcomeShown', 'true');
         }
         
+        // تهيئة الصفحة الرئيسية
         currentPage = 'dashboard';
         renderDashboard();
+        
       } catch(e) { 
-        console.error(e); 
+        console.error('Load user error:', e); 
         showErrorModal('❌ خطأ', 'حدث خطأ في تحميل البيانات');
       }
     }
@@ -689,6 +712,7 @@
       localStorage.clear();
       window.location.href = '/';
     };
+    
     document.getElementById('supportBtn').onclick = () => window.open('https://t.me/cryptoenvset', '_blank');
     document.getElementById('themeToggleBtn').onclick = toggleTheme;
 
@@ -850,7 +874,7 @@
         document.getElementById('modalProductDesc').textContent = product.description || '';
         document.getElementById('modalProductPrice').textContent = `💰 سعر الحبة: ${product.group_price} USDT`;
         document.getElementById('modalProductWholesale').textContent = `📦 سعر الجملة: ${product.wholesale_price} USDT`;
-        document.getElementById('modalProductProgress').textContent = `📊 التقدم: ${product.current_orders} من ${product.min_quantity}`;
+        document.getElementById('modalProductProgress').textContent = `📊 التقدم: ${product.current_orders} ${product.min_quantity}`;
         document.getElementById('modalProgressFill').style.width = Math.min((product.current_orders / product.min_quantity) * 100, 100) + '%';
         const remaining = Math.max(0, product.min_quantity - product.current_orders);
         document.getElementById('modalProductRemaining').textContent = `📦 المتبقي: ${remaining} قطعة`;
@@ -1157,10 +1181,11 @@
     }
 
     // ==========================================
-    // الملف الشخصي (أنا)
+    // الملف الشخصي (أنا) - إصلاح كامل
     // ==========================================
     async function renderProfile() {
       const avail = userData?.available_balance || 0;
+      
       document.getElementById('mainContent').innerHTML = `
         <div class="card" style="text-align:center;">
           <div style="font-size:60px;">👤</div>
@@ -1169,7 +1194,7 @@
           <div style="color:#00aa55; font-size:28px; margin-top:16px;">${avail.toFixed(2)} USDT</div>
           <div style="color:#888888; font-size:14px; margin-top:8px;">📦 إجمالي الطلبات: ${userData.total_orders || 0}</div>
           <div style="color:#888888; font-size:14px;">💳 إجمالي المنفق: ${(userData.total_spent || 0).toFixed(2)} USDT</div>
-          ${userData.is_admin ? `<div style="color:#7c3aed; font-size:14px; margin-top:8px;">🛠️ مدير النظام</div>` : ''}
+          ${isAdmin ? `<div style="color:#7c3aed; font-size:14px; margin-top:8px;">🛠️ مدير النظام</div>` : ''}
         </div>
         <div class="card">
           <div class="card-title">📋 سجل العمليات</div>
@@ -1202,7 +1227,7 @@
             'profit': '📈 ربح',
             'commission': '🎁 عمولة'
           };
-          listDiv.innerHTML = transactions.slice(0, 10).map(t => `
+          listDiv.innerHTML = transactions.map(t => `
             <div class="transaction-item">
               <div>
                 <div class="transaction-type">${typeMap[t.type] || t.type}</div>
@@ -1555,9 +1580,16 @@
       };
     });
 
+    // ==========================================
+    // بدء التشغيل
+    // ==========================================
+    
     // تهيئة الوضع النهاري كأساسي
     setTheme(localStorage.getItem('theme') || 'light');
+    
+    // تحميل المستخدم
     loadUser();
+    
   </script>
 </body>
 </html>
