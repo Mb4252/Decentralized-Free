@@ -38,7 +38,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // ==========================================
-// API: عرض المنتجات المتاحة
+// API: عرض المنتجات المتاحة للمستخدمين
 // ==========================================
 app.get('/api/products', async (req, res) => {
   try {
@@ -56,7 +56,7 @@ app.get('/api/products', async (req, res) => {
 });
 
 // ==========================================
-// API: تفاصيل منتج معين
+// API: تفاصيل منتج معين (للمستخدم)
 // ==========================================
 app.get('/api/product/:id', async (req, res) => {
   try {
@@ -75,13 +75,17 @@ app.get('/api/product/:id', async (req, res) => {
 });
 
 // ==========================================
-// API: طلب منتج (إيداع في محفظة المنصة)
+// API: طلب منتج (شراء)
 // ==========================================
 app.post('/api/order-product', async (req, res) => {
-  const { userId, productId, quantity, location } = req.body;
+  const { userId, productId, quantity, location, acceptTerms } = req.body;
 
   if (!userId || !productId || !quantity || !location) {
     return res.status(400).json({ error: 'جميع الحقول مطلوبة (المنتج، الكمية، المنطقة)' });
+  }
+
+  if (!acceptTerms) {
+    return res.status(400).json({ error: '⚠️ يجب الموافقة على شروط الشراء' });
   }
 
   try {
@@ -96,9 +100,16 @@ app.post('/api/order-product', async (req, res) => {
       return res.status(404).json({ error: 'المنتج غير موجود' });
     }
 
-    // التحقق من اكتمال العدد
     if (product.status === 'completed') {
-      return res.status(400).json({ error: '⚠️ العدد المطلوب اكتمل، لا يمكن تقديم طلبات جديدة' });
+      return res.status(400).json({ error: '⚠️ العدد المطلوب اكتمل' });
+    }
+
+    // التحقق من العدد المتبقي
+    const remaining = product.min_quantity - product.current_orders;
+    if (quantity > remaining) {
+      return res.status(400).json({ 
+        error: `⚠️ العدد المتبقي فقط ${remaining} قطعة` 
+      });
     }
 
     const totalAmount = product.group_price * quantity;
@@ -117,22 +128,15 @@ app.post('/api/order-product', async (req, res) => {
     // التحقق من الرصيد
     if (user.available_balance < totalAmount) {
       return res.status(400).json({ 
-        error: `⚠️ رصيدك غير كافٍ. تحتاج إلى ${totalAmount} USDT` 
+        error: `⚠️ رصيدك غير كافٍ. المطلوب: ${totalAmount} USDT، المتاح: ${user.available_balance} USDT` 
       });
     }
 
-    // خصم المبلغ من رصيد المستخدم (يذهب إلى محفظة المنصة)
+    // خصم المبلغ
     await supabaseAdmin
       .from('users')
       .update({ 
-        available_balance: supabaseAdmin.raw('available_balance - ?', totalAmount)
-      })
-      .eq('id', userId);
-
-    // إضافة المبلغ إلى رصيد المنصة
-    await supabaseAdmin
-      .from('users')
-      .update({ 
+        available_balance: supabaseAdmin.raw('available_balance - ?', totalAmount),
         platform_balance: supabaseAdmin.raw('platform_balance + ?', totalAmount)
       })
       .eq('id', userId);
@@ -155,7 +159,6 @@ app.post('/api/order-product', async (req, res) => {
       .single();
 
     if (orderError) {
-      // استعادة الرصيد إذا فشل التسجيل
       await supabaseAdmin
         .from('users')
         .update({ 
@@ -166,13 +169,11 @@ app.post('/api/order-product', async (req, res) => {
       throw orderError;
     }
 
-    // تحديث عدد الطلبات الحالية
+    // تحديث عدد الطلبات
     const newCurrentOrders = product.current_orders + quantity;
     await supabaseAdmin
       .from('products')
-      .update({ 
-        current_orders: newCurrentOrders
-      })
+      .update({ current_orders: newCurrentOrders })
       .eq('id', productId);
 
     // تحديث إحصائيات المستخدم
@@ -184,20 +185,15 @@ app.post('/api/order-product', async (req, res) => {
       })
       .eq('id', userId);
 
-    let message = `✅ تم طلب ${quantity} × ${product.name} بنجاح!`;
+    let message = `✅ تم شراء ${quantity} × ${product.name} بنجاح!`;
     let isCompleted = false;
 
-    // التحقق من اكتمال العدد المطلوب
     if (newCurrentOrders >= product.min_quantity) {
       isCompleted = true;
-      message += ` 🎉 اكتمل العدد المطلوب (${product.min_quantity})! سيتم شراء المنتجات وتوزيعها قريباً.`;
-
+      message += ` 🎉 اكتمل العدد المطلوب! سيتم الشراء والتوزيع قريباً.`;
       await supabaseAdmin
         .from('products')
-        .update({ 
-          status: 'completed',
-          completed_at: new Date().toISOString()
-        })
+        .update({ status: 'completed', completed_at: new Date().toISOString() })
         .eq('id', productId);
     }
 
@@ -228,7 +224,6 @@ app.post('/api/withdraw-order', async (req, res) => {
   }
 
   try {
-    // جلب الطلب
     const { data: order, error: orderError } = await supabaseAdmin
       .from('product_orders')
       .select('*, products(status, min_quantity, current_orders)')
@@ -239,55 +234,35 @@ app.post('/api/withdraw-order', async (req, res) => {
       return res.status(404).json({ error: 'الطلب غير موجود' });
     }
 
-    // التحقق: هل الطلب ملك لهذا المستخدم؟
     if (order.user_id !== userId) {
       return res.status(403).json({ error: '⚠️ هذا الطلب ليس لك' });
     }
 
-    // التحقق: هل تم اكتمال العدد؟
     if (order.products.status === 'completed') {
-      return res.status(400).json({ 
-        error: '⚠️ العدد المطلوب اكتمل، لا يمكن سحب الطلب بعد الآن' 
-      });
+      return res.status(400).json({ error: '⚠️ العدد اكتمل، لا يمكن السحب' });
     }
 
-    // التحقق: هل تم استبعاد المستخدم؟
     if (order.is_banned) {
-      return res.status(400).json({ 
-        error: '⚠️ تم استبعادك من هذا المنتج بسبب كثرة السحب' 
-      });
+      return res.status(400).json({ error: '⚠️ تم استبعادك من هذا المنتج' });
     }
 
-    // رسالة تحذير عند السحب
-    const warningMessage = `⚠️ تحذير: أنت على وشك سحب طلبك. إذا قمت بالسحب مرة أخرى، سيتم استبعادك من هذا المنتج نهائياً.`;
-
-    // تحديث عدد مرات السحب
     const newWithdrawCount = (order.withdraw_count || 0) + 1;
-
-    // التحقق: إذا كانت هذه هي المرة الثانية، استبعاد المستخدم
     let isBanned = false;
+
     if (newWithdrawCount >= 2) {
       isBanned = true;
       await supabaseAdmin
         .from('product_orders')
-        .update({ 
-          is_banned: true,
-          status: 'withdrawn',
-          withdrawn_at: new Date().toISOString()
-        })
+        .update({ is_banned: true, status: 'withdrawn', withdrawn_at: new Date().toISOString() })
         .eq('id', orderId);
     } else {
       await supabaseAdmin
         .from('product_orders')
-        .update({ 
-          status: 'withdrawn',
-          withdraw_count: newWithdrawCount,
-          withdrawn_at: new Date().toISOString()
-        })
+        .update({ status: 'withdrawn', withdraw_count: newWithdrawCount, withdrawn_at: new Date().toISOString() })
         .eq('id', orderId);
     }
 
-    // إعادة المبلغ إلى رصيد المستخدم
+    // إعادة المبلغ
     await supabaseAdmin
       .from('users')
       .update({ 
@@ -296,15 +271,12 @@ app.post('/api/withdraw-order', async (req, res) => {
       })
       .eq('id', userId);
 
-    // تقليل عدد الطلبات الحالية للمنتج
+    // تقليل عدد الطلبات
     await supabaseAdmin
       .from('products')
-      .update({ 
-        current_orders: supabaseAdmin.raw('current_orders - ?', order.quantity)
-      })
+      .update({ current_orders: supabaseAdmin.raw('current_orders - ?', order.quantity) })
       .eq('id', order.product_id);
 
-    // تسجيل سجل السحب
     await supabaseAdmin
       .from('withdrawal_logs')
       .insert({
@@ -315,19 +287,18 @@ app.post('/api/withdraw-order', async (req, res) => {
         created_at: new Date().toISOString()
       });
 
-    let responseMessage = `✅ تم سحب طلبك بنجاح. تم إعادة ${order.total_amount} USDT إلى رصيدك.`;
+    let responseMessage = `✅ تم سحب طلبك. تم إعادة ${order.total_amount} USDT.`;
     if (isBanned) {
-      responseMessage += ` ⚠️ تم استبعادك من هذا المنتج نهائياً بسبب كثرة السحب.`;
+      responseMessage += ` ⚠️ تم استبعادك من هذا المنتج نهائياً.`;
     } else if (newWithdrawCount === 1) {
-      responseMessage += ` ⚠️ تحذير: إذا قمت بالسحب مرة أخرى، سيتم استبعادك من هذا المنتج نهائياً.`;
+      responseMessage += ` ⚠️ تحذير: إذا سحبت مرة أخرى، سيتم استبعادك.`;
     }
 
     res.json({
       success: true,
       message: responseMessage,
       isBanned: isBanned,
-      withdrawCount: newWithdrawCount,
-      warning: newWithdrawCount < 2 ? warningMessage : null
+      withdrawCount: newWithdrawCount
     });
 
   } catch (error) {
@@ -337,7 +308,7 @@ app.post('/api/withdraw-order', async (req, res) => {
 });
 
 // ==========================================
-// API: عرض طلبات المستخدم
+// API: طلبات المستخدم
 // ==========================================
 app.post('/api/my-orders', async (req, res) => {
   const { userId } = req.body;
@@ -363,7 +334,7 @@ app.post('/api/deposit', async (req, res) => {
   const { userId, amount, transactionHash } = req.body;
 
   if (!amount || amount < 1) {
-    return res.status(400).json({ error: '⚠️ الحد الأدنى للإيداع هو 1 USDT' });
+    return res.status(400).json({ error: '⚠️ الحد الأدنى للإيداع 1 USDT' });
   }
 
   if (!transactionHash || transactionHash.length < 10) {
@@ -371,30 +342,27 @@ app.post('/api/deposit', async (req, res) => {
   }
 
   try {
-    const { data: user, error: userError } = await supabaseAdmin
+    const { data: user } = await supabaseAdmin
       .from('users')
       .select('*')
       .eq('id', userId)
       .single();
 
-    if (userError || !user) {
+    if (!user) {
       return res.status(404).json({ error: 'المستخدم غير موجود' });
     }
 
-    // التحقق من عدم استخدام الهاش مسبقاً
-    const { data: existingHash, error: hashError } = await supabaseAdmin
+    // التحقق من الهاش
+    const { data: existingHash } = await supabaseAdmin
       .from('deposit_requests')
-      .select('id, amount, transaction_hash')
+      .select('id')
       .eq('transaction_hash', transactionHash)
       .maybeSingle();
 
     if (existingHash) {
-      return res.status(400).json({ 
-        error: '⚠️ هذا الـ TXID تم استخدامه مسبقاً في إيداع سابق! لا يمكن استخدام نفس TXID مرتين.'
-      });
+      return res.status(400).json({ error: '⚠️ هذا الـ TXID مستخدم مسبقاً' });
     }
 
-    // التحقق من المعاملة على الشبكة
     const verification = await bsc.verifyTransaction(transactionHash, amount, bsc.HOT_WALLET_ADDRESS);
 
     if (!verification.success) {
@@ -403,7 +371,6 @@ app.post('/api/deposit', async (req, res) => {
 
     const actualAmount = verification.amount || amount;
 
-    // إنشاء سجل الإيداع
     const { data: deposit, error: depositError } = await supabaseAdmin
       .from('deposit_requests')
       .insert({ 
@@ -421,7 +388,6 @@ app.post('/api/deposit', async (req, res) => {
       return res.status(500).json({ error: depositError.message });
     }
 
-    // إضافة المبلغ إلى رصيد المستخدم
     await supabaseAdmin
       .from('users')
       .update({ 
@@ -429,7 +395,6 @@ app.post('/api/deposit', async (req, res) => {
       })
       .eq('id', userId);
 
-    // تسجيل المعاملة
     await supabaseAdmin
       .from('transactions')
       .insert({
@@ -444,43 +409,43 @@ app.post('/api/deposit', async (req, res) => {
 
     res.json({ 
       success: true, 
-      message: `✅ تم إضافة ${actualAmount} USDT إلى رصيدك بنجاح!`,
-      depositId: deposit.id,
-      verification: verification
+      message: `✅ تم إضافة ${actualAmount} USDT إلى رصيدك بنجاح!`
     });
 
   } catch (error) {
     console.error('Deposit error:', error);
-    res.status(500).json({ error: 'حدث خطأ داخلي في الخادم' });
+    res.status(500).json({ error: 'حدث خطأ داخلي' });
   }
 });
 
 // ==========================================
-// API: التحقق من الإيداع
+// API: التحقق من الإيداع (للأدمن)
 // ==========================================
-app.post('/api/verify-deposit', async (req, res) => {
-  const { userId, transactionHash, amount } = req.body;
+app.post('/api/admin/verify-deposit', async (req, res) => {
+  const { adminSecret, transactionHash, amount } = req.body;
 
-  if (!userId || !transactionHash) {
-    return res.status(400).json({ error: 'userId و TXID مطلوبان' });
+  if (adminSecret !== process.env.ADMIN_SECRET) {
+    return res.status(401).json({ error: 'غير مصرح به' });
+  }
+
+  if (!transactionHash) {
+    return res.status(400).json({ error: 'TXID مطلوب' });
   }
 
   try {
-    // التحقق من عدم استخدام الهاش مسبقاً
     const { data: existingHash } = await supabaseAdmin
       .from('deposit_requests')
-      .select('id, amount, transaction_hash')
+      .select('id')
       .eq('transaction_hash', transactionHash)
       .maybeSingle();
 
     if (existingHash) {
       return res.status(400).json({ 
         success: false, 
-        error: '⚠️ هذا الـ TXID تم استخدامه مسبقاً في إيداع سابق! لا يمكن استخدام نفس TXID مرتين.'
+        error: '⚠️ هذا الـ TXID مستخدم مسبقاً'
       });
     }
 
-    // التحقق من المعاملة على الشبكة
     const verification = await bsc.verifyTransaction(transactionHash, amount || 0, bsc.HOT_WALLET_ADDRESS);
 
     if (!verification.success) {
@@ -494,7 +459,6 @@ app.post('/api/verify-deposit', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Verify error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -514,29 +478,22 @@ app.post('/api/withdraw', async (req, res) => {
   }
 
   try {
-    const { data: user, error: userError } = await supabaseAdmin
+    const { data: user } = await supabaseAdmin
       .from('users')
       .select('available_balance')
       .eq('id', userId)
       .single();
 
-    if (userError || !user) {
-      return res.status(404).json({ error: 'المستخدم غير موجود' });
-    }
-
-    if (user.available_balance < amount) {
+    if (!user || user.available_balance < amount) {
       return res.status(400).json({ error: '⚠️ الرصيد غير كافٍ' });
     }
 
-    // خصم المبلغ من رصيد المستخدم
+    // خصم الرصيد وتسجيل السحب
     await supabaseAdmin
       .from('users')
-      .update({ 
-        available_balance: supabaseAdmin.raw('available_balance - ?', amount)
-      })
+      .update({ available_balance: supabaseAdmin.raw('available_balance - ?', amount) })
       .eq('id', userId);
 
-    // تسجيل السحب
     await supabaseAdmin
       .from('withdrawals')
       .insert({
@@ -544,11 +501,9 @@ app.post('/api/withdraw', async (req, res) => {
         amount: amount,
         wallet_address: walletAddress,
         status: 'approved',
-        created_at: new Date().toISOString(),
-        processed_at: new Date().toISOString()
+        created_at: new Date().toISOString()
       });
 
-    // تسجيل المعاملة
     await supabaseAdmin
       .from('transactions')
       .insert({
@@ -562,12 +517,11 @@ app.post('/api/withdraw', async (req, res) => {
 
     res.json({ 
       success: true, 
-      message: `✅ تم سحب ${amount} USDT إلى محفظتك بنجاح`
+      message: `✅ تم سحب ${amount} USDT بنجاح`
     });
 
   } catch (error) {
-    console.error('Withdraw error:', error);
-    res.status(500).json({ error: 'حدث خطأ داخلي في الخادم' });
+    res.status(500).json({ error: 'حدث خطأ داخلي' });
   }
 });
 
@@ -635,9 +589,6 @@ app.post('/api/register', async (req, res) => {
     if (referrer) referrerId = referrer.id;
   }
 
-  const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'mb425262@gmail.com';
-  const isAdmin = (email === ADMIN_EMAIL);
-
   const userId = generateUUID();
 
   const { error: insertError } = await supabaseAdmin
@@ -649,30 +600,22 @@ app.post('/api/register', async (req, res) => {
       name: name,
       referral_code: newReferralCode,
       referrer_id: referrerId,
-      is_admin: isAdmin,
-      vip_level: 0,
+      is_admin: false,
       available_balance: 0,
       platform_balance: 0,
       total_orders: 0,
       total_spent: 0,
-      total_deposits: 0,
-      total_withdrawn: 0,
-      qualifying_deposit: false,
-      is_exceptional: false,
-      custom_min_deposit: 10,
       created_at: new Date().toISOString()
     });
 
   if (insertError) {
-    console.error('Insert error:', insertError);
-    return res.status(500).json({ error: 'حدث خطأ في إنشاء الحساب: ' + insertError.message });
+    return res.status(500).json({ error: 'حدث خطأ في إنشاء الحساب' });
   }
 
   res.json({ 
     success: true, 
     user: { id: userId, email: email, name: name },
-    referral_code: newReferralCode,
-    is_admin: isAdmin
+    referral_code: newReferralCode
   });
 });
 
@@ -714,6 +657,42 @@ app.post('/api/update-user', async (req, res) => {
 });
 
 // ==========================================
+// ============ APIs الأدمن ============
+// ==========================================
+
+// التحقق من صلاحية الأدمن
+async function isAdmin(userId) {
+  const { data } = await supabaseAdmin
+    .from('users')
+    .select('is_admin')
+    .eq('id', userId)
+    .single();
+  return data?.is_admin === true;
+}
+
+// ==========================================
+// API: جعل مستخدم أدمن
+// ==========================================
+app.post('/api/admin/make-admin', async (req, res) => {
+  const { adminSecret, userId } = req.body;
+
+  if (adminSecret !== process.env.ADMIN_SECRET) {
+    return res.status(401).json({ error: 'غير مصرح به' });
+  }
+
+  try {
+    await supabaseAdmin
+      .from('users')
+      .update({ is_admin: true })
+      .eq('id', userId);
+
+    res.json({ success: true, message: '✅ تم جعل المستخدم أدمن' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==========================================
 // API: عرض جميع المنتجات (للأدمن)
 // ==========================================
 app.post('/api/admin/products', async (req, res) => {
@@ -740,10 +719,14 @@ app.post('/api/admin/products', async (req, res) => {
 // API: إضافة منتج جديد (للأدمن)
 // ==========================================
 app.post('/api/admin/add-product', async (req, res) => {
-  const { adminSecret, name, description, imageUrl, wholesalePrice, groupPrice, minQuantity, deliveryLocations } = req.body;
+  const { adminSecret, name, description, imageUrl, wholesalePrice, groupPrice, minQuantity, deliveryLocations, deliveryDate, pickupTime } = req.body;
 
   if (adminSecret !== process.env.ADMIN_SECRET) {
     return res.status(401).json({ error: 'غير مصرح به' });
+  }
+
+  if (!name || !description || !wholesalePrice || !groupPrice || !minQuantity) {
+    return res.status(400).json({ error: 'جميع الحقول الأساسية مطلوبة' });
   }
 
   try {
@@ -752,11 +735,13 @@ app.post('/api/admin/add-product', async (req, res) => {
       .insert({
         name: name,
         description: description,
-        image_url: imageUrl,
-        wholesale_price: wholesalePrice,
-        group_price: groupPrice,
-        min_quantity: minQuantity || 10,
-        delivery_locations: deliveryLocations || [],
+        image_url: imageUrl || '',
+        wholesale_price: parseFloat(wholesalePrice),
+        group_price: parseFloat(groupPrice),
+        min_quantity: parseInt(minQuantity),
+        delivery_locations: deliveryLocations || ['الخرطوم', 'أم درمان', 'بحري'],
+        delivery_date: deliveryDate || null,
+        pickup_time: pickupTime || null,
         status: 'active',
         created_at: new Date().toISOString()
       })
@@ -778,38 +763,37 @@ app.post('/api/admin/add-product', async (req, res) => {
 });
 
 // ==========================================
-// API: تحديد موعد التسليم (للأدمن)
+// API: تحديث منتج (للأدمن)
 // ==========================================
-app.post('/api/admin/set-delivery-date', async (req, res) => {
-  const { adminSecret, productId, deliveryDate } = req.body;
+app.post('/api/admin/update-product', async (req, res) => {
+  const { adminSecret, productId, updates } = req.body;
 
   if (adminSecret !== process.env.ADMIN_SECRET) {
     return res.status(401).json({ error: 'غير مصرح به' });
   }
 
   try {
-    await supabaseAdmin
+    const { error } = await supabaseAdmin
       .from('products')
-      .update({ 
-        delivery_date: deliveryDate
-      })
+      .update(updates)
       .eq('id', productId);
+
+    if (error) throw error;
 
     res.json({
       success: true,
-      message: `✅ تم تحديد موعد التسليم: ${new Date(deliveryDate).toLocaleDateString()}`
+      message: '✅ تم تحديث المنتج بنجاح'
     });
 
   } catch (error) {
-    console.error('Set delivery date error:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
 // ==========================================
-// API: تأكيد استلام المنتج وتوزيعه (للأدمن)
+// API: حذف منتج (للأدمن)
 // ==========================================
-app.post('/api/admin/confirm-delivery', async (req, res) => {
+app.post('/api/admin/delete-product', async (req, res) => {
   const { adminSecret, productId } = req.body;
 
   if (adminSecret !== process.env.ADMIN_SECRET) {
@@ -817,52 +801,147 @@ app.post('/api/admin/confirm-delivery', async (req, res) => {
   }
 
   try {
-    const { data: product, error: productError } = await supabaseAdmin
-      .from('products')
-      .select('*')
-      .eq('id', productId)
-      .single();
-
-    if (productError || !product) {
-      return res.status(404).json({ error: 'المنتج غير موجود' });
-    }
-
-    if (product.status !== 'completed') {
-      return res.status(400).json({ error: '⚠️ العدد لم يكتمل بعد، لا يمكن التوزيع' });
-    }
-
+    // التحقق من عدم وجود طلبات معلقة
     const { data: orders, error: ordersError } = await supabaseAdmin
       .from('product_orders')
-      .select('*')
+      .select('id')
       .eq('product_id', productId)
-      .eq('status', 'pending')
-      .eq('is_banned', false);
+      .eq('status', 'pending');
 
     if (ordersError) throw ordersError;
 
-    if (!orders || orders.length === 0) {
-      return res.json({ message: 'لا توجد طلبات للتوزيع' });
+    if (orders && orders.length > 0) {
+      return res.status(400).json({ 
+        error: '⚠️ لا يمكن حذف المنتج لأن هناك طلبات معلقة' 
+      });
     }
 
-    for (const order of orders) {
-      await supabaseAdmin
-        .from('product_orders')
-        .update({ 
-          status: 'delivered',
-          delivered_at: new Date().toISOString()
-        })
-        .eq('id', order.id);
-    }
+    const { error } = await supabaseAdmin
+      .from('products')
+      .delete()
+      .eq('id', productId);
+
+    if (error) throw error;
 
     res.json({
       success: true,
-      message: `✅ تم توزيع المنتج على ${orders.length} مستخدم`,
-      ordersCount: orders.length,
-      deliveryDate: new Date().toISOString()
+      message: '✅ تم حذف المنتج بنجاح'
     });
 
   } catch (error) {
-    console.error('Confirm delivery error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==========================================
+// API: تحديد موعد التسليم (للأدمن)
+// ==========================================
+app.post('/api/admin/set-delivery-date', async (req, res) => {
+  const { adminSecret, productId, deliveryDate, pickupTime } = req.body;
+
+  if (adminSecret !== process.env.ADMIN_SECRET) {
+    return res.status(401).json({ error: 'غير مصرح به' });
+  }
+
+  try {
+    const updates = {};
+    if (deliveryDate) updates.delivery_date = deliveryDate;
+    if (pickupTime) updates.pickup_time = pickupTime;
+
+    await supabaseAdmin
+      .from('products')
+      .update(updates)
+      .eq('id', productId);
+
+    res.json({
+      success: true,
+      message: '✅ تم تحديث مواعيد التسليم والاستلام'
+    });
+
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==========================================
+// API: عرض الطلبات حسب المنتج (للأدمن)
+// ==========================================
+app.post('/api/admin/product-orders', async (req, res) => {
+  const { adminSecret, productId } = req.body;
+
+  if (adminSecret !== process.env.ADMIN_SECRET) {
+    return res.status(401).json({ error: 'غير مصرح به' });
+  }
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('product_orders')
+      .select('*, users(name, email)')
+      .eq('product_id', productId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    res.json(data || []);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==========================================
+// API: تحديث حالة الطلب (للأدمن)
+// ==========================================
+app.post('/api/admin/update-order-status', async (req, res) => {
+  const { adminSecret, orderId, status } = req.body;
+
+  if (adminSecret !== process.env.ADMIN_SECRET) {
+    return res.status(401).json({ error: 'غير مصرح به' });
+  }
+
+  const validStatuses = ['pending', 'confirmed', 'shipped', 'in_location', 'delivered', 'cancelled'];
+  if (!validStatuses.includes(status)) {
+    return res.status(400).json({ error: 'حالة غير صالحة' });
+  }
+
+  try {
+    await supabaseAdmin
+      .from('product_orders')
+      .update({ 
+        status: status,
+        confirmed_at: status === 'confirmed' ? new Date().toISOString() : undefined,
+        delivered_at: status === 'delivered' ? new Date().toISOString() : undefined
+      })
+      .eq('id', orderId);
+
+    res.json({
+      success: true,
+      message: `✅ تم تحديث حالة الطلب إلى ${status}`
+    });
+
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==========================================
+// API: عرض جميع المستخدمين (للأدمن)
+// ==========================================
+app.post('/api/admin/users', async (req, res) => {
+  const { adminSecret } = req.body;
+
+  if (adminSecret !== process.env.ADMIN_SECRET) {
+    return res.status(401).json({ error: 'غير مصرح به' });
+  }
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('users')
+      .select('id, name, email, available_balance, platform_balance, total_orders, total_spent, is_admin, created_at')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    res.json(data || []);
+  } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
