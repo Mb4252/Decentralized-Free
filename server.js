@@ -331,10 +331,12 @@ app.post('/api/my-orders', async (req, res) => {
 });
 
 // ==========================================
-// API: الإيداع
+// API: الإيداع - إصلاح
 // ==========================================
 app.post('/api/deposit', async (req, res) => {
   const { userId, amount, transactionHash } = req.body;
+
+  console.log('💰 Deposit request:', { userId, amount, transactionHash });
 
   if (!amount || amount < 1) {
     return res.status(400).json({ error: '⚠️ الحد الأدنى للإيداع 1 USDT' });
@@ -366,6 +368,7 @@ app.post('/api/deposit', async (req, res) => {
       return res.status(400).json({ error: '⚠️ هذا الـ TXID مستخدم مسبقاً' });
     }
 
+    // التحقق من المعاملة على الشبكة
     const verification = await bsc.verifyTransaction(transactionHash, amount, bsc.HOT_WALLET_ADDRESS);
 
     if (!verification.success) {
@@ -388,17 +391,25 @@ app.post('/api/deposit', async (req, res) => {
       .single();
 
     if (depositError) {
-      return res.status(500).json({ error: depositError.message });
+      console.error('Deposit insert error:', depositError);
+      return res.status(500).json({ error: 'حدث خطأ في تسجيل الإيداع' });
     }
 
-    await supabaseAdmin
+    // تحديث رصيد المستخدم
+    const { error: updateError } = await supabaseAdmin
       .from('users')
       .update({ 
         available_balance: supabaseAdmin.raw('available_balance + ?', [actualAmount])
       })
       .eq('id', userId);
 
-    await supabaseAdmin
+    if (updateError) {
+      console.error('Update balance error:', updateError);
+      return res.status(500).json({ error: 'حدث خطأ في تحديث الرصيد' });
+    }
+
+    // تسجيل المعاملة
+    const { error: txError } = await supabaseAdmin
       .from('transactions')
       .insert({
         user_id: userId,
@@ -410,6 +421,10 @@ app.post('/api/deposit', async (req, res) => {
         created_at: new Date().toISOString()
       });
 
+    if (txError) {
+      console.error('Transaction insert error:', txError);
+    }
+
     res.json({ 
       success: true, 
       message: `✅ تم إضافة ${actualAmount} USDT إلى رصيدك بنجاح!`
@@ -417,7 +432,55 @@ app.post('/api/deposit', async (req, res) => {
 
   } catch (error) {
     console.error('Deposit error:', error);
-    res.status(500).json({ error: 'حدث خطأ داخلي' });
+    res.status(500).json({ error: 'حدث خطأ داخلي: ' + error.message });
+  }
+});
+
+// ==========================================
+// API: التحقق من الإيداع (للمستخدم) - إصلاح
+// ==========================================
+app.post('/api/verify-deposit', async (req, res) => {
+  const { userId, transactionHash, amount } = req.body;
+
+  console.log('🔍 Verify deposit request:', { userId, transactionHash, amount });
+
+  if (!transactionHash) {
+    return res.status(400).json({ success: false, error: 'TXID مطلوب' });
+  }
+
+  try {
+    // التحقق من الهاش في قاعدة البيانات
+    const { data: existingHash } = await supabaseAdmin
+      .from('deposit_requests')
+      .select('id')
+      .eq('transaction_hash', transactionHash)
+      .maybeSingle();
+
+    if (existingHash) {
+      return res.status(400).json({ 
+        success: false, 
+        error: '⚠️ هذا الـ TXID مستخدم مسبقاً'
+      });
+    }
+
+    // التحقق من المعاملة على الشبكة
+    const verification = await bsc.verifyTransaction(transactionHash, amount || 0, bsc.HOT_WALLET_ADDRESS);
+
+    console.log('Verification result:', verification);
+
+    if (!verification.success) {
+      return res.status(400).json({ success: false, error: verification.error });
+    }
+
+    res.json({
+      success: true,
+      message: 'المعاملة صالحة',
+      verification: verification
+    });
+
+  } catch (error) {
+    console.error('Verify deposit error:', error);
+    res.status(500).json({ success: false, error: 'حدث خطأ داخلي: ' + error.message });
   }
 });
 
@@ -426,6 +489,8 @@ app.post('/api/deposit', async (req, res) => {
 // ==========================================
 app.post('/api/admin/verify-deposit', async (req, res) => {
   const { adminSecret, transactionHash, amount } = req.body;
+
+  console.log('🔍 Admin verify deposit:', { adminSecret, transactionHash, amount });
 
   if (adminSecret !== process.env.ADMIN_SECRET) {
     return res.status(401).json({ error: 'غير مصرح به' });
@@ -452,7 +517,7 @@ app.post('/api/admin/verify-deposit', async (req, res) => {
     const verification = await bsc.verifyTransaction(transactionHash, amount || 0, bsc.HOT_WALLET_ADDRESS);
 
     if (!verification.success) {
-      return res.status(400).json({ error: verification.error });
+      return res.status(400).json({ success: false, error: verification.error });
     }
 
     res.json({
@@ -462,15 +527,18 @@ app.post('/api/admin/verify-deposit', async (req, res) => {
     });
 
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Admin verify error:', error);
+    res.status(500).json({ success: false, error: 'حدث خطأ داخلي: ' + error.message });
   }
 });
 
 // ==========================================
-// API: السحب
+// API: السحب - إصلاح
 // ==========================================
 app.post('/api/withdraw', async (req, res) => {
   const { userId, amount, walletAddress } = req.body;
+
+  console.log('💸 Withdraw request:', { userId, amount, walletAddress });
 
   if (!amount || amount < 0.5) {
     return res.status(400).json({ error: '⚠️ الحد الأدنى للسحب 0.5 USDT' });
@@ -480,51 +548,80 @@ app.post('/api/withdraw', async (req, res) => {
     return res.status(400).json({ error: '⚠️ عنوان المحفظة مطلوب' });
   }
 
+  if (!walletAddress.startsWith('0x') || walletAddress.length < 30) {
+    return res.status(400).json({ error: '⚠️ عنوان محفظة غير صالح' });
+  }
+
   try {
-    const { data: user } = await supabaseAdmin
+    const { data: user, error: userError } = await supabaseAdmin
       .from('users')
       .select('available_balance')
       .eq('id', userId)
       .single();
 
-    if (!user || user.available_balance < amount) {
+    if (userError || !user) {
+      return res.status(404).json({ error: 'المستخدم غير موجود' });
+    }
+
+    if (user.available_balance < amount) {
       return res.status(400).json({ error: '⚠️ الرصيد غير كافٍ' });
     }
 
-    // خصم الرصيد وتسجيل السحب
-    await supabaseAdmin
+    // خصم الرصيد
+    const { error: updateError } = await supabaseAdmin
       .from('users')
       .update({ available_balance: supabaseAdmin.raw('available_balance - ?', [amount]) })
       .eq('id', userId);
 
-    await supabaseAdmin
+    if (updateError) {
+      console.error('Update balance error:', updateError);
+      return res.status(500).json({ error: 'حدث خطأ في تحديث الرصيد' });
+    }
+
+    // تسجيل طلب السحب
+    const { data: withdrawal, error: wError } = await supabaseAdmin
       .from('withdrawals')
       .insert({
         user_id: userId,
         amount: amount,
         wallet_address: walletAddress,
-        status: 'approved',
+        status: 'pending',
         created_at: new Date().toISOString()
-      });
+      })
+      .select()
+      .single();
 
+    if (wError) {
+      console.error('Withdrawal insert error:', wError);
+      // استرجاع الرصيد إذا فشل التسجيل
+      await supabaseAdmin
+        .from('users')
+        .update({ available_balance: supabaseAdmin.raw('available_balance + ?', [amount]) })
+        .eq('id', userId);
+      return res.status(500).json({ error: 'حدث خطأ في تسجيل السحب' });
+    }
+
+    // تسجيل المعاملة
     await supabaseAdmin
       .from('transactions')
       .insert({
         user_id: userId,
         type: 'withdraw',
         amount: amount,
-        status: 'approved',
-        description: `📤 سحب ${amount} USDT`,
+        status: 'pending',
+        reference_id: withdrawal.id,
+        description: `📤 طلب سحب ${amount} USDT`,
         created_at: new Date().toISOString()
       });
 
     res.json({ 
       success: true, 
-      message: `✅ تم سحب ${amount} USDT بنجاح`
+      message: `✅ تم طلب سحب ${amount} USDT بنجاح. سيتم المعالجة قريباً.`
     });
 
   } catch (error) {
-    res.status(500).json({ error: 'حدث خطأ داخلي' });
+    console.error('Withdraw error:', error);
+    res.status(500).json({ error: 'حدث خطأ داخلي: ' + error.message });
   }
 });
 
@@ -612,6 +709,7 @@ app.post('/api/register', async (req, res) => {
     });
 
   if (insertError) {
+    console.error('Register error:', insertError);
     return res.status(500).json({ error: 'حدث خطأ في إنشاء الحساب' });
   }
 
@@ -683,6 +781,16 @@ app.post('/api/transactions', async (req, res) => {
 // ============ APIs الأدمن ============
 // ==========================================
 
+// التحقق من صلاحية الأدمن
+async function isAdmin(userId) {
+  const { data } = await supabaseAdmin
+    .from('users')
+    .select('is_admin')
+    .eq('id', userId)
+    .single();
+  return data?.is_admin === true;
+}
+
 // ==========================================
 // API: عرض جميع المنتجات (للأدمن)
 // ==========================================
@@ -707,13 +815,16 @@ app.post('/api/admin/products', async (req, res) => {
 });
 
 // ==========================================
-// API: إضافة منتج جديد (للأدمن)
+// API: إضافة منتج جديد (للأدمن) - إصلاح
 // ==========================================
 app.post('/api/admin/add-product', async (req, res) => {
   const { adminSecret, name, description, imageUrl, wholesalePrice, groupPrice, minQuantity, deliveryLocations, deliveryDate, pickupTime } = req.body;
 
+  console.log('📦 Add product request:', { adminSecret, name, description });
+
   if (adminSecret !== process.env.ADMIN_SECRET) {
-    return res.status(401).json({ error: 'غير مصرح به' });
+    console.log('❌ Invalid admin secret');
+    return res.status(401).json({ error: 'غير مصرح به - كلمة سر غير صحيحة' });
   }
 
   if (!name || !description || !wholesalePrice || !groupPrice || !minQuantity) {
@@ -740,7 +851,12 @@ app.post('/api/admin/add-product', async (req, res) => {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Insert error:', error);
+      throw error;
+    }
+
+    console.log('✅ Product added successfully:', data);
 
     res.json({
       success: true,
@@ -750,7 +866,7 @@ app.post('/api/admin/add-product', async (req, res) => {
 
   } catch (error) {
     console.error('Add product error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'حدث خطأ داخلي: ' + error.message });
   }
 });
 
@@ -783,13 +899,16 @@ app.post('/api/admin/update-product', async (req, res) => {
 });
 
 // ==========================================
-// API: حذف منتج (للأدمن)
+// API: حذف منتج (للأدمن) - إصلاح
 // ==========================================
 app.post('/api/admin/delete-product', async (req, res) => {
   const { adminSecret, productId } = req.body;
 
+  console.log('🗑️ Delete product request:', { adminSecret, productId });
+
   if (adminSecret !== process.env.ADMIN_SECRET) {
-    return res.status(401).json({ error: 'غير مصرح به' });
+    console.log('❌ Invalid admin secret');
+    return res.status(401).json({ error: 'غير مصرح به - كلمة سر غير صحيحة' });
   }
 
   try {
@@ -815,13 +934,15 @@ app.post('/api/admin/delete-product', async (req, res) => {
 
     if (error) throw error;
 
+    console.log('✅ Product deleted successfully');
     res.json({
       success: true,
       message: '✅ تم حذف المنتج بنجاح'
     });
 
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Delete product error:', error);
+    res.status(500).json({ error: 'حدث خطأ داخلي: ' + error.message });
   }
 });
 
