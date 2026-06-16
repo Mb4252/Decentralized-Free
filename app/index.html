@@ -207,7 +207,9 @@
       btn.textContent = loading ? '⏳ جاري...' : btn.id === 'doLoginBtn' ? 'تسجيل الدخول' : 'إنشاء حساب';
     }
 
-    // تسجيل الدخول
+    // ==========================================
+    // تسجيل الدخول (مع Cookies)
+    // ==========================================
     document.getElementById('doLoginBtn').onclick = async () => {
       const email = document.getElementById('loginEmail').value.trim();
       const password = document.getElementById('loginPassword').value;
@@ -224,12 +226,13 @@
         const res = await fetch(`${API_URL}/api/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password })
+          body: JSON.stringify({ email, password }),
+          credentials: 'include' // ⭐ مهم: لإرسال واستقبال الكوكيز
         });
         const data = await res.json();
 
         if (data.success) {
-          localStorage.setItem('token', data.token);
+          // تخزين بيانات المستخدم (غير حساسة)
           localStorage.setItem('user', JSON.stringify(data.user));
           showMessage('✅ تم تسجيل الدخول بنجاح!', 'success');
           setTimeout(() => { window.location.href = '/dashboard.html'; }, 1000);
@@ -243,7 +246,9 @@
       }
     };
 
-    // إنشاء حساب
+    // ==========================================
+    // إنشاء حساب (مع Cookies)
+    // ==========================================
     document.getElementById('doRegisterBtn').onclick = async () => {
       const name = document.getElementById('regName').value.trim();
       const email = document.getElementById('regEmail').value.trim();
@@ -271,12 +276,12 @@
         const res = await fetch(`${API_URL}/api/register`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, email, password, referralCode })
+          body: JSON.stringify({ name, email, password, referralCode }),
+          credentials: 'include' // ⭐ مهم: لإرسال واستقبال الكوكيز
         });
         const data = await res.json();
 
         if (data.success) {
-          localStorage.setItem('token', data.token);
           localStorage.setItem('user', JSON.stringify(data.user));
           showMessage('✅ تم إنشاء الحساب بنجاح!', 'success');
           setTimeout(() => { window.location.href = '/dashboard.html'; }, 1000);
@@ -298,16 +303,25 @@
       if (e.key === 'Enter') document.getElementById('doRegisterBtn').click();
     });
 
+    // ==========================================
     // التحقق من الجلسة
+    // ==========================================
     (function() {
-      const token = localStorage.getItem('token');
-      if (token) {
-        try {
-          const payload = JSON.parse(atob(token.split('.')[1]));
-          if (Date.now() < payload.exp * 1000) {
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      if (user.id) {
+        // التحقق من صحة الجلسة عن طريق طلب بيانات المستخدم
+        fetch(`${API_URL}/api/user`, {
+          method: 'POST',
+          credentials: 'include'
+        })
+        .then(res => {
+          if (res.status === 401 || res.status === 403) {
+            localStorage.clear();
+          } else {
             window.location.href = '/dashboard.html';
           }
-        } catch(e) {}
+        })
+        .catch(() => {});
       }
     })();
   </script>
