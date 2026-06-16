@@ -9,16 +9,10 @@ const bsc = require('./lib/bsc');
 
 const app = express();
 
-// ==========================================
-// إعدادات
-// ==========================================
 app.use(cors({ origin: '*', credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static('app'));
 
-// ========================================
-// Supabase
-// ========================================
 const supabaseAdmin = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -27,9 +21,6 @@ const supabaseAdmin = createClient(
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 const SALT_ROUNDS = 10;
 
-// ========================================
-// دوال مساعدة
-// ========================================
 function generateUUID() {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
     const r = Math.random() * 16 | 0;
@@ -72,10 +63,12 @@ app.get('/api/health', (req, res) => {
 });
 
 // ==========================================
-// API: تسجيل الدخول
+// API: تسجيل الدخول (معدل)
 // ==========================================
 app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
+  
+  console.log('🔐 محاولة تسجيل دخول:', email);
   
   if (!email || !password) {
     return res.status(400).json({ error: 'البريد وكلمة المرور مطلوبة' });
@@ -89,11 +82,41 @@ app.post('/api/login', async (req, res) => {
       .single();
     
     if (error || !user) {
+      console.log('❌ مستخدم غير موجود:', email);
       return res.status(401).json({ error: 'بيانات غير صحيحة' });
     }
     
-    const match = await bcrypt.compare(password, user.password);
-    if (!match) {
+    // التحقق من كلمة المرور (تدعم النص العادي والمشفر)
+    let passwordValid = false;
+    
+    // 1. محاولة bcrypt (كلمة مرور مشفرة)
+    try {
+      passwordValid = await bcrypt.compare(password, user.password);
+      if (passwordValid) console.log('✅ تم التحقق عبر bcrypt');
+    } catch (e) {
+      // تجاهل
+    }
+    
+    // 2. إذا فشلت، جرب المقارنة النصية (لكلمات المرور القديمة)
+    if (!passwordValid && user.password === password) {
+      passwordValid = true;
+      console.log('✅ تم التحقق عبر المقارنة النصية (قديم)');
+      
+      // تحديث كلمة المرور إلى النص المشفر
+      try {
+        const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+        await supabaseAdmin
+          .from('users')
+          .update({ password: hashedPassword })
+          .eq('id', user.id);
+        console.log(`✅ تم تحديث كلمة مرور ${email} إلى النص المشفر`);
+      } catch (e) {
+        console.warn('⚠️ فشل تحديث كلمة المرور:', e.message);
+      }
+    }
+    
+    if (!passwordValid) {
+      console.log('❌ كلمة مرور خاطئة:', email);
       return res.status(401).json({ error: 'بيانات غير صحيحة' });
     }
     
@@ -103,6 +126,8 @@ app.post('/api/login', async (req, res) => {
       { expiresIn: '7d' }
     );
     
+    console.log('✅ تم تسجيل الدخول بنجاح:', email);
+    
     res.json({
       success: true,
       token: token,
@@ -110,6 +135,7 @@ app.post('/api/login', async (req, res) => {
     });
     
   } catch (error) {
+    console.error('Login error:', error);
     res.status(500).json({ error: 'حدث خطأ داخلي' });
   }
 });
@@ -119,6 +145,8 @@ app.post('/api/login', async (req, res) => {
 // ==========================================
 app.post('/api/register', async (req, res) => {
   const { email, password, name, referralCode } = req.body;
+  
+  console.log('📝 محاولة إنشاء حساب:', email);
   
   if (!email || !password || !name) {
     return res.status(400).json({ error: 'جميع الحقول مطلوبة' });
@@ -171,6 +199,7 @@ app.post('/api/register', async (req, res) => {
       });
     
     if (insertError) {
+      console.error('Insert error:', insertError);
       return res.status(500).json({ error: 'حدث خطأ في إنشاء الحساب' });
     }
     
@@ -180,6 +209,8 @@ app.post('/api/register', async (req, res) => {
       { expiresIn: '7d' }
     );
     
+    console.log('✅ تم إنشاء الحساب بنجاح:', email);
+    
     res.json({
       success: true,
       token,
@@ -188,6 +219,7 @@ app.post('/api/register', async (req, res) => {
     });
     
   } catch (error) {
+    console.error('Register error:', error);
     res.status(500).json({ error: 'حدث خطأ داخلي' });
   }
 });
@@ -299,7 +331,7 @@ app.post('/api/order-product', authenticateToken, async (req, res) => {
     }
     
     if (user.available_balance < totalAmount) {
-      return res.status(400).json({ error: `الرصيد غير كافٍ: ${user.available_balance} < ${totalAmount}` });
+      return res.status(400).json({ error: `الرصيد غير كافٍ` });
     }
     
     const newBalance = user.available_balance - totalAmount;
@@ -400,7 +432,7 @@ app.post('/api/withdraw-order', authenticateToken, async (req, res) => {
     }
     
     if (order.is_banned) {
-      return res.status(400).json({ error: 'تم استبعادك من هذا المنتج' });
+      return res.status(400).json({ error: 'تم استبعادك' });
     }
     
     const newWithdrawCount = (order.withdraw_count || 0) + 1;
@@ -437,9 +469,7 @@ app.post('/api/withdraw-order', authenticateToken, async (req, res) => {
       .eq('id', order.product_id);
     
     let message = `✅ تم سحب الطلب وإعادة ${order.total_amount} USDT`;
-    if (isBanned) {
-      message += ' ⚠️ تم استبعادك نهائياً';
-    }
+    if (isBanned) message += ' ⚠️ تم استبعادك نهائياً';
     
     res.json({ success: true, message, isBanned, withdrawCount: newWithdrawCount });
     
@@ -645,7 +675,6 @@ app.post('/api/transactions', authenticateToken, async (req, res) => {
 // ============ APIs الأدمن ============
 // ==========================================
 
-// إضافة منتج
 app.post('/api/admin/add-product', authenticateAdmin, async (req, res) => {
   const { name, description, imageUrl, wholesalePrice, groupPrice, minQuantity, deliveryLocations, deliveryDate, pickupTime } = req.body;
   
@@ -685,7 +714,6 @@ app.post('/api/admin/add-product', authenticateAdmin, async (req, res) => {
   }
 });
 
-// حذف منتج
 app.post('/api/admin/delete-product', authenticateAdmin, async (req, res) => {
   const { productId } = req.body;
   
@@ -697,7 +725,7 @@ app.post('/api/admin/delete-product', authenticateAdmin, async (req, res) => {
       .eq('status', 'pending');
     
     if (orders && orders.length > 0) {
-      return res.status(400).json({ error: 'يوجد طلبات معلقة لهذا المنتج' });
+      return res.status(400).json({ error: 'يوجد طلبات معلقة' });
     }
     
     await supabaseAdmin
@@ -712,7 +740,6 @@ app.post('/api/admin/delete-product', authenticateAdmin, async (req, res) => {
   }
 });
 
-// طلبات المنتج
 app.post('/api/admin/product-orders', authenticateAdmin, async (req, res) => {
   const { productId } = req.body;
   
@@ -730,7 +757,6 @@ app.post('/api/admin/product-orders', authenticateAdmin, async (req, res) => {
   }
 });
 
-// تحديث حالة الطلب
 app.post('/api/admin/update-order-status', authenticateAdmin, async (req, res) => {
   const { orderId, status } = req.body;
   
@@ -756,7 +782,6 @@ app.post('/api/admin/update-order-status', authenticateAdmin, async (req, res) =
   }
 });
 
-// فحص TXID للأدمن
 app.post('/api/admin/verify-deposit', authenticateAdmin, async (req, res) => {
   const { transactionHash, amount } = req.body;
   
@@ -778,7 +803,6 @@ app.post('/api/admin/verify-deposit', authenticateAdmin, async (req, res) => {
   }
 });
 
-// عرض جميع المستخدمين
 app.post('/api/admin/users', authenticateAdmin, async (req, res) => {
   try {
     const { data, error } = await supabaseAdmin
@@ -804,6 +828,7 @@ app.listen(PORT, () => {
   ║   📡 الخادم على المنفذ: ${PORT}                                  ║
   ║   🌐 http://localhost:${PORT}                                   ║
   ║   🔐 نظام مصادقة JWT آمن                                      ║
+  ║   ✅ دعم كلمات المرور القديمة والجديدة                        ║
   ╚═══════════════════════════════════════════════════════════════╝
   `);
 });
