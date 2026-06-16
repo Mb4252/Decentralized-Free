@@ -133,13 +133,15 @@ app.post('/api/order-product', async (req, res) => {
     }
 
     // خصم المبلغ
-    await supabaseAdmin
+    const { error: updateError } = await supabaseAdmin
       .from('users')
       .update({ 
-        available_balance: supabaseAdmin.raw('available_balance - ?', totalAmount),
-        platform_balance: supabaseAdmin.raw('platform_balance + ?', totalAmount)
+        available_balance: supabaseAdmin.raw('available_balance - ?', [totalAmount]),
+        platform_balance: supabaseAdmin.raw('platform_balance + ?', [totalAmount])
       })
       .eq('id', userId);
+
+    if (updateError) throw updateError;
 
     // تسجيل الطلب
     const { data: order, error: orderError } = await supabaseAdmin
@@ -159,11 +161,12 @@ app.post('/api/order-product', async (req, res) => {
       .single();
 
     if (orderError) {
+      // استرجاع المبلغ إذا فشل الطلب
       await supabaseAdmin
         .from('users')
         .update({ 
-          available_balance: supabaseAdmin.raw('available_balance + ?', totalAmount),
-          platform_balance: supabaseAdmin.raw('platform_balance - ?', totalAmount)
+          available_balance: supabaseAdmin.raw('available_balance + ?', [totalAmount]),
+          platform_balance: supabaseAdmin.raw('platform_balance - ?', [totalAmount])
         })
         .eq('id', userId);
       throw orderError;
@@ -181,7 +184,7 @@ app.post('/api/order-product', async (req, res) => {
       .from('users')
       .update({ 
         total_orders: supabaseAdmin.raw('total_orders + 1'),
-        total_spent: supabaseAdmin.raw('total_spent + ?', totalAmount)
+        total_spent: supabaseAdmin.raw('total_spent + ?', [totalAmount])
       })
       .eq('id', userId);
 
@@ -266,15 +269,15 @@ app.post('/api/withdraw-order', async (req, res) => {
     await supabaseAdmin
       .from('users')
       .update({ 
-        available_balance: supabaseAdmin.raw('available_balance + ?', order.total_amount),
-        platform_balance: supabaseAdmin.raw('platform_balance - ?', order.total_amount)
+        available_balance: supabaseAdmin.raw('available_balance + ?', [order.total_amount]),
+        platform_balance: supabaseAdmin.raw('platform_balance - ?', [order.total_amount])
       })
       .eq('id', userId);
 
     // تقليل عدد الطلبات
     await supabaseAdmin
       .from('products')
-      .update({ current_orders: supabaseAdmin.raw('current_orders - ?', order.quantity) })
+      .update({ current_orders: supabaseAdmin.raw('current_orders - ?', [order.quantity]) })
       .eq('id', order.product_id);
 
     await supabaseAdmin
@@ -391,7 +394,7 @@ app.post('/api/deposit', async (req, res) => {
     await supabaseAdmin
       .from('users')
       .update({ 
-        available_balance: supabaseAdmin.raw('available_balance + ?', actualAmount)
+        available_balance: supabaseAdmin.raw('available_balance + ?', [actualAmount])
       })
       .eq('id', userId);
 
@@ -491,7 +494,7 @@ app.post('/api/withdraw', async (req, res) => {
     // خصم الرصيد وتسجيل السحب
     await supabaseAdmin
       .from('users')
-      .update({ available_balance: supabaseAdmin.raw('available_balance - ?', amount) })
+      .update({ available_balance: supabaseAdmin.raw('available_balance - ?', [amount]) })
       .eq('id', userId);
 
     await supabaseAdmin
@@ -548,7 +551,7 @@ app.post('/api/login', async (req, res) => {
 
   res.json({ 
     success: true,
-    user: { id: user.id, email: user.email, name: user.name },
+    user: { id: user.id, email: user.email, name: user.name, is_admin: user.is_admin || false },
     profile: user
   });
 });
@@ -657,40 +660,28 @@ app.post('/api/update-user', async (req, res) => {
 });
 
 // ==========================================
-// ============ APIs الأدمن ============
+// API: المعاملات
 // ==========================================
-
-// التحقق من صلاحية الأدمن
-async function isAdmin(userId) {
-  const { data } = await supabaseAdmin
-    .from('users')
-    .select('is_admin')
-    .eq('id', userId)
-    .single();
-  return data?.is_admin === true;
-}
-
-// ==========================================
-// API: جعل مستخدم أدمن
-// ==========================================
-app.post('/api/admin/make-admin', async (req, res) => {
-  const { adminSecret, userId } = req.body;
-
-  if (adminSecret !== process.env.ADMIN_SECRET) {
-    return res.status(401).json({ error: 'غير مصرح به' });
-  }
+app.post('/api/transactions', async (req, res) => {
+  const { userId } = req.body;
 
   try {
-    await supabaseAdmin
-      .from('users')
-      .update({ is_admin: true })
-      .eq('id', userId);
+    const { data, error } = await supabaseAdmin
+      .from('transactions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
 
-    res.json({ success: true, message: '✅ تم جعل المستخدم أدمن' });
+    if (error) throw error;
+    res.json(data || []);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
+
+// ==========================================
+// ============ APIs الأدمن ============
+// ==========================================
 
 // ==========================================
 // API: عرض جميع المنتجات (للأدمن)
@@ -739,6 +730,7 @@ app.post('/api/admin/add-product', async (req, res) => {
         wholesale_price: parseFloat(wholesalePrice),
         group_price: parseFloat(groupPrice),
         min_quantity: parseInt(minQuantity),
+        current_orders: 0,
         delivery_locations: deliveryLocations || ['الخرطوم', 'أم درمان', 'بحري'],
         delivery_date: deliveryDate || null,
         pickup_time: pickupTime || null,
