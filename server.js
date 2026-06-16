@@ -75,7 +75,7 @@ app.get('/api/product/:id', async (req, res) => {
 });
 
 // ==========================================
-// API: طلب منتج (شراء) - إصلاح
+// API: طلب منتج (شراء)
 // ==========================================
 app.post('/api/order-product', async (req, res) => {
   const { userId, productId, quantity, location, acceptTerms } = req.body;
@@ -132,7 +132,7 @@ app.post('/api/order-product', async (req, res) => {
       });
     }
 
-    // خصم المبلغ - الطريقة الصحيحة
+    // خصم المبلغ
     const newBalance = user.available_balance - totalAmount;
     const { error: updateError } = await supabaseAdmin
       .from('users')
@@ -218,7 +218,7 @@ app.post('/api/order-product', async (req, res) => {
 });
 
 // ==========================================
-// API: سحب الطلب (قبل اكتمال العدد) - إصلاح
+// API: سحب الطلب (قبل اكتمال العدد)
 // ==========================================
 app.post('/api/withdraw-order', async (req, res) => {
   const { userId, orderId } = req.body;
@@ -275,7 +275,7 @@ app.post('/api/withdraw-order', async (req, res) => {
 
     if (userError) throw userError;
 
-    // إعادة المبلغ - الطريقة الصحيحة
+    // إعادة المبلغ
     const newBalance = (user.available_balance || 0) + order.total_amount;
     await supabaseAdmin
       .from('users')
@@ -342,7 +342,7 @@ app.post('/api/my-orders', async (req, res) => {
 });
 
 // ==========================================
-// API: الإيداع - إصلاح
+// API: الإيداع
 // ==========================================
 app.post('/api/deposit', async (req, res) => {
   const { userId, amount, transactionHash } = req.body;
@@ -406,7 +406,7 @@ app.post('/api/deposit', async (req, res) => {
       return res.status(500).json({ error: 'حدث خطأ في تسجيل الإيداع' });
     }
 
-    // تحديث رصيد المستخدم - الطريقة الصحيحة
+    // تحديث رصيد المستخدم
     const newBalance = (user.available_balance || 0) + actualAmount;
     const { error: updateError } = await supabaseAdmin
       .from('users')
@@ -543,7 +543,7 @@ app.post('/api/admin/verify-deposit', async (req, res) => {
 });
 
 // ==========================================
-// API: السحب - إصلاح
+// API: السحب - النظام الآمن الجديد
 // ==========================================
 app.post('/api/withdraw', async (req, res) => {
   const { userId, amount, walletAddress } = req.body;
@@ -563,9 +563,10 @@ app.post('/api/withdraw', async (req, res) => {
   }
 
   try {
+    // جلب بيانات المستخدم
     const { data: user, error: userError } = await supabaseAdmin
       .from('users')
-      .select('available_balance')
+      .select('available_balance, name, email')
       .eq('id', userId)
       .single();
 
@@ -573,23 +574,38 @@ app.post('/api/withdraw', async (req, res) => {
       return res.status(404).json({ error: 'المستخدم غير موجود' });
     }
 
+    // التحقق من الرصيد
     if (user.available_balance < amount) {
       return res.status(400).json({ error: '⚠️ الرصيد غير كافٍ' });
     }
 
-    // خصم الرصيد - الطريقة الصحيحة
-    const newBalance = user.available_balance - amount;
-    const { error: updateError } = await supabaseAdmin
-      .from('users')
-      .update({ available_balance: newBalance })
-      .eq('id', userId);
+    // التحقق من وجود طلبات سحب معلقة (لمنع التكرار)
+    const { data: pendingWithdrawals, error: pendingError } = await supabaseAdmin
+      .from('withdrawals')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('status', 'pending')
+      .maybeSingle();
 
-    if (updateError) {
-      console.error('Update balance error:', updateError);
-      return res.status(500).json({ error: 'حدث خطأ في تحديث الرصيد' });
+    if (pendingWithdrawals) {
+      return res.status(400).json({ 
+        error: '⚠️ لديك طلب سحب قيد المعالجة حالياً. يرجى الانتظار حتى يتم الانتهاء منه.' 
+      });
     }
 
-    // تسجيل طلب السحب
+    // التحقق من رصيد محفظة البوت (تحذير فقط)
+    let botBalance = 0;
+    let botBalanceWarning = '';
+    try {
+      botBalance = await bsc.getUSDTBalance();
+      if (botBalance < amount) {
+        botBalanceWarning = ` ⚠️ تنبيه: رصيد المحفظة ${botBalance} USDT فقط. سيتم معالجة طلبك خلال 24 ساعة.`;
+      }
+    } catch (e) {
+      console.warn('⚠️ Could not check bot balance:', e.message);
+    }
+
+    // 🔒 لا يتم خصم الرصيد هنا - فقط تسجيل الطلب
     const { data: withdrawal, error: wError } = await supabaseAdmin
       .from('withdrawals')
       .insert({
@@ -597,22 +613,18 @@ app.post('/api/withdraw', async (req, res) => {
         amount: amount,
         wallet_address: walletAddress,
         status: 'pending',
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        processed_at: null
       })
       .select()
       .single();
 
     if (wError) {
       console.error('Withdrawal insert error:', wError);
-      // استرجاع الرصيد إذا فشل التسجيل
-      await supabaseAdmin
-        .from('users')
-        .update({ available_balance: user.available_balance })
-        .eq('id', userId);
-      return res.status(500).json({ error: 'حدث خطأ في تسجيل السحب' });
+      return res.status(500).json({ error: 'حدث خطأ في تسجيل طلب السحب' });
     }
 
-    // تسجيل المعاملة
+    // تسجيل المعاملة بحالة "pending"
     await supabaseAdmin
       .from('transactions')
       .insert({
@@ -621,13 +633,23 @@ app.post('/api/withdraw', async (req, res) => {
         amount: amount,
         status: 'pending',
         reference_id: withdrawal.id,
-        description: `📤 طلب سحب ${amount} USDT`,
+        description: `📤 طلب سحب ${amount} USDT إلى ${walletAddress.substring(0, 10)}...`,
         created_at: new Date().toISOString()
       });
 
+    // إشعار للأدمن (في console)
+    console.log(`
+    📢 طلب سحب جديد!
+    👤 المستخدم: ${user.name} (${user.email})
+    💰 المبلغ: ${amount} USDT
+    📤 العنوان: ${walletAddress}
+    📅 التاريخ: ${new Date().toISOString()}
+    ${botBalanceWarning}
+    `);
+
     res.json({ 
       success: true, 
-      message: `✅ تم طلب سحب ${amount} USDT بنجاح. سيتم المعالجة قريباً.`
+      message: `✅ تم تسجيل طلب سحب ${amount} USDT بنجاح. سيتم معالجته خلال 24 ساعة.${botBalanceWarning}`
     });
 
   } catch (error) {
@@ -637,149 +659,166 @@ app.post('/api/withdraw', async (req, res) => {
 });
 
 // ==========================================
-// API: تسجيل الدخول
+// API: معالجة طلبات السحب المعلقة (للأدمن)
 // ==========================================
-app.post('/api/login', async (req, res) => {
-  const { email, password } = req.body;
+app.post('/api/admin/process-withdrawal', async (req, res) => {
+  const { adminSecret, withdrawalId } = req.body;
 
-  if (!email || !password) {
-    return res.status(400).json({ error: 'البريد الإلكتروني وكلمة المرور مطلوبة' });
+  if (adminSecret !== process.env.ADMIN_SECRET) {
+    return res.status(401).json({ error: 'غير مصرح به' });
   }
-
-  const { data: user, error } = await supabaseAdmin
-    .from('users')
-    .select('*')
-    .eq('email', email)
-    .eq('password', password)
-    .single();
-
-  if (error || !user) {
-    return res.status(401).json({ error: 'البريد الإلكتروني أو كلمة المرور غير صحيحة' });
-  }
-
-  res.json({ 
-    success: true,
-    user: { id: user.id, email: user.email, name: user.name, is_admin: user.is_admin || false },
-    profile: user
-  });
-});
-
-// ==========================================
-// API: إنشاء حساب جديد
-// ==========================================
-app.post('/api/register', async (req, res) => {
-  const { email, password, name, referralCode } = req.body;
-
-  if (!email || !password || !name) {
-    return res.status(400).json({ error: 'جميع الحقول مطلوبة' });
-  }
-
-  if (password.length < 4) {
-    return res.status(400).json({ error: 'كلمة المرور يجب أن تكون 4 أحرف على الأقل' });
-  }
-
-  const { data: existingUser } = await supabaseAdmin
-    .from('users')
-    .select('id')
-    .eq('email', email)
-    .single();
-
-  if (existingUser) {
-    return res.status(400).json({ error: 'هذا البريد مسجل بالفعل' });
-  }
-
-  const newReferralCode = Math.random().toString(36).substring(2, 10).toUpperCase();
-
-  let referrerId = null;
-  if (referralCode) {
-    const { data: referrer } = await supabaseAdmin
-      .from('users')
-      .select('id')
-      .eq('referral_code', referralCode.toUpperCase())
-      .single();
-    if (referrer) referrerId = referrer.id;
-  }
-
-  const userId = generateUUID();
-
-  const { error: insertError } = await supabaseAdmin
-    .from('users')
-    .insert({
-      id: userId,
-      email: email,
-      password: password,
-      name: name,
-      referral_code: newReferralCode,
-      referrer_id: referrerId,
-      is_admin: false,
-      available_balance: 0,
-      platform_balance: 0,
-      total_orders: 0,
-      total_spent: 0,
-      created_at: new Date().toISOString()
-    });
-
-  if (insertError) {
-    console.error('Register error:', insertError);
-    return res.status(500).json({ error: 'حدث خطأ في إنشاء الحساب' });
-  }
-
-  res.json({ 
-    success: true, 
-    user: { id: userId, email: email, name: name },
-    referral_code: newReferralCode
-  });
-});
-
-// ==========================================
-// API: جلب بيانات المستخدم
-// ==========================================
-app.post('/api/user', async (req, res) => {
-  const { userId } = req.body;
-
-  const { data, error } = await supabaseAdmin
-    .from('users')
-    .select('*')
-    .eq('id', userId)
-    .single();
-
-  if (error) {
-    return res.status(404).json({ error: 'المستخدم غير موجود' });
-  }
-
-  res.json(data);
-});
-
-// ==========================================
-// API: تحديث بيانات المستخدم
-// ==========================================
-app.post('/api/update-user', async (req, res) => {
-  const { userId, updates } = req.body;
-
-  const { error } = await supabaseAdmin
-    .from('users')
-    .update(updates)
-    .eq('id', userId);
-
-  if (error) {
-    return res.status(500).json({ error: error.message });
-  }
-
-  res.json({ success: true });
-});
-
-// ==========================================
-// API: المعاملات
-// ==========================================
-app.post('/api/transactions', async (req, res) => {
-  const { userId } = req.body;
 
   try {
-    const { data, error } = await supabaseAdmin
+    // جلب طلب السحب
+    const { data: withdrawal, error: wError } = await supabaseAdmin
+      .from('withdrawals')
+      .select('*, users(available_balance, name, email)')
+      .eq('id', withdrawalId)
+      .single();
+
+    if (wError || !withdrawal) {
+      return res.status(404).json({ error: 'طلب السحب غير موجود' });
+    }
+
+    if (withdrawal.status !== 'pending') {
+      return res.status(400).json({ error: 'هذا الطلب تم معالجته بالفعل' });
+    }
+
+    const userId = withdrawal.user_id;
+    const amount = withdrawal.amount;
+    const walletAddress = withdrawal.wallet_address;
+
+    // التحقق من رصيد محفظة البوت
+    const botBalance = await bsc.getUSDTBalance();
+    if (botBalance < amount) {
+      return res.status(400).json({ 
+        error: `⚠️ رصيد المحفظة غير كافٍ: ${botBalance} USDT متاح، والمطلوب: ${amount} USDT` 
+      });
+    }
+
+    // تنفيذ التحويل الفعلي
+    const transferResult = await bsc.transferUSDT(walletAddress, amount);
+
+    if (!transferResult.success) {
+      return res.status(500).json({ error: 'فشل التحويل: ' + transferResult.error });
+    }
+
+    // تحديث حالة طلب السحب
+    await supabaseAdmin
+      .from('withdrawals')
+      .update({
+        status: 'completed',
+        processed_at: new Date().toISOString(),
+        tx_hash: transferResult.hash
+      })
+      .eq('id', withdrawalId);
+
+    // خصم الرصيد من المستخدم (بعد نجاح التحويل)
+    const newBalance = withdrawal.users.available_balance - amount;
+    await supabaseAdmin
+      .from('users')
+      .update({ available_balance: newBalance })
+      .eq('id', userId);
+
+    // تحديث حالة المعاملة
+    await supabaseAdmin
       .from('transactions')
-      .select('*')
-      .eq('user_id', userId)
+      .update({
+        status: 'approved',
+        description: `✅ تم سحب ${amount} USDT إلى ${walletAddress.substring(0, 10)}... (TX: ${transferResult.hash.substring(0, 10)}...)`
+      })
+      .eq('reference_id', withdrawalId)
+      .eq('type', 'withdraw');
+
+    res.json({
+      success: true,
+      message: `✅ تم تحويل ${amount} USDT بنجاح إلى ${walletAddress}`,
+      txHash: transferResult.hash
+    });
+
+  } catch (error) {
+    console.error('Process withdrawal error:', error);
+    res.status(500).json({ error: 'حدث خطأ داخلي: ' + error.message });
+  }
+});
+
+// ==========================================
+// API: إلغاء طلب سحب (للأدمن)
+// ==========================================
+app.post('/api/admin/cancel-withdrawal', async (req, res) => {
+  const { adminSecret, withdrawalId, reason } = req.body;
+
+  if (adminSecret !== process.env.ADMIN_SECRET) {
+    return res.status(401).json({ error: 'غير مصرح به' });
+  }
+
+  try {
+    const { data: withdrawal, error: wError } = await supabaseAdmin
+      .from('withdrawals')
+      .select('*, users(available_balance)')
+      .eq('id', withdrawalId)
+      .single();
+
+    if (wError || !withdrawal) {
+      return res.status(404).json({ error: 'طلب السحب غير موجود' });
+    }
+
+    if (withdrawal.status !== 'pending') {
+      return res.status(400).json({ error: 'هذا الطلب تم معالجته بالفعل' });
+    }
+
+    // إلغاء الطلب (الرصيد لم يخصم، لذلك لا داعي لإعادته)
+    await supabaseAdmin
+      .from('withdrawals')
+      .update({
+        status: 'cancelled',
+        processed_at: new Date().toISOString(),
+        cancellation_reason: reason || 'تم الإلغاء من قبل الأدمن'
+      })
+      .eq('id', withdrawalId);
+
+    // تحديث حالة المعاملة
+    await supabaseAdmin
+      .from('transactions')
+      .update({
+        status: 'cancelled',
+        description: `❌ تم إلغاء سحب ${withdrawal.amount} USDT: ${reason || 'تم الإلغاء من قبل الأدمن'}`
+      })
+      .eq('reference_id', withdrawalId)
+      .eq('type', 'withdraw');
+
+    res.json({
+      success: true,
+      message: `✅ تم إلغاء طلب السحب بنجاح`
+    });
+
+  } catch (error) {
+    console.error('Cancel withdrawal error:', error);
+    res.status(500).json({ error: 'حدث خطأ داخلي: ' + error.message });
+  }
+});
+
+// ==========================================
+// API: عرض جميع طلبات السحب (للأدمن)
+// ==========================================
+app.post('/api/admin/withdrawals', async (req, res) => {
+  const { adminSecret, status } = req.body;
+
+  if (adminSecret !== process.env.ADMIN_SECRET) {
+    return res.status(401).json({ error: 'غير مصرح به' });
+  }
+
+  try {
+    let query = supabaseAdmin
+      .from('withdrawals')
+      .select('*, users(name, email, available_balance)')
       .order('created_at', { ascending: false });
+
+    if (status) {
+      query = query.eq('status', status);
+    }
+
+    const { data, error } = await query;
 
     if (error) throw error;
     res.json(data || []);
@@ -789,7 +828,104 @@ app.post('/api/transactions', async (req, res) => {
 });
 
 // ==========================================
-// ============ APIs الأدمن ============
+// ============ المهمة التلقائية ============
+// معالجة طلبات السحب المعلقة كل 5 دقائق
+// ==========================================
+async function processPendingWithdrawals() {
+  console.log('🔄 جاري معالجة طلبات السحب المعلقة...');
+  
+  try {
+    // جلب جميع طلبات السحب المعلقة
+    const { data: pendingWithdrawals, error } = await supabaseAdmin
+      .from('withdrawals')
+      .select('*, users(available_balance, name, email)')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+
+    if (!pendingWithdrawals || pendingWithdrawals.length === 0) {
+      console.log('✅ لا توجد طلبات سحب معلقة');
+      return;
+    }
+
+    console.log(`📋 عدد الطلبات المعلقة: ${pendingWithdrawals.length}`);
+
+    // التحقق من رصيد محفظة البوت
+    const botBalance = await bsc.getUSDTBalance();
+    console.log(`💰 رصيد محفظة البوت: ${botBalance} USDT`);
+
+    let processedCount = 0;
+    let failedCount = 0;
+
+    for (const withdrawal of pendingWithdrawals) {
+      const amount = withdrawal.amount;
+      const walletAddress = withdrawal.wallet_address;
+      const withdrawalId = withdrawal.id;
+      const userId = withdrawal.user_id;
+
+      // التحقق من كفاية الرصيد
+      if (botBalance < amount) {
+        console.log(`⚠️ رصيد غير كافٍ للطلب ${withdrawalId}: يحتاج ${amount} USDT، المتاح ${botBalance} USDT`);
+        continue;
+      }
+
+      console.log(`🔄 جاري معالجة الطلب ${withdrawalId}: ${amount} USDT إلى ${walletAddress.substring(0, 10)}...`);
+
+      // تنفيذ التحويل
+      const transferResult = await bsc.transferUSDT(walletAddress, amount);
+
+      if (transferResult.success) {
+        // تحديث حالة الطلب
+        await supabaseAdmin
+          .from('withdrawals')
+          .update({
+            status: 'completed',
+            processed_at: new Date().toISOString(),
+            tx_hash: transferResult.hash
+          })
+          .eq('id', withdrawalId);
+
+        // تحديث حالة المعاملة
+        await supabaseAdmin
+          .from('transactions')
+          .update({
+            status: 'approved',
+            description: `✅ تم سحب ${amount} USDT (TX: ${transferResult.hash.substring(0, 10)}...)`
+          })
+          .eq('reference_id', withdrawalId)
+          .eq('type', 'withdraw');
+
+        // خصم الرصيد من المستخدم
+        const newBalance = withdrawal.users.available_balance - amount;
+        await supabaseAdmin
+          .from('users')
+          .update({ available_balance: newBalance })
+          .eq('id', userId);
+
+        processedCount++;
+        console.log(`✅ تم معالجة الطلب ${withdrawalId} بنجاح (TX: ${transferResult.hash})`);
+      } else {
+        failedCount++;
+        console.error(`❌ فشل معالجة الطلب ${withdrawalId}: ${transferResult.error}`);
+      }
+    }
+
+    console.log(`📊 ملخص المعالجة: ${processedCount} تمت بنجاح، ${failedCount} فشلت`);
+
+  } catch (error) {
+    console.error('❌ خطأ في معالجة الطلبات المعلقة:', error);
+  }
+}
+
+// تشغيل المهمة كل 5 دقائق
+setInterval(processPendingWithdrawals, 5 * 60 * 1000);
+
+// تشغيلها فور بدء التشغيل
+setTimeout(processPendingWithdrawals, 5000);
+
+// ==========================================
+// ============ APIs الأدمن الأخرى ============
 // ==========================================
 
 // ==========================================
@@ -1061,6 +1197,158 @@ app.post('/api/admin/users', async (req, res) => {
 });
 
 // ==========================================
+// API: جلب بيانات المستخدم
+// ==========================================
+app.post('/api/user', async (req, res) => {
+  const { userId } = req.body;
+
+  const { data, error } = await supabaseAdmin
+    .from('users')
+    .select('*')
+    .eq('id', userId)
+    .single();
+
+  if (error) {
+    return res.status(404).json({ error: 'المستخدم غير موجود' });
+  }
+
+  res.json(data);
+});
+
+// ==========================================
+// API: تحديث بيانات المستخدم
+// ==========================================
+app.post('/api/update-user', async (req, res) => {
+  const { userId, updates } = req.body;
+
+  const { error } = await supabaseAdmin
+    .from('users')
+    .update(updates)
+    .eq('id', userId);
+
+  if (error) {
+    return res.status(500).json({ error: error.message });
+  }
+
+  res.json({ success: true });
+});
+
+// ==========================================
+// API: المعاملات
+// ==========================================
+app.post('/api/transactions', async (req, res) => {
+  const { userId } = req.body;
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('transactions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    res.json(data || []);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==========================================
+// API: تسجيل الدخول
+// ==========================================
+app.post('/api/login', async (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ error: 'البريد الإلكتروني وكلمة المرور مطلوبة' });
+  }
+
+  const { data: user, error } = await supabaseAdmin
+    .from('users')
+    .select('*')
+    .eq('email', email)
+    .eq('password', password)
+    .single();
+
+  if (error || !user) {
+    return res.status(401).json({ error: 'البريد الإلكتروني أو كلمة المرور غير صحيحة' });
+  }
+
+  res.json({ 
+    success: true,
+    user: { id: user.id, email: user.email, name: user.name, is_admin: user.is_admin || false },
+    profile: user
+  });
+});
+
+// ==========================================
+// API: إنشاء حساب جديد
+// ==========================================
+app.post('/api/register', async (req, res) => {
+  const { email, password, name, referralCode } = req.body;
+
+  if (!email || !password || !name) {
+    return res.status(400).json({ error: 'جميع الحقول مطلوبة' });
+  }
+
+  if (password.length < 4) {
+    return res.status(400).json({ error: 'كلمة المرور يجب أن تكون 4 أحرف على الأقل' });
+  }
+
+  const { data: existingUser } = await supabaseAdmin
+    .from('users')
+    .select('id')
+    .eq('email', email)
+    .single();
+
+  if (existingUser) {
+    return res.status(400).json({ error: 'هذا البريد مسجل بالفعل' });
+  }
+
+  const newReferralCode = Math.random().toString(36).substring(2, 10).toUpperCase();
+
+  let referrerId = null;
+  if (referralCode) {
+    const { data: referrer } = await supabaseAdmin
+      .from('users')
+      .select('id')
+      .eq('referral_code', referralCode.toUpperCase())
+      .single();
+    if (referrer) referrerId = referrer.id;
+  }
+
+  const userId = generateUUID();
+
+  const { error: insertError } = await supabaseAdmin
+    .from('users')
+    .insert({
+      id: userId,
+      email: email,
+      password: password,
+      name: name,
+      referral_code: newReferralCode,
+      referrer_id: referrerId,
+      is_admin: false,
+      available_balance: 0,
+      platform_balance: 0,
+      total_orders: 0,
+      total_spent: 0,
+      created_at: new Date().toISOString()
+    });
+
+  if (insertError) {
+    console.error('Register error:', insertError);
+    return res.status(500).json({ error: 'حدث خطأ في إنشاء الحساب' });
+  }
+
+  res.json({ 
+    success: true, 
+    user: { id: userId, email: email, name: name },
+    referral_code: newReferralCode
+  });
+});
+
+// ==========================================
 // تشغيل الخادم
 // ==========================================
 const PORT = process.env.PORT || 3000;
@@ -1071,6 +1359,7 @@ app.listen(PORT, () => {
   ║   📡 الخادم على المنفذ: ${PORT}                                  ║
   ║   🌐 http://localhost:${PORT}                                   ║
   ║   🤲 نظام متوافق مع الشريعة الإسلامية                         ║
+  ║   🔄 نظام معالجة الطلبات المعلقة يعمل كل 5 دقائق             ║
   ╚═══════════════════════════════════════════════════════════════╝
   `);
 });
