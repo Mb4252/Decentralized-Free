@@ -3,23 +3,141 @@ const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const cookieParser = require('cookie-parser');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
 const bsc = require('./lib/bsc');
 
 const app = express();
 
-app.use(cors({ origin: '*', credentials: true }));
+// ==========================================
+// إعدادات Render (مهم جداً)
+// ==========================================
+
+// الثقة بـ proxy (لـ Rate Limiting على Render)
+app.set('trust proxy', 1);
+
+// ==========================================
+// Security Headers (Helmet)
+// ==========================================
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", "https://*.supabase.co"],
+      fontSrc: ["'self'", "data:"],
+    },
+  },
+  frameguard: { action: 'deny' },
+  noSniff: true,
+  xssFilter: true,
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true
+  }
+}));
+
+// ==========================================
+// CORS
+// ==========================================
+const allowedOrigins = [
+  process.env.CLIENT_URL || 'https://crypto-api-c2v8.onrender.com',
+  'http://localhost:3000',
+  'http://127.0.0.1:3000'
+];
+
+app.use(cors({
+  origin: function(origin, callback) {
+    // السماح للطلبات بدون origin (مثل Postman)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie']
+}));
+
 app.use(express.json({ limit: '10mb' }));
+app.use(cookieParser());
 app.use(express.static('app'));
 
+// ==========================================
+// Rate Limiting
+// ==========================================
+
+// حد عام: 100 طلب في 15 دقيقة
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  message: { error: '⚠️太多 طلبات. يرجى الانتظار' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// حد لتسجيل الدخول: 5 محاولات في الدقيقة
+const loginLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 5,
+  message: { error: '⚠️太多 محاولات تسجيل الدخول. يرجى الانتظار دقيقة' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// حد للـ API العامة: 30 طلب في الدقيقة
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  message: { error: '⚠️太多 طلبات. يرجى الانتظار' },
+});
+
+// تطبيق الحدود
+app.use('/api/', generalLimiter);
+app.use('/api/login', loginLimiter);
+app.use('/api/register', loginLimiter);
+app.use('/api/products', apiLimiter);
+
+// ========================================
+// إجبار HTTPS (لـ Render)
+// ========================================
+app.use((req, res, next) => {
+  if (req.headers['x-forwarded-proto'] !== 'https' && process.env.NODE_ENV === 'production') {
+    return res.redirect(`https://${req.headers.host}${req.url}`);
+  }
+  next();
+});
+
+// ========================================
+// Supabase
+// ========================================
 const supabaseAdmin = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
+const supabaseClient = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_ANON_KEY
+);
+
+// ========================================
+// JWT
+// ========================================
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 const SALT_ROUNDS = 10;
+
+// ========================================
+// دوال مساعدة
+// ========================================
 
 function generateUUID() {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
@@ -29,16 +147,43 @@ function generateUUID() {
   });
 }
 
+// ==========================================
+// Audit Log
+// ==========================================
+async function logAudit(userId, action, details = {}, req = null) {
+  try {
+    await supabaseAdmin
+      .from('audit_log')
+      .insert({
+        user_id: userId,
+        action: action,
+        details: details,
+        ip_address: req?.ip || req?.connection?.remoteAddress || 'unknown',
+        user_agent: req?.headers?.['user-agent'] || 'unknown',
+        created_at: new Date().toISOString()
+      });
+  } catch (error) {
+    console.error('Audit log error:', error);
+  }
+}
+
+// ==========================================
+// Middleware للمصادقة
+// ==========================================
+
 function authenticateToken(req, res, next) {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+  // جلب التوكن من Cookie
+  const token = req.cookies.token;
   
   if (!token) {
-    return res.status(401).json({ error: 'غير مصرح به' });
+    return res.status(401).json({ error: 'غير مصرح به - يرجى تسجيل الدخول' });
   }
   
   jwt.verify(token, JWT_SECRET, (err, decoded) => {
     if (err) {
+      if (err.name === 'TokenExpiredError') {
+        return res.status(401).json({ error: 'انتهت صلاحية الجلسة' });
+      }
       return res.status(403).json({ error: 'رمز غير صالح' });
     }
     req.user = decoded;
@@ -63,9 +208,9 @@ app.get('/api/health', (req, res) => {
 });
 
 // ==========================================
-// API: تسجيل الدخول (معدل)
+// API: تسجيل الدخول
 // ==========================================
-app.post('/api/login', async (req, res) => {
+app.post('/api/login', loginLimiter, async (req, res) => {
   const { email, password } = req.body;
   
   console.log('🔐 محاولة تسجيل دخول:', email);
@@ -86,33 +231,21 @@ app.post('/api/login', async (req, res) => {
       return res.status(401).json({ error: 'بيانات غير صحيحة' });
     }
     
-    // التحقق من كلمة المرور (تدعم النص العادي والمشفر)
+    // التحقق من كلمة المرور
     let passwordValid = false;
     
-    // 1. محاولة bcrypt (كلمة مرور مشفرة)
     try {
       passwordValid = await bcrypt.compare(password, user.password);
-      if (passwordValid) console.log('✅ تم التحقق عبر bcrypt');
-    } catch (e) {
-      // تجاهل
-    }
+    } catch (e) {}
     
-    // 2. إذا فشلت، جرب المقارنة النصية (لكلمات المرور القديمة)
     if (!passwordValid && user.password === password) {
       passwordValid = true;
-      console.log('✅ تم التحقق عبر المقارنة النصية (قديم)');
-      
-      // تحديث كلمة المرور إلى النص المشفر
-      try {
-        const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
-        await supabaseAdmin
-          .from('users')
-          .update({ password: hashedPassword })
-          .eq('id', user.id);
-        console.log(`✅ تم تحديث كلمة مرور ${email} إلى النص المشفر`);
-      } catch (e) {
-        console.warn('⚠️ فشل تحديث كلمة المرور:', e.message);
-      }
+      const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+      await supabaseAdmin
+        .from('users')
+        .update({ password: hashedPassword })
+        .eq('id', user.id);
+      console.log(`✅ تم تحديث كلمة مرور ${email} إلى النص المشفر`);
     }
     
     if (!passwordValid) {
@@ -120,17 +253,30 @@ app.post('/api/login', async (req, res) => {
       return res.status(401).json({ error: 'بيانات غير صحيحة' });
     }
     
+    // إنشاء JWT token
     const token = jwt.sign(
       { userId: user.id, email: user.email, name: user.name, is_admin: user.is_admin || false },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
     
+    // إرسال التوكن في HttpOnly Cookie
+    const isProd = process.env.NODE_ENV === 'production';
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: isProd ? 'none' : 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: '/'
+    });
+    
+    // تسجيل في Audit Log
+    await logAudit(user.id, 'login', { email: user.email }, req);
+    
     console.log('✅ تم تسجيل الدخول بنجاح:', email);
     
     res.json({
       success: true,
-      token: token,
       user: { id: user.id, email: user.email, name: user.name, is_admin: user.is_admin || false }
     });
     
@@ -141,9 +287,22 @@ app.post('/api/login', async (req, res) => {
 });
 
 // ==========================================
+// API: تسجيل الخروج
+// ==========================================
+app.post('/api/logout', (req, res) => {
+  res.clearCookie('token', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    path: '/'
+  });
+  res.json({ success: true, message: 'تم تسجيل الخروج بنجاح' });
+});
+
+// ==========================================
 // API: إنشاء حساب
 // ==========================================
-app.post('/api/register', async (req, res) => {
+app.post('/api/register', loginLimiter, async (req, res) => {
   const { email, password, name, referralCode } = req.body;
   
   console.log('📝 محاولة إنشاء حساب:', email);
@@ -203,17 +362,27 @@ app.post('/api/register', async (req, res) => {
       return res.status(500).json({ error: 'حدث خطأ في إنشاء الحساب' });
     }
     
+    // إنشاء JWT token
     const token = jwt.sign(
       { userId, email, name, is_admin: false },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
     
+    // إرسال التوكن في HttpOnly Cookie
+    const isProd = process.env.NODE_ENV === 'production';
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: isProd ? 'none' : 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: '/'
+    });
+    
     console.log('✅ تم إنشاء الحساب بنجاح:', email);
     
     res.json({
       success: true,
-      token,
       user: { id: userId, email, name, is_admin: false },
       referral_code: newReferralCode
     });
@@ -252,7 +421,7 @@ app.post('/api/user', authenticateToken, async (req, res) => {
 // ==========================================
 app.get('/api/products', async (req, res) => {
   try {
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabaseClient
       .from('products')
       .select('*')
       .eq('status', 'active')
@@ -270,7 +439,7 @@ app.get('/api/products', async (req, res) => {
 // ==========================================
 app.get('/api/product/:id', async (req, res) => {
   try {
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabaseClient
       .from('products')
       .select('*')
       .eq('id', req.params.id)
@@ -363,6 +532,9 @@ app.post('/api/order-product', authenticateToken, async (req, res) => {
       .from('products')
       .update({ current_orders: newCurrentOrders })
       .eq('id', productId);
+    
+    // تسجيل في Audit Log
+    await logAudit(userId, 'order_product', { productId, quantity, totalAmount }, req);
     
     let message = `✅ تم شراء ${quantity} × ${product.name}`;
     let isCompleted = false;
@@ -468,6 +640,9 @@ app.post('/api/withdraw-order', authenticateToken, async (req, res) => {
       .update({ current_orders: supabaseAdmin.raw('current_orders - ?', order.quantity) })
       .eq('id', order.product_id);
     
+    // تسجيل في Audit Log
+    await logAudit(userId, 'withdraw_order', { orderId, amount: order.total_amount }, req);
+    
     let message = `✅ تم سحب الطلب وإعادة ${order.total_amount} USDT`;
     if (isBanned) message += ' ⚠️ تم استبعادك نهائياً';
     
@@ -550,9 +725,13 @@ app.post('/api/deposit', authenticateToken, async (req, res) => {
         created_at: new Date().toISOString()
       });
     
+    // تسجيل في Audit Log
+    await logAudit(userId, 'deposit', { amount: actualAmount, transactionHash }, req);
+    
     res.json({ success: true, message: `✅ تم إضافة ${actualAmount} USDT` });
     
   } catch (error) {
+    console.error('Deposit error:', error);
     res.status(500).json({ error: 'حدث خطأ داخلي' });
   }
 });
@@ -646,9 +825,13 @@ app.post('/api/withdraw', authenticateToken, async (req, res) => {
         created_at: new Date().toISOString()
       });
     
+    // تسجيل في Audit Log
+    await logAudit(userId, 'withdraw', { amount, walletAddress }, req);
+    
     res.json({ success: true, message: `✅ تم تسجيل طلب سحب ${amount} USDT` });
     
   } catch (error) {
+    console.error('Withdraw error:', error);
     res.status(500).json({ error: 'حدث خطأ داخلي' });
   }
 });
@@ -675,6 +858,7 @@ app.post('/api/transactions', authenticateToken, async (req, res) => {
 // ============ APIs الأدمن ============
 // ==========================================
 
+// إضافة منتج
 app.post('/api/admin/add-product', authenticateAdmin, async (req, res) => {
   const { name, description, imageUrl, wholesalePrice, groupPrice, minQuantity, deliveryLocations, deliveryDate, pickupTime } = req.body;
   
@@ -707,13 +891,18 @@ app.post('/api/admin/add-product', authenticateAdmin, async (req, res) => {
     
     if (error) throw error;
     
+    // تسجيل في Audit Log
+    await logAudit(req.user.userId, 'add_product', { name, wholesalePrice, groupPrice }, req);
+    
     res.json({ success: true, message: `✅ تم إضافة ${name}`, product: data });
     
   } catch (error) {
+    console.error('Add product error:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
+// حذف منتج
 app.post('/api/admin/delete-product', authenticateAdmin, async (req, res) => {
   const { productId } = req.body;
   
@@ -733,13 +922,18 @@ app.post('/api/admin/delete-product', authenticateAdmin, async (req, res) => {
       .delete()
       .eq('id', productId);
     
+    // تسجيل في Audit Log
+    await logAudit(req.user.userId, 'delete_product', { productId }, req);
+    
     res.json({ success: true, message: '✅ تم حذف المنتج' });
     
   } catch (error) {
+    console.error('Delete product error:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
+// طلبات المنتج
 app.post('/api/admin/product-orders', authenticateAdmin, async (req, res) => {
   const { productId } = req.body;
   
@@ -757,6 +951,7 @@ app.post('/api/admin/product-orders', authenticateAdmin, async (req, res) => {
   }
 });
 
+// تحديث حالة الطلب
 app.post('/api/admin/update-order-status', authenticateAdmin, async (req, res) => {
   const { orderId, status } = req.body;
   
@@ -775,6 +970,9 @@ app.post('/api/admin/update-order-status', authenticateAdmin, async (req, res) =
       })
       .eq('id', orderId);
     
+    // تسجيل في Audit Log
+    await logAudit(req.user.userId, 'update_order_status', { orderId, status }, req);
+    
     res.json({ success: true, message: `✅ تم تحديث الحالة إلى ${status}` });
     
   } catch (error) {
@@ -782,6 +980,7 @@ app.post('/api/admin/update-order-status', authenticateAdmin, async (req, res) =
   }
 });
 
+// فحص TXID للأدمن
 app.post('/api/admin/verify-deposit', authenticateAdmin, async (req, res) => {
   const { transactionHash, amount } = req.body;
   
@@ -803,6 +1002,7 @@ app.post('/api/admin/verify-deposit', authenticateAdmin, async (req, res) => {
   }
 });
 
+// عرض جميع المستخدمين
 app.post('/api/admin/users', authenticateAdmin, async (req, res) => {
   try {
     const { data, error } = await supabaseAdmin
@@ -824,11 +1024,12 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`
   ╔═══════════════════════════════════════════════════════════════╗
-  ║   🛍️  منصة الشراء الجماعي - تعمل بنجاح                       ║
+  ║   🛍️  منصة الشراء الجماعي - النسخة الآمنة                     ║
   ║   📡 الخادم على المنفذ: ${PORT}                                  ║
-  ║   🌐 http://localhost:${PORT}                                   ║
-  ║   🔐 نظام مصادقة JWT آمن                                      ║
-  ║   ✅ دعم كلمات المرور القديمة والجديدة                        ║
+  ║   🌐 ${process.env.CLIENT_URL || `http://localhost:${PORT}`}     ║
+  ║   🔐 JWT + HttpOnly Cookies                                    ║
+  ║   🛡️ Helmet + Rate Limiting + Audit Log                        ║
+  ║   ✅ متوافق مع Render                                           ║
   ╚═══════════════════════════════════════════════════════════════╝
   `);
 });
