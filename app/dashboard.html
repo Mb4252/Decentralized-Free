@@ -112,6 +112,20 @@
     .stat-value { color: #00ff66; font-size: 24px; font-weight: bold; }
     .stat-label { color: #8899aa; font-size: 12px; }
     
+    .action-card {
+      background: linear-gradient(135deg, #1a1a2e, #0f0f1a);
+      border-radius: 20px;
+      padding: 20px;
+      text-align: center;
+      border: 1px solid #00ff66;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    .action-card:hover { transform: translateY(-3px); border-color: #00ff66; box-shadow: 0 10px 20px rgba(0,255,102,0.2); }
+    .action-icon { font-size: 40px; margin-bottom: 10px; }
+    .action-title { color: white; font-size: 18px; font-weight: bold; }
+    .action-sub { color: #8899aa; font-size: 12px; margin-top: 5px; }
+    
     .product-card {
       background: #1a1a2e;
       border-radius: 20px;
@@ -197,8 +211,8 @@
     .modal-content h3 { color: #00ff66; margin-bottom: 16px; font-size: 20px; }
     .modal-content p { color: #8899aa; margin-bottom: 20px; line-height: 1.6; font-size: 14px; }
     .close-modal { background: #00ff66; color: #0a0a0f; border: none; padding: 12px; border-radius: 30px; font-weight: bold; width: 100%; cursor: pointer; }
-    .modal-content .input-field { width: 100%; padding: 12px; border-radius: 12px; border: 1px solid #00ff66; background: #0a0a0f; color: white; margin-bottom: 12px; }
-    .modal-content .input-field:focus { outline: none; border-color: #00ccff; }
+    .input-field { width: 100%; padding: 12px; border-radius: 12px; border: 1px solid #00ff66; background: #0a0a0f; color: white; margin-bottom: 12px; }
+    .input-field:focus { outline: none; border-color: #00ccff; }
     .hidden { display: none; }
     
     .message { padding: 12px; border-radius: 12px; margin-bottom: 16px; text-align: center; font-size: 14px; }
@@ -208,6 +222,11 @@
     .loading { background: rgba(0,204,255,0.15); border: 1px solid #00ccff; color: #00ccff; }
     
     .info-box { background: rgba(0,204,255,0.1); border: 1px solid #00ccff; border-radius: 16px; padding: 12px; margin-top: 12px; font-size: 12px; color: #00ccff; }
+    .network-btn { background: rgba(0,255,102,0.1); border: 1px solid #00ff66; color: #00ff66; padding: 10px; border-radius: 16px; cursor: pointer; width: 100%; margin-bottom: 12px; text-align: center; }
+    .deposit-btn, .withdraw-btn { width: 100%; padding: 12px; border-radius: 30px; font-weight: bold; cursor: pointer; border: none; }
+    .deposit-btn { background: linear-gradient(135deg, #00ff66, #00ccff); color: #0a0a0f; }
+    .withdraw-btn { background: linear-gradient(135deg, #ff4444, #ff6680); color: white; }
+    .btn-copy { background: rgba(0,255,102,0.15); border: 1px solid #00ff66; color: #00ff66; padding: 8px; border-radius: 20px; cursor: pointer; width: 100%; margin-top: 8px; }
   </style>
 </head>
 <body class="dark-mode">
@@ -456,7 +475,6 @@
         document.getElementById('userName').innerHTML = `👋 ${userData.name}`;
         
         if (!localStorage.getItem('welcomeShown')) {
-          // يمكن إظهار رسالة ترحيبية هنا
           localStorage.setItem('welcomeShown', 'true');
         }
         
@@ -511,15 +529,15 @@
         </div>
         
         <div class="stats-grid">
-          <div class="action-card" id="quickProductsBtn" style="background:linear-gradient(135deg,#1a1a2e,#0f0f1a); border-radius:20px; padding:20px; text-align:center; border:1px solid #00ff66; cursor:pointer;">
-            <div class="action-icon" style="font-size:40px;">📦</div>
-            <div class="action-title" style="color:white; font-size:18px; font-weight:bold;">${t.navProducts}</div>
-            <div class="action-sub" style="color:#8899aa; font-size:12px; margin-top:5px;">${currentLang === 'ar' ? 'تصفح المنتجات المتاحة' : 'Browse available products'}</div>
+          <div class="action-card" id="quickProductsBtn">
+            <div class="action-icon">📦</div>
+            <div class="action-title">${t.navProducts}</div>
+            <div class="action-sub">${currentLang === 'ar' ? 'تصفح المنتجات المتاحة' : 'Browse available products'}</div>
           </div>
-          <div class="action-card" id="quickOrdersBtn" style="background:linear-gradient(135deg,#1a1a2e,#0f0f1a); border-radius:20px; padding:20px; text-align:center; border:1px solid #00ff66; cursor:pointer;">
-            <div class="action-icon" style="font-size:40px;">📋</div>
-            <div class="action-title" style="color:white; font-size:18px; font-weight:bold;">${t.navOrders}</div>
-            <div class="action-sub" style="color:#8899aa; font-size:12px; margin-top:5px;">${currentLang === 'ar' ? 'عرض طلباتك السابقة' : 'View your orders'}</div>
+          <div class="action-card" id="quickOrdersBtn">
+            <div class="action-icon">📋</div>
+            <div class="action-title">${t.navOrders}</div>
+            <div class="action-sub">${currentLang === 'ar' ? 'عرض طلباتك السابقة' : 'View your orders'}</div>
           </div>
         </div>
         
@@ -573,7 +591,6 @@
           `;
         }).join('');
         
-        // إضافة حدث النقر على البطاقة لفتح المودال
         document.querySelectorAll('.product-card').forEach(card => {
           card.addEventListener('click', (e) => {
             if (e.target.classList.contains('btn-order')) return;
@@ -727,13 +744,13 @@
       document.getElementById('mainContent').innerHTML = `
         <div class="card">
           <div class="card-title">${t.depositTitle}</div>
-          <div class="network-btn" id="networkInfoBtn" style="background:rgba(0,255,102,0.1); border:1px solid #00ff66; color:#00ff66; padding:10px; border-radius:16px; cursor:pointer; width:100%; margin-bottom:12px; text-align:center;">${t.networkInfo} 📋</div>
+          <div class="network-btn" id="networkInfoBtn">${t.networkInfo} 📋</div>
           <p style="color:#8899aa; font-size:12px; margin-bottom:8px;">${t.walletAddress}</p>
           <code style="color:#00ff66; word-break:break-all;">${HOT_WALLET_ADDRESS}</code>
-          <button class="btn-copy" id="copyWalletBtn" style="background:rgba(0,255,102,0.15); border:1px solid #00ff66; color:#00ff66; padding:8px; border-radius:20px; cursor:pointer; width:100%; margin-top:8px;">${t.copyWallet}</button>
+          <button class="btn-copy" id="copyWalletBtn">${t.copyWallet}</button>
           
-          <input type="text" id="depositTxHash" class="input-field" placeholder="${t.txHashPlaceholder}" style="direction:ltr; font-family: monospace; margin-top:16px; width:100%; padding:12px; border-radius:12px; border:1px solid #00ff66; background:#0a0a0f; color:white;">
-          <button class="deposit-btn" id="doDepositBtn" style="width:100%; padding:12px; border-radius:30px; font-weight:bold; cursor:pointer; border:none; background:linear-gradient(135deg,#00ff66,#00ccff); color:#0a0a0f;">${t.verifyAndDeposit}</button>
+          <input type="text" id="depositTxHash" class="input-field" placeholder="${t.txHashPlaceholder}" style="direction:ltr; font-family: monospace; margin-top:16px;">
+          <button class="deposit-btn" id="doDepositBtn">${t.verifyAndDeposit}</button>
           
           <div class="info-box">
             <strong>${t.howToDeposit}</strong><br>
@@ -830,7 +847,7 @@
           <div class="assets-amount" style="font-size:28px;">${avail.toFixed(2)} USDT</div>
           <input type="number" id="withdrawAmount" class="input-field" placeholder="${currentLang === 'ar' ? 'المبلغ (USDT) - الحد الأدنى' : 'Amount (USDT) - minimum'} ${MIN_WITHDRAW}" step="0.1">
           <input type="text" id="walletAddress" class="input-field" placeholder="${t.walletAddressPlaceholder}">
-          <button class="withdraw-btn" id="doWithdrawBtn" style="width:100%; padding:12px; border-radius:30px; font-weight:bold; cursor:pointer; border:none; background:linear-gradient(135deg,#ff4444,#ff6680); color:white;">${t.withdrawButton}</button>
+          <button class="withdraw-btn" id="doWithdrawBtn">${t.withdrawButton}</button>
           <div class="info-box">
             ${t.minWithdrawNote} ${MIN_WITHDRAW} USDT<br>${t.warningAddress}
           </div>
@@ -903,7 +920,6 @@
     document.getElementById('closeWithdrawModal').onclick = () => document.getElementById('withdrawModal').classList.add('hidden');
     document.getElementById('confirmWithdrawBtn').onclick = confirmWithdraw;
     
-    // إغلاق المودال عند الضغط خارج المحتوى
     document.querySelectorAll('.modal').forEach(modal => {
       modal.addEventListener('click', (e) => {
         if (e.target === modal) modal.classList.add('hidden');
