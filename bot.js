@@ -7,14 +7,14 @@ const path = require('path');
 dotenv.config();
 
 // ==========================================
-// إعدادات البوت (Binance Futures)
+// إعدادات البوت (Binance Futures - حقيقي)
 // ==========================================
 
 const API_KEY = process.env.BINANCE_API_KEY;
 const API_SECRET = process.env.BINANCE_API_SECRET;
 const SYMBOL = process.env.SYMBOL || 'BTCUSDT';
 const LEVERAGE = parseInt(process.env.LEVERAGE) || 10;
-const TRADE_AMOUNT = parseFloat(process.env.TRADE_AMOUNT) || 10; // بالدولار
+const TRADE_AMOUNT = parseFloat(process.env.TRADE_AMOUNT) || 10;
 const PROFIT_PERCENT = parseFloat(process.env.PROFIT_PERCENT) || 0.3;
 const PRICE_CHANGE_THRESHOLD = parseFloat(process.env.PRICE_CHANGE_THRESHOLD) || 0.1;
 const CHECK_INTERVAL = parseInt(process.env.CHECK_INTERVAL) || 5000;
@@ -142,7 +142,7 @@ async function setLeverage(symbol) {
 }
 
 // ==========================================
-// فتح صفقة شراء (Long)
+// فتح صفقة شراء (Long) - حقيقي
 // ==========================================
 
 async function openLongPosition(symbol, amount) {
@@ -156,15 +156,16 @@ async function openLongPosition(symbol, amount) {
 
     log(`📊 فتح صفقة شراء: ${roundedQuantity} ${symbol} بسعر ${price} (رافعة x${LEVERAGE})`, 'INFO');
 
-    // تنفيذ الأمر (⚠️ معطل للتجربة - فعّل عند التأكد)
-    // const order = await binance.futuresMarketBuy(symbol, roundedQuantity);
+    // ✅ تنفيذ الأمر (حقيقي)
+    const order = await binance.futuresMarketBuy(symbol, roundedQuantity);
     
-    log(`✅ تم فتح صفقة شراء (تجريبي): ${roundedQuantity} ${symbol}`, 'SUCCESS');
+    log(`✅ تم فتح صفقة شراء: ${roundedQuantity} ${symbol} (ID: ${order.orderId})`, 'SUCCESS');
     
     return {
       symbol,
       entryPrice: price,
       quantity: roundedQuantity,
+      orderId: order.orderId,
       timestamp: Date.now()
     };
   } catch (error) {
@@ -174,7 +175,7 @@ async function openLongPosition(symbol, amount) {
 }
 
 // ==========================================
-// إغلاق صفقة (بيع)
+// إغلاق صفقة (بيع) - حقيقي
 // ==========================================
 
 async function closePosition(position, profit) {
@@ -184,10 +185,10 @@ async function closePosition(position, profit) {
 
     log(`📊 إغلاق صفقة: ${position.quantity} ${position.symbol} بسعر ${currentPrice}`, 'INFO');
 
-    // تنفيذ البيع (⚠️ معطل للتجربة - فعّل عند التأكد)
-    // const order = await binance.futuresMarketSell(position.symbol, position.quantity);
+    // ✅ تنفيذ البيع (حقيقي)
+    const order = await binance.futuresMarketSell(position.symbol, position.quantity);
     
-    log(`✅ تم إغلاق الصفقة (تجريبي)`, 'SUCCESS');
+    log(`✅ تم إغلاق الصفقة: ${position.symbol} (ID: ${order.orderId})`, 'SUCCESS');
     return true;
   } catch (error) {
     log(`❌ فشل إغلاق الصفقة: ${error.message}`, 'ERROR');
@@ -343,8 +344,8 @@ app.get('/', async (req, res) => {
   const usdtBalance = parseFloat(balances.USDT.available) || 0;
   
   res.json({
-    status: '⚡ بوت العقود الآجلة يعمل',
-    version: '3.0.0',
+    status: '⚡ بوت العقود الآجلة يعمل (حقيقي)',
+    version: '4.0.0',
     timestamp: new Date().toISOString(),
     balance: `${usdtBalance.toFixed(2)} USDT`,
     leverage: `${LEVERAGE}x`,
@@ -408,13 +409,14 @@ app.get('/dashboard.html', (req, res) => {
 // ==========================================
 
 async function startBot() {
-  log(`⚡⚡ بدء تشغيل بوت العقود الآجلة (Futures)`, 'START');
+  log(`⚡⚡ بدء تشغيل بوت العقود الآجلة (Futures - حقيقي)`, 'START');
   log(`📊 العملات: ${SYMBOLS.join(', ')}`, 'INFO');
-  log(`💰 المبلغ: ${TRADE_AMOUNT} USDT (رافعة x${LEVERAGE})`, 'INFO`);
-  log(`📈 حد الارتفاع: ${PRICE_CHANGE_THRESHOLD}%`, 'INFO`);
-  log(`🎯 هدف الربح: ${PROFIT_PERCENT}%`, 'INFO`);
-  log(`🛑 وقف الخسارة: ${STOP_LOSS_PERCENT}%`, 'INFO`);
-  log(`⏱️ الفحص كل ${CHECK_INTERVAL/1000} ثانية`, 'INFO`);
+  log(`💰 المبلغ: ${TRADE_AMOUNT} USDT (رافعة x${LEVERAGE})`, 'INFO');
+  log(`📈 حد الارتفاع: ${PRICE_CHANGE_THRESHOLD}%`, 'INFO');
+  log(`🎯 هدف الربح: ${PROFIT_PERCENT}%`, 'INFO');
+  log(`🛑 وقف الخسارة: ${STOP_LOSS_PERCENT}%`, 'INFO');
+  log(`⏱️ الفحص كل ${CHECK_INTERVAL/1000} ثانية`, 'INFO');
+  log(`⚠️ تحذير: هذا البوت يستخدم أموالاً حقيقية!`, 'WARNING');
 
   // التحقق من الاتصال
   try {
@@ -433,16 +435,17 @@ async function startBot() {
     await tradingCycle();
   }, CHECK_INTERVAL);
 
-  log(`✅ البوت يعمل بنجاح!`, 'SUCCESS');
+  log(`✅ البوت يعمل بنجاح! (تداول حقيقي)`, 'SUCCESS');
 }
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`
   ╔═══════════════════════════════════════════════════════════════╗
-  ║   ⚡ بوت العقود الآجلة - Futures Bot                         ║
+  ║   ⚡ بوت العقود الآجلة - Futures Bot (حقيقي)                ║
   ║   📡 http://localhost:${PORT}                                  ║
   ║   📊 لوحة التحكم: http://localhost:${PORT}/dashboard.html     ║
   ║   🚀 رافعة حقيقية x${LEVERAGE} - يشتري عند أي ارتفاع 0.1%      ║
+  ║   ⚠️ تداول حقيقي - استخدم بحذر!                              ║
   ╚═══════════════════════════════════════════════════════════════╝
   `);
 });
