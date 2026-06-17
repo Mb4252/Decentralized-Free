@@ -3,6 +3,7 @@ const dotenv = require('dotenv');
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
+const express = require('express');
 const abi = require('./abi.json');
 dotenv.config();
 
@@ -177,31 +178,6 @@ async function sellToken(tokenAddress, tokenAmount) {
 }
 
 // ==========================================
-// بيع العملة الحالية (لبدء البحث من جديد)
-// ==========================================
-
-async function sellCurrentPosition() {
-  if (!currentPosition) {
-    log('⚠️ لا توجد صفقة مفتوحة لبيعها', 'WARNING');
-    return false;
-  }
-
-  log(`💰 جاري بيع العملة الحالية: ${currentPosition.name} (${currentPosition.address})`, 'INFO');
-  
-  const result = await sellToken(currentPosition.address, currentPosition.amount);
-  if (result.success) {
-    log(`✅ تم بيع العملة الحالية بنجاح! جاري البحث عن فرصة جديدة...`, 'SUCCESS');
-    currentPosition = null;
-    // تحديث الأسعار بعد البيع
-    await updatePriceHistory();
-    return true;
-  } else {
-    log(`❌ فشل بيع العملة الحالية: ${result.error}`, 'ERROR');
-    return false;
-  }
-}
-
-// ==========================================
 // تحديث تاريخ الأسعار
 // ==========================================
 
@@ -245,7 +221,6 @@ async function tradingCycle() {
         if (result.success) {
           currentPosition = null;
           log(`🔄 تم البيع، جاري البحث عن عملة جديدة...`, 'INFO');
-          // تحديث الأسعار بعد البيع
           await updatePriceHistory();
         }
       } 
@@ -311,7 +286,6 @@ async function tradingCycle() {
           timestamp: Date.now()
         };
         log(`✅ تم فتح الصفقة على ${best.name}`, 'SUCCESS');
-        // تحديث تاريخ الأسعار بعد الشراء
         await updatePriceHistory();
       }
     } else {
@@ -326,16 +300,62 @@ async function tradingCycle() {
 }
 
 // ==========================================
+// خادم ويب بسيط (لتلبية متطلبات Render)
+// ==========================================
+
+const webApp = express();
+const WEB_PORT = process.env.PORT || 10000;
+
+webApp.get('/', async (req, res) => {
+  let positionStatus = 'لا توجد صفقة مفتوحة';
+  let profit = '0%';
+  
+  if (currentPosition) {
+    const currentPrice = await getTokenPriceBNB(currentPosition.address);
+    if (currentPrice) {
+      profit = (((currentPrice - currentPosition.entryPrice) / currentPosition.entryPrice) * 100).toFixed(2) + '%';
+      positionStatus = `${currentPosition.name} - السعر: ${currentPrice.toFixed(4)} BNB - الربح: ${profit}`;
+    } else {
+      positionStatus = `${currentPosition.name} - جاري تحديث السعر...`;
+    }
+  }
+  
+  const balance = await wallet.getBalance();
+  const bnbBalance = parseFloat(ethers.utils.formatEther(balance)).toFixed(6);
+  
+  res.json({
+    status: '🤖 بوت التداول يعمل',
+    version: '1.0.0',
+    timestamp: new Date().toISOString(),
+    balance: `${bnbBalance} BNB`,
+    currentPosition: positionStatus,
+    watching: TOKENS.map(t => t.name).join(', '),
+    settings: {
+      tradeAmount: TRADE_AMOUNT,
+      leverage: LEVERAGE,
+      profitTarget: PROFIT_PERCENT + '%',
+      priceChangeThreshold: PRICE_CHANGE_THRESHOLD + '%',
+      checkInterval: CHECK_INTERVAL / 1000 + ' ثانية'
+    }
+  });
+});
+
+webApp.listen(WEB_PORT, '0.0.0.0', () => {
+  console.log(`📡 خادم الحالة يعمل على المنفذ ${WEB_PORT}`);
+});
+
+// ==========================================
 // تشغيل البوت
 // ==========================================
 
 async function startBot() {
   log(`🚀 بدء تشغيل بوت صيد الزخم (Momentum Sniping)`, 'START');
   log(`📊 العملات المراقبة: ${TOKENS.map(t => t.name).join(', ')}`, 'INFO');
-  log(`💰 المبلغ: ${TRADE_AMOUNT} BNB (رافعة x${LEVERAGE})`, 'INFO`);
-  log(`📈 حد الارتفاع: ${PRICE_CHANGE_THRESHOLD}%`, 'INFO`);
-  log(`🎯 هدف الربح: ${PROFIT_PERCENT}%`, 'INFO`);
-  log(`⏱️ الفحص كل ${CHECK_INTERVAL/1000} ثانية`, 'INFO`);
+  log(`💰 المبلغ: ${TRADE_AMOUNT} BNB (رافعة x${LEVERAGE})`, 'INFO');
+  log(`📈 حد الارتفاع: ${PRICE_CHANGE_THRESHOLD}%`, 'INFO');
+  log(`🎯 هدف الربح: ${PROFIT_PERCENT}%`, 'INFO');
+  log(`⏱️ الفحص كل ${CHECK_INTERVAL/1000} ثانية`, 'INFO');
+  log(`📡 خادم الحالة: http://localhost:${WEB_PORT}`, 'INFO');
 
   // تحديث الأسعار الأولية
   await updatePriceHistory();
