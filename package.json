@@ -1,6 +1,6 @@
 {
   "name": "crypto-futures-bot",
-  "version": "3.0.0",
+  "version": "4.0.0",
   "description": "بوت تداول العقود الآجلة (Futures) على Binance مع رافعة حقيقية",
   "main": "bot.js",
   "scripts": {
