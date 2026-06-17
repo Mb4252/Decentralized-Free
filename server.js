@@ -6,7 +6,6 @@ const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const { Resend } = require('resend');
 require('dotenv').config();
 
 const bsc = require('./lib/bsc');
@@ -19,7 +18,6 @@ const app = express();
 
 app.set('trust proxy', 1);
 
-// Helmet
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -110,82 +108,6 @@ app.use((req, res, next) => {
 });
 
 // ========================================
-// إعداد Resend (البريد الإلكتروني)
-// ========================================
-
-const resend = new Resend(process.env.RESEND_API_KEY);
-
-// ========================================
-// دالة إرسال رمز التحقق عبر البريد (باستخدام Resend)
-// ========================================
-
-async function sendVerificationEmail(email, name, code) {
-  try {
-    const { data, error } = await resend.emails.send({
-      from: process.env.SMTP_FROM || 'onboarding@resend.dev',
-      to: [email],
-      subject: '🔑 رمز التحقق - CryptoShop',
-      html: `
-        <!DOCTYPE html>
-        <html dir="rtl" lang="ar">
-        <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>رمز التحقق</title>
-          <style>
-            body { font-family: Arial, sans-serif; background: #f0f2f5; padding: 20px; }
-            .container { max-width: 500px; margin: 0 auto; background: white; border-radius: 16px; padding: 32px; border: 1px solid #00aa55; }
-            .header { text-align: center; margin-bottom: 24px; }
-            .header h1 { color: #00aa55; font-size: 24px; }
-            .code { 
-              font-size: 48px; 
-              font-weight: bold; 
-              color: #00aa55; 
-              text-align: center; 
-              padding: 16px; 
-              background: #f5f5f5; 
-              border-radius: 12px;
-              letter-spacing: 8px;
-              margin: 16px 0;
-            }
-            .footer { text-align: center; color: #888; font-size: 12px; margin-top: 24px; }
-            .warning { color: #ff4444; font-size: 12px; text-align: center; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <h1>🛍️ CryptoShop</h1>
-              <p>مرحباً ${name}،</p>
-            </div>
-            <p style="color:#666;text-align:center;">لقد تلقينا طلباً لإنشاء حساب جديد. لتفعيل حسابك، يرجى استخدام رمز التحقق التالي:</p>
-            <div class="code">${code}</div>
-            <p style="color:#666;text-align:center;">هذا الرمز صالح لمدة <strong>10 دقائق</strong>.</p>
-            <p style="color:#666;text-align:center;font-size:14px;">إذا لم تطلب هذا، يمكنك تجاهل هذا البريد.</p>
-            <div class="warning">⚠️ لا تشارك هذا الرمز مع أي شخص</div>
-            <div class="footer">
-              © ${new Date().getFullYear()} CryptoShop - منصة الشراء الجماعي
-            </div>
-          </div>
-        </body>
-        </html>
-      `
-    });
-
-    if (error) {
-      console.error('❌ Resend error:', error);
-      return { success: false, error: error.message };
-    }
-
-    console.log(`✅ تم إرسال رمز التحقق إلى ${email}`);
-    return { success: true };
-  } catch (error) {
-    console.error('❌ فشل إرسال البريد:', error);
-    return { success: false, error: error.message };
-  }
-}
-
-// ========================================
 // Supabase
 // ========================================
 const supabaseAdmin = createClient(
@@ -214,10 +136,6 @@ function generateUUID() {
     const v = c === 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);
   });
-}
-
-function generateVerificationCode() {
-  return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
 // ==========================================
@@ -280,132 +198,18 @@ app.get('/api/health', (req, res) => {
 });
 
 // ==========================================
-// API: طلب رمز التحقق (للتسجيل)
-// ==========================================
-app.post('/api/request-verification', async (req, res) => {
-  const { email, name } = req.body;
-  
-  console.log('📝 طلب رمز تحقق:', email);
-  
-  if (!email || !name) {
-    return res.status(400).json({ error: 'البريد والاسم مطلوبان' });
-  }
-  
-  try {
-    // التحقق من عدم وجود البريد
-    const { data: existing } = await supabaseAdmin
-      .from('users')
-      .select('id')
-      .eq('email', email)
-      .single();
-    
-    if (existing) {
-      return res.status(400).json({ error: 'هذا البريد مسجل بالفعل' });
-    }
-    
-    // إنشاء رمز تحقق
-    const code = generateVerificationCode();
-    const expiry = new Date();
-    expiry.setMinutes(expiry.getMinutes() + 10);
-    
-    // تخزين رمز التحقق
-    await supabaseAdmin
-      .from('verification_codes')
-      .upsert({
-        email: email,
-        code: code,
-        name: name,
-        expiry: expiry.toISOString(),
-        created_at: new Date().toISOString()
-      }, { onConflict: 'email' });
-    
-    // إرسال رمز التحقق عبر البريد (باستخدام Resend)
-    const emailResult = await sendVerificationEmail(email, name, code);
-    
-    if (!emailResult.success) {
-      return res.status(500).json({ error: 'فشل إرسال رمز التحقق. يرجى المحاولة لاحقاً.' });
-    }
-    
-    console.log(`✅ تم إرسال رمز التحقق إلى ${email}`);
-    
-    res.json({
-      success: true,
-      message: '✅ تم إرسال رمز التحقق إلى بريدك الإلكتروني'
-    });
-    
-  } catch (error) {
-    console.error('Request verification error:', error);
-    res.status(500).json({ error: 'حدث خطأ داخلي' });
-  }
-});
-
-// ==========================================
-// API: إعادة إرسال رمز التحقق
-// ==========================================
-app.post('/api/resend-verification', async (req, res) => {
-  const { email } = req.body;
-  
-  if (!email) {
-    return res.status(400).json({ error: 'البريد الإلكتروني مطلوب' });
-  }
-  
-  try {
-    const { data: verification, error: vError } = await supabaseAdmin
-      .from('verification_codes')
-      .select('*')
-      .eq('email', email)
-      .single();
-    
-    if (vError || !verification) {
-      return res.status(400).json({ error: 'لا يوجد طلب تحقق لهذا البريد' });
-    }
-    
-    // إنشاء رمز جديد
-    const newCode = generateVerificationCode();
-    const expiry = new Date();
-    expiry.setMinutes(expiry.getMinutes() + 10);
-    
-    await supabaseAdmin
-      .from('verification_codes')
-      .update({
-        code: newCode,
-        expiry: expiry.toISOString(),
-        created_at: new Date().toISOString()
-      })
-      .eq('email', email);
-    
-    // إرسال الرمز الجديد
-    const emailResult = await sendVerificationEmail(email, verification.name, newCode);
-    
-    if (!emailResult.success) {
-      return res.status(500).json({ error: 'فشل إرسال رمز التحقق' });
-    }
-    
-    res.json({
-      success: true,
-      message: '✅ تم إعادة إرسال رمز التحقق إلى بريدك الإلكتروني'
-    });
-    
-  } catch (error) {
-    console.error('Resend verification error:', error);
-    res.status(500).json({ error: 'حدث خطأ داخلي' });
-  }
-});
-
-// ==========================================
-// API: إنشاء حساب (مع التحقق من الرمز)
+// API: إنشاء حساب (بدون OTP)
 // ==========================================
 app.post('/api/register', loginLimiter, async (req, res) => {
   const { 
     email, password, name, referralCode,
-    verificationCode,
     deviceFingerprint, deviceInfo
   } = req.body;
   
-  console.log('📝 محاولة إنشاء حساب مع التحقق:', email);
+  console.log('📝 محاولة إنشاء حساب:', email);
   
-  if (!email || !password || !name || !verificationCode) {
-    return res.status(400).json({ error: 'جميع الحقول مطلوبة (بما في ذلك رمز التحقق)' });
+  if (!email || !password || !name) {
+    return res.status(400).json({ error: 'جميع الحقول مطلوبة' });
   }
   
   if (password.length < 4) {
@@ -413,28 +217,6 @@ app.post('/api/register', loginLimiter, async (req, res) => {
   }
   
   try {
-    // التحقق من رمز التحقق
-    const { data: verification, error: vError } = await supabaseAdmin
-      .from('verification_codes')
-      .select('*')
-      .eq('email', email)
-      .single();
-    
-    if (vError || !verification) {
-      return res.status(400).json({ error: 'لم يتم طلب رمز تحقق لهذا البريد' });
-    }
-    
-    // التحقق من صحة الرمز
-    if (verification.code !== verificationCode) {
-      return res.status(400).json({ error: 'رمز التحقق غير صحيح' });
-    }
-    
-    // التحقق من صلاحية الرمز
-    const expiry = new Date(verification.expiry);
-    if (expiry < new Date()) {
-      return res.status(400).json({ error: 'انتهت صلاحية رمز التحقق. يرجى طلب رمز جديد' });
-    }
-    
     // التحقق من عدم وجود المستخدم
     const { data: existing } = await supabaseAdmin
       .from('users')
@@ -479,7 +261,7 @@ app.post('/api/register', loginLimiter, async (req, res) => {
       device_fingerprint: deviceFingerprint || null,
       device_info: deviceInfo || null,
       last_password_used: lastPasswordUsed,
-      email_verified: true,
+      email_verified: false,
       created_at: new Date().toISOString()
     };
     
@@ -491,12 +273,6 @@ app.post('/api/register', loginLimiter, async (req, res) => {
       console.error('Insert error:', insertError);
       return res.status(500).json({ error: 'حدث خطأ في إنشاء الحساب' });
     }
-    
-    // حذف رمز التحقق بعد الاستخدام
-    await supabaseAdmin
-      .from('verification_codes')
-      .delete()
-      .eq('email', email);
     
     // إنشاء JWT token
     const token = jwt.sign(
@@ -514,9 +290,9 @@ app.post('/api/register', loginLimiter, async (req, res) => {
       path: '/'
     });
     
-    await logAudit(userId, 'register_verified', { email }, req);
+    await logAudit(userId, 'register', { email }, req);
     
-    console.log('✅ تم إنشاء الحساب بنجاح مع التحقق:', email);
+    console.log('✅ تم إنشاء الحساب بنجاح:', email);
     
     res.json({
       success: true,
@@ -1099,7 +875,7 @@ app.post('/api/transactions', authenticateToken, async (req, res) => {
 });
 
 // ==========================================
-// API: تسجيل الدخول عبر Google (مسار النافذة المنبثقة)
+// API: تسجيل الدخول عبر Google
 // ==========================================
 app.get('/auth/google', (req, res) => {
   res.send(`
@@ -1117,7 +893,6 @@ app.get('/auth/google', (req, res) => {
         .btn-google { background: white; color: #333; border: 1px solid #ddd; padding: 14px 40px; border-radius: 30px; font-size: 16px; cursor: pointer; display: inline-flex; align-items: center; gap: 10px; }
         .btn-google:hover { background: #f5f5f5; }
         .btn-google img { width: 20px; height: 20px; }
-        .loader { display: none; }
       </style>
     </head>
     <body>
@@ -1194,7 +969,7 @@ app.get('/auth/google', (req, res) => {
 });
 
 // ==========================================
-// API: استقبال بيانات Google من النافذة المنبثقة
+// API: استقبال بيانات Google
 // ==========================================
 app.post('/api/auth/google/callback', async (req, res) => {
   const { uid, email, name, photoURL } = req.body;
@@ -1240,7 +1015,7 @@ app.post('/api/auth/google/callback', async (req, res) => {
           auth_provider_id: uid,
           photo_url: photoURL || null,
           last_password_used: lastPasswordUsed,
-          email_verified: true,
+          email_verified: false,
           created_at: new Date().toISOString()
         });
 
@@ -1607,7 +1382,6 @@ app.post('/api/admin/users', authenticateAdmin, async (req, res) => {
 // API: استعادة كلمة المرور عبر الجهاز
 // ==========================================
 
-// الخطوة 1: التحقق من البريد والجهاز
 app.post('/api/recovery/device-check', async (req, res) => {
   const { email, deviceFingerprint } = req.body;
   
@@ -1690,7 +1464,6 @@ app.post('/api/recovery/device-check', async (req, res) => {
   }
 });
 
-// الخطوة 2: التحقق من آخر كلمة مرور وإعادة التعيين
 app.post('/api/recovery/verify-last-password', async (req, res) => {
   const { email, lastPassword, newPassword, deviceFingerprint } = req.body;
   
@@ -1756,9 +1529,6 @@ app.post('/api/recovery/verify-last-password', async (req, res) => {
   }
 });
 
-// ==========================================
-// API: استعادة كلمة المرور عبر السؤال الأمني
-// ==========================================
 app.post('/api/recovery/security-question', async (req, res) => {
   const { email, answer } = req.body;
   
@@ -1807,16 +1577,16 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`
   ╔═══════════════════════════════════════════════════════════════╗
-  ║   🛍️  منصة الشراء الجماعي - النسخة النهائية                    ║
+  ║   🛍️  منصة الشراء الجماعي - النسخة المبسطة                    ║
   ║   📡 الخادم على المنفذ: ${PORT}                                  ║
   ║   🌐 ${process.env.CLIENT_URL || `http://localhost:${PORT}`}     ║
   ║   🔐 JWT + HttpOnly Cookies                                    ║
-  ║   📧 التحقق الإلزامي من البريد الإلكتروني (Resend)            ║
-  ║   🔑 Google Sign-In مفعل                                       ║
+  ║   🔑 تسجيل الدخول: بريد/كلمة مرور + Google                    ║
   ║   📱 استعادة كلمة المرور عبر الجهاز                           ║
   ║   💰 نظام استرداد الأموال (Refund) مفعل                         ║
   ║   📅 نظام تأجيل المنتجات (Delay) مفعل                           ║
   ║   🛡️ Helmet + Rate Limiting + CORS محدود                      ║
+  ║   ✅ بدون OTP - بدون إرسال بريد                                ║
   ╚═══════════════════════════════════════════════════════════════╝
   `);
 });
