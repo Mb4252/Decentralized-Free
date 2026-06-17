@@ -28,7 +28,7 @@
     .logo p { color: #666; font-size: 14px; }
     .input-group { margin-bottom: 16px; }
     .input-group label { display: block; color: #666; font-size: 13px; margin-bottom: 4px; }
-    .input-group input {
+    .input-group input, .input-group select {
       width: 100%;
       padding: 12px 16px;
       border-radius: 12px;
@@ -36,7 +36,7 @@
       font-size: 14px;
       transition: all 0.3s;
     }
-    .input-group input:focus { outline: none; border-color: #00aa55; box-shadow: 0 0 0 3px rgba(0,170,85,0.1); }
+    .input-group input:focus, .input-group select:focus { outline: none; border-color: #00aa55; box-shadow: 0 0 0 3px rgba(0,170,85,0.1); }
     .btn {
       width: 100%;
       padding: 14px;
@@ -51,6 +51,10 @@
     }
     .btn:hover { background: #008844; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
     .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+    .btn-secondary { background: #7c3aed; }
+    .btn-secondary:hover { background: #6d28d9; }
+    .btn-danger { background: #ff4444; }
+    .btn-danger:hover { background: #cc0000; }
     .btn-google {
       width: 100%;
       padding: 12px;
@@ -103,6 +107,7 @@
     .error { background: #fee; border: 1px solid #ff4444; color: #ff4444; }
     .success { background: #efe; border: 1px solid #00aa55; color: #00aa55; }
     .warning { background: #fff3cd; border: 1px solid #ffaa00; color: #ffaa00; }
+    .loading { background: #e8f4fd; border: 1px solid #00ccff; color: #00ccff; }
     .theme-toggle {
       position: fixed;
       top: 16px;
@@ -126,7 +131,7 @@
       border-color: #00ff66;
     }
     body.dark-mode .logo h1 { color: #00ff66; }
-    body.dark-mode .input-group input {
+    body.dark-mode .input-group input, body.dark-mode .input-group select {
       background: #0a0a0f;
       border-color: #00ff66;
       color: white;
@@ -145,17 +150,23 @@
       color: white;
     }
     body.dark-mode .btn-google:hover { background: #2a2a3e; }
-    .security-hint {
-      color: #888;
-      font-size: 11px;
-      margin-top: 4px;
-      display: flex;
-      align-items: center;
-      gap: 4px;
+    .verification-section {
+      background: #f8f9fa;
+      border-radius: 12px;
+      padding: 16px;
+      margin: 12px 0;
+      border: 1px solid #00aa55;
     }
-    .security-hint .lock-icon { color: #00aa55; }
-    body.dark-mode .security-hint { color: #8899aa; }
-    body.dark-mode .security-hint .lock-icon { color: #00ff66; }
+    body.dark-mode .verification-section {
+      background: #1a1a2e;
+      border-color: #00ff66;
+    }
+    .verification-section .code-input {
+      font-size: 24px;
+      letter-spacing: 8px;
+      text-align: center;
+      direction: ltr;
+    }
   </style>
 </head>
 <body>
@@ -167,9 +178,6 @@
       <div class="logo">
         <h1>🛍️ CryptoShop</h1>
         <p>شراء جماعي | أسعار الجملة</p>
-        <div class="security-hint">
-          <span class="lock-icon">🔒</span> اتصال آمن ومشفر
-        </div>
       </div>
 
       <div class="tabs">
@@ -181,11 +189,11 @@
       <div id="loginForm">
         <div class="input-group">
           <label>📧 البريد الإلكتروني</label>
-          <input type="email" id="loginEmail" placeholder="example@email.com" autocomplete="email">
+          <input type="email" id="loginEmail" placeholder="example@email.com">
         </div>
         <div class="input-group">
           <label>🔒 كلمة المرور</label>
-          <input type="password" id="loginPassword" placeholder="********" autocomplete="current-password">
+          <input type="password" id="loginPassword" placeholder="********">
         </div>
         <button class="btn" id="doLoginBtn">تسجيل الدخول</button>
 
@@ -195,7 +203,6 @@
           <hr>
         </div>
 
-        <!-- زر Google -->
         <button class="btn-google" id="googleSignInBtn">
           <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google">
           تسجيل الدخول عبر Google
@@ -210,51 +217,54 @@
 
       <!-- إنشاء حساب -->
       <div id="registerForm" class="hidden">
-        <div class="input-group">
-          <label>👤 اسم المستخدم</label>
-          <input type="text" id="regName" placeholder="أدخل اسمك" autocomplete="name">
-        </div>
-        <div class="input-group">
-          <label>📧 البريد الإلكتروني</label>
-          <input type="email" id="regEmail" placeholder="example@email.com" autocomplete="email">
-        </div>
-        <div class="input-group">
-          <label>🔒 كلمة المرور</label>
-          <input type="password" id="regPassword" placeholder="********" autocomplete="new-password">
-        </div>
-        <div class="input-group">
-          <label>✔️ تأكيد كلمة المرور</label>
-          <input type="password" id="regConfirmPassword" placeholder="********" autocomplete="new-password">
-        </div>
-        <div class="input-group">
-          <label>🎁 رمز الدعوة (اختياري)</label>
-          <input type="text" id="regReferral" placeholder="XXXXXX" autocomplete="off">
-        </div>
-
-        <!-- السؤال الأمني (اختياري) -->
-        <button class="btn" id="enableSecurityBtn" style="background:#7c3aed;margin-bottom:8px;font-size:13px;padding:8px;">
-          🔐 إضافة سؤال أمني (اختياري)
-        </button>
-        <div id="securityQuestions" style="display:none;">
+        <!-- الخطوة 1: معلومات المستخدم -->
+        <div id="registerStep1">
           <div class="input-group">
-            <label>🔐 سؤال أمني</label>
-            <select id="regSecurityQuestion" class="input-field" style="width:100%;padding:12px;border-radius:12px;border:1px solid #ddd;font-size:14px;">
-              <option value="">اختر سؤالاً أمنياً</option>
-              <option value="ما هو اسم والدتك؟">ما هو اسم والدتك؟</option>
-              <option value="ما هو اسم حيوانك الأليف الأول؟">ما هو اسم حيوانك الأليف الأول؟</option>
-              <option value="ما هي المدينة التي ولدت فيها؟">ما هي المدينة التي ولدت فيها؟</option>
-              <option value="ما هو اسم مدرستك الأولى؟">ما هو اسم مدرستك الأولى؟</option>
-              <option value="ما هي وظيفة والدك؟">ما هي وظيفة والدك؟</option>
-            </select>
+            <label>👤 اسم المستخدم</label>
+            <input type="text" id="regName" placeholder="أدخل اسمك">
           </div>
           <div class="input-group">
-            <label>📝 الإجابة</label>
-            <input type="text" id="regSecurityAnswer" class="input-field" placeholder="أدخل الإجابة" style="width:100%;padding:12px;border-radius:12px;border:1px solid #ddd;font-size:14px;">
+            <label>📧 البريد الإلكتروني</label>
+            <input type="email" id="regEmail" placeholder="example@email.com">
           </div>
-          <small style="color:#888;font-size:11px;">📌 يساعدك هذا السؤال في استعادة كلمة المرور إذا نسيتها</small>
+          <div class="input-group">
+            <label>🔒 كلمة المرور</label>
+            <input type="password" id="regPassword" placeholder="********">
+          </div>
+          <div class="input-group">
+            <label>✔️ تأكيد كلمة المرور</label>
+            <input type="password" id="regConfirmPassword" placeholder="********">
+          </div>
+          <div class="input-group">
+            <label>🎁 رمز الدعوة (اختياري)</label>
+            <input type="text" id="regReferral" placeholder="XXXXXX">
+          </div>
+          <button class="btn" id="requestVerificationBtn">📧 إرسال رمز التحقق</button>
         </div>
 
-        <button class="btn" id="doRegisterBtn">إنشاء حساب</button>
+        <!-- الخطوة 2: إدخال رمز التحقق -->
+        <div id="registerStep2" class="hidden">
+          <div class="verification-section">
+            <p style="color:#00aa55;font-weight:bold;text-align:center;margin-bottom:12px;">
+              ✅ تم إرسال رمز التحقق إلى بريدك
+            </p>
+            <p style="color:#666;font-size:13px;text-align:center;">
+              أدخل الرمز المكون من 6 أرقام الذي تلقيته في بريدك الإلكتروني
+            </p>
+            <div class="input-group" style="margin-top:12px;">
+              <label>🔑 رمز التحقق</label>
+              <input type="text" id="verificationCode" class="code-input" placeholder="_ _ _ _ _ _" maxlength="6" inputmode="numeric">
+            </div>
+            <div style="display:flex;gap:8px;margin-top:8px;">
+              <button class="btn btn-secondary" id="resendCodeBtn" style="font-size:13px;padding:10px;">🔄 إعادة إرسال</button>
+              <button class="btn btn-danger" id="backToStep1Btn" style="font-size:13px;padding:10px;">🔙 تغيير البريد</button>
+            </div>
+            <p id="timerDisplay" style="color:#888;font-size:12px;text-align:center;margin-top:8px;">
+              ⏳ صلاحية الرمز: 10 دقائق
+            </p>
+          </div>
+          <button class="btn" id="completeRegisterBtn">✅ إنشاء الحساب</button>
+        </div>
       </div>
 
       <div id="message"></div>
@@ -262,25 +272,20 @@
   </div>
 
   <!-- ========================================== -->
-  <!-- Firebase SDK مع نظام الأمان -->
+  <!-- JavaScript -->
   <!-- ========================================== -->
   <script type="module">
-    // استيراد الخدمات
-    import { 
-      signInWithGoogle, 
-      logout, 
-      onAuthStateChange,
-      resetPassword,
-      getDeviceFingerprint
-    } from './firebase-auth.js';
-    import { login, register, googleAuth, getCurrentUser, isAuthenticated } from './auth-service.js';
     import { API } from './config.js';
+    import { signInWithGoogle, getDeviceFingerprint } from './firebase-auth.js';
+    import { login, googleAuth, getCurrentUser, isAuthenticated } from './auth-service.js';
 
     // ==========================================
     // المتغيرات العامة
     // ==========================================
 
     let currentTheme = localStorage.getItem('theme') || 'light';
+    let timerInterval = null;
+    let timerSeconds = 600; // 10 دقائق
 
     // ==========================================
     // إدارة الوضع النهاري/الليلي
@@ -305,12 +310,12 @@
     function showMessage(msg, type) {
       const div = document.getElementById('message');
       div.innerHTML = `<div class="message ${type}">${msg}</div>`;
-      setTimeout(() => div.innerHTML = '', 5000);
+      setTimeout(() => div.innerHTML = '', 8000);
     }
 
     function setLoading(btn, loading) {
       btn.disabled = loading;
-      btn.textContent = loading ? '⏳ جاري...' : btn.id === 'doLoginBtn' ? 'تسجيل الدخول' : 'إنشاء حساب';
+      btn.textContent = loading ? '⏳ جاري...' : btn.textContent;
     }
 
     // ==========================================
@@ -323,6 +328,7 @@
       document.getElementById('loginForm').classList.remove('hidden');
       document.getElementById('registerForm').classList.add('hidden');
       document.getElementById('message').innerHTML = '';
+      resetRegisterForm();
     };
 
     document.getElementById('registerTab').onclick = () => {
@@ -331,71 +337,29 @@
       document.getElementById('loginForm').classList.add('hidden');
       document.getElementById('registerForm').classList.remove('hidden');
       document.getElementById('message').innerHTML = '';
+      resetRegisterForm();
     };
 
-    // ==========================================
-    // تفعيل السؤال الأمني
-    // ==========================================
-
-    let securityEnabled = false;
-    document.getElementById('enableSecurityBtn').addEventListener('click', function() {
-      const section = document.getElementById('securityQuestions');
-      if (section.style.display === 'none') {
-        section.style.display = 'block';
-        this.textContent = '❌ إخفاء السؤال الأمني';
-        securityEnabled = true;
-      } else {
-        section.style.display = 'none';
-        this.textContent = '🔐 إضافة سؤال أمني (اختياري)';
-        securityEnabled = false;
+    function resetRegisterForm() {
+      document.getElementById('registerStep1').classList.remove('hidden');
+      document.getElementById('registerStep2').classList.add('hidden');
+      document.getElementById('verificationCode').value = '';
+      if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
       }
-    });
+    }
 
     // ==========================================
-    // تسجيل الدخول (بريد/كلمة مرور)
+    // الخطوة 1: طلب رمز التحقق
     // ==========================================
 
-    document.getElementById('doLoginBtn').onclick = async () => {
-      const email = document.getElementById('loginEmail').value.trim();
-      const password = document.getElementById('loginPassword').value;
-      const btn = document.getElementById('doLoginBtn');
-
-      if (!email || !password) {
-        showMessage('⚠️ يرجى ملء جميع الحقول', 'error');
-        return;
-      }
-
-      setLoading(btn, true);
-
-      try {
-        const result = await login(email, password);
-        
-        if (result.success) {
-          showMessage('✅ تم تسجيل الدخول بنجاح!', 'success');
-          setTimeout(() => {
-            window.location.href = '/dashboard.html';
-          }, 1000);
-        } else {
-          showMessage(result.error || '❌ فشل تسجيل الدخول', 'error');
-          setLoading(btn, false);
-        }
-      } catch (error) {
-        showMessage('❌ خطأ في الاتصال بالخادم', 'error');
-        setLoading(btn, false);
-      }
-    };
-
-    // ==========================================
-    // إنشاء حساب (مع دعم السؤال الأمني)
-    // ==========================================
-
-    document.getElementById('doRegisterBtn').onclick = async () => {
+    document.getElementById('requestVerificationBtn').addEventListener('click', async () => {
       const name = document.getElementById('regName').value.trim();
       const email = document.getElementById('regEmail').value.trim();
       const password = document.getElementById('regPassword').value;
       const confirm = document.getElementById('regConfirmPassword').value;
-      const referralCode = document.getElementById('regReferral').value.trim();
-      const btn = document.getElementById('doRegisterBtn');
+      const btn = document.getElementById('requestVerificationBtn');
 
       if (!name || !email || !password || !confirm) {
         showMessage('⚠️ يرجى ملء جميع الحقول', 'error');
@@ -413,25 +377,201 @@
       setLoading(btn, true);
 
       try {
-        const result = await register(name, email, password, referralCode);
-        
-        if (result.success) {
-          showMessage('✅ تم إنشاء الحساب بنجاح!', 'success');
-          setTimeout(() => {
-            window.location.href = '/dashboard.html';
-          }, 1000);
+        const response = await fetch(`${API.baseUrl}/api/request-verification`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, name })
+        });
+        const data = await response.json();
+
+        if (data.success) {
+          showMessage('✅ ' + data.message, 'success');
+          // الانتقال إلى الخطوة 2
+          document.getElementById('registerStep1').classList.add('hidden');
+          document.getElementById('registerStep2').classList.remove('hidden');
+          // بدء计时器
+          startTimer();
+          // تخزين البيانات مؤقتاً
+          document.getElementById('registerStep2').dataset.email = email;
+          document.getElementById('registerStep2').dataset.name = name;
+          document.getElementById('registerStep2').dataset.password = password;
+          document.getElementById('registerStep2').dataset.referral = document.getElementById('regReferral').value.trim();
         } else {
-          showMessage(result.error || '❌ فشل إنشاء الحساب', 'error');
-          setLoading(btn, false);
+          showMessage('❌ ' + data.error, 'error');
         }
       } catch (error) {
         showMessage('❌ خطأ في الاتصال بالخادم', 'error');
+      }
+
+      setLoading(btn, false);
+    });
+
+    // ==========================================
+    // الخطوة 2: إكمال التسجيل
+    // ==========================================
+
+    document.getElementById('completeRegisterBtn').addEventListener('click', async () => {
+      const code = document.getElementById('verificationCode').value.trim();
+      const btn = document.getElementById('completeRegisterBtn');
+      const step2 = document.getElementById('registerStep2');
+
+      if (!code || code.length !== 6) {
+        showMessage('⚠️ يرجى إدخال رمز التحقق المكون من 6 أرقام', 'error');
+        return;
+      }
+
+      const email = step2.dataset.email;
+      const name = step2.dataset.name;
+      const password = step2.dataset.password;
+      const referral = step2.dataset.referral;
+
+      setLoading(btn, true);
+
+      try {
+        const fingerprint = await getDeviceFingerprint();
+        const deviceInfo = {
+          userAgent: navigator.userAgent,
+          platform: navigator.platform,
+          screen: `${screen.width}x${screen.height}`,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+        };
+
+        const response = await fetch(`${API.baseUrl}/api/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name,
+            email,
+            password,
+            referralCode: referral,
+            verificationCode: code,
+            deviceFingerprint: fingerprint,
+            deviceInfo: deviceInfo
+          }),
+          credentials: 'include'
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          localStorage.setItem('user', JSON.stringify(data.user));
+          showMessage('✅ تم إنشاء الحساب بنجاح!', 'success');
+          setTimeout(() => {
+            window.location.href = '/dashboard.html';
+          }, 1500);
+        } else {
+          showMessage('❌ ' + data.error, 'error');
+        }
+      } catch (error) {
+        showMessage('❌ خطأ في الاتصال بالخادم', 'error');
+      }
+
+      setLoading(btn, false);
+    });
+
+    // ==========================================
+    // إعادة إرسال الرمز
+    // ==========================================
+
+    document.getElementById('resendCodeBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('resendCodeBtn');
+      const email = document.getElementById('registerStep2').dataset.email;
+
+      setLoading(btn, true);
+
+      try {
+        const response = await fetch(`${API.baseUrl}/api/resend-verification`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
+        const data = await response.json();
+
+        if (data.success) {
+          showMessage('✅ ' + data.message, 'success');
+          // إعادة تعيين المؤقت
+          if (timerInterval) {
+            clearInterval(timerInterval);
+          }
+          startTimer();
+        } else {
+          showMessage('❌ ' + data.error, 'error');
+        }
+      } catch (error) {
+        showMessage('❌ خطأ في الاتصال بالخادم', 'error');
+      }
+
+      setLoading(btn, false);
+    });
+
+    // ==========================================
+    // العودة إلى الخطوة 1
+    // ==========================================
+
+    document.getElementById('backToStep1Btn').addEventListener('click', () => {
+      resetRegisterForm();
+      document.getElementById('registerStep1').classList.remove('hidden');
+      document.getElementById('registerStep2').classList.add('hidden');
+    });
+
+    // ==========================================
+    // مؤقت صلاحية الرمز
+    // ==========================================
+
+    function startTimer() {
+      timerSeconds = 600;
+      const timerDisplay = document.getElementById('timerDisplay');
+      
+      if (timerInterval) {
+        clearInterval(timerInterval);
+      }
+
+      timerInterval = setInterval(() => {
+        timerSeconds--;
+        const minutes = Math.floor(timerSeconds / 60);
+        const seconds = timerSeconds % 60;
+        timerDisplay.textContent = `⏳ صلاحية الرمز: ${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        
+        if (timerSeconds <= 0) {
+          clearInterval(timerInterval);
+          timerInterval = null;
+          timerDisplay.textContent = '⏳ انتهت صلاحية الرمز. يرجى طلب رمز جديد';
+          timerDisplay.style.color = '#ff4444';
+        }
+      }, 1000);
+    }
+
+    // ==========================================
+    // تسجيل الدخول (بريد/كلمة مرور)
+    // ==========================================
+
+    document.getElementById('doLoginBtn').onclick = async () => {
+      const email = document.getElementById('loginEmail').value.trim();
+      const password = document.getElementById('loginPassword').value;
+      const btn = document.getElementById('doLoginBtn');
+
+      if (!email || !password) {
+        showMessage('⚠️ يرجى ملء جميع الحقول', 'error');
+        return;
+      }
+
+      setLoading(btn, true);
+
+      const result = await login(email, password);
+      
+      if (result.success) {
+        showMessage('✅ تم تسجيل الدخول بنجاح!', 'success');
+        setTimeout(() => {
+          window.location.href = '/dashboard.html';
+        }, 1000);
+      } else {
+        showMessage(result.error || '❌ فشل تسجيل الدخول', 'error');
         setLoading(btn, false);
       }
     };
 
     // ==========================================
-    // تسجيل الدخول عبر Google (مع Firebase + الأمان)
+    // تسجيل الدخول عبر Google
     // ==========================================
 
     document.getElementById('googleSignInBtn').addEventListener('click', async () => {
@@ -439,34 +579,27 @@
       btn.disabled = true;
       btn.innerHTML = '⏳ جاري...';
 
-      try {
-        // 1. تسجيل الدخول عبر Firebase
-        const firebaseResult = await signInWithGoogle();
-        
-        if (!firebaseResult.success) {
-          showMessage('❌ ' + firebaseResult.error, 'error');
-          btn.disabled = false;
-          btn.innerHTML = `
-            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" style="width:20px;height:20px;">
-            تسجيل الدخول عبر Google
-          `;
-          return;
-        }
+      const firebaseResult = await signInWithGoogle();
+      
+      if (!firebaseResult.success) {
+        showMessage('❌ ' + firebaseResult.error, 'error');
+        btn.disabled = false;
+        btn.innerHTML = `
+          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" style="width:20px;height:20px;">
+          تسجيل الدخول عبر Google
+        `;
+        return;
+      }
 
-        // 2. إرسال بيانات Firebase إلى الخادم
-        const authResult = await googleAuth(firebaseResult.user);
-        
-        if (authResult.success) {
-          showMessage(`✅ ${authResult.isNewUser ? 'تم إنشاء الحساب' : 'تم تسجيل الدخول'} بنجاح!`, 'success');
-          setTimeout(() => {
-            window.location.href = '/dashboard.html';
-          }, 1000);
-        } else {
-          showMessage('❌ ' + authResult.error, 'error');
-        }
-      } catch (error) {
-        console.error('❌ Google sign-in error:', error);
-        showMessage('❌ حدث خطأ أثناء تسجيل الدخول عبر Google', 'error');
+      const authResult = await googleAuth(firebaseResult.user);
+      
+      if (authResult.success) {
+        showMessage(`✅ ${authResult.isNewUser ? 'تم إنشاء الحساب' : 'تم تسجيل الدخول'} بنجاح!`, 'success');
+        setTimeout(() => {
+          window.location.href = '/dashboard.html';
+        }, 1000);
+      } else {
+        showMessage('❌ ' + authResult.error, 'error');
       }
 
       btn.disabled = false;
@@ -477,62 +610,14 @@
     });
 
     // ==========================================
-    // مراقبة حالة المستخدم (Firebase)
+    // التحقق من الجلسة
     // ==========================================
 
-    onAuthStateChange((state) => {
-      if (state.isAuthenticated) {
-        console.log('👤 مستخدم Firebase مسجل:', state.user.email);
-        // تخزين معلومات Firebase للاستخدام لاحقاً
-        sessionStorage.setItem('firebaseUser', JSON.stringify(state.user));
-      } else {
-        console.log('🚪 المستخدم غير مسجل في Firebase');
-        sessionStorage.removeItem('firebaseUser');
-      }
-    });
+    if (isAuthenticated()) {
+      window.location.href = '/dashboard.html';
+    }
 
-    // ==========================================
-    // نسيت كلمة المرور
-    // ==========================================
-
-    document.getElementById('forgotPasswordLink').addEventListener('click', async (e) => {
-      e.preventDefault();
-      
-      const email = prompt('📧 أدخل بريدك الإلكتروني لإعادة تعيين كلمة المرور:');
-      if (!email) return;
-      
-      const result = await resetPassword(email);
-      if (result.success) {
-        showMessage('✅ ' + result.message, 'success');
-      } else {
-        showMessage('❌ ' + result.error, 'error');
-      }
-    });
-
-    // ==========================================
-    // Enter key support
-    // ==========================================
-
-    document.getElementById('loginPassword').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') document.getElementById('doLoginBtn').click();
-    });
-
-    document.getElementById('regConfirmPassword').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') document.getElementById('doRegisterBtn').click();
-    });
-
-    // ==========================================
-    // التحقق من الجلسة الحالية
-    // ==========================================
-
-    (function checkSession() {
-      if (isAuthenticated()) {
-        window.location.href = '/dashboard.html';
-      }
-    })();
-
-    console.log('🔐 نظام المصادقة الآمن جاهز');
-    console.log('📱 بصمة الجهاز:', await getDeviceFingerprint());
+    console.log('🔐 نظام التسجيل مع التحقق من البريد الإلكتروني جاهز');
   </script>
 </body>
 </html>
