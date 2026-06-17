@@ -13,14 +13,12 @@ const bsc = require('./lib/bsc');
 const app = express();
 
 // ==========================================
-// إعدادات Render (مهم جداً)
+// إعدادات Render
 // ==========================================
-
-// الثقة بـ proxy (لـ Rate Limiting على Render)
 app.set('trust proxy', 1);
 
 // ==========================================
-// Security Headers (Helmet)
+// Security Headers
 // ==========================================
 app.use(helmet({
   contentSecurityPolicy: {
@@ -54,7 +52,6 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: function(origin, callback) {
-    // السماح للطلبات بدون origin (مثل Postman)
     if (!origin) return callback(null, true);
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
@@ -74,8 +71,6 @@ app.use(express.static('app'));
 // ==========================================
 // Rate Limiting
 // ==========================================
-
-// حد عام: 100 طلب في 15 دقيقة
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
@@ -84,7 +79,6 @@ const generalLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// حد لتسجيل الدخول: 5 محاولات في الدقيقة
 const loginLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 5,
@@ -93,21 +87,19 @@ const loginLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// حد للـ API العامة: 30 طلب في الدقيقة
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 30,
   message: { error: '⚠️太多 طلبات. يرجى الانتظار' },
 });
 
-// تطبيق الحدود
 app.use('/api/', generalLimiter);
 app.use('/api/login', loginLimiter);
 app.use('/api/register', loginLimiter);
 app.use('/api/products', apiLimiter);
 
 // ========================================
-// إجبار HTTPS (لـ Render)
+// HTTPS إجباري
 // ========================================
 app.use((req, res, next) => {
   if (req.headers['x-forwarded-proto'] !== 'https' && process.env.NODE_ENV === 'production') {
@@ -172,7 +164,6 @@ async function logAudit(userId, action, details = {}, req = null) {
 // ==========================================
 
 function authenticateToken(req, res, next) {
-  // جلب التوكن من Cookie
   const token = req.cookies.token;
   
   if (!token) {
@@ -231,7 +222,6 @@ app.post('/api/login', loginLimiter, async (req, res) => {
       return res.status(401).json({ error: 'بيانات غير صحيحة' });
     }
     
-    // التحقق من كلمة المرور
     let passwordValid = false;
     
     try {
@@ -253,14 +243,12 @@ app.post('/api/login', loginLimiter, async (req, res) => {
       return res.status(401).json({ error: 'بيانات غير صحيحة' });
     }
     
-    // إنشاء JWT token
     const token = jwt.sign(
       { userId: user.id, email: user.email, name: user.name, is_admin: user.is_admin || false },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
     
-    // إرسال التوكن في HttpOnly Cookie
     const isProd = process.env.NODE_ENV === 'production';
     res.cookie('token', token, {
       httpOnly: true,
@@ -270,7 +258,6 @@ app.post('/api/login', loginLimiter, async (req, res) => {
       path: '/'
     });
     
-    // تسجيل في Audit Log
     await logAudit(user.id, 'login', { email: user.email }, req);
     
     console.log('✅ تم تسجيل الدخول بنجاح:', email);
@@ -362,14 +349,12 @@ app.post('/api/register', loginLimiter, async (req, res) => {
       return res.status(500).json({ error: 'حدث خطأ في إنشاء الحساب' });
     }
     
-    // إنشاء JWT token
     const token = jwt.sign(
       { userId, email, name, is_admin: false },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
     
-    // إرسال التوكن في HttpOnly Cookie
     const isProd = process.env.NODE_ENV === 'production';
     res.cookie('token', token, {
       httpOnly: true,
@@ -533,7 +518,6 @@ app.post('/api/order-product', authenticateToken, async (req, res) => {
       .update({ current_orders: newCurrentOrders })
       .eq('id', productId);
     
-    // تسجيل في Audit Log
     await logAudit(userId, 'order_product', { productId, quantity, totalAmount }, req);
     
     let message = `✅ تم شراء ${quantity} × ${product.name}`;
@@ -640,7 +624,6 @@ app.post('/api/withdraw-order', authenticateToken, async (req, res) => {
       .update({ current_orders: supabaseAdmin.raw('current_orders - ?', order.quantity) })
       .eq('id', order.product_id);
     
-    // تسجيل في Audit Log
     await logAudit(userId, 'withdraw_order', { orderId, amount: order.total_amount }, req);
     
     let message = `✅ تم سحب الطلب وإعادة ${order.total_amount} USDT`;
@@ -725,7 +708,6 @@ app.post('/api/deposit', authenticateToken, async (req, res) => {
         created_at: new Date().toISOString()
       });
     
-    // تسجيل في Audit Log
     await logAudit(userId, 'deposit', { amount: actualAmount, transactionHash }, req);
     
     res.json({ success: true, message: `✅ تم إضافة ${actualAmount} USDT` });
@@ -825,7 +807,6 @@ app.post('/api/withdraw', authenticateToken, async (req, res) => {
         created_at: new Date().toISOString()
       });
     
-    // تسجيل في Audit Log
     await logAudit(userId, 'withdraw', { amount, walletAddress }, req);
     
     res.json({ success: true, message: `✅ تم تسجيل طلب سحب ${amount} USDT` });
@@ -891,7 +872,6 @@ app.post('/api/admin/add-product', authenticateAdmin, async (req, res) => {
     
     if (error) throw error;
     
-    // تسجيل في Audit Log
     await logAudit(req.user.userId, 'add_product', { name, wholesalePrice, groupPrice }, req);
     
     res.json({ success: true, message: `✅ تم إضافة ${name}`, product: data });
@@ -922,7 +902,6 @@ app.post('/api/admin/delete-product', authenticateAdmin, async (req, res) => {
       .delete()
       .eq('id', productId);
     
-    // تسجيل في Audit Log
     await logAudit(req.user.userId, 'delete_product', { productId }, req);
     
     res.json({ success: true, message: '✅ تم حذف المنتج' });
@@ -955,7 +934,7 @@ app.post('/api/admin/product-orders', authenticateAdmin, async (req, res) => {
 app.post('/api/admin/update-order-status', authenticateAdmin, async (req, res) => {
   const { orderId, status } = req.body;
   
-  const validStatuses = ['pending', 'confirmed', 'shipped', 'in_location', 'delivered', 'cancelled'];
+  const validStatuses = ['pending', 'confirmed', 'shipped', 'in_location', 'delivered', 'cancelled', 'refunded', 'delayed'];
   if (!validStatuses.includes(status)) {
     return res.status(400).json({ error: 'حالة غير صالحة' });
   }
@@ -964,19 +943,182 @@ app.post('/api/admin/update-order-status', authenticateAdmin, async (req, res) =
     await supabaseAdmin
       .from('product_orders')
       .update({
-        status,
+        status: status,
         confirmed_at: status === 'confirmed' ? new Date().toISOString() : undefined,
-        delivered_at: status === 'delivered' ? new Date().toISOString() : undefined
+        delivered_at: status === 'delivered' ? new Date().toISOString() : undefined,
+        refunded_at: status === 'refunded' ? new Date().toISOString() : undefined
       })
       .eq('id', orderId);
     
-    // تسجيل في Audit Log
     await logAudit(req.user.userId, 'update_order_status', { orderId, status }, req);
     
     res.json({ success: true, message: `✅ تم تحديث الحالة إلى ${status}` });
     
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// ==========================================
+// 🆕 API: استرداد أموال (Refund) - جديد
+// ==========================================
+app.post('/api/admin/refund-order', authenticateAdmin, async (req, res) => {
+  const { orderId, reason } = req.body;
+  
+  console.log('💰 طلب استرداد:', { orderId, reason });
+  
+  if (!orderId) {
+    return res.status(400).json({ error: 'معرف الطلب مطلوب' });
+  }
+  
+  try {
+    // جلب الطلب مع بيانات المستخدم
+    const { data: order, error: orderError } = await supabaseAdmin
+      .from('product_orders')
+      .select('*, users!product_orders_user_id_fkey(available_balance, name, email)')
+      .eq('id', orderId)
+      .single();
+    
+    if (orderError || !order) {
+      return res.status(404).json({ error: 'الطلب غير موجود' });
+    }
+    
+    // التحقق من أن الطلب لم يتم استرداده مسبقاً
+    if (order.status === 'refunded') {
+      return res.status(400).json({ error: 'تم استرداد هذا الطلب مسبقاً' });
+    }
+    
+    // التحقق من أن الطلب في حالة تسمح بالاسترداد
+    if (order.status === 'delivered') {
+      return res.status(400).json({ error: 'لا يمكن استرداد طلب تم تسليمه' });
+    }
+    
+    if (order.status === 'withdrawn') {
+      return res.status(400).json({ error: 'لا يمكن استرداد طلب تم سحبه' });
+    }
+    
+    // إعادة المبلغ للمستخدم
+    const refundAmount = order.total_amount;
+    const newBalance = (order.users.available_balance || 0) + refundAmount;
+    
+    await supabaseAdmin
+      .from('users')
+      .update({ available_balance: newBalance })
+      .eq('id', order.user_id);
+    
+    // تحديث حالة الطلب
+    const refundReason = reason || 'استرداد بسبب عدم توفر المنتج';
+    await supabaseAdmin
+      .from('product_orders')
+      .update({
+        status: 'refunded',
+        refunded_at: new Date().toISOString(),
+        refund_reason: refundReason,
+        admin_notes: `تم الاسترداد بواسطة: ${req.user.name || 'أدمن'}`
+      })
+      .eq('id', orderId);
+    
+    // تسجيل المعاملة
+    await supabaseAdmin
+      .from('transactions')
+      .insert({
+        user_id: order.user_id,
+        type: 'refund',
+        amount: refundAmount,
+        status: 'approved',
+        description: `🔄 استرداد ${refundAmount} USDT للطلب #${orderId}`,
+        created_at: new Date().toISOString()
+      });
+    
+    // تسجيل في Audit Log
+    await logAudit(req.user.userId, 'refund_order', { 
+      orderId, 
+      amount: refundAmount,
+      userId: order.user_id,
+      reason: refundReason
+    }, req);
+    
+    console.log(`✅ تم استرداد ${refundAmount} USDT للمستخدم ${order.users.name}`);
+    
+    res.json({
+      success: true,
+      message: `✅ تم استرداد ${refundAmount} USDT للمستخدم ${order.users.name}`,
+      refundAmount: refundAmount,
+      userId: order.user_id
+    });
+    
+  } catch (error) {
+    console.error('Refund error:', error);
+    res.status(500).json({ error: 'حدث خطأ داخلي: ' + error.message });
+  }
+});
+
+// ==========================================
+// 🆕 API: تأخير منتج (Delay) - جديد
+// ==========================================
+app.post('/api/admin/delay-product', authenticateAdmin, async (req, res) => {
+  const { productId, newDeliveryDate, reason } = req.body;
+  
+  console.log('📅 طلب تأخير منتج:', { productId, newDeliveryDate, reason });
+  
+  if (!productId || !newDeliveryDate) {
+    return res.status(400).json({ error: 'معرف المنتج والتاريخ الجديد مطلوبان' });
+  }
+  
+  try {
+    // جلب المنتج
+    const { data: product, error: productError } = await supabaseAdmin
+      .from('products')
+      .select('*')
+      .eq('id', productId)
+      .single();
+    
+    if (productError || !product) {
+      return res.status(404).json({ error: 'المنتج غير موجود' });
+    }
+    
+    // تحديث موعد التسليم
+    const delayReason = reason || 'تأخر في التوريد';
+    await supabaseAdmin
+      .from('products')
+      .update({
+        delivery_date: newDeliveryDate,
+        status: 'delayed',
+        delay_reason: delayReason
+      })
+      .eq('id', productId);
+    
+    // تحديث جميع طلبات هذا المنتج إلى حالة "delayed"
+    await supabaseAdmin
+      .from('product_orders')
+      .update({
+        status: 'delayed',
+        delay_reason: delayReason,
+        delayed_until: newDeliveryDate,
+        admin_notes: `تم تأجيل المنتج إلى ${newDeliveryDate}`
+      })
+      .eq('product_id', productId)
+      .in('status', ['pending', 'confirmed']);
+    
+    // تسجيل في Audit Log
+    await logAudit(req.user.userId, 'delay_product', { 
+      productId, 
+      newDeliveryDate,
+      reason: delayReason
+    }, req);
+    
+    console.log(`✅ تم تأجيل المنتج ${product.name} إلى ${newDeliveryDate}`);
+    
+    res.json({
+      success: true,
+      message: `✅ تم تأجيل المنتج ${product.name} إلى ${newDeliveryDate}`,
+      productId: productId,
+      newDeliveryDate: newDeliveryDate
+    });
+    
+  } catch (error) {
+    console.error('Delay product error:', error);
+    res.status(500).json({ error: 'حدث خطأ داخلي: ' + error.message });
   }
 });
 
@@ -1029,7 +1171,8 @@ app.listen(PORT, () => {
   ║   🌐 ${process.env.CLIENT_URL || `http://localhost:${PORT}`}     ║
   ║   🔐 JWT + HttpOnly Cookies                                    ║
   ║   🛡️ Helmet + Rate Limiting + Audit Log                        ║
-  ║   ✅ متوافق مع Render                                           ║
+  ║   💰 نظام استرداد الأموال (Refund) مفعل                         ║
+  ║   📅 نظام تأجيل المنتجات (Delay) مفعل                           ║
   ╚═══════════════════════════════════════════════════════════════╝
   `);
 });
