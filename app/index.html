@@ -28,7 +28,7 @@
     .logo p { color: #666; font-size: 14px; }
     .input-group { margin-bottom: 16px; }
     .input-group label { display: block; color: #666; font-size: 13px; margin-bottom: 4px; }
-    .input-group input, .input-group select {
+    .input-group input {
       width: 100%;
       padding: 12px 16px;
       border-radius: 12px;
@@ -36,7 +36,7 @@
       font-size: 14px;
       transition: all 0.3s;
     }
-    .input-group input:focus, .input-group select:focus { outline: none; border-color: #00aa55; box-shadow: 0 0 0 3px rgba(0,170,85,0.1); }
+    .input-group input:focus { outline: none; border-color: #00aa55; box-shadow: 0 0 0 3px rgba(0,170,85,0.1); }
     .btn {
       width: 100%;
       padding: 14px;
@@ -49,12 +49,8 @@
       cursor: pointer;
       transition: all 0.3s;
     }
-    .btn:hover { background: #008844; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
-    .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
-    .btn-secondary { background: #7c3aed; }
-    .btn-secondary:hover { background: #6d28d9; }
-    .btn-danger { background: #ff4444; }
-    .btn-danger:hover { background: #cc0000; }
+    .btn:hover { background: #008844; }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
     .btn-google {
       width: 100%;
       padding: 12px;
@@ -71,7 +67,7 @@
       gap: 10px;
       transition: all 0.3s;
     }
-    .btn-google:hover { background: #f5f5f5; border-color: #aaa; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    .btn-google:hover { background: #f5f5f5; border-color: #aaa; }
     .btn-google img { width: 20px; height: 20px; }
     .divider {
       display: flex;
@@ -100,10 +96,20 @@
       color: #666;
       transition: all 0.3s;
     }
-    .tab.active { background: #00aa55; color: white; box-shadow: 0 2px 8px rgba(0,170,85,0.3); }
-    .hidden { display: none; }
-    .message { margin-top: 16px; padding: 12px; border-radius: 12px; text-align: center; font-size: 14px; animation: fadeIn 0.3s ease; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    .tab.active { background: #00aa55; color: white; }
+    .hidden { display: none !important; }
+    .message {
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 12px;
+      text-align: center;
+      font-size: 14px;
+      animation: fadeIn 0.3s ease;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
     .error { background: #fee; border: 1px solid #ff4444; color: #ff4444; }
     .success { background: #efe; border: 1px solid #00aa55; color: #00aa55; }
     .warning { background: #fff3cd; border: 1px solid #ffaa00; color: #ffaa00; }
@@ -120,9 +126,8 @@
       cursor: pointer;
       font-size: 13px;
       z-index: 100;
-      transition: all 0.3s;
     }
-    .theme-toggle:hover { background: rgba(0,170,85,0.2); transform: scale(1.05); }
+    .theme-toggle:hover { background: rgba(0,170,85,0.2); }
     body.dark-mode {
       background: #0a0a0f;
     }
@@ -131,12 +136,12 @@
       border-color: #00ff66;
     }
     body.dark-mode .logo h1 { color: #00ff66; }
-    body.dark-mode .input-group input, body.dark-mode .input-group select {
+    body.dark-mode .input-group input {
       background: #0a0a0f;
       border-color: #00ff66;
       color: white;
     }
-    body.dark-mode .input-group input:focus { border-color: #00ccff; box-shadow: 0 0 0 3px rgba(0,255,102,0.1); }
+    body.dark-mode .input-group input:focus { border-color: #00ccff; }
     body.dark-mode .tabs { background: #1a1a2e; }
     body.dark-mode .tab { color: #8899aa; }
     body.dark-mode .tab.active { background: #00ff66; color: #0a0a0f; }
@@ -161,12 +166,16 @@
       background: #1a1a2e;
       border-color: #00ff66;
     }
-    .verification-section .code-input {
+    .code-input {
       font-size: 24px;
       letter-spacing: 8px;
       text-align: center;
       direction: ltr;
     }
+    .btn-secondary { background: #7c3aed; }
+    .btn-secondary:hover { background: #6d28d9; }
+    .btn-danger { background: #ff4444; }
+    .btn-danger:hover { background: #cc0000; }
   </style>
 </head>
 <body>
@@ -217,7 +226,7 @@
 
       <!-- إنشاء حساب -->
       <div id="registerForm" class="hidden">
-        <!-- الخطوة 1: معلومات المستخدم -->
+        <!-- الخطوة 1 -->
         <div id="registerStep1">
           <div class="input-group">
             <label>👤 اسم المستخدم</label>
@@ -242,16 +251,16 @@
           <button class="btn" id="requestVerificationBtn">📧 إرسال رمز التحقق</button>
         </div>
 
-        <!-- الخطوة 2: إدخال رمز التحقق -->
+        <!-- الخطوة 2 -->
         <div id="registerStep2" class="hidden">
           <div class="verification-section">
             <p style="color:#00aa55;font-weight:bold;text-align:center;margin-bottom:12px;">
-              ✅ تم إرسال رمز التحقق إلى بريدك
+              ✅ تم إرسال رمز التحقق
             </p>
             <p style="color:#666;font-size:13px;text-align:center;">
-              أدخل الرمز المكون من 6 أرقام الذي تلقيته في بريدك الإلكتروني
+              أدخل الرمز المكون من 6 أرقام
             </p>
-            <div class="input-group" style="margin-top:12px;">
+            <div class="input-group">
               <label>🔑 رمز التحقق</label>
               <input type="text" id="verificationCode" class="code-input" placeholder="_ _ _ _ _ _" maxlength="6" inputmode="numeric">
             </div>
@@ -260,7 +269,7 @@
               <button class="btn btn-danger" id="backToStep1Btn" style="font-size:13px;padding:10px;">🔙 تغيير البريد</button>
             </div>
             <p id="timerDisplay" style="color:#888;font-size:12px;text-align:center;margin-top:8px;">
-              ⏳ صلاحية الرمز: 10 دقائق
+              ⏳ صلاحية الرمز: 10:00
             </p>
           </div>
           <button class="btn" id="completeRegisterBtn">✅ إنشاء الحساب</button>
@@ -272,24 +281,47 @@
   </div>
 
   <!-- ========================================== -->
-  <!-- JavaScript -->
+  <!-- JavaScript (مباشر بدون استيراد) -->
   <!-- ========================================== -->
-  <script type="module">
-    import { API } from './config.js';
-    import { signInWithGoogle, getDeviceFingerprint } from './firebase-auth.js';
-    import { login, googleAuth, getCurrentUser, isAuthenticated } from './auth-service.js';
+  <script>
+    // ==========================================
+    // دوال مساعدة (بدون استيراد)
+    // ==========================================
+
+    const API_URL = window.location.origin;
+
+    function showMessage(msg, type) {
+      const div = document.getElementById('message');
+      div.innerHTML = `<div class="message ${type}">${msg}</div>`;
+      setTimeout(() => div.innerHTML = '', 8000);
+    }
+
+    function setLoading(btn, loading) {
+      btn.disabled = loading;
+      btn.textContent = loading ? '⏳ جاري...' : btn.textContent;
+    }
+
+    function getDeviceFingerprint() {
+      try {
+        const data = {
+          userAgent: navigator.userAgent,
+          platform: navigator.platform,
+          language: navigator.language,
+          screen: `${screen.width}x${screen.height}`,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          timestamp: Date.now()
+        };
+        return btoa(JSON.stringify(data));
+      } catch (e) {
+        return 'fallback-' + Date.now();
+      }
+    }
 
     // ==========================================
-    // المتغيرات العامة
+    // الوضع النهاري/الليلي
     // ==========================================
 
     let currentTheme = localStorage.getItem('theme') || 'light';
-    let timerInterval = null;
-    let timerSeconds = 600; // 10 دقائق
-
-    // ==========================================
-    // إدارة الوضع النهاري/الليلي
-    // ==========================================
 
     function setTheme(theme) {
       document.body.classList.toggle('dark-mode', theme === 'dark');
@@ -304,22 +336,7 @@
     setTheme(currentTheme);
 
     // ==========================================
-    // دوال مساعدة
-    // ==========================================
-
-    function showMessage(msg, type) {
-      const div = document.getElementById('message');
-      div.innerHTML = `<div class="message ${type}">${msg}</div>`;
-      setTimeout(() => div.innerHTML = '', 8000);
-    }
-
-    function setLoading(btn, loading) {
-      btn.disabled = loading;
-      btn.textContent = loading ? '⏳ جاري...' : btn.textContent;
-    }
-
-    // ==========================================
-    // تبديل التبويبات
+    // التبويبات
     // ==========================================
 
     document.getElementById('loginTab').onclick = () => {
@@ -344,22 +361,64 @@
       document.getElementById('registerStep1').classList.remove('hidden');
       document.getElementById('registerStep2').classList.add('hidden');
       document.getElementById('verificationCode').value = '';
-      if (timerInterval) {
-        clearInterval(timerInterval);
-        timerInterval = null;
+      if (window.timerInterval) {
+        clearInterval(window.timerInterval);
+        window.timerInterval = null;
       }
     }
 
     // ==========================================
-    // الخطوة 1: طلب رمز التحقق
+    // تسجيل الدخول
     // ==========================================
 
-    document.getElementById('requestVerificationBtn').addEventListener('click', async () => {
+    document.getElementById('doLoginBtn').onclick = async function() {
+      const email = document.getElementById('loginEmail').value.trim();
+      const password = document.getElementById('loginPassword').value;
+      const btn = this;
+
+      if (!email || !password) {
+        showMessage('⚠️ يرجى ملء جميع الحقول', 'error');
+        return;
+      }
+
+      setLoading(btn, true);
+
+      try {
+        const fingerprint = getDeviceFingerprint();
+        const response = await fetch(`${API_URL}/api/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password, deviceFingerprint: fingerprint }),
+          credentials: 'include'
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          localStorage.setItem('user', JSON.stringify(data.user));
+          showMessage('✅ تم تسجيل الدخول بنجاح!', 'success');
+          setTimeout(() => { window.location.href = '/dashboard.html'; }, 1000);
+        } else {
+          showMessage('❌ ' + (data.error || 'فشل تسجيل الدخول'), 'error');
+        }
+      } catch (error) {
+        showMessage('❌ خطأ في الاتصال بالخادم', 'error');
+        console.error('Login error:', error);
+      }
+
+      setLoading(btn, false);
+    };
+
+    // ==========================================
+    // طلب رمز التحقق
+    // ==========================================
+
+    document.getElementById('requestVerificationBtn').onclick = async function() {
       const name = document.getElementById('regName').value.trim();
       const email = document.getElementById('regEmail').value.trim();
       const password = document.getElementById('regPassword').value;
       const confirm = document.getElementById('regConfirmPassword').value;
-      const btn = document.getElementById('requestVerificationBtn');
+      const btn = this;
 
       if (!name || !email || !password || !confirm) {
         showMessage('⚠️ يرجى ملء جميع الحقول', 'error');
@@ -370,53 +429,52 @@
         return;
       }
       if (password.length < 4) {
-        showMessage('⚠️ كلمة المرور يجب أن تكون 4 أحرف على الأقل', 'error');
+        showMessage('⚠️ كلمة المرور 4 أحرف على الأقل', 'error');
         return;
       }
 
       setLoading(btn, true);
 
       try {
-        const response = await fetch(`${API.baseUrl}/api/request-verification`, {
+        const response = await fetch(`${API_URL}/api/request-verification`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, name })
         });
+
         const data = await response.json();
 
         if (data.success) {
           showMessage('✅ ' + data.message, 'success');
-          // الانتقال إلى الخطوة 2
           document.getElementById('registerStep1').classList.add('hidden');
           document.getElementById('registerStep2').classList.remove('hidden');
-          // بدء计时器
-          startTimer();
-          // تخزين البيانات مؤقتاً
           document.getElementById('registerStep2').dataset.email = email;
           document.getElementById('registerStep2').dataset.name = name;
           document.getElementById('registerStep2').dataset.password = password;
           document.getElementById('registerStep2').dataset.referral = document.getElementById('regReferral').value.trim();
+          startTimer();
         } else {
-          showMessage('❌ ' + data.error, 'error');
+          showMessage('❌ ' + (data.error || 'فشل إرسال الرمز'), 'error');
         }
       } catch (error) {
         showMessage('❌ خطأ في الاتصال بالخادم', 'error');
+        console.error('Request verification error:', error);
       }
 
       setLoading(btn, false);
-    });
+    };
 
     // ==========================================
-    // الخطوة 2: إكمال التسجيل
+    // إكمال التسجيل
     // ==========================================
 
-    document.getElementById('completeRegisterBtn').addEventListener('click', async () => {
+    document.getElementById('completeRegisterBtn').onclick = async function() {
       const code = document.getElementById('verificationCode').value.trim();
-      const btn = document.getElementById('completeRegisterBtn');
+      const btn = this;
       const step2 = document.getElementById('registerStep2');
 
       if (!code || code.length !== 6) {
-        showMessage('⚠️ يرجى إدخال رمز التحقق المكون من 6 أرقام', 'error');
+        showMessage('⚠️ يرجى إدخال رمز مكون من 6 أرقام', 'error');
         return;
       }
 
@@ -428,15 +486,8 @@
       setLoading(btn, true);
 
       try {
-        const fingerprint = await getDeviceFingerprint();
-        const deviceInfo = {
-          userAgent: navigator.userAgent,
-          platform: navigator.platform,
-          screen: `${screen.width}x${screen.height}`,
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
-        };
-
-        const response = await fetch(`${API.baseUrl}/api/register`, {
+        const fingerprint = getDeviceFingerprint();
+        const response = await fetch(`${API_URL}/api/register`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -445,8 +496,7 @@
             password,
             referralCode: referral,
             verificationCode: code,
-            deviceFingerprint: fingerprint,
-            deviceInfo: deviceInfo
+            deviceFingerprint: fingerprint
           }),
           credentials: 'include'
         });
@@ -456,85 +506,90 @@
         if (data.success) {
           localStorage.setItem('user', JSON.stringify(data.user));
           showMessage('✅ تم إنشاء الحساب بنجاح!', 'success');
-          setTimeout(() => {
-            window.location.href = '/dashboard.html';
-          }, 1500);
+          setTimeout(() => { window.location.href = '/dashboard.html'; }, 1500);
         } else {
-          showMessage('❌ ' + data.error, 'error');
+          showMessage('❌ ' + (data.error || 'فشل إنشاء الحساب'), 'error');
         }
       } catch (error) {
         showMessage('❌ خطأ في الاتصال بالخادم', 'error');
+        console.error('Register error:', error);
       }
 
       setLoading(btn, false);
-    });
+    };
 
     // ==========================================
     // إعادة إرسال الرمز
     // ==========================================
 
-    document.getElementById('resendCodeBtn').addEventListener('click', async () => {
-      const btn = document.getElementById('resendCodeBtn');
+    document.getElementById('resendCodeBtn').onclick = async function() {
+      const btn = this;
       const email = document.getElementById('registerStep2').dataset.email;
+
+      if (!email) {
+        showMessage('⚠️ البريد الإلكتروني غير موجود', 'error');
+        return;
+      }
 
       setLoading(btn, true);
 
       try {
-        const response = await fetch(`${API.baseUrl}/api/resend-verification`, {
+        const response = await fetch(`${API_URL}/api/resend-verification`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email })
         });
+
         const data = await response.json();
 
         if (data.success) {
           showMessage('✅ ' + data.message, 'success');
-          // إعادة تعيين المؤقت
-          if (timerInterval) {
-            clearInterval(timerInterval);
+          if (window.timerInterval) {
+            clearInterval(window.timerInterval);
           }
           startTimer();
         } else {
-          showMessage('❌ ' + data.error, 'error');
+          showMessage('❌ ' + (data.error || 'فشل إعادة الإرسال'), 'error');
         }
       } catch (error) {
         showMessage('❌ خطأ في الاتصال بالخادم', 'error');
+        console.error('Resend error:', error);
       }
 
       setLoading(btn, false);
-    });
+    };
 
     // ==========================================
-    // العودة إلى الخطوة 1
+    // العودة للخطوة 1
     // ==========================================
 
-    document.getElementById('backToStep1Btn').addEventListener('click', () => {
+    document.getElementById('backToStep1Btn').onclick = function() {
       resetRegisterForm();
       document.getElementById('registerStep1').classList.remove('hidden');
       document.getElementById('registerStep2').classList.add('hidden');
-    });
+    };
 
     // ==========================================
-    // مؤقت صلاحية الرمز
+    // المؤقت
     // ==========================================
 
     function startTimer() {
-      timerSeconds = 600;
+      let seconds = 600;
       const timerDisplay = document.getElementById('timerDisplay');
-      
-      if (timerInterval) {
-        clearInterval(timerInterval);
+
+      if (window.timerInterval) {
+        clearInterval(window.timerInterval);
       }
 
-      timerInterval = setInterval(() => {
-        timerSeconds--;
-        const minutes = Math.floor(timerSeconds / 60);
-        const seconds = timerSeconds % 60;
-        timerDisplay.textContent = `⏳ صلاحية الرمز: ${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-        
-        if (timerSeconds <= 0) {
-          clearInterval(timerInterval);
-          timerInterval = null;
+      window.timerInterval = setInterval(() => {
+        seconds--;
+        const minutes = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        timerDisplay.textContent = `⏳ صلاحية الرمز: ${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+
+        if (seconds <= 0) {
+          clearInterval(window.timerInterval);
+          window.timerInterval = null;
           timerDisplay.textContent = '⏳ انتهت صلاحية الرمز. يرجى طلب رمز جديد';
           timerDisplay.style.color = '#ff4444';
         }
@@ -542,64 +597,22 @@
     }
 
     // ==========================================
-    // تسجيل الدخول (بريد/كلمة مرور)
+    // Google Sign-In
     // ==========================================
 
-    document.getElementById('doLoginBtn').onclick = async () => {
-      const email = document.getElementById('loginEmail').value.trim();
-      const password = document.getElementById('loginPassword').value;
-      const btn = document.getElementById('doLoginBtn');
-
-      if (!email || !password) {
-        showMessage('⚠️ يرجى ملء جميع الحقول', 'error');
-        return;
-      }
-
-      setLoading(btn, true);
-
-      const result = await login(email, password);
-      
-      if (result.success) {
-        showMessage('✅ تم تسجيل الدخول بنجاح!', 'success');
-        setTimeout(() => {
-          window.location.href = '/dashboard.html';
-        }, 1000);
-      } else {
-        showMessage(result.error || '❌ فشل تسجيل الدخول', 'error');
-        setLoading(btn, false);
-      }
-    };
-
-    // ==========================================
-    // تسجيل الدخول عبر Google
-    // ==========================================
-
-    document.getElementById('googleSignInBtn').addEventListener('click', async () => {
-      const btn = document.getElementById('googleSignInBtn');
+    document.getElementById('googleSignInBtn').onclick = async function() {
+      const btn = this;
       btn.disabled = true;
       btn.innerHTML = '⏳ جاري...';
 
-      const firebaseResult = await signInWithGoogle();
-      
-      if (!firebaseResult.success) {
-        showMessage('❌ ' + firebaseResult.error, 'error');
-        btn.disabled = false;
-        btn.innerHTML = `
-          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" style="width:20px;height:20px;">
-          تسجيل الدخول عبر Google
-        `;
-        return;
-      }
-
-      const authResult = await googleAuth(firebaseResult.user);
-      
-      if (authResult.success) {
-        showMessage(`✅ ${authResult.isNewUser ? 'تم إنشاء الحساب' : 'تم تسجيل الدخول'} بنجاح!`, 'success');
-        setTimeout(() => {
-          window.location.href = '/dashboard.html';
-        }, 1000);
-      } else {
-        showMessage('❌ ' + authResult.error, 'error');
+      try {
+        showMessage('⏳ جاري التوجيه إلى Google...', 'loading');
+        // توجيه المستخدم إلى صفحة Google Sign-In (سيتم تنفيذها لاحقاً)
+        // حالياً نعطي رسالة بأن الميزة قيد التطوير
+        showMessage('⚠️ ميزة تسجيل الدخول عبر Google قيد التطوير. استخدم البريد وكلمة المرور.', 'warning');
+      } catch (error) {
+        showMessage('❌ خطأ في Google', 'error');
+        console.error('Google error:', error);
       }
 
       btn.disabled = false;
@@ -607,17 +620,53 @@
         <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" style="width:20px;height:20px;">
         تسجيل الدخول عبر Google
       `;
+    };
+
+    // ==========================================
+    // نسيت كلمة المرور
+    // ==========================================
+
+    document.getElementById('forgotPasswordLink').onclick = function(e) {
+      e.preventDefault();
+      const email = prompt('📧 أدخل بريدك الإلكتروني لإعادة تعيين كلمة المرور:');
+      if (!email) return;
+
+      showMessage('⚠️ ميزة إعادة تعيين كلمة المرور قيد التطوير. يرجى الاتصال بالدعم.', 'warning');
+    };
+
+    // ==========================================
+    // Enter key support
+    // ==========================================
+
+    document.getElementById('loginPassword').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') document.getElementById('doLoginBtn').click();
+    });
+
+    document.getElementById('regConfirmPassword').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') document.getElementById('requestVerificationBtn').click();
+    });
+
+    document.getElementById('verificationCode').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') document.getElementById('completeRegisterBtn').click();
     });
 
     // ==========================================
     // التحقق من الجلسة
     // ==========================================
 
-    if (isAuthenticated()) {
-      window.location.href = '/dashboard.html';
-    }
+    (function checkSession() {
+      try {
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        if (user && user.id) {
+          window.location.href = '/dashboard.html';
+        }
+      } catch (e) {
+        console.log('Session check:', e);
+      }
+    })();
 
-    console.log('🔐 نظام التسجيل مع التحقق من البريد الإلكتروني جاهز');
+    console.log('✅ CryptoShop - صفحة تسجيل الدخول جاهزة');
+    console.log('📡 API URL:', API_URL);
   </script>
 </body>
 </html>
