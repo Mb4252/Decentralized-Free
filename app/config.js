@@ -1,5 +1,6 @@
 // ==========================================
-// الإعدادات العامة (config.js)
+// ملف: app/config.js
+// الإعدادات العامة - كاملة
 // ==========================================
 
 // 🔥 إعدادات Firebase (من Console)
@@ -17,7 +18,7 @@ export const firebaseConfig = {
 // 🔐 إعدادات الأمان
 export const SECURITY = {
   // تفعيل App Check (يحتاج تسجيل في Firebase Console)
-  appCheckEnabled: true,
+  appCheckEnabled: false, // ⭐ فعّل إلى true بعد إعداد App Check
   recaptchaSiteKey: 'YOUR_RECAPTCHA_SITE_KEY', // ستحصل عليها من Firebase Console
 };
 
@@ -28,6 +29,8 @@ export const API = {
     health: '/api/health',
     login: '/api/login',
     register: '/api/register',
+    requestVerification: '/api/request-verification',
+    resendVerification: '/api/resend-verification',
     googleAuth: '/api/auth/google',
     user: '/api/user',
     products: '/api/products',
@@ -39,7 +42,6 @@ export const API = {
 
 // 📱 إعدادات الجهاز
 export const DEVICE = {
-  // معلومات الجهاز الحالية
   getInfo: function() {
     return {
       userAgent: navigator.userAgent,
@@ -50,4 +52,27 @@ export const DEVICE = {
       isMobile: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
     };
   }
+};
+
+// ⏰ إعدادات المؤقتات
+export const TIMERS = {
+  verificationCodeExpiry: 600, // 10 دقائق بالثواني
+  sessionTimeout: 7 * 24 * 60 * 60, // 7 أيام بالثواني
+  rateLimitReset: 60, // دقيقة واحدة
+};
+
+// 📧 إعدادات البريد الإلكتروني
+export const EMAIL = {
+  verificationSubject: '🔑 رمز التحقق - CryptoShop',
+  resetSubject: '🔐 إعادة تعيين كلمة المرور - CryptoShop',
+  welcomeSubject: '🎉 مرحباً بك في CryptoShop',
+};
+
+// 🎯 إعدادات التطبيق
+export const APP = {
+  name: 'CryptoShop',
+  version: '2.0.0',
+  description: 'منصة الشراء الجماعي',
+  supportEmail: 'support@cryptoshop.com',
+  supportPhone: '+966500000000',
 };
