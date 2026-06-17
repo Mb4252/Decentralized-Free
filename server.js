@@ -6,7 +6,7 @@ const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 require('dotenv').config();
 
 const bsc = require('./lib/bsc');
@@ -110,77 +110,72 @@ app.use((req, res, next) => {
 });
 
 // ========================================
-// إعداد البريد الإلكتروني (Nodemailer)
+// إعداد Resend (البريد الإلكتروني)
 // ========================================
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: process.env.SMTP_PORT || 587,
-  secure: process.env.SMTP_SECURE === 'true' || false,
-  auth: {
-    user: process.env.SMTP_USER || 'your-email@gmail.com',
-    pass: process.env.SMTP_PASS || 'your-app-password'
-  }
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 // ========================================
-// دالة إرسال رمز التحقق عبر البريد
+// دالة إرسال رمز التحقق عبر البريد (باستخدام Resend)
 // ========================================
 
 async function sendVerificationEmail(email, name, code) {
   try {
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html dir="rtl" lang="ar">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>رمز التحقق</title>
-        <style>
-          body { font-family: Arial, sans-serif; background: #f0f2f5; padding: 20px; }
-          .container { max-width: 500px; margin: 0 auto; background: white; border-radius: 16px; padding: 32px; border: 1px solid #00aa55; }
-          .header { text-align: center; margin-bottom: 24px; }
-          .header h1 { color: #00aa55; font-size: 24px; }
-          .code { 
-            font-size: 48px; 
-            font-weight: bold; 
-            color: #00aa55; 
-            text-align: center; 
-            padding: 16px; 
-            background: #f5f5f5; 
-            border-radius: 12px;
-            letter-spacing: 8px;
-            margin: 16px 0;
-          }
-          .footer { text-align: center; color: #888; font-size: 12px; margin-top: 24px; }
-          .warning { color: #ff4444; font-size: 12px; text-align: center; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>🛍️ CryptoShop</h1>
-            <p>مرحباً ${name}،</p>
-          </div>
-          <p style="color:#666;text-align:center;">لقد تلقينا طلباً لإنشاء حساب جديد. لتفعيل حسابك، يرجى استخدام رمز التحقق التالي:</p>
-          <div class="code">${code}</div>
-          <p style="color:#666;text-align:center;">هذا الرمز صالح لمدة <strong>10 دقائق</strong>.</p>
-          <p style="color:#666;text-align:center;font-size:14px;">إذا لم تطلب هذا، يمكنك تجاهل هذا البريد.</p>
-          <div class="warning">⚠️ لا تشارك هذا الرمز مع أي شخص</div>
-          <div class="footer">
-            © ${new Date().getFullYear()} CryptoShop - منصة الشراء الجماعي
-          </div>
-        </div>
-      </body>
-      </html>
-    `;
-
-    await transporter.sendMail({
-      from: process.env.SMTP_FROM || 'noreply@cryptoshop.com',
-      to: email,
+    const { data, error } = await resend.emails.send({
+      from: process.env.SMTP_FROM || 'onboarding@resend.dev',
+      to: [email],
       subject: '🔑 رمز التحقق - CryptoShop',
-      html: htmlContent
+      html: `
+        <!DOCTYPE html>
+        <html dir="rtl" lang="ar">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>رمز التحقق</title>
+          <style>
+            body { font-family: Arial, sans-serif; background: #f0f2f5; padding: 20px; }
+            .container { max-width: 500px; margin: 0 auto; background: white; border-radius: 16px; padding: 32px; border: 1px solid #00aa55; }
+            .header { text-align: center; margin-bottom: 24px; }
+            .header h1 { color: #00aa55; font-size: 24px; }
+            .code { 
+              font-size: 48px; 
+              font-weight: bold; 
+              color: #00aa55; 
+              text-align: center; 
+              padding: 16px; 
+              background: #f5f5f5; 
+              border-radius: 12px;
+              letter-spacing: 8px;
+              margin: 16px 0;
+            }
+            .footer { text-align: center; color: #888; font-size: 12px; margin-top: 24px; }
+            .warning { color: #ff4444; font-size: 12px; text-align: center; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>🛍️ CryptoShop</h1>
+              <p>مرحباً ${name}،</p>
+            </div>
+            <p style="color:#666;text-align:center;">لقد تلقينا طلباً لإنشاء حساب جديد. لتفعيل حسابك، يرجى استخدام رمز التحقق التالي:</p>
+            <div class="code">${code}</div>
+            <p style="color:#666;text-align:center;">هذا الرمز صالح لمدة <strong>10 دقائق</strong>.</p>
+            <p style="color:#666;text-align:center;font-size:14px;">إذا لم تطلب هذا، يمكنك تجاهل هذا البريد.</p>
+            <div class="warning">⚠️ لا تشارك هذا الرمز مع أي شخص</div>
+            <div class="footer">
+              © ${new Date().getFullYear()} CryptoShop - منصة الشراء الجماعي
+            </div>
+          </div>
+        </body>
+        </html>
+      `
     });
+
+    if (error) {
+      console.error('❌ Resend error:', error);
+      return { success: false, error: error.message };
+    }
 
     console.log(`✅ تم إرسال رمز التحقق إلى ${email}`);
     return { success: true };
@@ -324,7 +319,7 @@ app.post('/api/request-verification', async (req, res) => {
         created_at: new Date().toISOString()
       }, { onConflict: 'email' });
     
-    // إرسال رمز التحقق عبر البريد
+    // إرسال رمز التحقق عبر البريد (باستخدام Resend)
     const emailResult = await sendVerificationEmail(email, name, code);
     
     if (!emailResult.success) {
@@ -1139,7 +1134,6 @@ app.get('/auth/google', (req, res) => {
       </div>
 
       <script>
-        // إعدادات Firebase
         const firebaseConfig = {
           apiKey: "AIzaSyAI_mUhuPNoO-XC0Q-VNoWft8UWFbAbIGg",
           authDomain: "sudan-market-6b122.firebaseapp.com",
@@ -1149,7 +1143,6 @@ app.get('/auth/google', (req, res) => {
           appId: "1:66729481566:web:93393f28dc22d32cceebcf"
         };
 
-        // تهيئة Firebase
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const provider = new firebase.auth.GoogleAuthProvider();
@@ -1213,7 +1206,6 @@ app.post('/api/auth/google/callback', async (req, res) => {
   }
 
   try {
-    // التحقق من وجود المستخدم
     const { data: existingUser } = await supabaseAdmin
       .from('users')
       .select('*')
@@ -1224,7 +1216,6 @@ app.post('/api/auth/google/callback', async (req, res) => {
     let isNewUser = false;
 
     if (!existingUser) {
-      // إنشاء حساب جديد
       isNewUser = true;
       const randomPassword = Math.random().toString(36).substring(2, 15);
       const hashedPassword = await bcrypt.hash(randomPassword, SALT_ROUNDS);
@@ -1267,7 +1258,6 @@ app.post('/api/auth/google/callback', async (req, res) => {
         .eq('id', userId);
     }
 
-    // إنشاء JWT token
     const token = jwt.sign(
       { userId: userId, email: email, name: name || email.split('@')[0], is_admin: existingUser?.is_admin || false },
       JWT_SECRET,
@@ -1821,7 +1811,7 @@ app.listen(PORT, () => {
   ║   📡 الخادم على المنفذ: ${PORT}                                  ║
   ║   🌐 ${process.env.CLIENT_URL || `http://localhost:${PORT}`}     ║
   ║   🔐 JWT + HttpOnly Cookies                                    ║
-  ║   📧 التحقق الإلزامي من البريد الإلكتروني (OTP)               ║
+  ║   📧 التحقق الإلزامي من البريد الإلكتروني (Resend)            ║
   ║   🔑 Google Sign-In مفعل                                       ║
   ║   📱 استعادة كلمة المرور عبر الجهاز                           ║
   ║   💰 نظام استرداد الأموال (Refund) مفعل                         ║
