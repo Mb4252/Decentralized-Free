@@ -142,33 +142,69 @@ async function setLeverage(symbol) {
 }
 
 // ==========================================
-// جلب رصيد USDT من Binance Futures (نسخة معدلة)
+// جلب رصيد USDT من Binance Futures (نسخة متطورة)
 // ==========================================
 
 async function getFuturesBalance() {
   try {
     const balances = await binance.futuresBalance();
     
-    // محاولة قراءة الرصيد بعدة طرق مختلفة
+    // إذا كانت الاستجابة غير متوقعة، سجلها للتشخيص
+    if (!balances) {
+      log('⚠️ استجابة Binance فارغة', 'WARNING');
+      return 0;
+    }
+    
+    // محاولة قراءة الرصيد بعدة طرق
     let usdtBalance = 0;
     
-    // الطريقة 1: مباشرة (balances.USDT)
-    if (balances && balances.USDT) {
+    // طريقة 1: مباشرة
+    if (balances.USDT) {
       usdtBalance = parseFloat(balances.USDT.available) || 0;
-    }
-    // الطريقة 2: إذا لم تنجح الأولى، جرب البحث في المصفوفة
-    else if (balances && Array.isArray(balances)) {
-      const usdtAsset = balances.find(asset => asset.asset === 'USDT');
-      if (usdtAsset) {
-        usdtBalance = parseFloat(usdtAsset.available) || 0;
+      if (usdtBalance > 0) {
+        log(`✅ طريقة 1: وجدت ${usdtBalance} USDT`, 'SUCCESS');
+        return usdtBalance;
       }
     }
-    // الطريقة 3: إذا كانت الاستجابة بصيغة أخرى
-    else if (balances && balances.data && balances.data.USDT) {
+    
+    // طريقة 2: في data
+    if (balances.data && balances.data.USDT) {
       usdtBalance = parseFloat(balances.data.USDT.available) || 0;
+      if (usdtBalance > 0) {
+        log(`✅ طريقة 2: وجدت ${usdtBalance} USDT في data`, 'SUCCESS');
+        return usdtBalance;
+      }
     }
     
-    return usdtBalance;
+    // طريقة 3: مصفوفة
+    if (Array.isArray(balances)) {
+      const usdtAsset = balances.find(a => a.asset === 'USDT');
+      if (usdtAsset) {
+        usdtBalance = parseFloat(usdtAsset.available) || 0;
+        if (usdtBalance > 0) {
+          log(`✅ طريقة 3: وجدت ${usdtBalance} USDT في المصفوفة`, 'SUCCESS');
+          return usdtBalance;
+        }
+      }
+    }
+    
+    // طريقة 4: البحث في جميع المفاتيح
+    for (const key of Object.keys(balances)) {
+      if (balances[key] && typeof balances[key] === 'object') {
+        if (balances[key].USDT) {
+          usdtBalance = parseFloat(balances[key].USDT.available) || 0;
+          if (usdtBalance > 0) {
+            log(`✅ طريقة 4: وجدت ${usdtBalance} USDT في ${key}`, 'SUCCESS');
+            return usdtBalance;
+          }
+        }
+      }
+    }
+    
+    // إذا لم نجد رصيداً، سجل الاستجابة للتشخيص
+    log(`⚠️ لم يتم العثور على USDT في الاستجابة.`, 'WARNING');
+    
+    return 0;
   } catch (error) {
     log(`❌ فشل جلب الرصيد: ${error.message}`, 'ERROR');
     return 0;
