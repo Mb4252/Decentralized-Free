@@ -23,7 +23,7 @@ const PRICE_CHANGE_THRESHOLD = parseFloat(process.env.PRICE_CHANGE_THRESHOLD) ||
 const CHECK_INTERVAL = parseInt(process.env.CHECK_INTERVAL) || 30000;
 const SLIPPAGE = parseFloat(process.env.SLIPPAGE) || 0.5;
 
-// قائمة العملات للمراقبة
+// قائمة العملات
 const TOKENS = [
   { address: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c", name: "WBNB" },
   { address: "0x0E09FaBB73Bd3Ade0a17ECC321fD13a19e81cE82", name: "CAKE" },
@@ -310,71 +310,109 @@ async function tradingCycle() {
 const app = express();
 const PORT = process.env.PORT || 10000;
 
+// معالجة الأخطاء العامة
+process.on('uncaughtException', (error) => {
+  console.error('❌ خطأ غير متوقع:', error);
+});
+
+process.on('unhandledRejection', (error) => {
+  console.error('❌ وعد مرفوض:', error);
+});
+
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// صفحة الحالة (JSON)
+// صفحة الحالة
 app.get('/', async (req, res) => {
-  let positionStatus = 'لا توجد صفقة مفتوحة';
-  let profit = '0%';
-  
-  if (currentPosition) {
-    const currentPrice = await getTokenPriceBNB(currentPosition.address);
-    if (currentPrice) {
-      profit = (((currentPrice - currentPosition.entryPrice) / currentPosition.entryPrice) * 100).toFixed(2) + '%';
-      positionStatus = `${currentPosition.name} - الربح: ${profit}`;
+  try {
+    let positionStatus = 'لا توجد صفقة مفتوحة';
+    let profit = '0%';
+    
+    if (currentPosition) {
+      const currentPrice = await getTokenPriceBNB(currentPosition.address);
+      if (currentPrice) {
+        profit = (((currentPrice - currentPosition.entryPrice) / currentPosition.entryPrice) * 100).toFixed(2) + '%';
+        positionStatus = `${currentPosition.name} - الربح: ${profit}`;
+      }
     }
+    
+    const balance = await wallet.getBalance();
+    const bnbBalance = parseFloat(ethers.utils.formatEther(balance)).toFixed(6);
+    
+    res.json({
+      status: '🤖 بوت التداول يعمل',
+      version: '1.0.0',
+      timestamp: new Date().toISOString(),
+      balance: `${bnbBalance} BNB`,
+      currentPosition: positionStatus,
+      watching: TOKENS.map(t => t.name).join(', '),
+      settings: {
+        tradeAmount: TRADE_AMOUNT,
+        leverage: LEVERAGE,
+        profitTarget: PROFIT_PERCENT + '%',
+        priceChangeThreshold: PRICE_CHANGE_THRESHOLD + '%',
+        checkInterval: CHECK_INTERVAL / 1000 + ' ثانية'
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
-  
-  const balance = await wallet.getBalance();
-  const bnbBalance = parseFloat(ethers.utils.formatEther(balance)).toFixed(6);
-  
-  res.json({
-    status: '🤖 بوت التداول يعمل',
-    version: '1.0.0',
-    timestamp: new Date().toISOString(),
-    balance: `${bnbBalance} BNB`,
-    currentPosition: positionStatus,
-    watching: TOKENS.map(t => t.name).join(', '),
-    settings: {
-      tradeAmount: TRADE_AMOUNT,
-      leverage: LEVERAGE,
-      profitTarget: PROFIT_PERCENT + '%',
-      priceChangeThreshold: PRICE_CHANGE_THRESHOLD + '%',
-      checkInterval: CHECK_INTERVAL / 1000 + ' ثانية'
-    }
-  });
 });
 
-// API للوحة التحكم
-app.get('/api/trades', (req, res) => {
-  loadTrades();
-  res.json(tradesHistory);
-});
-
+// API: جلب جميع البيانات
 app.get('/api/status-full', async (req, res) => {
-  const balance = await wallet.getBalance();
-  const bnbBalance = parseFloat(ethers.utils.formatEther(balance));
-  
-  loadTrades();
-  const openTrades = tradesHistory.filter(t => t.status === 'open');
-  const closedTrades = tradesHistory.filter(t => t.status === 'closed');
-  
-  res.json({
-    balance: bnbBalance,
-    position: currentPosition,
-    trades: tradesHistory,
-    openTrades: openTrades.length,
-    totalTrades: tradesHistory.length,
-    watching: TOKENS.map(t => t.name),
-    settings: {
-      tradeAmount: TRADE_AMOUNT,
-      leverage: LEVERAGE,
-      profitTarget: PROFIT_PERCENT,
-      priceChangeThreshold: PRICE_CHANGE_THRESHOLD
-    }
-  });
+  try {
+    const balance = await wallet.getBalance();
+    const bnbBalance = parseFloat(ethers.utils.formatEther(balance));
+    
+    loadTrades();
+    const openTrades = tradesHistory.filter(t => t.status === 'open');
+    
+    res.json({
+      balance: bnbBalance,
+      position: currentPosition,
+      trades: tradesHistory,
+      openTrades: openTrades.length,
+      totalTrades: tradesHistory.length,
+      watching: TOKENS.map(t => t.name),
+      settings: {
+        tradeAmount: TRADE_AMOUNT,
+        leverage: LEVERAGE,
+        profitTarget: PROFIT_PERCENT,
+        priceChangeThreshold: PRICE_CHANGE_THRESHOLD
+      }
+    });
+  } catch (error) {
+    console.error('❌ خطأ في API:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// API: جلب الصفقات
+app.get('/api/trades', async (req, res) => {
+  try {
+    loadTrades();
+    res.json(tradesHistory);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// API: مسح الصفقات
+app.delete('/api/clear-trades', (req, res) => {
+  try {
+    tradesHistory = [];
+    saveTrades();
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// لوحة التحكم
+app.get('/dashboard.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // ==========================================
