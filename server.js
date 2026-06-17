@@ -13,21 +13,20 @@ const bsc = require('./lib/bsc');
 const app = express();
 
 // ==========================================
-// إعدادات Render
+// إعدادات الأمان
 // ==========================================
+
 app.set('trust proxy', 1);
 
-// ==========================================
-// Security Headers
-// ==========================================
+// Helmet - حماية الرؤوس
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: ["'self'", "https://*.supabase.co"],
+      imgSrc: ["'self'", "data:", "https:", "http:"],
+      connectSrc: ["'self'", "https://*.supabase.co", "https://*.firebaseapp.com", "https://*.googleapis.com"],
       fontSrc: ["'self'", "data:"],
     },
   },
@@ -41,13 +40,12 @@ app.use(helmet({
   }
 }));
 
-// ==========================================
-// CORS
-// ==========================================
+// CORS - النطاقات المسموحة
 const allowedOrigins = [
   process.env.CLIENT_URL || 'https://crypto-api-c2v8.onrender.com',
   'http://localhost:3000',
-  'http://127.0.0.1:3000'
+  'http://127.0.0.1:3000',
+  'https://sudan-market-6b122.firebaseapp.com'
 ];
 
 app.use(cors({
@@ -56,12 +54,13 @@ app.use(cors({
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
+      console.log('❌ CORS blocked:', origin);
       callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie']
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie', 'X-Requested-With']
 }));
 
 app.use(express.json({ limit: '10mb' }));
@@ -69,8 +68,9 @@ app.use(cookieParser());
 app.use(express.static('app'));
 
 // ==========================================
-// Rate Limiting
+// Rate Limiting - حماية من الهجمات
 // ==========================================
+
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
@@ -109,7 +109,7 @@ app.use((req, res, next) => {
 });
 
 // ========================================
-// Supabase
+// تهيئة Supabase
 // ========================================
 const supabaseAdmin = createClient(
   process.env.SUPABASE_URL,
@@ -124,8 +124,8 @@ const supabaseClient = createClient(
 // ========================================
 // JWT
 // ========================================
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
-const SALT_ROUNDS = 10;
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this';
+const SALT_ROUNDS = 12;
 
 // ========================================
 // دوال مساعدة
@@ -140,7 +140,7 @@ function generateUUID() {
 }
 
 // ==========================================
-// Audit Log
+// Audit Log - تسجيل الأحداث
 // ==========================================
 async function logAudit(userId, action, details = {}, req = null) {
   try {
@@ -202,7 +202,7 @@ app.get('/api/health', (req, res) => {
 // API: تسجيل الدخول
 // ==========================================
 app.post('/api/login', loginLimiter, async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, deviceFingerprint, deviceInfo } = req.body;
   
   console.log('🔐 محاولة تسجيل دخول:', email);
   
@@ -222,6 +222,14 @@ app.post('/api/login', loginLimiter, async (req, res) => {
       return res.status(401).json({ error: 'بيانات غير صحيحة' });
     }
     
+    // التحقق من المستخدم عبر Google
+    if (user.auth_provider === 'google') {
+      return res.status(400).json({ 
+        error: '⚠️ هذا الحساب مسجل عبر Google. يرجى استخدام "تسجيل الدخول عبر Google".' 
+      });
+    }
+    
+    // التحقق من كلمة المرور
     let passwordValid = false;
     
     try {
@@ -243,6 +251,20 @@ app.post('/api/login', loginLimiter, async (req, res) => {
       return res.status(401).json({ error: 'بيانات غير صحيحة' });
     }
     
+    // تحديث بصمة الجهاز
+    if (deviceFingerprint) {
+      await supabaseAdmin
+        .from('users')
+        .update({
+          device_fingerprint: deviceFingerprint,
+          device_info: deviceInfo || null,
+          last_login_ip: req.ip || req.connection?.remoteAddress || 'unknown',
+          last_login_at: new Date().toISOString()
+        })
+        .eq('id', user.id);
+    }
+    
+    // إنشاء JWT token
     const token = jwt.sign(
       { userId: user.id, email: user.email, name: user.name, is_admin: user.is_admin || false },
       JWT_SECRET,
@@ -290,7 +312,12 @@ app.post('/api/logout', (req, res) => {
 // API: إنشاء حساب
 // ==========================================
 app.post('/api/register', loginLimiter, async (req, res) => {
-  const { email, password, name, referralCode } = req.body;
+  const { 
+    email, password, name, referralCode,
+    deviceFingerprint, deviceInfo,
+    authProvider, authProviderId, photoURL,
+    securityQuestion, securityAnswer, securityEnabled
+  } = req.body;
   
   console.log('📝 محاولة إنشاء حساب:', email);
   
@@ -298,7 +325,7 @@ app.post('/api/register', loginLimiter, async (req, res) => {
     return res.status(400).json({ error: 'جميع الحقول مطلوبة' });
   }
   
-  if (password.length < 4) {
+  if (password.length < 4 && !authProvider) {
     return res.status(400).json({ error: 'كلمة المرور 4 أحرف على الأقل' });
   }
   
@@ -327,28 +354,53 @@ app.post('/api/register', loginLimiter, async (req, res) => {
       if (referrer) referrerId = referrer.id;
     }
     
+    // تخزين آخر كلمة مرور للاستعادة
+    const lastPasswordUsed = await bcrypt.hash(password, 8);
+    
+    // تشفير الإجابة الأمنية
+    let hashedSecurityAnswer = null;
+    if (securityEnabled && securityQuestion && securityAnswer) {
+      hashedSecurityAnswer = await bcrypt.hash(securityAnswer, SALT_ROUNDS);
+    }
+    
+    const userData = {
+      id: userId,
+      email,
+      password: hashedPassword,
+      name,
+      referral_code: newReferralCode,
+      referrer_id: referrerId,
+      is_admin: false,
+      available_balance: 0,
+      platform_balance: 0,
+      total_orders: 0,
+      total_spent: 0,
+      device_fingerprint: deviceFingerprint || null,
+      device_info: deviceInfo || null,
+      last_password_used: lastPasswordUsed,
+      security_question: securityEnabled ? securityQuestion : null,
+      security_answer: hashedSecurityAnswer,
+      security_question_enabled: securityEnabled || false,
+      created_at: new Date().toISOString()
+    };
+    
+    // إذا كان من Google
+    if (authProvider === 'google') {
+      userData.auth_provider = 'google';
+      userData.auth_provider_id = authProviderId;
+      userData.photo_url = photoURL || null;
+    }
+    
     const { error: insertError } = await supabaseAdmin
       .from('users')
-      .insert({
-        id: userId,
-        email,
-        password: hashedPassword,
-        name,
-        referral_code: newReferralCode,
-        referrer_id: referrerId,
-        is_admin: false,
-        available_balance: 0,
-        platform_balance: 0,
-        total_orders: 0,
-        total_spent: 0,
-        created_at: new Date().toISOString()
-      });
+      .insert(userData);
     
     if (insertError) {
       console.error('Insert error:', insertError);
       return res.status(500).json({ error: 'حدث خطأ في إنشاء الحساب' });
     }
     
+    // إنشاء JWT token
     const token = jwt.sign(
       { userId, email, name, is_admin: false },
       JWT_SECRET,
@@ -364,6 +416,8 @@ app.post('/api/register', loginLimiter, async (req, res) => {
       path: '/'
     });
     
+    await logAudit(userId, 'register', { email, authProvider: authProvider || 'email' }, req);
+    
     console.log('✅ تم إنشاء الحساب بنجاح:', email);
     
     res.json({
@@ -374,6 +428,127 @@ app.post('/api/register', loginLimiter, async (req, res) => {
     
   } catch (error) {
     console.error('Register error:', error);
+    res.status(500).json({ error: 'حدث خطأ داخلي' });
+  }
+});
+
+// ==========================================
+// API: تسجيل الدخول عبر Google (Firebase)
+// ==========================================
+app.post('/api/auth/google', async (req, res) => {
+  const { uid, email, name, photoURL, deviceFingerprint, deviceInfo } = req.body;
+  
+  console.log('🔐 محاولة تسجيل دخول عبر Google:', email);
+  
+  if (!email || !uid) {
+    return res.status(400).json({ error: 'بيانات ناقصة' });
+  }
+  
+  try {
+    // التحقق من وجود المستخدم
+    const { data: existingUser } = await supabaseAdmin
+      .from('users')
+      .select('*')
+      .eq('email', email)
+      .maybeSingle();
+    
+    let userId;
+    let isNewUser = false;
+    
+    if (!existingUser) {
+      // إنشاء حساب جديد
+      isNewUser = true;
+      const randomPassword = Math.random().toString(36).substring(2, 15);
+      const hashedPassword = await bcrypt.hash(randomPassword, SALT_ROUNDS);
+      const lastPasswordUsed = await bcrypt.hash(randomPassword, 8);
+      userId = generateUUID();
+      const referralCode = Math.random().toString(36).substring(2, 10).toUpperCase();
+      
+      const { error: insertError } = await supabaseAdmin
+        .from('users')
+        .insert({
+          id: userId,
+          email: email,
+          password: hashedPassword,
+          name: name || email.split('@')[0],
+          referral_code: referralCode,
+          is_admin: false,
+          available_balance: 0,
+          platform_balance: 0,
+          total_orders: 0,
+          total_spent: 0,
+          auth_provider: 'google',
+          auth_provider_id: uid,
+          photo_url: photoURL || null,
+          device_fingerprint: deviceFingerprint || null,
+          device_info: deviceInfo || null,
+          last_password_used: lastPasswordUsed,
+          created_at: new Date().toISOString()
+        });
+      
+      if (insertError) {
+        console.error('Insert error:', insertError);
+        return res.status(500).json({ error: 'حدث خطأ في إنشاء الحساب' });
+      }
+      
+      console.log('✅ تم إنشاء حساب جديد عبر Google:', email);
+      
+    } else {
+      userId = existingUser.id;
+      
+      // تحديث معلومات المستخدم
+      await supabaseAdmin
+        .from('users')
+        .update({
+          name: name || existingUser.name,
+          photo_url: photoURL || existingUser.photo_url,
+          auth_provider_id: uid,
+          device_fingerprint: deviceFingerprint || existingUser.device_fingerprint,
+          device_info: deviceInfo || existingUser.device_info,
+          last_login_ip: req.ip || req.connection?.remoteAddress || 'unknown',
+          last_login_at: new Date().toISOString()
+        })
+        .eq('id', userId);
+    }
+    
+    // إنشاء JWT token
+    const token = jwt.sign(
+      { 
+        userId: userId, 
+        email: email, 
+        name: name || email.split('@')[0],
+        is_admin: existingUser?.is_admin || false,
+        auth_provider: 'google'
+      },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+    
+    const isProd = process.env.NODE_ENV === 'production';
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: isProd ? 'none' : 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: '/'
+    });
+    
+    await logAudit(userId, 'google_login', { email, isNewUser }, req);
+    
+    res.json({
+      success: true,
+      isNewUser: isNewUser,
+      user: {
+        id: userId,
+        email: email,
+        name: name || email.split('@')[0],
+        photoURL: photoURL || null,
+        is_admin: existingUser?.is_admin || false
+      }
+    });
+    
+  } catch (error) {
+    console.error('Google auth error:', error);
     res.status(500).json({ error: 'حدث خطأ داخلي' });
   }
 });
@@ -394,6 +569,7 @@ app.post('/api/user', authenticateToken, async (req, res) => {
     }
     
     delete data.password;
+    delete data.last_password_used;
     res.json(data);
     
   } catch (error) {
@@ -960,7 +1136,7 @@ app.post('/api/admin/update-order-status', authenticateAdmin, async (req, res) =
 });
 
 // ==========================================
-// 🆕 API: استرداد أموال (Refund) - جديد
+// API: استرداد أموال (Refund)
 // ==========================================
 app.post('/api/admin/refund-order', authenticateAdmin, async (req, res) => {
   const { orderId, reason } = req.body;
@@ -972,7 +1148,6 @@ app.post('/api/admin/refund-order', authenticateAdmin, async (req, res) => {
   }
   
   try {
-    // جلب الطلب مع بيانات المستخدم
     const { data: order, error: orderError } = await supabaseAdmin
       .from('product_orders')
       .select('*, users!product_orders_user_id_fkey(available_balance, name, email)')
@@ -983,12 +1158,10 @@ app.post('/api/admin/refund-order', authenticateAdmin, async (req, res) => {
       return res.status(404).json({ error: 'الطلب غير موجود' });
     }
     
-    // التحقق من أن الطلب لم يتم استرداده مسبقاً
     if (order.status === 'refunded') {
       return res.status(400).json({ error: 'تم استرداد هذا الطلب مسبقاً' });
     }
     
-    // التحقق من أن الطلب في حالة تسمح بالاسترداد
     if (order.status === 'delivered') {
       return res.status(400).json({ error: 'لا يمكن استرداد طلب تم تسليمه' });
     }
@@ -997,7 +1170,6 @@ app.post('/api/admin/refund-order', authenticateAdmin, async (req, res) => {
       return res.status(400).json({ error: 'لا يمكن استرداد طلب تم سحبه' });
     }
     
-    // إعادة المبلغ للمستخدم
     const refundAmount = order.total_amount;
     const newBalance = (order.users.available_balance || 0) + refundAmount;
     
@@ -1006,7 +1178,6 @@ app.post('/api/admin/refund-order', authenticateAdmin, async (req, res) => {
       .update({ available_balance: newBalance })
       .eq('id', order.user_id);
     
-    // تحديث حالة الطلب
     const refundReason = reason || 'استرداد بسبب عدم توفر المنتج';
     await supabaseAdmin
       .from('product_orders')
@@ -1018,7 +1189,6 @@ app.post('/api/admin/refund-order', authenticateAdmin, async (req, res) => {
       })
       .eq('id', orderId);
     
-    // تسجيل المعاملة
     await supabaseAdmin
       .from('transactions')
       .insert({
@@ -1030,7 +1200,6 @@ app.post('/api/admin/refund-order', authenticateAdmin, async (req, res) => {
         created_at: new Date().toISOString()
       });
     
-    // تسجيل في Audit Log
     await logAudit(req.user.userId, 'refund_order', { 
       orderId, 
       amount: refundAmount,
@@ -1054,7 +1223,7 @@ app.post('/api/admin/refund-order', authenticateAdmin, async (req, res) => {
 });
 
 // ==========================================
-// 🆕 API: تأخير منتج (Delay) - جديد
+// API: تأخير منتج (Delay)
 // ==========================================
 app.post('/api/admin/delay-product', authenticateAdmin, async (req, res) => {
   const { productId, newDeliveryDate, reason } = req.body;
@@ -1066,7 +1235,6 @@ app.post('/api/admin/delay-product', authenticateAdmin, async (req, res) => {
   }
   
   try {
-    // جلب المنتج
     const { data: product, error: productError } = await supabaseAdmin
       .from('products')
       .select('*')
@@ -1077,7 +1245,6 @@ app.post('/api/admin/delay-product', authenticateAdmin, async (req, res) => {
       return res.status(404).json({ error: 'المنتج غير موجود' });
     }
     
-    // تحديث موعد التسليم
     const delayReason = reason || 'تأخر في التوريد';
     await supabaseAdmin
       .from('products')
@@ -1088,7 +1255,6 @@ app.post('/api/admin/delay-product', authenticateAdmin, async (req, res) => {
       })
       .eq('id', productId);
     
-    // تحديث جميع طلبات هذا المنتج إلى حالة "delayed"
     await supabaseAdmin
       .from('product_orders')
       .update({
@@ -1100,7 +1266,6 @@ app.post('/api/admin/delay-product', authenticateAdmin, async (req, res) => {
       .eq('product_id', productId)
       .in('status', ['pending', 'confirmed']);
     
-    // تسجيل في Audit Log
     await logAudit(req.user.userId, 'delay_product', { 
       productId, 
       newDeliveryDate,
@@ -1160,6 +1325,211 @@ app.post('/api/admin/users', authenticateAdmin, async (req, res) => {
 });
 
 // ==========================================
+// API: استعادة كلمة المرور عبر الجهاز (Device Recovery)
+// ==========================================
+
+// الخطوة 1: التحقق من البريد والجهاز
+app.post('/api/recovery/device-check', async (req, res) => {
+  const { email, deviceFingerprint } = req.body;
+  
+  if (!email) {
+    return res.status(400).json({ error: 'البريد الإلكتروني مطلوب' });
+  }
+  
+  try {
+    const { data: user, error } = await supabaseAdmin
+      .from('users')
+      .select('id, email, device_fingerprint, recovery_attempts, recovery_blocked_until, security_question_enabled')
+      .eq('email', email)
+      .single();
+    
+    if (error || !user) {
+      return res.json({ 
+        success: true,
+        deviceMatched: false,
+        message: 'إذا كان البريد مسجلاً، سيتم التحقق من الجهاز'
+      });
+    }
+    
+    // التحقق من الحظر
+    if (user.recovery_blocked_until && new Date(user.recovery_blocked_until) > new Date()) {
+      const remaining = Math.ceil((new Date(user.recovery_blocked_until) - new Date()) / 60000);
+      return res.status(400).json({
+        error: `تم حظر استعادة كلمة المرور. حاول بعد ${remaining} دقيقة`
+      });
+    }
+    
+    // التحقق من تطابق الجهاز
+    const deviceMatched = user.device_fingerprint === deviceFingerprint;
+    
+    if (!deviceMatched) {
+      const attempts = (user.recovery_attempts || 0) + 1;
+      let blockedUntil = null;
+      let timeMessage = '';
+      
+      if (attempts >= 3) {
+        blockedUntil = new Date();
+        blockedUntil.setHours(blockedUntil.getHours() + 1);
+        timeMessage = 'تم حظر المحاولات لمدة ساعة';
+      } else {
+        timeMessage = `محاولة ${attempts} من 3`;
+      }
+      
+      await supabaseAdmin
+        .from('users')
+        .update({
+          recovery_attempts: attempts,
+          recovery_blocked_until: blockedUntil
+        })
+        .eq('id', user.id);
+      
+      return res.json({
+        success: true,
+        deviceMatched: false,
+        message: `الجهاز غير معروف. ${timeMessage}`,
+        attemptsLeft: 3 - attempts
+      });
+    }
+    
+    // إعادة تعيين محاولات الفشل
+    await supabaseAdmin
+      .from('users')
+      .update({
+        recovery_attempts: 0,
+        recovery_blocked_until: null
+      })
+      .eq('id', user.id);
+    
+    res.json({
+      success: true,
+      deviceMatched: true,
+      message: 'تم التحقق من الجهاز. أدخل آخر كلمة مرور تتذكرها.',
+      userId: user.id,
+      hasSecurityQuestion: user.security_question_enabled
+    });
+    
+  } catch (error) {
+    console.error('Device check error:', error);
+    res.status(500).json({ error: 'حدث خطأ داخلي' });
+  }
+});
+
+// الخطوة 2: التحقق من آخر كلمة مرور وإعادة التعيين
+app.post('/api/recovery/verify-last-password', async (req, res) => {
+  const { email, lastPassword, newPassword, deviceFingerprint } = req.body;
+  
+  if (!email || !lastPassword || !newPassword) {
+    return res.status(400).json({ error: 'جميع الحقول مطلوبة' });
+  }
+  
+  if (newPassword.length < 4) {
+    return res.status(400).json({ error: 'كلمة المرور الجديدة يجب أن تكون 4 أحرف على الأقل' });
+  }
+  
+  try {
+    const { data: user, error } = await supabaseAdmin
+      .from('users')
+      .select('id, email, device_fingerprint, last_password_used')
+      .eq('email', email)
+      .single();
+    
+    if (error || !user) {
+      return res.status(400).json({ error: 'بيانات غير صحيحة' });
+    }
+    
+    // التحقق من الجهاز
+    if (user.device_fingerprint !== deviceFingerprint) {
+      return res.status(400).json({ error: 'الجهاز غير معروف لهذا الحساب' });
+    }
+    
+    // التحقق من آخر كلمة مرور
+    let lastPasswordValid = false;
+    try {
+      lastPasswordValid = await bcrypt.compare(lastPassword, user.last_password_used);
+    } catch (e) {
+      if (user.last_password_used === lastPassword) {
+        lastPasswordValid = true;
+      }
+    }
+    
+    if (!lastPasswordValid) {
+      return res.status(400).json({ error: 'كلمة المرور القديمة غير صحيحة' });
+    }
+    
+    // تشفير كلمة المرور الجديدة
+    const hashedPassword = await bcrypt.hash(newPassword, SALT_ROUNDS);
+    const newLastPassword = await bcrypt.hash(newPassword, 8);
+    
+    // تحديث كلمة المرور
+    await supabaseAdmin
+      .from('users')
+      .update({
+        password: hashedPassword,
+        last_password_used: newLastPassword,
+        recovery_attempts: 0,
+        recovery_blocked_until: null
+      })
+      .eq('id', user.id);
+    
+    console.log(`✅ تم استعادة كلمة مرور ${email} عبر الجهاز`);
+    
+    res.json({
+      success: true,
+      message: '✅ تم استعادة كلمة المرور بنجاح. يمكنك تسجيل الدخول الآن.'
+    });
+    
+  } catch (error) {
+    console.error('Recovery verify error:', error);
+    res.status(500).json({ error: 'حدث خطأ داخلي' });
+  }
+});
+
+// ==========================================
+// API: استعادة كلمة المرور عبر السؤال الأمني
+// ==========================================
+app.post('/api/recovery/security-question', async (req, res) => {
+  const { email, answer } = req.body;
+  
+  if (!email || !answer) {
+    return res.status(400).json({ error: 'البريد والإجابة مطلوبان' });
+  }
+  
+  try {
+    const { data: user, error } = await supabaseAdmin
+      .from('users')
+      .select('id, email, security_question, security_answer, security_question_enabled')
+      .eq('email', email)
+      .single();
+    
+    if (error || !user) {
+      return res.status(404).json({ error: 'المستخدم غير موجود' });
+    }
+    
+    if (!user.security_question_enabled) {
+      return res.status(400).json({ error: 'لم يتم تفعيل السؤال الأمني لهذا الحساب' });
+    }
+    
+    // التحقق من الإجابة
+    const isValid = await bcrypt.compare(answer, user.security_answer);
+    
+    if (!isValid) {
+      return res.status(400).json({ error: 'الإجابة غير صحيحة' });
+    }
+    
+    res.json({
+      success: true,
+      message: '✅ تم التحقق من السؤال الأمني',
+      userId: user.id,
+      securityQuestion: user.security_question
+    });
+    
+  } catch (error) {
+    console.error('Security question error:', error);
+    res.status(500).json({ error: 'حدث خطأ داخلي' });
+  }
+});
+
+// ==========================================
 // تشغيل الخادم
 // ==========================================
 const PORT = process.env.PORT || 3000;
@@ -1170,7 +1540,9 @@ app.listen(PORT, () => {
   ║   📡 الخادم على المنفذ: ${PORT}                                  ║
   ║   🌐 ${process.env.CLIENT_URL || `http://localhost:${PORT}`}     ║
   ║   🔐 JWT + HttpOnly Cookies                                    ║
-  ║   🛡️ Helmet + Rate Limiting + Audit Log                        ║
+  ║   🛡️ Helmet + Rate Limiting + CORS محدود                      ║
+  ║   🔑 Google Sign-In (Firebase) مفعل                           ║
+  ║   📱 استعادة كلمة المرور عبر الجهاز                           ║
   ║   💰 نظام استرداد الأموال (Refund) مفعل                         ║
   ║   📅 نظام تأجيل المنتجات (Delay) مفعل                           ║
   ╚═══════════════════════════════════════════════════════════════╝
