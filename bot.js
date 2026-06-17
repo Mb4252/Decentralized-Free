@@ -1,6 +1,8 @@
 const { ethers } = require('ethers');
 const dotenv = require('dotenv');
 const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
 const abi = require('./abi.json');
 dotenv.config();
 
@@ -34,6 +36,7 @@ const router = new ethers.Contract(PANCAKE_ROUTER, abi, wallet);
 
 let currentPosition = null;
 let isRunning = false;
+let tradeHistory = [];
 
 // ==========================================
 // دوال مساعدة
@@ -86,8 +89,13 @@ async function buyToken(amountBNB) {
     );
     
     const receipt = await tx.wait();
+    const price = await getPrice(TOKEN_ADDRESS);
     log(`✅ تم الشراء بنجاح: ${amountBNB} BNB -> ${ethers.utils.formatUnits(amountOutMin, 18)} USDT`, 'SUCCESS');
     log(`📝 TX: ${receipt.transactionHash}`, 'INFO');
+    
+    // إرسال البيانات للوحة التحكم
+    await sendTradeToDashboard('buy', 'BNB', amountBNB, price, 0, 'open');
+    
     return receipt;
   } catch (error) {
     log(`❌ فشل الشراء: ${error.message}`, 'ERROR');
@@ -99,7 +107,7 @@ async function buyToken(amountBNB) {
 // بيع عملة
 // ==========================================
 
-async function sellToken(amountToken) {
+async function sellToken(amountToken, profit = 0) {
   try {
     const path = [TOKEN_ADDRESS, USDT_ADDRESS];
     const amountIn = ethers.utils.parseUnits(amountToken.toString(), 18);
@@ -117,12 +125,39 @@ async function sellToken(amountToken) {
     );
     
     const receipt = await tx.wait();
+    const price = await getPrice(TOKEN_ADDRESS);
     log(`✅ تم البيع بنجاح: ${amountToken} TOKEN -> ${ethers.utils.formatUnits(amountOutMin, 18)} USDT`, 'SUCCESS');
     log(`📝 TX: ${receipt.transactionHash}`, 'INFO');
+    
+    // إرسال البيانات للوحة التحكم
+    await sendTradeToDashboard('sell', 'BNB', amountToken, price, profit, 'closed');
+    
     return receipt;
   } catch (error) {
     log(`❌ فشل البيع: ${error.message}`, 'ERROR');
     return null;
+  }
+}
+
+// ==========================================
+// إرسال البيانات للوحة التحكم
+// ==========================================
+
+async function sendTradeToDashboard(type, token, amount, price, profit, status) {
+  try {
+    await axios.post('http://localhost:8080/api/add-trade', {
+      type,
+      token,
+      amount,
+      price,
+      profit,
+      status
+    });
+  } catch (error) {
+    // لا نعرض خطأ حتى لا نوقف البوت
+    if (DEBUG) {
+      log(`⚠️ فشل إرسال البيانات للوحة التحكم: ${error.message}`, 'WARNING');
+    }
   }
 }
 
@@ -150,12 +185,13 @@ async function tradingCycle() {
 
       // حساب كمية الشراء مع الرافعة
       const tradeAmount = TRADE_AMOUNT * LEVERAGE;
+      const currentPrice = await getPrice(TOKEN_ADDRESS);
       log(`📊 فتح صفقة شراء: ${tradeAmount.toFixed(6)} BNB (رافعة x${LEVERAGE})`, 'INFO');
       
       const receipt = await buyToken(tradeAmount);
       if (receipt) {
         currentPosition = {
-          entryPrice: await getPrice(TOKEN_ADDRESS),
+          entryPrice: currentPrice,
           amount: tradeAmount,
           timestamp: Date.now()
         };
@@ -170,16 +206,17 @@ async function tradingCycle() {
       }
 
       const profitPercent = ((currentPrice - currentPosition.entryPrice) / currentPosition.entryPrice) * 100;
+      const profitAmount = (currentPrice - currentPosition.entryPrice) * currentPosition.amount;
       log(`📊 السعر الحالي: ${currentPrice.toFixed(6)} USDT، الربح: ${profitPercent.toFixed(2)}%`, 'INFO');
 
       if (profitPercent >= PROFIT_PERCENT) {
-        log(`✅ جني ربح: ${profitPercent.toFixed(2)}%`, 'SUCCESS');
-        await sellToken(currentPosition.amount);
+        log(`✅ جني ربح: ${profitPercent.toFixed(2)}% (${profitAmount.toFixed(4)} USDT)`, 'SUCCESS');
+        await sellToken(currentPosition.amount, profitAmount);
         currentPosition = null;
         log(`🔄 جاري التحضير للصفقة التالية...`, 'INFO');
       } else if (profitPercent <= -5) {
         log(`⚠️ وقف الخسارة مفعل! الخسارة ${profitPercent.toFixed(2)}%`, 'WARNING');
-        await sellToken(currentPosition.amount);
+        await sellToken(currentPosition.amount, profitAmount);
         currentPosition = null;
       }
     }
@@ -201,6 +238,7 @@ async function startBot() {
   log(`💰 المبلغ: ${TRADE_AMOUNT} BNB (رافعة x${LEVERAGE})`, 'INFO');
   log(`📈 نسبة الربح: ${PROFIT_PERCENT}%`, 'INFO');
   log(`⏱️ الفحص كل ${CHECK_INTERVAL/1000} ثانية`, 'INFO');
+  log(`📡 لوحة التحكم: http://localhost:8080`, 'INFO');
 
   // تشغيل الدورة الأولى
   await tradingCycle();
