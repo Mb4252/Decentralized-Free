@@ -5,7 +5,7 @@ const path = require('path');
 require('dotenv').config();
 
 const app = express();
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.DASHBOARD_PORT || 8080;
 
 // ==========================================
 // إعدادات
@@ -36,7 +36,8 @@ function getTradesData() {
     totalProfit: 0,
     totalLoss: 0,
     openPositions: 0,
-    currentBalance: 0
+    currentBalance: 0,
+    lastUpdate: new Date().toISOString()
   };
 }
 
@@ -58,11 +59,12 @@ function saveTradesData(data) {
 
 app.get('/api/status', (req, res) => {
   const data = getTradesData();
+  data.lastUpdate = new Date().toISOString();
   res.json(data);
 });
 
 // ==========================================
-// API: إضافة صفقة جديدة (يستخدمها البوت)
+// API: إضافة صفقة جديدة
 // ==========================================
 
 app.post('/api/add-trade', (req, res) => {
@@ -72,20 +74,20 @@ app.post('/api/add-trade', (req, res) => {
   
   const trade = {
     id: Date.now(),
-    type: type || 'buy', // buy / sell
+    type: type || 'buy',
     token: token || 'BNB',
     amount: amount || 0,
     price: price || 0,
     profit: profit || 0,
-    profitPercent: profit ? ((profit / (amount * price)) * 100).toFixed(2) : '0',
-    status: status || 'open', // open / closed
+    profitPercent: profit && price && amount ? ((profit / (amount * price)) * 100).toFixed(2) : '0',
+    status: status || 'open',
     timestamp: new Date().toISOString()
   };
   
   data.trades.unshift(trade);
   data.totalTrades += 1;
   
-  if (status === 'closed') {
+  if (status === 'closed' && profit !== undefined) {
     if (profit > 0) {
       data.totalProfit += profit;
     } else {
@@ -93,7 +95,6 @@ app.post('/api/add-trade', (req, res) => {
     }
   }
   
-  // تحديث عدد الصفقات المفتوحة
   data.openPositions = data.trades.filter(t => t.status === 'open').length;
   
   saveTradesData(data);
@@ -117,7 +118,9 @@ app.post('/api/update-trade', (req, res) => {
   data.trades[tradeIndex].status = status || 'closed';
   if (profit !== undefined) {
     data.trades[tradeIndex].profit = profit;
-    data.trades[tradeIndex].profitPercent = (profit / (data.trades[tradeIndex].amount * data.trades[tradeIndex].price) * 100).toFixed(2);
+    const amount = data.trades[tradeIndex].amount;
+    const price = data.trades[tradeIndex].price;
+    data.trades[tradeIndex].profitPercent = amount && price ? ((profit / (amount * price)) * 100).toFixed(2) : '0';
   }
   
   data.openPositions = data.trades.filter(t => t.status === 'open').length;
@@ -135,14 +138,33 @@ app.post('/api/update-trade', (req, res) => {
 });
 
 // ==========================================
+// API: حذف جميع الصفقات (إعادة تعيين)
+// ==========================================
+
+app.delete('/api/clear-trades', (req, res) => {
+  const data = {
+    trades: [],
+    totalTrades: 0,
+    totalProfit: 0,
+    totalLoss: 0,
+    openPositions: 0,
+    currentBalance: 0,
+    lastUpdate: new Date().toISOString()
+  };
+  saveTradesData(data);
+  res.json({ success: true, message: '✅ تم مسح جميع الصفقات' });
+});
+
+// ==========================================
 // تشغيل الخادم
 // ==========================================
 
 app.listen(PORT, () => {
   console.log(`
-  ╔═══════════════════════════════════════════════════╗
-  ║   📊 لوحة تحكم البوت - DashBoard                  ║
-  ║   🌐 http://localhost:${PORT}                      ║
-  ╚═══════════════════════════════════════════════════╝
+  ╔═══════════════════════════════════════════════════════════════╗
+  ║   📊 لوحة تحكم البوت - BSC Trading Bot                       ║
+  ║   🌐 http://localhost:${PORT}                                  ║
+  ║   🕐 تحديث تلقائي كل 5 ثواني                                 ║
+  ╚═══════════════════════════════════════════════════════════════╝
   `);
 });
