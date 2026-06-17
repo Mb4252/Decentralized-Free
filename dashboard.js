@@ -13,7 +13,15 @@ const PORT = process.env.DASHBOARD_PORT || 8080;
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static('public'));
+
+// ⭐ تأكد من تقديم الملفات الثابتة من مجلد public
+const publicPath = path.join(__dirname, 'public');
+app.use(express.static(publicPath));
+
+// ⭐ مسار الصفحة الرئيسية (في حال عدم عمل static)
+app.get('/', (req, res) => {
+  res.sendFile(path.join(publicPath, 'index.html'));
+});
 
 const TRADES_FILE = path.join(__dirname, 'data', 'trades.json');
 
@@ -159,7 +167,7 @@ app.delete('/api/clear-trades', (req, res) => {
 // تشغيل الخادم
 // ==========================================
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`
   ╔═══════════════════════════════════════════════════════════════╗
   ║   📊 لوحة تحكم البوت - BSC Trading Bot                       ║
