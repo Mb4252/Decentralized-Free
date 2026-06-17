@@ -6,6 +6,7 @@ const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const nodemailer = require('nodemailer');
 require('dotenv').config();
 
 const bsc = require('./lib/bsc');
@@ -18,7 +19,7 @@ const app = express();
 
 app.set('trust proxy', 1);
 
-// Helmet - حماية الرؤوس
+// Helmet
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -40,7 +41,7 @@ app.use(helmet({
   }
 }));
 
-// CORS - النطاقات المسموحة
+// CORS
 const allowedOrigins = [
   process.env.CLIENT_URL || 'https://crypto-api-c2v8.onrender.com',
   'http://localhost:3000',
@@ -68,7 +69,7 @@ app.use(cookieParser());
 app.use(express.static('app'));
 
 // ==========================================
-// Rate Limiting - حماية من الهجمات
+// Rate Limiting
 // ==========================================
 
 const generalLimiter = rateLimit({
@@ -109,7 +110,88 @@ app.use((req, res, next) => {
 });
 
 // ========================================
-// تهيئة Supabase
+// إعداد البريد الإلكتروني (Nodemailer)
+// ========================================
+
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST || 'smtp.gmail.com',
+  port: process.env.SMTP_PORT || 587,
+  secure: process.env.SMTP_SECURE === 'true' || false,
+  auth: {
+    user: process.env.SMTP_USER || 'your-email@gmail.com',
+    pass: process.env.SMTP_PASS || 'your-app-password'
+  }
+});
+
+// ========================================
+// دالة إرسال رمز التحقق عبر البريد
+// ========================================
+
+async function sendVerificationEmail(email, name, code) {
+  try {
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html dir="rtl" lang="ar">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>رمز التحقق</title>
+        <style>
+          body { font-family: Arial, sans-serif; background: #f0f2f5; padding: 20px; }
+          .container { max-width: 500px; margin: 0 auto; background: white; border-radius: 16px; padding: 32px; border: 1px solid #00aa55; }
+          .header { text-align: center; margin-bottom: 24px; }
+          .header h1 { color: #00aa55; font-size: 24px; }
+          .code { 
+            font-size: 48px; 
+            font-weight: bold; 
+            color: #00aa55; 
+            text-align: center; 
+            padding: 16px; 
+            background: #f5f5f5; 
+            border-radius: 12px;
+            letter-spacing: 8px;
+            margin: 16px 0;
+          }
+          .footer { text-align: center; color: #888; font-size: 12px; margin-top: 24px; }
+          .warning { color: #ff4444; font-size: 12px; text-align: center; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>🛍️ CryptoShop</h1>
+            <p>مرحباً ${name}،</p>
+          </div>
+          <p style="color:#666;text-align:center;">لقد تلقينا طلباً لإنشاء حساب جديد. لتفعيل حسابك، يرجى استخدام رمز التحقق التالي:</p>
+          <div class="code">${code}</div>
+          <p style="color:#666;text-align:center;">هذا الرمز صالح لمدة <strong>10 دقائق</strong>.</p>
+          <p style="color:#666;text-align:center;font-size:14px;">إذا لم تطلب هذا، يمكنك تجاهل هذا البريد.</p>
+          <div class="warning">⚠️ لا تشارك هذا الرمز مع أي شخص</div>
+          <div class="footer">
+            © ${new Date().getFullYear()} CryptoShop - منصة الشراء الجماعي
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || 'noreply@cryptoshop.com',
+      to: email,
+      subject: '🔑 رمز التحقق - CryptoShop',
+      html: htmlContent
+    });
+
+    console.log(`✅ تم إرسال رمز التحقق إلى ${email}`);
+    return { success: true };
+  } catch (error) {
+    console.error('❌ فشل إرسال البريد:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+// ========================================
+// Supabase
 // ========================================
 const supabaseAdmin = createClient(
   process.env.SUPABASE_URL,
@@ -139,8 +221,12 @@ function generateUUID() {
   });
 }
 
+function generateVerificationCode() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
 // ==========================================
-// Audit Log - تسجيل الأحداث
+// Audit Log
 // ==========================================
 async function logAudit(userId, action, details = {}, req = null) {
   try {
@@ -160,7 +246,7 @@ async function logAudit(userId, action, details = {}, req = null) {
 }
 
 // ==========================================
-// Middleware للمصادقة
+// Middleware
 // ==========================================
 
 function authenticateToken(req, res, next) {
@@ -196,6 +282,257 @@ function authenticateAdmin(req, res, next) {
 // ==========================================
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// ==========================================
+// API: طلب رمز التحقق (للتسجيل)
+// ==========================================
+app.post('/api/request-verification', async (req, res) => {
+  const { email, name } = req.body;
+  
+  console.log('📝 طلب رمز تحقق:', email);
+  
+  if (!email || !name) {
+    return res.status(400).json({ error: 'البريد والاسم مطلوبان' });
+  }
+  
+  try {
+    // التحقق من عدم وجود البريد
+    const { data: existing } = await supabaseAdmin
+      .from('users')
+      .select('id')
+      .eq('email', email)
+      .single();
+    
+    if (existing) {
+      return res.status(400).json({ error: 'هذا البريد مسجل بالفعل' });
+    }
+    
+    // إنشاء رمز تحقق
+    const code = generateVerificationCode();
+    const expiry = new Date();
+    expiry.setMinutes(expiry.getMinutes() + 10);
+    
+    // تخزين رمز التحقق
+    await supabaseAdmin
+      .from('verification_codes')
+      .upsert({
+        email: email,
+        code: code,
+        name: name,
+        expiry: expiry.toISOString(),
+        created_at: new Date().toISOString()
+      }, { onConflict: 'email' });
+    
+    // إرسال رمز التحقق عبر البريد
+    const emailResult = await sendVerificationEmail(email, name, code);
+    
+    if (!emailResult.success) {
+      return res.status(500).json({ error: 'فشل إرسال رمز التحقق. يرجى المحاولة لاحقاً.' });
+    }
+    
+    console.log(`✅ تم إرسال رمز التحقق إلى ${email}`);
+    
+    res.json({
+      success: true,
+      message: '✅ تم إرسال رمز التحقق إلى بريدك الإلكتروني'
+    });
+    
+  } catch (error) {
+    console.error('Request verification error:', error);
+    res.status(500).json({ error: 'حدث خطأ داخلي' });
+  }
+});
+
+// ==========================================
+// API: إعادة إرسال رمز التحقق
+// ==========================================
+app.post('/api/resend-verification', async (req, res) => {
+  const { email } = req.body;
+  
+  if (!email) {
+    return res.status(400).json({ error: 'البريد الإلكتروني مطلوب' });
+  }
+  
+  try {
+    const { data: verification, error: vError } = await supabaseAdmin
+      .from('verification_codes')
+      .select('*')
+      .eq('email', email)
+      .single();
+    
+    if (vError || !verification) {
+      return res.status(400).json({ error: 'لا يوجد طلب تحقق لهذا البريد' });
+    }
+    
+    // إنشاء رمز جديد
+    const newCode = generateVerificationCode();
+    const expiry = new Date();
+    expiry.setMinutes(expiry.getMinutes() + 10);
+    
+    await supabaseAdmin
+      .from('verification_codes')
+      .update({
+        code: newCode,
+        expiry: expiry.toISOString(),
+        created_at: new Date().toISOString()
+      })
+      .eq('email', email);
+    
+    // إرسال الرمز الجديد
+    const emailResult = await sendVerificationEmail(email, verification.name, newCode);
+    
+    if (!emailResult.success) {
+      return res.status(500).json({ error: 'فشل إرسال رمز التحقق' });
+    }
+    
+    res.json({
+      success: true,
+      message: '✅ تم إعادة إرسال رمز التحقق إلى بريدك الإلكتروني'
+    });
+    
+  } catch (error) {
+    console.error('Resend verification error:', error);
+    res.status(500).json({ error: 'حدث خطأ داخلي' });
+  }
+});
+
+// ==========================================
+// API: إنشاء حساب (مع التحقق من الرمز)
+// ==========================================
+app.post('/api/register', loginLimiter, async (req, res) => {
+  const { 
+    email, password, name, referralCode,
+    verificationCode,
+    deviceFingerprint, deviceInfo
+  } = req.body;
+  
+  console.log('📝 محاولة إنشاء حساب مع التحقق:', email);
+  
+  if (!email || !password || !name || !verificationCode) {
+    return res.status(400).json({ error: 'جميع الحقول مطلوبة (بما في ذلك رمز التحقق)' });
+  }
+  
+  if (password.length < 4) {
+    return res.status(400).json({ error: 'كلمة المرور 4 أحرف على الأقل' });
+  }
+  
+  try {
+    // التحقق من رمز التحقق
+    const { data: verification, error: vError } = await supabaseAdmin
+      .from('verification_codes')
+      .select('*')
+      .eq('email', email)
+      .single();
+    
+    if (vError || !verification) {
+      return res.status(400).json({ error: 'لم يتم طلب رمز تحقق لهذا البريد' });
+    }
+    
+    // التحقق من صحة الرمز
+    if (verification.code !== verificationCode) {
+      return res.status(400).json({ error: 'رمز التحقق غير صحيح' });
+    }
+    
+    // التحقق من صلاحية الرمز
+    const expiry = new Date(verification.expiry);
+    if (expiry < new Date()) {
+      return res.status(400).json({ error: 'انتهت صلاحية رمز التحقق. يرجى طلب رمز جديد' });
+    }
+    
+    // التحقق من عدم وجود المستخدم
+    const { data: existing } = await supabaseAdmin
+      .from('users')
+      .select('id')
+      .eq('email', email)
+      .single();
+    
+    if (existing) {
+      return res.status(400).json({ error: 'هذا البريد مسجل بالفعل' });
+    }
+    
+    // تشفير كلمة المرور
+    const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+    const userId = generateUUID();
+    const newReferralCode = Math.random().toString(36).substring(2, 10).toUpperCase();
+    
+    let referrerId = null;
+    if (referralCode) {
+      const { data: referrer } = await supabaseAdmin
+        .from('users')
+        .select('id')
+        .eq('referral_code', referralCode.toUpperCase())
+        .single();
+      if (referrer) referrerId = referrer.id;
+    }
+    
+    // تخزين آخر كلمة مرور للاستعادة
+    const lastPasswordUsed = await bcrypt.hash(password, 8);
+    
+    const userData = {
+      id: userId,
+      email,
+      password: hashedPassword,
+      name: name || email.split('@')[0],
+      referral_code: newReferralCode,
+      referrer_id: referrerId,
+      is_admin: false,
+      available_balance: 0,
+      platform_balance: 0,
+      total_orders: 0,
+      total_spent: 0,
+      device_fingerprint: deviceFingerprint || null,
+      device_info: deviceInfo || null,
+      last_password_used: lastPasswordUsed,
+      email_verified: true,
+      created_at: new Date().toISOString()
+    };
+    
+    const { error: insertError } = await supabaseAdmin
+      .from('users')
+      .insert(userData);
+    
+    if (insertError) {
+      console.error('Insert error:', insertError);
+      return res.status(500).json({ error: 'حدث خطأ في إنشاء الحساب' });
+    }
+    
+    // حذف رمز التحقق بعد الاستخدام
+    await supabaseAdmin
+      .from('verification_codes')
+      .delete()
+      .eq('email', email);
+    
+    // إنشاء JWT token
+    const token = jwt.sign(
+      { userId, email, name, is_admin: false },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+    
+    const isProd = process.env.NODE_ENV === 'production';
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: isProd ? 'none' : 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: '/'
+    });
+    
+    await logAudit(userId, 'register_verified', { email }, req);
+    
+    console.log('✅ تم إنشاء الحساب بنجاح مع التحقق:', email);
+    
+    res.json({
+      success: true,
+      user: { id: userId, email, name, is_admin: false },
+      referral_code: newReferralCode
+    });
+    
+  } catch (error) {
+    console.error('Register error:', error);
+    res.status(500).json({ error: 'حدث خطأ داخلي' });
+  }
 });
 
 // ==========================================
@@ -309,130 +646,6 @@ app.post('/api/logout', (req, res) => {
 });
 
 // ==========================================
-// API: إنشاء حساب
-// ==========================================
-app.post('/api/register', loginLimiter, async (req, res) => {
-  const { 
-    email, password, name, referralCode,
-    deviceFingerprint, deviceInfo,
-    authProvider, authProviderId, photoURL,
-    securityQuestion, securityAnswer, securityEnabled
-  } = req.body;
-  
-  console.log('📝 محاولة إنشاء حساب:', email);
-  
-  if (!email || !password || !name) {
-    return res.status(400).json({ error: 'جميع الحقول مطلوبة' });
-  }
-  
-  if (password.length < 4 && !authProvider) {
-    return res.status(400).json({ error: 'كلمة المرور 4 أحرف على الأقل' });
-  }
-  
-  try {
-    const { data: existing } = await supabaseAdmin
-      .from('users')
-      .select('id')
-      .eq('email', email)
-      .single();
-    
-    if (existing) {
-      return res.status(400).json({ error: 'البريد مسجل بالفعل' });
-    }
-    
-    const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
-    const userId = generateUUID();
-    const newReferralCode = Math.random().toString(36).substring(2, 10).toUpperCase();
-    
-    let referrerId = null;
-    if (referralCode) {
-      const { data: referrer } = await supabaseAdmin
-        .from('users')
-        .select('id')
-        .eq('referral_code', referralCode.toUpperCase())
-        .single();
-      if (referrer) referrerId = referrer.id;
-    }
-    
-    // تخزين آخر كلمة مرور للاستعادة
-    const lastPasswordUsed = await bcrypt.hash(password, 8);
-    
-    // تشفير الإجابة الأمنية
-    let hashedSecurityAnswer = null;
-    if (securityEnabled && securityQuestion && securityAnswer) {
-      hashedSecurityAnswer = await bcrypt.hash(securityAnswer, SALT_ROUNDS);
-    }
-    
-    const userData = {
-      id: userId,
-      email,
-      password: hashedPassword,
-      name,
-      referral_code: newReferralCode,
-      referrer_id: referrerId,
-      is_admin: false,
-      available_balance: 0,
-      platform_balance: 0,
-      total_orders: 0,
-      total_spent: 0,
-      device_fingerprint: deviceFingerprint || null,
-      device_info: deviceInfo || null,
-      last_password_used: lastPasswordUsed,
-      security_question: securityEnabled ? securityQuestion : null,
-      security_answer: hashedSecurityAnswer,
-      security_question_enabled: securityEnabled || false,
-      created_at: new Date().toISOString()
-    };
-    
-    // إذا كان من Google
-    if (authProvider === 'google') {
-      userData.auth_provider = 'google';
-      userData.auth_provider_id = authProviderId;
-      userData.photo_url = photoURL || null;
-    }
-    
-    const { error: insertError } = await supabaseAdmin
-      .from('users')
-      .insert(userData);
-    
-    if (insertError) {
-      console.error('Insert error:', insertError);
-      return res.status(500).json({ error: 'حدث خطأ في إنشاء الحساب' });
-    }
-    
-    // إنشاء JWT token
-    const token = jwt.sign(
-      { userId, email, name, is_admin: false },
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-    
-    const isProd = process.env.NODE_ENV === 'production';
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure: isProd,
-      sameSite: isProd ? 'none' : 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      path: '/'
-    });
-    
-    await logAudit(userId, 'register', { email, authProvider: authProvider || 'email' }, req);
-    
-    console.log('✅ تم إنشاء الحساب بنجاح:', email);
-    
-    res.json({
-      success: true,
-      user: { id: userId, email, name, is_admin: false },
-      referral_code: newReferralCode
-    });
-    
-  } catch (error) {
-    console.error('Register error:', error);
-    res.status(500).json({ error: 'حدث خطأ داخلي' });
-  }
-});
-
-// ==========================================
 // API: تسجيل الدخول عبر Google (Firebase)
 // ==========================================
 app.post('/api/auth/google', async (req, res) => {
@@ -445,7 +658,6 @@ app.post('/api/auth/google', async (req, res) => {
   }
   
   try {
-    // التحقق من وجود المستخدم
     const { data: existingUser } = await supabaseAdmin
       .from('users')
       .select('*')
@@ -456,7 +668,6 @@ app.post('/api/auth/google', async (req, res) => {
     let isNewUser = false;
     
     if (!existingUser) {
-      // إنشاء حساب جديد
       isNewUser = true;
       const randomPassword = Math.random().toString(36).substring(2, 15);
       const hashedPassword = await bcrypt.hash(randomPassword, SALT_ROUNDS);
@@ -483,6 +694,7 @@ app.post('/api/auth/google', async (req, res) => {
           device_fingerprint: deviceFingerprint || null,
           device_info: deviceInfo || null,
           last_password_used: lastPasswordUsed,
+          email_verified: true,
           created_at: new Date().toISOString()
         });
       
@@ -496,7 +708,6 @@ app.post('/api/auth/google', async (req, res) => {
     } else {
       userId = existingUser.id;
       
-      // تحديث معلومات المستخدم
       await supabaseAdmin
         .from('users')
         .update({
@@ -511,7 +722,6 @@ app.post('/api/auth/google', async (req, res) => {
         .eq('id', userId);
     }
     
-    // إنشاء JWT token
     const token = jwt.sign(
       { 
         userId: userId, 
@@ -1351,7 +1561,6 @@ app.post('/api/recovery/device-check', async (req, res) => {
       });
     }
     
-    // التحقق من الحظر
     if (user.recovery_blocked_until && new Date(user.recovery_blocked_until) > new Date()) {
       const remaining = Math.ceil((new Date(user.recovery_blocked_until) - new Date()) / 60000);
       return res.status(400).json({
@@ -1359,7 +1568,6 @@ app.post('/api/recovery/device-check', async (req, res) => {
       });
     }
     
-    // التحقق من تطابق الجهاز
     const deviceMatched = user.device_fingerprint === deviceFingerprint;
     
     if (!deviceMatched) {
@@ -1391,7 +1599,6 @@ app.post('/api/recovery/device-check', async (req, res) => {
       });
     }
     
-    // إعادة تعيين محاولات الفشل
     await supabaseAdmin
       .from('users')
       .update({
@@ -1437,12 +1644,10 @@ app.post('/api/recovery/verify-last-password', async (req, res) => {
       return res.status(400).json({ error: 'بيانات غير صحيحة' });
     }
     
-    // التحقق من الجهاز
     if (user.device_fingerprint !== deviceFingerprint) {
       return res.status(400).json({ error: 'الجهاز غير معروف لهذا الحساب' });
     }
     
-    // التحقق من آخر كلمة مرور
     let lastPasswordValid = false;
     try {
       lastPasswordValid = await bcrypt.compare(lastPassword, user.last_password_used);
@@ -1456,11 +1661,9 @@ app.post('/api/recovery/verify-last-password', async (req, res) => {
       return res.status(400).json({ error: 'كلمة المرور القديمة غير صحيحة' });
     }
     
-    // تشفير كلمة المرور الجديدة
     const hashedPassword = await bcrypt.hash(newPassword, SALT_ROUNDS);
     const newLastPassword = await bcrypt.hash(newPassword, 8);
     
-    // تحديث كلمة المرور
     await supabaseAdmin
       .from('users')
       .update({
@@ -1509,7 +1712,6 @@ app.post('/api/recovery/security-question', async (req, res) => {
       return res.status(400).json({ error: 'لم يتم تفعيل السؤال الأمني لهذا الحساب' });
     }
     
-    // التحقق من الإجابة
     const isValid = await bcrypt.compare(answer, user.security_answer);
     
     if (!isValid) {
@@ -1536,15 +1738,16 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`
   ╔═══════════════════════════════════════════════════════════════╗
-  ║   🛍️  منصة الشراء الجماعي - النسخة الآمنة                     ║
+  ║   🛍️  منصة الشراء الجماعي - النسخة النهائية                    ║
   ║   📡 الخادم على المنفذ: ${PORT}                                  ║
   ║   🌐 ${process.env.CLIENT_URL || `http://localhost:${PORT}`}     ║
   ║   🔐 JWT + HttpOnly Cookies                                    ║
-  ║   🛡️ Helmet + Rate Limiting + CORS محدود                      ║
+  ║   📧 التحقق الإلزامي من البريد الإلكتروني (OTP)               ║
   ║   🔑 Google Sign-In (Firebase) مفعل                           ║
   ║   📱 استعادة كلمة المرور عبر الجهاز                           ║
   ║   💰 نظام استرداد الأموال (Refund) مفعل                         ║
   ║   📅 نظام تأجيل المنتجات (Delay) مفعل                           ║
+  ║   🛡️ Helmet + Rate Limiting + CORS محدود                      ║
   ╚═══════════════════════════════════════════════════════════════╝
   `);
 });
