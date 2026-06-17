@@ -145,6 +145,8 @@
     .status-shipped { background: rgba(0,204,255,0.2); color: #00ccff; }
     .status-delivered { background: rgba(5,150,105,0.2); color: #059669; }
     .status-withdrawn { background: rgba(255,68,68,0.2); color: #ff4444; }
+    .status-refunded { background: rgba(124,58,237,0.2); color: #7c3aed; }
+    .status-delayed { background: rgba(255,170,0,0.2); color: #ffaa00; }
     .bottom-nav {
       position: fixed;
       bottom: 0;
@@ -264,6 +266,7 @@
     .admin-btn:hover { opacity: 0.8; transform: scale(1.02); }
     .admin-btn-danger { background: linear-gradient(135deg, #dc2626, #b91c1c); }
     .admin-btn-success { background: linear-gradient(135deg, #059669, #047857); }
+    .admin-btn-warning { background: linear-gradient(135deg, #f59e0b, #d97706); }
     .message {
       padding: 12px;
       border-radius: 12px;
@@ -325,6 +328,8 @@
     body.dark-mode .info-box { background: rgba(0,255,102,0.05); border-color: #00ff66; color: #00ff66; }
     body.dark-mode .admin-panel { background: rgba(124,58,237,0.12); }
     body.dark-mode .transaction-amount { color: #00ff66; }
+    body.dark-mode .status-refunded { background: rgba(124,58,237,0.2); color: #a78bfa; }
+    body.dark-mode .status-delayed { background: rgba(255,170,0,0.2); color: #fbbf24; }
   </style>
 </head>
 <body>
@@ -613,11 +618,13 @@
               <div class="progress-bar"><div class="progress-fill" style="width:${progress}%"></div></div>
               <div class="product-meta" style="margin-top:8px;">📦 المتبقي: ${remaining} قطعة</div>
               <div class="product-meta">📍 ${p.delivery_locations?.join(', ') || '-'}</div>
+              <div class="product-meta">📅 موعد التسليم: ${p.delivery_date ? new Date(p.delivery_date).toLocaleDateString() : 'سيُحدد لاحقاً'}</div>
               ${!isCompleted ? `<button class="btn-order" data-id="${p.id}">🛒 شراء</button>` : '<span style="color:#00aa55;">✅ اكتمل</span>'}
               ${isAdmin ? `
                 <div style="margin-top:12px;">
                   <button class="admin-btn admin-btn-success" data-product="${p.id}" data-action="orders">📋 الطلبات</button>
                   <button class="admin-btn admin-btn-danger" data-product="${p.id}" data-action="delete">🗑️ حذف</button>
+                  <button class="admin-btn admin-btn-warning" data-product="${p.id}" data-action="delay">📅 تأجيل</button>
                 </div>
               ` : ''}
             </div>
@@ -648,6 +655,8 @@
               showAdminProductOrders(productId);
             } else if (action === 'delete') {
               deleteProduct(productId);
+            } else if (action === 'delay') {
+              delayProduct(productId);
             }
           });
         });
@@ -783,7 +792,9 @@
           'shipped': { text: '📦 تم الشحن', class: 'status-shipped' },
           'in_location': { text: '📍 في منطقة الاستلام', class: 'status-in_location' },
           'delivered': { text: '✅ تم التوصيل', class: 'status-delivered' },
-          'withdrawn': { text: '📤 تم السحب', class: 'status-withdrawn' }
+          'withdrawn': { text: '📤 تم السحب', class: 'status-withdrawn' },
+          'refunded': { text: '💰 تم الاسترداد', class: 'status-refunded' },
+          'delayed': { text: '📅 تم التأجيل', class: 'status-delayed' }
         };
 
         container.innerHTML = orders.map(o => {
@@ -804,6 +815,8 @@
               ${isBanned ? `<span style="color:#ff4444;font-size:12px;">🚫 مستبعد</span>` : ''}
               ${canWithdraw ? `<button class="btn-withdraw" data-order="${o.id}">📤 سحب</button>` : ''}
               ${o.status === 'delivered' ? `<span style="color:#00aa55;">✅ تم الاستلام</span>` : ''}
+              ${o.status === 'refunded' ? `<span style="color:#7c3aed;">💰 تم استرداد المبلغ</span>` : ''}
+              ${o.status === 'delayed' ? `<span style="color:#f59e0b;">📅 تم تأجيل الطلب</span>` : ''}
             </div>
           `;
         }).join('');
@@ -1063,7 +1076,7 @@
         if (transactions.length === 0) {
           listDiv.innerHTML = '<p style="color:#888;text-align:center;">لا توجد معاملات</p>';
         } else {
-          const typeMap = { 'deposit': '💰 إيداع', 'withdraw': '📤 سحب', 'profit': '📈 ربح', 'commission': '🎁 عمولة' };
+          const typeMap = { 'deposit': '💰 إيداع', 'withdraw': '📤 سحب', 'profit': '📈 ربح', 'commission': '🎁 عمولة', 'refund': '🔄 استرداد' };
           listDiv.innerHTML = transactions.map(t => `
             <div class="transaction-item">
               <div>
@@ -1099,7 +1112,9 @@
             'shipped': '📦 تم الشحن',
             'in_location': '📍 في منطقة الاستلام',
             'delivered': '✅ تم التوصيل',
-            'withdrawn': '📤 تم السحب'
+            'withdrawn': '📤 تم السحب',
+            'refunded': '💰 تم الاسترداد',
+            'delayed': '📅 تم التأجيل'
           };
           listDiv.innerHTML = orders.map(o => `
             <div class="transaction-item">
@@ -1139,20 +1154,24 @@
           return;
         }
 
-        const statusOptions = ['pending', 'confirmed', 'shipped', 'in_location', 'delivered'];
+        const statusOptions = ['pending', 'confirmed', 'shipped', 'in_location', 'delivered', 'refunded', 'delayed'];
         const statusLabels = {
           'pending': '⏳ قيد الانتظار',
           'confirmed': '✅ تم التأكيد',
           'shipped': '📦 تم الشحن',
           'in_location': '📍 في منطقة الاستلام',
-          'delivered': '✅ تم التوصيل'
+          'delivered': '✅ تم التوصيل',
+          'refunded': '💰 تم الاسترداد',
+          'delayed': '📅 تم التأجيل'
         };
         const statusClasses = {
           'pending': 'status-pending',
           'confirmed': 'status-confirmed',
           'shipped': 'status-shipped',
           'in_location': 'status-in_location',
-          'delivered': 'status-delivered'
+          'delivered': 'status-delivered',
+          'refunded': 'status-refunded',
+          'delayed': 'status-delayed'
         };
 
         let html = `
@@ -1163,6 +1182,9 @@
 
         orders.forEach(o => {
           const isWithdrawn = o.status === 'withdrawn' || o.is_banned;
+          const isRefunded = o.status === 'refunded';
+          const isDelayed = o.status === 'delayed';
+          
           html += `
             <div style="background:rgba(0,0,0,0.05);border-radius:12px;padding:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
               <div>
@@ -1171,17 +1193,23 @@
                 <div style="color:#888;font-size:12px;">📍 ${o.location || '-'}</div>
                 <div style="color:#888;font-size:12px;">📦 ${o.quantity} قطعة</div>
                 ${isWithdrawn ? '<div style="color:#ff4444;font-weight:bold;">📤 تم السحب</div>' : ''}
+                ${isRefunded ? '<div style="color:#7c3aed;font-weight:bold;">💰 تم الاسترداد</div>' : ''}
+                ${isDelayed ? '<div style="color:#f59e0b;font-weight:bold;">📅 تم التأجيل</div>' : ''}
+                ${o.admin_notes ? `<div style="color:#888;font-size:11px;">📝 ${o.admin_notes}</div>` : ''}
               </div>
               <div style="text-align:left;">
-                ${!isWithdrawn ? `
+                ${!isWithdrawn && !isRefunded ? `
                   <span class="status-badge ${statusClasses[o.status] || ''}">${statusLabels[o.status] || o.status}</span>
                   <div style="margin-top:8px;">
                     <select id="statusSelect_${o.id}" style="background:white;color:#1a1a2e;border:1px solid #00aa55;border-radius:8px;padding:4px 8px;font-size:11px;">
                       ${statusOptions.map(s => `<option value="${s}" ${s === o.status ? 'selected' : ''}>${statusLabels[s] || s}</option>`).join('')}
                     </select>
                     <button class="admin-btn admin-btn-success" data-order="${o.id}" style="font-size:10px;">تحديث</button>
+                    <button class="admin-btn admin-btn-danger" data-order="${o.id}" data-action="refund" style="font-size:10px;">💰 استرداد</button>
                   </div>
-                ` : '<span style="color:#ff4444;font-weight:bold;">📤 تم السحب</span>'}
+                ` : ''}
+                ${isRefunded ? '<span style="color:#7c3aed;font-weight:bold;">💰 تم استرداد المبلغ</span>' : ''}
+                ${isWithdrawn ? '<span style="color:#ff4444;font-weight:bold;">📤 تم السحب</span>' : ''}
               </div>
             </div>
           `;
@@ -1204,6 +1232,13 @@
         document.querySelectorAll('#adminOrdersModal .admin-btn[data-order]').forEach(btn => {
           btn.addEventListener('click', async function() {
             const orderId = parseInt(this.dataset.order);
+            const action = this.dataset.action;
+            
+            if (action === 'refund') {
+              await refundOrder(orderId);
+              return;
+            }
+            
             const select = document.getElementById(`statusSelect_${orderId}`);
             const status = select.value;
 
@@ -1235,6 +1270,76 @@
       } catch (error) {
         showMessage('❌ خطأ في التحميل', 'error');
         console.error('Admin orders error:', error);
+      }
+    }
+
+    // ==========================================
+    // استرداد أموال (Refund)
+    // ==========================================
+
+    async function refundOrder(orderId) {
+      if (!confirm('⚠️ هل أنت متأكد من استرداد أموال هذا الطلب؟\nسيتم إعادة المبلغ للمستخدم.')) return;
+      
+      const reason = prompt('📝 سبب الاسترداد:', 'عدم توفر المنتج');
+      if (reason === null) return;
+      
+      try {
+        const res = await fetchWithAuth(`${API_URL}/api/admin/refund-order`, {
+          method: 'POST',
+          body: JSON.stringify({ 
+            orderId: orderId, 
+            reason: reason.trim() || 'عدم توفر المنتج' 
+          })
+        });
+        if (!res) return;
+        const data = await res.json();
+        if (data.success) {
+          showMessage(data.message, 'success', 5000);
+          // تحديث الصفحة
+          setTimeout(() => {
+            document.getElementById('adminOrdersModal')?.remove();
+            showAdminProductOrders(currentProductId);
+          }, 1000);
+        } else {
+          showMessage('❌ ' + data.error, 'error');
+        }
+      } catch (error) {
+        showMessage('❌ خطأ في الاتصال', 'error');
+        console.error('Refund error:', error);
+      }
+    }
+
+    // ==========================================
+    // تأجيل المنتج (Delay)
+    // ==========================================
+
+    async function delayProduct(productId) {
+      const newDate = prompt('📅 أدخل التاريخ الجديد للتسليم (YYYY-MM-DD):');
+      if (!newDate) return;
+      
+      const reason = prompt('📝 سبب التأخير:', 'تأخر في التوريد');
+      if (reason === null) return;
+      
+      try {
+        const res = await fetchWithAuth(`${API_URL}/api/admin/delay-product`, {
+          method: 'POST',
+          body: JSON.stringify({
+            productId: productId,
+            newDeliveryDate: newDate,
+            reason: reason.trim() || 'تأخر في التوريد'
+          })
+        });
+        if (!res) return;
+        const data = await res.json();
+        if (data.success) {
+          showMessage(data.message, 'warning', 5000);
+          renderProducts();
+        } else {
+          showMessage('❌ ' + data.error, 'error');
+        }
+      } catch (error) {
+        showMessage('❌ خطأ في الاتصال', 'error');
+        console.error('Delay product error:', error);
       }
     }
 
