@@ -10,12 +10,13 @@
       font-family: Arial, sans-serif;
       background: #f0f2f5;
       padding: 20px;
+      direction: rtl;
     }
-    .container { max-width: 900px; margin: 0 auto; }
+    .container { max-width: 1000px; margin: 0 auto; }
     h1 { color: #00aa55; text-align: center; margin-bottom: 20px; }
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
       gap: 16px;
       margin-bottom: 20px;
     }
@@ -32,6 +33,25 @@
     .stat-card .profit { color: #00aa55; }
     .stat-card .loss { color: #ff4444; }
     .stat-card .open { color: #ffaa00; }
+    .controls {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 30px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: all 0.3s;
+    }
+    .btn-refresh { background: #00aa55; color: white; }
+    .btn-refresh:hover { background: #008844; }
+    .btn-clear { background: #ff4444; color: white; }
+    .btn-clear:hover { background: #cc0000; }
+    .btn-refresh:disabled { opacity: 0.6; cursor: not-allowed; }
     table {
       width: 100%;
       background: white;
@@ -44,29 +64,20 @@
       background: #00aa55;
       color: white;
       padding: 12px;
-      text-align: right;
+      text-align: center;
     }
     td {
       padding: 10px 12px;
       border-bottom: 1px solid #eee;
+      text-align: center;
     }
     td .profit { color: #00aa55; font-weight: bold; }
     td .loss { color: #ff4444; font-weight: bold; }
     td .open-status { color: #ffaa00; font-weight: bold; }
     td .closed-status { color: #666; }
-    .refresh-btn {
-      background: #00aa55;
-      color: white;
-      border: none;
-      padding: 10px 20px;
-      border-radius: 30px;
-      cursor: pointer;
-      font-weight: bold;
-      margin-bottom: 16px;
-    }
-    .refresh-btn:hover { background: #008844; }
-    .footer { text-align: center; color: #888; font-size: 12px; margin-top: 16px; }
     .empty { text-align: center; color: #888; padding: 40px 0; }
+    .last-update { color: #888; font-size: 12px; text-align: center; margin-top: 12px; }
+    .trade-id { font-size: 11px; color: #888; }
   </style>
 </head>
 <body>
@@ -74,11 +85,16 @@
   <div class="container">
     <h1>🤖 لوحة تحكم البوت - CryptoBot</h1>
 
-    <button class="refresh-btn" onclick="loadData()">🔄 تحديث</button>
+    <div class="controls">
+      <button class="btn btn-refresh" onclick="loadData()">🔄 تحديث</button>
+      <button class="btn btn-clear" onclick="clearTrades()">🗑️ مسح الصفقات</button>
+      <span style="flex:1;"></span>
+      <span id="autoStatus" style="color:#00aa55;font-weight:bold;">🟢 تحديث تلقائي</span>
+    </div>
 
     <div class="stats-grid" id="statsGrid">
       <div class="stat-card">
-        <div class="value" id="openPositions">0</div>
+        <div class="value open" id="openPositions">0</div>
         <div class="label">📊 صفقات مفتوحة</div>
       </div>
       <div class="stat-card">
@@ -86,20 +102,20 @@
         <div class="label">📋 إجمالي الصفقات</div>
       </div>
       <div class="stat-card">
-        <div class="value profit" id="totalProfit">0.00</div>
+        <div class="value profit" id="totalProfit">0.0000</div>
         <div class="label">💰 إجمالي الربح</div>
       </div>
       <div class="stat-card">
-        <div class="value loss" id="totalLoss">0.00</div>
+        <div class="value loss" id="totalLoss">0.0000</div>
         <div class="label">📉 إجمالي الخسارة</div>
       </div>
       <div class="stat-card">
-        <div class="value" id="netProfit">0.00</div>
+        <div class="value" id="netProfit">0.0000</div>
         <div class="label">📊 صافي الربح</div>
       </div>
     </div>
 
-    <div id="tradesTable">
+    <div style="overflow-x:auto;">
       <table>
         <thead>
           <tr>
@@ -114,18 +130,27 @@
           </tr>
         </thead>
         <tbody id="tradesBody">
-          <tr><td colspan="8" class="empty">جاري التحميل...</td></tr>
+          <tr><td colspan="8" class="empty">⏳ جاري التحميل...</td></tr>
         </tbody>
       </table>
     </div>
 
-    <div class="footer">🔄 يتم التحديث التلقائي كل 30 ثانية</div>
+    <div class="last-update" id="lastUpdate">آخر تحديث: --</div>
   </div>
 
   <script>
     let currentData = null;
+    let autoRefreshInterval = null;
+    let isRefreshing = false;
 
     async function loadData() {
+      if (isRefreshing) return;
+      isRefreshing = true;
+
+      const btn = document.querySelector('.btn-refresh');
+      btn.disabled = true;
+      btn.textContent = '⏳ جاري...';
+
       try {
         const response = await fetch('/api/status');
         const data = await response.json();
@@ -135,42 +160,53 @@
         console.error('❌ خطأ في التحميل:', error);
         document.getElementById('tradesBody').innerHTML = '<tr><td colspan="8" class="empty">❌ خطأ في الاتصال بالخادم</td></tr>';
       }
+
+      btn.disabled = false;
+      btn.textContent = '🔄 تحديث';
+      isRefreshing = false;
     }
 
     function updateUI(data) {
       // تحديث الإحصائيات
       document.getElementById('openPositions').textContent = data.openPositions || 0;
       document.getElementById('totalTrades').textContent = data.totalTrades || 0;
-      document.getElementById('totalProfit').textContent = (data.totalProfit || 0).toFixed(4);
-      document.getElementById('totalLoss').textContent = (data.totalLoss || 0).toFixed(4);
       
-      const netProfit = (data.totalProfit || 0) - (data.totalLoss || 0);
+      const totalProfit = data.totalProfit || 0;
+      const totalLoss = data.totalLoss || 0;
+      document.getElementById('totalProfit').textContent = totalProfit.toFixed(4);
+      document.getElementById('totalLoss').textContent = totalLoss.toFixed(4);
+      
+      const netProfit = totalProfit - totalLoss;
       const netElement = document.getElementById('netProfit');
       netElement.textContent = netProfit.toFixed(4);
       netElement.className = 'value ' + (netProfit >= 0 ? 'profit' : 'loss');
+
+      // تحديث وقت آخر تحديث
+      document.getElementById('lastUpdate').textContent = 'آخر تحديث: ' + new Date(data.lastUpdate || Date.now()).toLocaleTimeString();
 
       // تحديث جدول الصفقات
       const tbody = document.getElementById('tradesBody');
       
       if (!data.trades || data.trades.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="empty">لا توجد صفقات حتى الآن</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="empty">📭 لا توجد صفقات حتى الآن</td></tr>';
         return;
       }
 
-      tbody.innerHTML = data.trades.map(trade => {
+      tbody.innerHTML = data.trades.slice(0, 50).map(trade => {
         const isProfit = trade.profit > 0;
         const profitClass = isProfit ? 'profit' : 'loss';
         const statusClass = trade.status === 'open' ? 'open-status' : 'closed-status';
         const statusText = trade.status === 'open' ? '🟡 مفتوحة' : '🔒 مغلقة';
+        const typeText = trade.type === 'buy' ? '🟢 شراء' : '🔴 بيع';
         
         return `
           <tr>
-            <td>${trade.id}</td>
-            <td>${trade.type === 'buy' ? '🟢 شراء' : '🔴 بيع'}</td>
+            <td class="trade-id">${String(trade.id).slice(-6)}</td>
+            <td>${typeText}</td>
             <td>${trade.token}</td>
-            <td>${trade.amount.toFixed(6)}</td>
-            <td>${trade.price.toFixed(6)}</td>
-            <td class="${profitClass}">${trade.profit.toFixed(4)} (${trade.profitPercent || '0'}%)</td>
+            <td>${(trade.amount || 0).toFixed(6)}</td>
+            <td>${(trade.price || 0).toFixed(4)}</td>
+            <td class="${profitClass}">${(trade.profit || 0).toFixed(4)} (${trade.profitPercent || '0'}%)</td>
             <td class="${statusClass}">${statusText}</td>
             <td>${new Date(trade.timestamp).toLocaleTimeString()}</td>
           </tr>
@@ -178,9 +214,32 @@
       }).join('');
     }
 
-    // تحديث تلقائي كل 30 ثانية
+    async function clearTrades() {
+      if (!confirm('⚠️ هل أنت متأكد من مسح جميع الصفقات؟')) return;
+      
+      try {
+        const response = await fetch('/api/clear-trades', { method: 'DELETE' });
+        const data = await response.json();
+        if (data.success) {
+          alert('✅ تم مسح جميع الصفقات');
+          loadData();
+        }
+      } catch (error) {
+        alert('❌ خطأ في مسح الصفقات');
+        console.error(error);
+      }
+    }
+
+    // بدء التحديث التلقائي كل 5 ثواني
+    function startAutoRefresh() {
+      if (autoRefreshInterval) clearInterval(autoRefreshInterval);
+      autoRefreshInterval = setInterval(loadData, 5000);
+      document.getElementById('autoStatus').textContent = '🟢 تحديث تلقائي (5 ثواني)';
+    }
+
+    // التحميل الأولي
     loadData();
-    setInterval(loadData, 30000);
+    startAutoRefresh();
   </script>
 </body>
 </html>
