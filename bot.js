@@ -1,64 +1,42 @@
-const { ethers } = require('ethers');
+const Binance = require('node-binance-api');
 const dotenv = require('dotenv');
-const axios = require('axios');
-const fs = require('fs');
-const path = require('path');
 const express = require('express');
 const cors = require('cors');
-const abi = require('./abi.json');
+const fs = require('fs');
+const path = require('path');
 dotenv.config();
 
 // ==========================================
-// إعدادات البوت
+// إعدادات البوت (Binance Futures)
 // ==========================================
 
-const PRIVATE_KEY = process.env.WALLET_PRIVATE_KEY;
-const WALLET_ADDRESS = process.env.WALLET_ADDRESS;
-const RPC_URL = process.env.BSC_RPC_URL || 'https://bsc-dataseed.binance.org/';
-const PANCAKE_ROUTER = '0x10ED43C718714eb63d5aA57B78B54704E256024E';
-const TRADE_AMOUNT = parseFloat(process.env.TRADE_AMOUNT) || 0.0001;
+const API_KEY = process.env.BINANCE_API_KEY;
+const API_SECRET = process.env.BINANCE_API_SECRET;
+const SYMBOL = process.env.SYMBOL || 'BTCUSDT';
 const LEVERAGE = parseInt(process.env.LEVERAGE) || 10;
-const PROFIT_PERCENT = parseFloat(process.env.PROFIT_PERCENT) || 0.8;  // ⬅️ زيادة طفيفة
-const PRICE_CHANGE_THRESHOLD = parseFloat(process.env.PRICE_CHANGE_THRESHOLD) || 0.6;  // ⬅️ حساسية عالية
-const CHECK_INTERVAL = parseInt(process.env.CHECK_INTERVAL) || 10000;  // ⬅️ فحص كل 10 ثواني
-const SLIPPAGE = parseFloat(process.env.SLIPPAGE) || 0.5;
+const TRADE_AMOUNT = parseFloat(process.env.TRADE_AMOUNT) || 10; // بالدولار
+const PROFIT_PERCENT = parseFloat(process.env.PROFIT_PERCENT) || 0.3;
+const PRICE_CHANGE_THRESHOLD = parseFloat(process.env.PRICE_CHANGE_THRESHOLD) || 0.1;
+const CHECK_INTERVAL = parseInt(process.env.CHECK_INTERVAL) || 5000;
+const STOP_LOSS_PERCENT = parseFloat(process.env.STOP_LOSS_PERCENT) || 2;
 
-// ==========================================
-// 🚀 قائمة العملات المتقلبة (موسعة)
-// ==========================================
-
-const TOKENS = [
-  // العملات الأساسية
-  { address: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c", name: "WBNB" },
-  { address: "0x0E09FaBB73Bd3Ade0a17ECC321fD13a19e81cE82", name: "CAKE" },
-  { address: "0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56", name: "BUSD" },
-  { address: "0x2170Ed0880ac9A755fd29B2688956BD959F933F8", name: "ETH" },
-  { address: "0x55d398326f99059fF775485246999027B3197955", name: "USDT" },
-  { address: "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d", name: "USDC" },
-  { address: "0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c", name: "BTCB" },
-  
-  // ⭐ العملات المتقلبة الجديدة (ميم كوينز)
-  { address: "0x6982508145454Ce325dDbE47a25d4ec3d2311933", name: "PEPE" },
-  { address: "0xfb5B838b6cfEEdC2873aB27866079AC55363D37E", name: "FLOKI" },
-  { address: "0x2859e4544C4bB03966803b044A93563Bd2D0DD4D", name: "SHIB" },
-  { address: "0xc748673057861a797275CD8A068Bb95f90225B50", name: "BABYDOGE" },
-  { address: "0x8076C74C5e3F5852037F31Ff0093Eeb8c8ADd8D3", name: "SAFEMOON" },
-  { address: "0x7aE0D42f23C33338dE15bF61204c78D4bA6C3D3C", name: "LUNC" },
-  { address: "0x352Cb5E19b12FC216548a2677bD0fce83BaE434B", name: "BTT" },
-  
-  // العملات الرقمية المعروفة
-  { address: "0x0b15Ddf19D47E6a86A56148fb4aFFFc6929BcB89", name: "ADA" },
-  { address: "0x5C6D51ecBA4D8E4F20373e3ce96a62342B125D6d", name: "XRP" },
-  { address: "0x1CE0c2827e2eF14D5C4f29a091d735A204794041", name: "DOGE" }
+// قائمة العملات للمراقبة (Futures)
+const SYMBOLS = [
+  'BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT',
+  'ADAUSDT', 'DOGEUSDT', 'AVAXUSDT', 'MATICUSDT', 'LINKUSDT'
 ];
 
 // ==========================================
-// الاتصال بالشبكة
+// الاتصال بـ Binance
 // ==========================================
 
-const provider = new ethers.providers.JsonRpcProvider(RPC_URL);
-const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
-const router = new ethers.Contract(PANCAKE_ROUTER, abi, wallet);
+const binance = new Binance().options({
+  APIKEY: API_KEY,
+  APISECRET: API_SECRET,
+  useServerTime: true,
+  recvWindow: 60000,
+  verbose: true
+});
 
 let currentPosition = null;
 let priceHistory = {};
@@ -111,22 +89,21 @@ function saveTrades() {
 // جلب سعر العملة
 // ==========================================
 
-async function getTokenPriceBNB(tokenAddress) {
+async function getPrice(symbol) {
   try {
-    const path = [tokenAddress, '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c'];
-    const amountIn = ethers.utils.parseUnits('1', 18);
-    const amounts = await router.getAmountsOut(amountIn, path);
-    return parseFloat(ethers.utils.formatUnits(amounts[1], 18));
+    const ticker = await binance.futuresPrices(symbol);
+    return parseFloat(ticker[symbol]);
   } catch (error) {
+    log(`❌ فشل جلب سعر ${symbol}: ${error.message}`, 'ERROR');
     return null;
   }
 }
 
 async function getAllPrices() {
   const prices = {};
-  for (const token of TOKENS) {
-    const price = await getTokenPriceBNB(token.address);
-    if (price) prices[token.address] = { price, name: token.name };
+  for (const symbol of SYMBOLS) {
+    const price = await getPrice(symbol);
+    if (price) prices[symbol] = { price, name: symbol };
   }
   return prices;
 }
@@ -137,13 +114,13 @@ async function getAllPrices() {
 
 function findRisingTokens(currentPrices) {
   const rising = [];
-  for (const [address, data] of Object.entries(currentPrices)) {
+  for (const [symbol, data] of Object.entries(currentPrices)) {
     const price = data.price;
-    if (priceHistory[address]) {
-      const oldPrice = priceHistory[address];
+    if (priceHistory[symbol]) {
+      const oldPrice = priceHistory[symbol];
       const changePercent = ((price - oldPrice) / oldPrice) * 100;
       if (changePercent >= PRICE_CHANGE_THRESHOLD) {
-        rising.push({ address, name: data.name, price, changePercent, oldPrice });
+        rising.push({ symbol, name: symbol, price, changePercent, oldPrice });
       }
     }
   }
@@ -152,70 +129,80 @@ function findRisingTokens(currentPrices) {
 }
 
 // ==========================================
-// شراء وبيع
+// تعيين الرافعة المالية
 // ==========================================
 
-async function buyToken(tokenAddress, amountBNB) {
+async function setLeverage(symbol) {
   try {
-    const path = ['0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c', tokenAddress];
-    const amountIn = ethers.utils.parseUnits(amountBNB.toString(), 18);
-    const amounts = await router.getAmountsOut(amountIn, path);
-    const amountOutMin = amounts[1].mul(100 - SLIPPAGE * 100).div(100 * 100);
-    
-    const deadline = Math.floor(Date.now() / 1000) + 60 * 20;
-    const tx = await router.swapExactETHForTokens(
-      amountOutMin,
-      path,
-      WALLET_ADDRESS,
-      deadline,
-      { value: amountIn, gasLimit: 300000 }
-    );
-    
-    const receipt = await tx.wait();
-    const tokenAmount = parseFloat(ethers.utils.formatUnits(amountOutMin, 18));
-    log(`✅ شراء: ${tokenAmount} TOKEN مقابل ${amountBNB} BNB`, 'SUCCESS');
-    log(`📝 TX: ${receipt.transactionHash}`, 'INFO');
-    
-    return { success: true, tokenAmount, tx: receipt.transactionHash };
+    await binance.futuresLeverage(symbol, LEVERAGE);
+    log(`✅ تم تعيين الرافعة x${LEVERAGE} لـ ${symbol}`, 'SUCCESS');
   } catch (error) {
-    log(`❌ فشل الشراء: ${error.message}`, 'ERROR');
-    return { success: false, error: error.message };
+    log(`❌ فشل تعيين الرافعة: ${error.message}`, 'ERROR');
   }
 }
 
-async function sellToken(tokenAddress, tokenAmount) {
+// ==========================================
+// فتح صفقة شراء (Long)
+// ==========================================
+
+async function openLongPosition(symbol, amount) {
   try {
-    const path = [tokenAddress, '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c'];
-    const amountIn = ethers.utils.parseUnits(tokenAmount.toString(), 18);
-    const amounts = await router.getAmountsOut(amountIn, path);
-    const amountOutMin = amounts[1].mul(100 - SLIPPAGE * 100).div(100 * 100);
+    const price = await getPrice(symbol);
+    if (!price) return null;
+
+    // حساب الكمية مع الرافعة
+    const quantity = (amount * LEVERAGE) / price;
+    const roundedQuantity = Math.floor(quantity * 1000) / 1000;
+
+    log(`📊 فتح صفقة شراء: ${roundedQuantity} ${symbol} بسعر ${price} (رافعة x${LEVERAGE})`, 'INFO');
+
+    // تنفيذ الأمر (⚠️ معطل للتجربة - فعّل عند التأكد)
+    // const order = await binance.futuresMarketBuy(symbol, roundedQuantity);
     
-    const deadline = Math.floor(Date.now() / 1000) + 60 * 20;
-    const tx = await router.swapExactTokensForETH(
-      amountIn,
-      amountOutMin,
-      path,
-      WALLET_ADDRESS,
-      deadline,
-      { gasLimit: 300000 }
-    );
+    log(`✅ تم فتح صفقة شراء (تجريبي): ${roundedQuantity} ${symbol}`, 'SUCCESS');
     
-    const receipt = await tx.wait();
-    const bnbReceived = parseFloat(ethers.utils.formatUnits(amountOutMin, 18));
-    log(`✅ بيع: ${tokenAmount} TOKEN → ${bnbReceived} BNB`, 'SUCCESS');
-    log(`📝 TX: ${receipt.transactionHash}`, 'INFO');
-    
-    return { success: true, bnbReceived, tx: receipt.transactionHash };
+    return {
+      symbol,
+      entryPrice: price,
+      quantity: roundedQuantity,
+      timestamp: Date.now()
+    };
   } catch (error) {
-    log(`❌ فشل البيع: ${error.message}`, 'ERROR');
-    return { success: false, error: error.message };
+    log(`❌ فشل فتح الصفقة: ${error.message}`, 'ERROR');
+    return null;
   }
 }
+
+// ==========================================
+// إغلاق صفقة (بيع)
+// ==========================================
+
+async function closePosition(position, profit) {
+  try {
+    const currentPrice = await getPrice(position.symbol);
+    if (!currentPrice) return false;
+
+    log(`📊 إغلاق صفقة: ${position.quantity} ${position.symbol} بسعر ${currentPrice}`, 'INFO');
+
+    // تنفيذ البيع (⚠️ معطل للتجربة - فعّل عند التأكد)
+    // const order = await binance.futuresMarketSell(position.symbol, position.quantity);
+    
+    log(`✅ تم إغلاق الصفقة (تجريبي)`, 'SUCCESS');
+    return true;
+  } catch (error) {
+    log(`❌ فشل إغلاق الصفقة: ${error.message}`, 'ERROR');
+    return false;
+  }
+}
+
+// ==========================================
+// تحديث تاريخ الأسعار
+// ==========================================
 
 async function updatePriceHistory() {
   const currentPrices = await getAllPrices();
-  for (const [address, data] of Object.entries(currentPrices)) {
-    priceHistory[address] = data.price;
+  for (const [symbol, data] of Object.entries(currentPrices)) {
+    priceHistory[symbol] = data.price;
   }
 }
 
@@ -228,28 +215,31 @@ async function tradingCycle() {
   isRunning = true;
 
   try {
-    const balance = await wallet.getBalance();
-    const bnbBalance = parseFloat(ethers.utils.formatEther(balance));
-    log(`💰 رصيد BNB: ${bnbBalance.toFixed(6)} BNB`, 'INFO');
+    // جلب الرصيد
+    const balances = await binance.futuresBalance();
+    const usdtBalance = parseFloat(balances.USDT.available) || 0;
+    log(`💰 رصيد USDT: ${usdtBalance.toFixed(2)}`, 'INFO');
 
+    // إذا كانت هناك صفقة مفتوحة
     if (currentPosition) {
-      const currentPrice = await getTokenPriceBNB(currentPosition.address);
+      const currentPrice = await getPrice(currentPosition.symbol);
       if (!currentPrice) { isRunning = false; return; }
 
-      const profitPercent = ((currentPrice - currentPosition.entryPrice) / currentPosition.entryPrice) * 100;
-      log(`📊 ${currentPosition.name} - الربح: ${profitPercent.toFixed(2)}%`, 'INFO');
+      const profitPercent = ((currentPrice - currentPosition.entryPrice) / currentPosition.entryPrice) * 100 * LEVERAGE;
+      log(`⚡ ${currentPosition.symbol} - الربح: ${profitPercent.toFixed(2)}%`, 'INFO');
 
+      // جني ربح
       if (profitPercent >= PROFIT_PERCENT) {
-        log(`✅ تحقيق الربح: ${profitPercent.toFixed(2)}%`, 'SUCCESS');
-        const result = await sellToken(currentPosition.address, currentPosition.amount);
-        if (result.success) {
+        log(`✅ جني ربح: ${profitPercent.toFixed(2)}%`, 'SUCCESS');
+        const result = await closePosition(currentPosition, profitPercent);
+        if (result) {
           tradesHistory.push({
             id: Date.now(),
             type: 'sell',
-            token: currentPosition.name,
-            amount: currentPosition.amount,
+            symbol: currentPosition.symbol,
+            quantity: currentPosition.quantity,
             price: currentPrice,
-            profit: (currentPrice - currentPosition.entryPrice) * currentPosition.amount,
+            profit: (currentPrice - currentPosition.entryPrice) * currentPosition.quantity,
             status: 'closed',
             timestamp: new Date().toISOString()
           });
@@ -257,10 +247,12 @@ async function tradingCycle() {
           currentPosition = null;
           await updatePriceHistory();
         }
-      } else if (profitPercent <= -5) {
+      } 
+      // وقف خسارة
+      else if (profitPercent <= -STOP_LOSS_PERCENT) {
         log(`⚠️ وقف الخسارة: ${profitPercent.toFixed(2)}%`, 'WARNING');
-        const result = await sellToken(currentPosition.address, currentPosition.amount);
-        if (result.success) {
+        const result = await closePosition(currentPosition, profitPercent);
+        if (result) {
           currentPosition = null;
           await updatePriceHistory();
         }
@@ -270,51 +262,50 @@ async function tradingCycle() {
       return;
     }
 
-    if (bnbBalance < TRADE_AMOUNT * LEVERAGE) {
-      log(`⚠️ رصيد غير كافٍ`, 'WARNING');
+    // التحقق من الرصيد
+    if (usdtBalance < TRADE_AMOUNT) {
+      log(`⚠️ رصيد غير كافٍ (يحتاج ${TRADE_AMOUNT} USDT)`, 'WARNING');
       isRunning = false;
       return;
     }
 
+    // جلب الأسعار الحالية
     const currentPrices = await getAllPrices();
     if (Object.keys(priceHistory).length === 0) {
-      for (const [address, data] of Object.entries(currentPrices)) {
-        priceHistory[address] = data.price;
+      for (const [symbol, data] of Object.entries(currentPrices)) {
+        priceHistory[symbol] = data.price;
       }
       isRunning = false;
       return;
     }
 
+    // البحث عن عملات متزايدة
     const risingTokens = findRisingTokens(currentPrices);
     
     if (risingTokens.length > 0) {
       const best = risingTokens[0];
-      log(`📈 اكتشاف ارتفاع: ${best.name} - ${best.changePercent.toFixed(2)}%`, 'INFO');
+      log(`📈 اكتشاف ارتفاع: ${best.symbol} - ${best.changePercent.toFixed(2)}%`, 'INFO');
 
-      const tradeAmount = TRADE_AMOUNT * LEVERAGE;
-      const result = await buyToken(best.address, tradeAmount);
-      
-      if (result.success) {
-        currentPosition = {
-          address: best.address,
-          name: best.name,
-          amount: result.tokenAmount,
-          entryPrice: best.price,
-          timestamp: Date.now()
-        };
+      // تعيين الرافعة
+      await setLeverage(best.symbol);
+
+      // فتح صفقة
+      const position = await openLongPosition(best.symbol, TRADE_AMOUNT);
+      if (position) {
+        currentPosition = position;
         tradesHistory.push({
           id: Date.now(),
           type: 'buy',
-          token: best.name,
-          amount: result.tokenAmount,
-          price: best.price,
+          symbol: best.symbol,
+          quantity: position.quantity,
+          price: position.entryPrice,
           profit: 0,
           status: 'open',
           timestamp: new Date().toISOString()
         });
         saveTrades();
         await updatePriceHistory();
-        log(`✅ تم فتح الصفقة على ${best.name}`, 'SUCCESS');
+        log(`✅ تم فتح الصفقة على ${best.symbol} (رافعة x${LEVERAGE})`, 'SUCCESS');
       }
     }
 
@@ -326,81 +317,65 @@ async function tradingCycle() {
 }
 
 // ==========================================
-// خادم الويب ولوحة التحكم
+// خادم الويب
 // ==========================================
 
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-process.on('uncaughtException', (error) => {
-  console.error('❌ خطأ غير متوقع:', error);
-});
-
-process.on('unhandledRejection', (error) => {
-  console.error('❌ وعد مرفوض:', error);
-});
-
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// صفحة الحالة
 app.get('/', async (req, res) => {
-  try {
-    let positionStatus = 'لا توجد صفقة مفتوحة';
-    let profit = '0%';
-    
-    if (currentPosition) {
-      const currentPrice = await getTokenPriceBNB(currentPosition.address);
-      if (currentPrice) {
-        profit = (((currentPrice - currentPosition.entryPrice) / currentPosition.entryPrice) * 100).toFixed(2) + '%';
-        positionStatus = `${currentPosition.name} - الربح: ${profit}`;
-      }
+  let positionStatus = 'لا توجد صفقة مفتوحة';
+  let profit = '0%';
+  
+  if (currentPosition) {
+    const currentPrice = await getPrice(currentPosition.symbol);
+    if (currentPrice) {
+      profit = (((currentPrice - currentPosition.entryPrice) / currentPosition.entryPrice) * 100 * LEVERAGE).toFixed(2) + '%';
+      positionStatus = `${currentPosition.symbol} - الربح: ${profit}`;
     }
-    
-    const balance = await wallet.getBalance();
-    const bnbBalance = parseFloat(ethers.utils.formatEther(balance)).toFixed(6);
-    
-    res.json({
-      status: '🤖 بوت التداول يعمل',
-      version: '1.0.0',
-      timestamp: new Date().toISOString(),
-      balance: `${bnbBalance} BNB`,
-      currentPosition: positionStatus,
-      watching: TOKENS.map(t => t.name).join(', '),
-      settings: {
-        tradeAmount: TRADE_AMOUNT,
-        leverage: LEVERAGE,
-        profitTarget: PROFIT_PERCENT + '%',
-        priceChangeThreshold: PRICE_CHANGE_THRESHOLD + '%',
-        checkInterval: CHECK_INTERVAL / 1000 + ' ثانية'
-      }
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
   }
+  
+  const balances = await binance.futuresBalance();
+  const usdtBalance = parseFloat(balances.USDT.available) || 0;
+  
+  res.json({
+    status: '⚡ بوت العقود الآجلة يعمل',
+    version: '3.0.0',
+    timestamp: new Date().toISOString(),
+    balance: `${usdtBalance.toFixed(2)} USDT`,
+    leverage: `${LEVERAGE}x`,
+    currentPosition: positionStatus,
+    watching: SYMBOLS.join(', '),
+    settings: {
+      tradeAmount: TRADE_AMOUNT,
+      leverage: LEVERAGE,
+      profitTarget: PROFIT_PERCENT + '%',
+      priceChangeThreshold: PRICE_CHANGE_THRESHOLD + '%',
+      stopLoss: STOP_LOSS_PERCENT + '%',
+      checkInterval: CHECK_INTERVAL / 1000 + ' ثانية'
+    }
+  });
 });
 
-// API: جلب جميع البيانات
 app.get('/api/status-full', async (req, res) => {
   try {
-    if (!Array.isArray(tradesHistory)) {
-      tradesHistory = [];
-    }
-    
-    const balance = await wallet.getBalance();
-    const bnbBalance = parseFloat(ethers.utils.formatEther(balance));
+    const balances = await binance.futuresBalance();
+    const usdtBalance = parseFloat(balances.USDT.available) || 0;
     
     loadTrades();
     const openTrades = tradesHistory.filter(t => t.status === 'open');
     
     res.json({
-      balance: bnbBalance,
+      balance: usdtBalance,
       position: currentPosition,
       trades: tradesHistory,
       openTrades: openTrades.length,
       totalTrades: tradesHistory.length,
-      watching: TOKENS.map(t => t.name),
+      watching: SYMBOLS,
       settings: {
         tradeAmount: TRADE_AMOUNT,
         leverage: LEVERAGE,
@@ -409,48 +384,46 @@ app.get('/api/status-full', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ خطأ في API:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// API: جلب الصفقات
 app.get('/api/trades', async (req, res) => {
-  try {
-    loadTrades();
-    res.json(tradesHistory);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+  loadTrades();
+  res.json(tradesHistory);
 });
 
-// API: مسح الصفقات
 app.delete('/api/clear-trades', (req, res) => {
-  try {
-    tradesHistory = [];
-    saveTrades();
-    res.json({ success: true });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+  tradesHistory = [];
+  saveTrades();
+  res.json({ success: true });
 });
 
-// لوحة التحكم
 app.get('/dashboard.html', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // ==========================================
-// تشغيل البوت والخادم
+// تشغيل البوت
 // ==========================================
 
 async function startBot() {
-  log(`🚀 بدء تشغيل بوت الصيد السريع (Scalping)`, 'START');
-  log(`📊 العملات: ${TOKENS.map(t => t.name).join(', ')}`, 'INFO');
-  log(`💰 المبلغ: ${TRADE_AMOUNT} BNB (رافعة x${LEVERAGE})`, 'INFO');
-  log(`📈 حد الارتفاع: ${PRICE_CHANGE_THRESHOLD}%`, 'INFO');
-  log(`🎯 هدف الربح: ${PROFIT_PERCENT}%`, 'INFO');
-  log(`⏱️ الفحص كل ${CHECK_INTERVAL/1000} ثانية`, 'INFO');
+  log(`⚡⚡ بدء تشغيل بوت العقود الآجلة (Futures)`, 'START');
+  log(`📊 العملات: ${SYMBOLS.join(', ')}`, 'INFO');
+  log(`💰 المبلغ: ${TRADE_AMOUNT} USDT (رافعة x${LEVERAGE})`, 'INFO`);
+  log(`📈 حد الارتفاع: ${PRICE_CHANGE_THRESHOLD}%`, 'INFO`);
+  log(`🎯 هدف الربح: ${PROFIT_PERCENT}%`, 'INFO`);
+  log(`🛑 وقف الخسارة: ${STOP_LOSS_PERCENT}%`, 'INFO`);
+  log(`⏱️ الفحص كل ${CHECK_INTERVAL/1000} ثانية`, 'INFO`);
+
+  // التحقق من الاتصال
+  try {
+    await binance.futuresBalance();
+    log(`✅ الاتصال بـ Binance ناجح`, 'SUCCESS');
+  } catch (error) {
+    log(`❌ فشل الاتصال بـ Binance: ${error.message}`, 'ERROR');
+    process.exit(1);
+  }
 
   loadTrades();
   await updatePriceHistory();
@@ -466,10 +439,10 @@ async function startBot() {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`
   ╔═══════════════════════════════════════════════════════════════╗
-  ║   🤖 بوت الصيد السريع - Scalping Bot                         ║
+  ║   ⚡ بوت العقود الآجلة - Futures Bot                         ║
   ║   📡 http://localhost:${PORT}                                  ║
   ║   📊 لوحة التحكم: http://localhost:${PORT}/dashboard.html     ║
-  ║   🚀 يعمل على ${TOKENS.length} عملة متقلبة                      ║
+  ║   🚀 رافعة حقيقية x${LEVERAGE} - يشتري عند أي ارتفاع 0.1%      ║
   ╚═══════════════════════════════════════════════════════════════╝
   `);
 });
