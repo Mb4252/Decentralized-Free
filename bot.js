@@ -18,13 +18,17 @@ const RPC_URL = process.env.BSC_RPC_URL || 'https://bsc-dataseed.binance.org/';
 const PANCAKE_ROUTER = '0x10ED43C718714eb63d5aA57B78B54704E256024E';
 const TRADE_AMOUNT = parseFloat(process.env.TRADE_AMOUNT) || 0.0001;
 const LEVERAGE = parseInt(process.env.LEVERAGE) || 10;
-const PROFIT_PERCENT = parseFloat(process.env.PROFIT_PERCENT) || 1.2;
-const PRICE_CHANGE_THRESHOLD = parseFloat(process.env.PRICE_CHANGE_THRESHOLD) || 1.5;
-const CHECK_INTERVAL = parseInt(process.env.CHECK_INTERVAL) || 30000;
+const PROFIT_PERCENT = parseFloat(process.env.PROFIT_PERCENT) || 0.8;  // ⬅️ زيادة طفيفة
+const PRICE_CHANGE_THRESHOLD = parseFloat(process.env.PRICE_CHANGE_THRESHOLD) || 0.6;  // ⬅️ حساسية عالية
+const CHECK_INTERVAL = parseInt(process.env.CHECK_INTERVAL) || 10000;  // ⬅️ فحص كل 10 ثواني
 const SLIPPAGE = parseFloat(process.env.SLIPPAGE) || 0.5;
 
-// قائمة العملات للمراقبة
+// ==========================================
+// 🚀 قائمة العملات المتقلبة (موسعة)
+// ==========================================
+
 const TOKENS = [
+  // العملات الأساسية
   { address: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c", name: "WBNB" },
   { address: "0x0E09FaBB73Bd3Ade0a17ECC321fD13a19e81cE82", name: "CAKE" },
   { address: "0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56", name: "BUSD" },
@@ -32,6 +36,17 @@ const TOKENS = [
   { address: "0x55d398326f99059fF775485246999027B3197955", name: "USDT" },
   { address: "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d", name: "USDC" },
   { address: "0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c", name: "BTCB" },
+  
+  // ⭐ العملات المتقلبة الجديدة (ميم كوينز)
+  { address: "0x6982508145454Ce325dDbE47a25d4ec3d2311933", name: "PEPE" },
+  { address: "0xfb5B838b6cfEEdC2873aB27866079AC55363D37E", name: "FLOKI" },
+  { address: "0x2859e4544C4bB03966803b044A93563Bd2D0DD4D", name: "SHIB" },
+  { address: "0xc748673057861a797275CD8A068Bb95f90225B50", name: "BABYDOGE" },
+  { address: "0x8076C74C5e3F5852037F31Ff0093Eeb8c8ADd8D3", name: "SAFEMOON" },
+  { address: "0x7aE0D42f23C33338dE15bF61204c78D4bA6C3D3C", name: "LUNC" },
+  { address: "0x352Cb5E19b12FC216548a2677bD0fce83BaE434B", name: "BTT" },
+  
+  // العملات الرقمية المعروفة
   { address: "0x0b15Ddf19D47E6a86A56148fb4aFFFc6929BcB89", name: "ADA" },
   { address: "0x5C6D51ecBA4D8E4F20373e3ce96a62342B125D6d", name: "XRP" },
   { address: "0x1CE0c2827e2eF14D5C4f29a091d735A204794041", name: "DOGE" }
@@ -59,10 +74,6 @@ function log(message, type = 'INFO') {
   const timestamp = new Date().toISOString();
   console.log(`[${timestamp}] [${type}] ${message}`);
 }
-
-// ==========================================
-// إدارة tradesHistory
-// ==========================================
 
 function loadTrades() {
   try {
@@ -321,7 +332,6 @@ async function tradingCycle() {
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// معالجة الأخطاء العامة
 process.on('uncaughtException', (error) => {
   console.error('❌ خطأ غير متوقع:', error);
 });
@@ -374,7 +384,6 @@ app.get('/', async (req, res) => {
 // API: جلب جميع البيانات
 app.get('/api/status-full', async (req, res) => {
   try {
-    // تأكد من أن tradesHistory مصفوفة
     if (!Array.isArray(tradesHistory)) {
       tradesHistory = [];
     }
@@ -436,7 +445,7 @@ app.get('/dashboard.html', (req, res) => {
 // ==========================================
 
 async function startBot() {
-  log(`🚀 بدء تشغيل بوت صيد الزخم`, 'START');
+  log(`🚀 بدء تشغيل بوت الصيد السريع (Scalping)`, 'START');
   log(`📊 العملات: ${TOKENS.map(t => t.name).join(', ')}`, 'INFO');
   log(`💰 المبلغ: ${TRADE_AMOUNT} BNB (رافعة x${LEVERAGE})`, 'INFO');
   log(`📈 حد الارتفاع: ${PRICE_CHANGE_THRESHOLD}%`, 'INFO');
@@ -454,18 +463,17 @@ async function startBot() {
   log(`✅ البوت يعمل بنجاح!`, 'SUCCESS');
 }
 
-// تشغيل الخادم
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`
   ╔═══════════════════════════════════════════════════════════════╗
-  ║   🤖 بوت التداول - Momentum Sniping Bot                      ║
+  ║   🤖 بوت الصيد السريع - Scalping Bot                         ║
   ║   📡 http://localhost:${PORT}                                  ║
   ║   📊 لوحة التحكم: http://localhost:${PORT}/dashboard.html     ║
+  ║   🚀 يعمل على ${TOKENS.length} عملة متقلبة                      ║
   ╚═══════════════════════════════════════════════════════════════╝
   `);
 });
 
-// تشغيل البوت
 startBot().catch(error => {
   log(`❌ فشل التشغيل: ${error.message}`, 'ERROR');
   process.exit(1);
