@@ -6,13 +6,13 @@ const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const nodemailer = require('nodemailer');  // ⭐ تأكد من هذا السطر
+const nodemailer = require('nodemailer');
 require('dotenv').config();
 
 const bsc = require('./lib/bsc');
 
 const app = express();
-// ... باقي الكود
+
 // ==========================================
 // إعدادات الأمان
 // ==========================================
@@ -646,124 +646,6 @@ app.post('/api/logout', (req, res) => {
 });
 
 // ==========================================
-// API: تسجيل الدخول عبر Google (Firebase)
-// ==========================================
-app.post('/api/auth/google', async (req, res) => {
-  const { uid, email, name, photoURL, deviceFingerprint, deviceInfo } = req.body;
-  
-  console.log('🔐 محاولة تسجيل دخول عبر Google:', email);
-  
-  if (!email || !uid) {
-    return res.status(400).json({ error: 'بيانات ناقصة' });
-  }
-  
-  try {
-    const { data: existingUser } = await supabaseAdmin
-      .from('users')
-      .select('*')
-      .eq('email', email)
-      .maybeSingle();
-    
-    let userId;
-    let isNewUser = false;
-    
-    if (!existingUser) {
-      isNewUser = true;
-      const randomPassword = Math.random().toString(36).substring(2, 15);
-      const hashedPassword = await bcrypt.hash(randomPassword, SALT_ROUNDS);
-      const lastPasswordUsed = await bcrypt.hash(randomPassword, 8);
-      userId = generateUUID();
-      const referralCode = Math.random().toString(36).substring(2, 10).toUpperCase();
-      
-      const { error: insertError } = await supabaseAdmin
-        .from('users')
-        .insert({
-          id: userId,
-          email: email,
-          password: hashedPassword,
-          name: name || email.split('@')[0],
-          referral_code: referralCode,
-          is_admin: false,
-          available_balance: 0,
-          platform_balance: 0,
-          total_orders: 0,
-          total_spent: 0,
-          auth_provider: 'google',
-          auth_provider_id: uid,
-          photo_url: photoURL || null,
-          device_fingerprint: deviceFingerprint || null,
-          device_info: deviceInfo || null,
-          last_password_used: lastPasswordUsed,
-          email_verified: true,
-          created_at: new Date().toISOString()
-        });
-      
-      if (insertError) {
-        console.error('Insert error:', insertError);
-        return res.status(500).json({ error: 'حدث خطأ في إنشاء الحساب' });
-      }
-      
-      console.log('✅ تم إنشاء حساب جديد عبر Google:', email);
-      
-    } else {
-      userId = existingUser.id;
-      
-      await supabaseAdmin
-        .from('users')
-        .update({
-          name: name || existingUser.name,
-          photo_url: photoURL || existingUser.photo_url,
-          auth_provider_id: uid,
-          device_fingerprint: deviceFingerprint || existingUser.device_fingerprint,
-          device_info: deviceInfo || existingUser.device_info,
-          last_login_ip: req.ip || req.connection?.remoteAddress || 'unknown',
-          last_login_at: new Date().toISOString()
-        })
-        .eq('id', userId);
-    }
-    
-    const token = jwt.sign(
-      { 
-        userId: userId, 
-        email: email, 
-        name: name || email.split('@')[0],
-        is_admin: existingUser?.is_admin || false,
-        auth_provider: 'google'
-      },
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-    
-    const isProd = process.env.NODE_ENV === 'production';
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure: isProd,
-      sameSite: isProd ? 'none' : 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      path: '/'
-    });
-    
-    await logAudit(userId, 'google_login', { email, isNewUser }, req);
-    
-    res.json({
-      success: true,
-      isNewUser: isNewUser,
-      user: {
-        id: userId,
-        email: email,
-        name: name || email.split('@')[0],
-        photoURL: photoURL || null,
-        is_admin: existingUser?.is_admin || false
-      }
-    });
-    
-  } catch (error) {
-    console.error('Google auth error:', error);
-    res.status(500).json({ error: 'حدث خطأ داخلي' });
-  }
-});
-
-// ==========================================
 // API: جلب بيانات المستخدم
 // ==========================================
 app.post('/api/user', authenticateToken, async (req, res) => {
@@ -1222,6 +1104,203 @@ app.post('/api/transactions', authenticateToken, async (req, res) => {
 });
 
 // ==========================================
+// API: تسجيل الدخول عبر Google (مسار النافذة المنبثقة)
+// ==========================================
+app.get('/auth/google', (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>تسجيل الدخول عبر Google</title>
+      <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
+      <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js"></script>
+      <style>
+        body { font-family: Arial; display: flex; justify-content: center; align-items: center; height: 100vh; background: #f0f2f5; margin: 0; }
+        .container { text-align: center; background: white; padding: 40px; border-radius: 16px; border: 1px solid #00aa55; }
+        .btn { background: #00aa55; color: white; border: none; padding: 14px 40px; border-radius: 30px; font-size: 16px; cursor: pointer; }
+        .btn:hover { background: #008844; }
+        .btn-google { background: white; color: #333; border: 1px solid #ddd; padding: 14px 40px; border-radius: 30px; font-size: 16px; cursor: pointer; display: inline-flex; align-items: center; gap: 10px; }
+        .btn-google:hover { background: #f5f5f5; }
+        .btn-google img { width: 20px; height: 20px; }
+        .loader { display: none; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <h1 style="color:#00aa55;">🛍️ تسجيل الدخول عبر Google</h1>
+        <p style="color:#666;">اختر حسابك للمتابعة</p>
+        <button class="btn-google" id="googleBtn">
+          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google">
+          تسجيل الدخول عبر Google
+        </button>
+        <br><br>
+        <button class="btn" onclick="window.close()">إلغاء</button>
+        <div id="message" style="margin-top:12px;color:#ff4444;"></div>
+      </div>
+
+      <script>
+        // إعدادات Firebase
+        const firebaseConfig = {
+          apiKey: "AIzaSyAI_mUhuPNoO-XC0Q-VNoWft8UWFbAbIGg",
+          authDomain: "sudan-market-6b122.firebaseapp.com",
+          projectId: "sudan-market-6b122",
+          storageBucket: "sudan-market-6b122.firebasestorage.app",
+          messagingSenderId: "66729481566",
+          appId: "1:66729481566:web:93393f28dc22d32cceebcf"
+        };
+
+        // تهيئة Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const provider = new firebase.auth.GoogleAuthProvider();
+
+        document.getElementById('googleBtn').onclick = function() {
+          const btn = this;
+          btn.disabled = true;
+          btn.innerHTML = '⏳ جاري...';
+
+          auth.signInWithPopup(provider)
+            .then(function(result) {
+              const user = result.user;
+              return fetch('/api/auth/google/callback', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  uid: user.uid,
+                  email: user.email,
+                  name: user.displayName || user.email.split('@')[0],
+                  photoURL: user.photoURL || null
+                })
+              });
+            })
+            .then(function(response) {
+              return response.json();
+            })
+            .then(function(data) {
+              if (data.success) {
+                localStorage.setItem('user', JSON.stringify(data.user));
+                window.opener.location.reload();
+                window.close();
+              } else {
+                document.getElementById('message').textContent = '❌ ' + (data.error || 'فشل تسجيل الدخول');
+                btn.disabled = false;
+                btn.innerHTML = '<img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" style="width:20px;height:20px;"> تسجيل الدخول عبر Google';
+              }
+            })
+            .catch(function(error) {
+              console.error('Google error:', error);
+              document.getElementById('message').textContent = '❌ خطأ: ' + error.message;
+              btn.disabled = false;
+              btn.innerHTML = '<img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" style="width:20px;height:20px;"> تسجيل الدخول عبر Google';
+            });
+        };
+      </script>
+    </body>
+    </html>
+  `);
+});
+
+// ==========================================
+// API: استقبال بيانات Google من النافذة المنبثقة
+// ==========================================
+app.post('/api/auth/google/callback', async (req, res) => {
+  const { uid, email, name, photoURL } = req.body;
+
+  console.log('🔐 Google callback:', email);
+
+  if (!email || !uid) {
+    return res.status(400).json({ error: 'بيانات ناقصة' });
+  }
+
+  try {
+    // التحقق من وجود المستخدم
+    const { data: existingUser } = await supabaseAdmin
+      .from('users')
+      .select('*')
+      .eq('email', email)
+      .maybeSingle();
+
+    let userId;
+    let isNewUser = false;
+
+    if (!existingUser) {
+      // إنشاء حساب جديد
+      isNewUser = true;
+      const randomPassword = Math.random().toString(36).substring(2, 15);
+      const hashedPassword = await bcrypt.hash(randomPassword, SALT_ROUNDS);
+      const lastPasswordUsed = await bcrypt.hash(randomPassword, 8);
+      userId = generateUUID();
+      const referralCode = Math.random().toString(36).substring(2, 10).toUpperCase();
+
+      await supabaseAdmin
+        .from('users')
+        .insert({
+          id: userId,
+          email: email,
+          password: hashedPassword,
+          name: name || email.split('@')[0],
+          referral_code: referralCode,
+          is_admin: false,
+          available_balance: 0,
+          platform_balance: 0,
+          total_orders: 0,
+          total_spent: 0,
+          auth_provider: 'google',
+          auth_provider_id: uid,
+          photo_url: photoURL || null,
+          last_password_used: lastPasswordUsed,
+          email_verified: true,
+          created_at: new Date().toISOString()
+        });
+
+      console.log('✅ تم إنشاء حساب جديد عبر Google:', email);
+    } else {
+      userId = existingUser.id;
+      await supabaseAdmin
+        .from('users')
+        .update({
+          name: name || existingUser.name,
+          photo_url: photoURL || existingUser.photo_url,
+          auth_provider_id: uid,
+          last_login_at: new Date().toISOString()
+        })
+        .eq('id', userId);
+    }
+
+    // إنشاء JWT token
+    const token = jwt.sign(
+      { userId: userId, email: email, name: name || email.split('@')[0], is_admin: existingUser?.is_admin || false },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: '/'
+    });
+
+    res.json({
+      success: true,
+      isNewUser: isNewUser,
+      user: {
+        id: userId,
+        email: email,
+        name: name || email.split('@')[0],
+        photoURL: photoURL || null,
+        is_admin: existingUser?.is_admin || false
+      }
+    });
+
+  } catch (error) {
+    console.error('Google callback error:', error);
+    res.status(500).json({ error: 'حدث خطأ داخلي' });
+  }
+});
+
+// ==========================================
 // ============ APIs الأدمن ============
 // ==========================================
 
@@ -1535,7 +1614,7 @@ app.post('/api/admin/users', authenticateAdmin, async (req, res) => {
 });
 
 // ==========================================
-// API: استعادة كلمة المرور عبر الجهاز (Device Recovery)
+// API: استعادة كلمة المرور عبر الجهاز
 // ==========================================
 
 // الخطوة 1: التحقق من البريد والجهاز
@@ -1743,7 +1822,7 @@ app.listen(PORT, () => {
   ║   🌐 ${process.env.CLIENT_URL || `http://localhost:${PORT}`}     ║
   ║   🔐 JWT + HttpOnly Cookies                                    ║
   ║   📧 التحقق الإلزامي من البريد الإلكتروني (OTP)               ║
-  ║   🔑 Google Sign-In (Firebase) مفعل                           ║
+  ║   🔑 Google Sign-In مفعل                                       ║
   ║   📱 استعادة كلمة المرور عبر الجهاز                           ║
   ║   💰 نظام استرداد الأموال (Refund) مفعل                         ║
   ║   📅 نظام تأجيل المنتجات (Delay) مفعل                           ║
