@@ -6,13 +6,13 @@ const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const nodemailer = require('nodemailer');
+const nodemailer = require('nodemailer');  // ⭐ تأكد من هذا السطر
 require('dotenv').config();
 
 const bsc = require('./lib/bsc');
 
 const app = express();
-
+// ... باقي الكود
 // ==========================================
 // إعدادات الأمان
 // ==========================================
