@@ -1,5 +1,6 @@
 // ==========================================
-// خدمة المصادقة مع الخادم (auth-service.js)
+// ملف: app/auth-service.js
+// خدمة المصادقة مع الخادم - كاملة
 // ==========================================
 
 import { API } from './config.js';
@@ -47,8 +48,54 @@ export async function login(email, password) {
   }
 }
 
-// 📝 تسجيل حساب جديد
-export async function register(name, email, password, referralCode = null) {
+// 📝 طلب رمز التحقق للتسجيل
+export async function requestVerificationCode(email, name) {
+  try {
+    const response = await fetch(`${API.baseUrl}/api/request-verification`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, name })
+    });
+
+    const data = await response.json();
+    
+    if (data.success) {
+      return { success: true, message: data.message };
+    } else {
+      return { success: false, error: data.error };
+    }
+    
+  } catch (error) {
+    console.error('❌ Request verification error:', error);
+    return { success: false, error: 'خطأ في الاتصال بالخادم' };
+  }
+}
+
+// 📝 إعادة إرسال رمز التحقق
+export async function resendVerificationCode(email) {
+  try {
+    const response = await fetch(`${API.baseUrl}/api/resend-verification`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+
+    const data = await response.json();
+    
+    if (data.success) {
+      return { success: true, message: data.message };
+    } else {
+      return { success: false, error: data.error };
+    }
+    
+  } catch (error) {
+    console.error('❌ Resend verification error:', error);
+    return { success: false, error: 'خطأ في الاتصال بالخادم' };
+  }
+}
+
+// 📝 إنشاء حساب جديد (مع التحقق من الرمز)
+export async function register(name, email, password, verificationCode, referralCode = null) {
   try {
     const fingerprint = await getDeviceFingerprint();
     const deviceInfo = {
@@ -66,6 +113,7 @@ export async function register(name, email, password, referralCode = null) {
         email, 
         password, 
         referralCode,
+        verificationCode,
         deviceFingerprint: fingerprint,
         deviceInfo: deviceInfo
       }),
