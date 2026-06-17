@@ -1,11 +1,10 @@
 {
   "name": "crypto-shop",
-  "version": "2.0.0",
-  "description": "منصة الشراء الجماعي - نظام آمن",
+  "version": "1.0.0",
+  "description": "منصة الشراء الجماعي",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js"
+    "start": "node server.js"
   },
   "dependencies": {
     "express": "^4.18.2",
@@ -17,9 +16,7 @@
     "ethers": "^6.8.0",
     "cookie-parser": "^1.4.6",
     "helmet": "^7.1.0",
-    "express-rate-limit": "^7.1.5"
-  },
-  "devDependencies": {
-    "nodemon": "^3.0.1"
+    "express-rate-limit": "^7.1.5",
+    "nodemailer": "^6.9.7"
   }
 }
