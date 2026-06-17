@@ -1,7 +1,7 @@
 {
-  "name": "crypto-bot",
-  "version": "1.0.0",
-  "description": "بوت تداول Momentum Sniping على BSC مع لوحة تحكم",
+  "name": "crypto-futures-bot",
+  "version": "3.0.0",
+  "description": "بوت تداول العقود الآجلة (Futures) على Binance مع رافعة حقيقية",
   "main": "bot.js",
   "scripts": {
     "start": "node bot.js"
@@ -10,9 +10,8 @@
     "node": "18.x"
   },
   "dependencies": {
-    "ethers": "^5.7.2",
+    "node-binance-api": "^0.13.1",
     "dotenv": "^16.3.1",
-    "axios": "^1.6.0",
     "express": "^4.18.2",
     "cors": "^2.8.5"
   }
