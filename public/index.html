@@ -16,7 +16,7 @@
     h1 { color: #00aa55; text-align: center; margin-bottom: 20px; }
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
       gap: 16px;
       margin-bottom: 20px;
     }
@@ -33,25 +33,6 @@
     .stat-card .profit { color: #00aa55; }
     .stat-card .loss { color: #ff4444; }
     .stat-card .open { color: #ffaa00; }
-    .controls {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 16px;
-      flex-wrap: wrap;
-    }
-    .btn {
-      padding: 10px 20px;
-      border: none;
-      border-radius: 30px;
-      cursor: pointer;
-      font-weight: bold;
-      transition: all 0.3s;
-    }
-    .btn-refresh { background: #00aa55; color: white; }
-    .btn-refresh:hover { background: #008844; }
-    .btn-clear { background: #ff4444; color: white; }
-    .btn-clear:hover { background: #cc0000; }
-    .btn-refresh:disabled { opacity: 0.6; cursor: not-allowed; }
     table {
       width: 100%;
       background: white;
@@ -77,7 +58,18 @@
     td .closed-status { color: #666; }
     .empty { text-align: center; color: #888; padding: 40px 0; }
     .last-update { color: #888; font-size: 12px; text-align: center; margin-top: 12px; }
-    .trade-id { font-size: 11px; color: #888; }
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 30px;
+      cursor: pointer;
+      font-weight: bold;
+      margin-bottom: 16px;
+    }
+    .btn-refresh { background: #00aa55; color: white; }
+    .btn-refresh:hover { background: #008844; }
+    .btn-clear { background: #ff4444; color: white; }
+    .btn-clear:hover { background: #cc0000; }
   </style>
 </head>
 <body>
@@ -85,12 +77,8 @@
   <div class="container">
     <h1>🤖 لوحة تحكم البوت - CryptoBot</h1>
 
-    <div class="controls">
-      <button class="btn btn-refresh" onclick="loadData()">🔄 تحديث</button>
-      <button class="btn btn-clear" onclick="clearTrades()">🗑️ مسح الصفقات</button>
-      <span style="flex:1;"></span>
-      <span id="autoStatus" style="color:#00aa55;font-weight:bold;">🟢 تحديث تلقائي</span>
-    </div>
+    <button class="btn btn-refresh" onclick="loadData()">🔄 تحديث</button>
+    <button class="btn btn-clear" onclick="clearTrades()">🗑️ مسح الصفقات</button>
 
     <div class="stats-grid" id="statsGrid">
       <div class="stat-card">
@@ -109,10 +97,6 @@
         <div class="value loss" id="totalLoss">0.0000</div>
         <div class="label">📉 إجمالي الخسارة</div>
       </div>
-      <div class="stat-card">
-        <div class="value" id="netProfit">0.0000</div>
-        <div class="label">📊 صافي الربح</div>
-      </div>
     </div>
 
     <div style="overflow-x:auto;">
@@ -123,7 +107,7 @@
             <th>النوع</th>
             <th>العملة</th>
             <th>الكمية</th>
-            <th>سعر الشراء</th>
+            <th>السعر</th>
             <th>الربح</th>
             <th>الحالة</th>
             <th>الوقت</th>
@@ -139,107 +123,75 @@
   </div>
 
   <script>
-    let currentData = null;
-    let autoRefreshInterval = null;
-    let isRefreshing = false;
-
     async function loadData() {
-      if (isRefreshing) return;
-      isRefreshing = true;
-
-      const btn = document.querySelector('.btn-refresh');
-      btn.disabled = true;
-      btn.textContent = '⏳ جاري...';
-
       try {
-        const response = await fetch('/api/status');
+        const response = await fetch('/api/status-full');
         const data = await response.json();
-        currentData = data;
         updateUI(data);
       } catch (error) {
-        console.error('❌ خطأ في التحميل:', error);
-        document.getElementById('tradesBody').innerHTML = '<tr><td colspan="8" class="empty">❌ خطأ في الاتصال بالخادم</td></tr>';
+        console.error('خطأ:', error);
+        document.getElementById('tradesBody').innerHTML = '<tr><td colspan="8" class="empty">❌ خطأ في الاتصال</td></tr>';
       }
-
-      btn.disabled = false;
-      btn.textContent = '🔄 تحديث';
-      isRefreshing = false;
     }
 
     function updateUI(data) {
-      // تحديث الإحصائيات
-      document.getElementById('openPositions').textContent = data.openPositions || 0;
+      document.getElementById('openPositions').textContent = data.openTrades || 0;
       document.getElementById('totalTrades').textContent = data.totalTrades || 0;
       
-      const totalProfit = data.totalProfit || 0;
-      const totalLoss = data.totalLoss || 0;
+      let totalProfit = 0, totalLoss = 0;
+      if (data.trades) {
+        data.trades.forEach(t => {
+          if (t.status === 'closed' && t.profit) {
+            if (t.profit > 0) totalProfit += t.profit;
+            else totalLoss += Math.abs(t.profit);
+          }
+        });
+      }
       document.getElementById('totalProfit').textContent = totalProfit.toFixed(4);
       document.getElementById('totalLoss').textContent = totalLoss.toFixed(4);
-      
-      const netProfit = totalProfit - totalLoss;
-      const netElement = document.getElementById('netProfit');
-      netElement.textContent = netProfit.toFixed(4);
-      netElement.className = 'value ' + (netProfit >= 0 ? 'profit' : 'loss');
 
-      // تحديث وقت آخر تحديث
-      document.getElementById('lastUpdate').textContent = 'آخر تحديث: ' + new Date(data.lastUpdate || Date.now()).toLocaleTimeString();
-
-      // تحديث جدول الصفقات
       const tbody = document.getElementById('tradesBody');
-      
       if (!data.trades || data.trades.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="empty">📭 لا توجد صفقات حتى الآن</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="empty">📭 لا توجد صفقات</td></tr>';
         return;
       }
 
-      tbody.innerHTML = data.trades.slice(0, 50).map(trade => {
-        const isProfit = trade.profit > 0;
+      tbody.innerHTML = data.trades.slice(0, 20).map(t => {
+        const isProfit = t.profit > 0;
         const profitClass = isProfit ? 'profit' : 'loss';
-        const statusClass = trade.status === 'open' ? 'open-status' : 'closed-status';
-        const statusText = trade.status === 'open' ? '🟡 مفتوحة' : '🔒 مغلقة';
-        const typeText = trade.type === 'buy' ? '🟢 شراء' : '🔴 بيع';
+        const statusClass = t.status === 'open' ? 'open-status' : 'closed-status';
+        const statusText = t.status === 'open' ? '🟡 مفتوحة' : '🔒 مغلقة';
+        const typeText = t.type === 'buy' ? '🟢 شراء' : '🔴 بيع';
         
         return `
           <tr>
-            <td class="trade-id">${String(trade.id).slice(-6)}</td>
+            <td>${String(t.id).slice(-6)}</td>
             <td>${typeText}</td>
-            <td>${trade.token}</td>
-            <td>${(trade.amount || 0).toFixed(6)}</td>
-            <td>${(trade.price || 0).toFixed(4)}</td>
-            <td class="${profitClass}">${(trade.profit || 0).toFixed(4)} (${trade.profitPercent || '0'}%)</td>
+            <td>${t.token}</td>
+            <td>${(t.amount || 0).toFixed(6)}</td>
+            <td>${(t.price || 0).toFixed(4)}</td>
+            <td class="${profitClass}">${(t.profit || 0).toFixed(4)}</td>
             <td class="${statusClass}">${statusText}</td>
-            <td>${new Date(trade.timestamp).toLocaleTimeString()}</td>
+            <td>${new Date(t.timestamp).toLocaleTimeString()}</td>
           </tr>
         `;
       }).join('');
+      
+      document.getElementById('lastUpdate').textContent = 'آخر تحديث: ' + new Date().toLocaleTimeString();
     }
 
     async function clearTrades() {
-      if (!confirm('⚠️ هل أنت متأكد من مسح جميع الصفقات؟')) return;
-      
+      if (!confirm('⚠️ مسح جميع الصفقات؟')) return;
       try {
-        const response = await fetch('/api/clear-trades', { method: 'DELETE' });
-        const data = await response.json();
-        if (data.success) {
-          alert('✅ تم مسح جميع الصفقات');
-          loadData();
-        }
+        await fetch('/api/clear-trades', { method: 'DELETE' });
+        loadData();
       } catch (error) {
-        alert('❌ خطأ في مسح الصفقات');
-        console.error(error);
+        alert('خطأ في المسح');
       }
     }
 
-    // بدء التحديث التلقائي كل 5 ثواني
-    function startAutoRefresh() {
-      if (autoRefreshInterval) clearInterval(autoRefreshInterval);
-      autoRefreshInterval = setInterval(loadData, 5000);
-      document.getElementById('autoStatus').textContent = '🟢 تحديث تلقائي (5 ثواني)';
-    }
-
-    // التحميل الأولي
     loadData();
-    startAutoRefresh();
+    setInterval(loadData, 10000);
   </script>
 </body>
 </html>
