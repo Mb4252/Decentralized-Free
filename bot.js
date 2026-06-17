@@ -208,7 +208,7 @@ async function updatePriceHistory() {
 }
 
 // ==========================================
-// دورة التداول الرئيسية
+// دورة التداول الرئيسية (معدلة)
 // ==========================================
 
 async function tradingCycle() {
@@ -216,9 +216,23 @@ async function tradingCycle() {
   isRunning = true;
 
   try {
-    // جلب الرصيد
-    const balances = await binance.futuresBalance();
-    const usdtBalance = parseFloat(balances.USDT.available) || 0;
+    // جلب الرصيد (مع التعامل مع الحالات الفارغة)
+    let usdtBalance = 0;
+    try {
+      const balances = await binance.futuresBalance();
+      if (balances && balances.USDT) {
+        usdtBalance = parseFloat(balances.USDT.available) || 0;
+      } else {
+        log(`⚠️ لا يمكن قراءة رصيد USDT، تأكد من صلاحيات API`, 'WARNING');
+        isRunning = false;
+        return;
+      }
+    } catch (balanceError) {
+      log(`⚠️ فشل جلب الرصيد: ${balanceError.message}`, 'WARNING');
+      isRunning = false;
+      return;
+    }
+    
     log(`💰 رصيد USDT: ${usdtBalance.toFixed(2)}`, 'INFO');
 
     // إذا كانت هناك صفقة مفتوحة
@@ -340,8 +354,16 @@ app.get('/', async (req, res) => {
     }
   }
   
-  const balances = await binance.futuresBalance();
-  const usdtBalance = parseFloat(balances.USDT.available) || 0;
+  // جلب الرصيد مع معالجة الأخطاء
+  let usdtBalance = 0;
+  try {
+    const balances = await binance.futuresBalance();
+    if (balances && balances.USDT) {
+      usdtBalance = parseFloat(balances.USDT.available) || 0;
+    }
+  } catch (error) {
+    console.error('خطأ في جلب الرصيد:', error);
+  }
   
   res.json({
     status: '⚡ بوت العقود الآجلة يعمل (حقيقي)',
@@ -364,8 +386,15 @@ app.get('/', async (req, res) => {
 
 app.get('/api/status-full', async (req, res) => {
   try {
-    const balances = await binance.futuresBalance();
-    const usdtBalance = parseFloat(balances.USDT.available) || 0;
+    let usdtBalance = 0;
+    try {
+      const balances = await binance.futuresBalance();
+      if (balances && balances.USDT) {
+        usdtBalance = parseFloat(balances.USDT.available) || 0;
+      }
+    } catch (error) {
+      console.error('خطأ في جلب الرصيد:', error);
+    }
     
     loadTrades();
     const openTrades = tradesHistory.filter(t => t.status === 'open');
@@ -418,12 +447,27 @@ async function startBot() {
   log(`⏱️ الفحص كل ${CHECK_INTERVAL/1000} ثانية`, 'INFO');
   log(`⚠️ تحذير: هذا البوت يستخدم أموالاً حقيقية!`, 'WARNING');
 
-  // التحقق من الاتصال
+  // التحقق من الاتصال والرصيد
   try {
-    await binance.futuresBalance();
-    log(`✅ الاتصال بـ Binance ناجح`, 'SUCCESS');
+    const balances = await binance.futuresBalance();
+    if (balances && balances.USDT) {
+      const usdtBalance = parseFloat(balances.USDT.available) || 0;
+      log(`✅ الاتصال بـ Binance ناجح`, 'SUCCESS');
+      log(`💰 رصيد USDT في Futures: ${usdtBalance.toFixed(2)}`, 'INFO');
+      
+      if (usdtBalance < TRADE_AMOUNT) {
+        log(`⚠️ تحذير: الرصيد (${usdtBalance}) أقل من مبلغ التداول (${TRADE_AMOUNT})`, 'WARNING');
+      }
+    } else {
+      log(`⚠️ لا يمكن قراءة رصيد USDT. تأكد من:`, 'WARNING');
+      log(`   1. لديك رصيد في محفظة Futures`, 'WARNING');
+      log(`   2. صلاحية "Enable Futures" مفعلة في API Key`, 'WARNING');
+    }
   } catch (error) {
     log(`❌ فشل الاتصال بـ Binance: ${error.message}`, 'ERROR');
+    log(`📝 تأكد من:`, 'ERROR');
+    log(`   1. صحة API_KEY و API_SECRET`, 'ERROR');
+    log(`   2. صلاحية "Enable Futures" مفعلة`, 'ERROR');
     process.exit(1);
   }
 
