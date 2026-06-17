@@ -281,14 +281,50 @@
   </div>
 
   <!-- ========================================== -->
-  <!-- JavaScript (مباشر بدون استيراد) -->
+  <!-- Firebase SDK (لتسجيل الدخول عبر Google) -->
   <!-- ========================================== -->
-  <script>
+  <script type="importmap">
+    {
+      "imports": {
+        "firebase/app": "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js",
+        "firebase/auth": "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js"
+      }
+    }
+  </script>
+
+  <script type="module">
     // ==========================================
-    // دوال مساعدة (بدون استيراد)
+    // استيراد Firebase
     // ==========================================
+    import { initializeApp } from "firebase/app";
+    import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "firebase/auth";
+
+    // ==========================================
+    // إعدادات Firebase
+    // ==========================================
+    const firebaseConfig = {
+      apiKey: "AIzaSyAI_mUhuPNoO-XC0Q-VNoWft8UWFbAbIGg",
+      authDomain: "sudan-market-6b122.firebaseapp.com",
+      databaseURL: "https://sudan-market-6b122-default-rtdb.firebaseio.com",
+      projectId: "sudan-market-6b122",
+      storageBucket: "sudan-market-6b122.firebasestorage.app",
+      messagingSenderId: "66729481566",
+      appId: "1:66729481566:web:93393f28dc22d32cceebcf",
+      measurementId: "G-L4SDJWKPK5"
+    };
+
+    // تهيئة Firebase
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const provider = new GoogleAuthProvider();
+    provider.addScope('email');
+    provider.addScope('profile');
 
     const API_URL = window.location.origin;
+
+    // ==========================================
+    // دوال مساعدة
+    // ==========================================
 
     function showMessage(msg, type) {
       const div = document.getElementById('message');
@@ -368,7 +404,7 @@
     }
 
     // ==========================================
-    // تسجيل الدخول
+    // تسجيل الدخول (بريد/كلمة مرور)
     // ==========================================
 
     document.getElementById('doLoginBtn').onclick = async function() {
@@ -597,7 +633,7 @@
     }
 
     // ==========================================
-    // Google Sign-In
+    // ⭐⭐⭐ تسجيل الدخول عبر Google (مفعّل) ⭐⭐⭐
     // ==========================================
 
     document.getElementById('googleSignInBtn').onclick = async function() {
@@ -606,13 +642,47 @@
       btn.innerHTML = '⏳ جاري...';
 
       try {
-        showMessage('⏳ جاري التوجيه إلى Google...', 'loading');
-        // توجيه المستخدم إلى صفحة Google Sign-In (سيتم تنفيذها لاحقاً)
-        // حالياً نعطي رسالة بأن الميزة قيد التطوير
-        showMessage('⚠️ ميزة تسجيل الدخول عبر Google قيد التطوير. استخدم البريد وكلمة المرور.', 'warning');
+        // تسجيل الدخول عبر Firebase Google
+        const result = await signInWithPopup(auth, provider);
+        const user = result.user;
+
+        console.log('✅ Google Auth Success:', user);
+
+        // إرسال بيانات المستخدم إلى الخادم
+        const fingerprint = getDeviceFingerprint();
+        const response = await fetch(`${API_URL}/api/auth/google`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            uid: user.uid,
+            email: user.email,
+            name: user.displayName || user.email.split('@')[0],
+            photoURL: user.photoURL || null,
+            deviceFingerprint: fingerprint
+          }),
+          credentials: 'include'
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          localStorage.setItem('user', JSON.stringify(data.user));
+          showMessage(`✅ ${data.isNewUser ? 'تم إنشاء الحساب' : 'تم تسجيل الدخول'} بنجاح عبر Google!`, 'success');
+          setTimeout(() => {
+            window.location.href = '/dashboard.html';
+          }, 1000);
+        } else {
+          showMessage('❌ ' + (data.error || 'فشل تسجيل الدخول عبر Google'), 'error');
+        }
       } catch (error) {
-        showMessage('❌ خطأ في Google', 'error');
-        console.error('Google error:', error);
+        console.error('❌ Google Sign-In Error:', error);
+        if (error.code === 'auth/popup-closed-by-user') {
+          showMessage('⚠️ تم إلغاء تسجيل الدخول', 'warning');
+        } else if (error.code === 'auth/network-request-failed') {
+          showMessage('❌ خطأ في الاتصال بالإنترنت', 'error');
+        } else {
+          showMessage('❌ خطأ في تسجيل الدخول عبر Google: ' + error.message, 'error');
+        }
       }
 
       btn.disabled = false;
@@ -621,6 +691,18 @@
         تسجيل الدخول عبر Google
       `;
     };
+
+    // ==========================================
+    // مراقبة حالة المستخدم (Firebase)
+    // ==========================================
+
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        console.log('👤 Firebase User:', user.email);
+      } else {
+        console.log('🚪 Firebase User: Not signed in');
+      }
+    });
 
     // ==========================================
     // نسيت كلمة المرور
@@ -665,8 +747,7 @@
       }
     })();
 
-    console.log('✅ CryptoShop - صفحة تسجيل الدخول جاهزة');
-    console.log('📡 API URL:', API_URL);
+    console.log('✅ CryptoShop - تسجيل الدخول عبر Google مفعل');
   </script>
 </body>
 </html>
