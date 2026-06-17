@@ -13,18 +13,27 @@ dotenv.config();
 const PRIVATE_KEY = process.env.WALLET_PRIVATE_KEY;
 const WALLET_ADDRESS = process.env.WALLET_ADDRESS;
 const RPC_URL = process.env.BSC_RPC_URL || 'https://bsc-dataseed.binance.org/';
-const TOKEN_ADDRESS = process.env.TOKEN_ADDRESS || '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c';
-const USDT_ADDRESS = process.env.USDT_ADDRESS || '0x55d398326f99059fF775485246999027B3197955';
+const PANCAKE_ROUTER = '0x10ED43C718714eb63d5aA57B78B54704E256024E';
+const TRADE_AMOUNT = parseFloat(process.env.TRADE_AMOUNT) || 0.0001;
 const LEVERAGE = parseInt(process.env.LEVERAGE) || 10;
-const TRADE_AMOUNT = parseFloat(process.env.TRADE_AMOUNT) || 0.001;
 const PROFIT_PERCENT = parseFloat(process.env.PROFIT_PERCENT) || 1.2;
+const PRICE_CHANGE_THRESHOLD = parseFloat(process.env.PRICE_CHANGE_THRESHOLD) || 1.5;
 const CHECK_INTERVAL = parseInt(process.env.CHECK_INTERVAL) || 30000;
 const SLIPPAGE = parseFloat(process.env.SLIPPAGE) || 0.5;
-const DEBUG = process.env.DEBUG === 'true';
 
-// عناوين العقود
-const PANCAKE_ROUTER = '0x10ED43C718714eb63d5aA57B78B54704E256024E';
-const PANCAKE_FACTORY = '0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73';
+// قائمة العملات للمراقبة (عناوين العقود + أسماء)
+const TOKENS = [
+  { address: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c", name: "WBNB" },
+  { address: "0x0E09FaBB73Bd3Ade0a17ECC321fD13a19e81cE82", name: "CAKE" },
+  { address: "0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56", name: "BUSD" },
+  { address: "0x2170Ed0880ac9A755fd29B2688956BD959F933F8", name: "ETH" },
+  { address: "0x55d398326f99059fF775485246999027B3197955", name: "USDT" },
+  { address: "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d", name: "USDC" },
+  { address: "0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c", name: "BTCB" },
+  { address: "0x0b15Ddf19D47E6a86A56148fb4aFFFc6929BcB89", name: "ADA" },
+  { address: "0x5C6D51ecBA4D8E4F20373e3ce96a62342B125D6d", name: "XRP" },
+  { address: "0x1CE0c2827e2eF14D5C4f29a091d735A204794041", name: "DOGE" }
+];
 
 // ==========================================
 // الاتصال بالشبكة
@@ -34,9 +43,9 @@ const provider = new ethers.providers.JsonRpcProvider(RPC_URL);
 const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
 const router = new ethers.Contract(PANCAKE_ROUTER, abi, wallet);
 
-let currentPosition = null;
+let currentPosition = null; // الصفقة المفتوحة حالياً
+let priceHistory = {}; // لتخزين الأسعار السابقة
 let isRunning = false;
-let tradeHistory = [];
 
 // ==========================================
 // دوال مساعدة
@@ -47,34 +56,68 @@ function log(message, type = 'INFO') {
   console.log(`[${timestamp}] [${type}] ${message}`);
 }
 
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
 // ==========================================
-// جلب سعر العملة
+// جلب سعر العملة (بالنسبة لـ BNB)
 // ==========================================
 
-async function getPrice(tokenAddress) {
+async function getTokenPriceBNB(tokenAddress) {
   try {
-    const path = [tokenAddress, USDT_ADDRESS];
+    const path = [tokenAddress, '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c'];
     const amountIn = ethers.utils.parseUnits('1', 18);
     const amounts = await router.getAmountsOut(amountIn, path);
-    const price = parseFloat(ethers.utils.formatUnits(amounts[1], 18));
-    return price;
+    return parseFloat(ethers.utils.formatUnits(amounts[1], 18));
   } catch (error) {
-    log(`❌ فشل جلب السعر: ${error.message}`, 'ERROR');
     return null;
   }
 }
 
 // ==========================================
-// شراء عملة
+// جلب جميع الأسعار الحالية
 // ==========================================
 
-async function buyToken(amountBNB) {
+async function getAllPrices() {
+  const prices = {};
+  for (const token of TOKENS) {
+    const price = await getTokenPriceBNB(token.address);
+    if (price) prices[token.address] = { price, name: token.name };
+  }
+  return prices;
+}
+
+// ==========================================
+// تحليل العملات المتزايدة (Momentum Scan)
+// ==========================================
+
+function findRisingTokens(currentPrices) {
+  const rising = [];
+  for (const [address, data] of Object.entries(currentPrices)) {
+    const price = data.price;
+    if (priceHistory[address]) {
+      const oldPrice = priceHistory[address];
+      const changePercent = ((price - oldPrice) / oldPrice) * 100;
+      if (changePercent >= PRICE_CHANGE_THRESHOLD) {
+        rising.push({ 
+          address, 
+          name: data.name, 
+          price, 
+          changePercent,
+          oldPrice
+        });
+      }
+    }
+  }
+  // ترتيب حسب نسبة الارتفاع (الأعلى أولاً)
+  rising.sort((a, b) => b.changePercent - a.changePercent);
+  return rising;
+}
+
+// ==========================================
+// شراء عملة (مع الرافعة المالية)
+// ==========================================
+
+async function buyToken(tokenAddress, amountBNB) {
   try {
-    const path = [TOKEN_ADDRESS, USDT_ADDRESS];
+    const path = ['0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c', tokenAddress];
     const amountIn = ethers.utils.parseUnits(amountBNB.toString(), 18);
     const amounts = await router.getAmountsOut(amountIn, path);
     const amountOutMin = amounts[1].mul(100 - SLIPPAGE * 100).div(100 * 100);
@@ -82,24 +125,21 @@ async function buyToken(amountBNB) {
     const deadline = Math.floor(Date.now() / 1000) + 60 * 20;
     const tx = await router.swapExactETHForTokens(
       amountOutMin,
-      [TOKEN_ADDRESS, USDT_ADDRESS],
+      path,
       WALLET_ADDRESS,
       deadline,
       { value: amountIn, gasLimit: 300000 }
     );
     
     const receipt = await tx.wait();
-    const price = await getPrice(TOKEN_ADDRESS);
-    log(`✅ تم الشراء بنجاح: ${amountBNB} BNB -> ${ethers.utils.formatUnits(amountOutMin, 18)} USDT`, 'SUCCESS');
+    const tokenAmount = parseFloat(ethers.utils.formatUnits(amountOutMin, 18));
+    log(`✅ شراء: ${tokenAmount} TOKEN مقابل ${amountBNB} BNB`, 'SUCCESS');
     log(`📝 TX: ${receipt.transactionHash}`, 'INFO');
     
-    // إرسال البيانات للوحة التحكم
-    await sendTradeToDashboard('buy', 'BNB', amountBNB, price, 0, 'open');
-    
-    return receipt;
+    return { success: true, tokenAmount, tx: receipt.transactionHash };
   } catch (error) {
     log(`❌ فشل الشراء: ${error.message}`, 'ERROR');
-    return null;
+    return { success: false, error: error.message };
   }
 }
 
@@ -107,10 +147,10 @@ async function buyToken(amountBNB) {
 // بيع عملة
 // ==========================================
 
-async function sellToken(amountToken, profit = 0) {
+async function sellToken(tokenAddress, tokenAmount) {
   try {
-    const path = [TOKEN_ADDRESS, USDT_ADDRESS];
-    const amountIn = ethers.utils.parseUnits(amountToken.toString(), 18);
+    const path = [tokenAddress, '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c'];
+    const amountIn = ethers.utils.parseUnits(tokenAmount.toString(), 18);
     const amounts = await router.getAmountsOut(amountIn, path);
     const amountOutMin = amounts[1].mul(100 - SLIPPAGE * 100).div(100 * 100);
     
@@ -118,47 +158,59 @@ async function sellToken(amountToken, profit = 0) {
     const tx = await router.swapExactTokensForETH(
       amountIn,
       amountOutMin,
-      [TOKEN_ADDRESS, USDT_ADDRESS],
+      path,
       WALLET_ADDRESS,
       deadline,
       { gasLimit: 300000 }
     );
     
     const receipt = await tx.wait();
-    const price = await getPrice(TOKEN_ADDRESS);
-    log(`✅ تم البيع بنجاح: ${amountToken} TOKEN -> ${ethers.utils.formatUnits(amountOutMin, 18)} USDT`, 'SUCCESS');
+    const bnbReceived = parseFloat(ethers.utils.formatUnits(amountOutMin, 18));
+    log(`✅ بيع: ${tokenAmount} TOKEN → ${bnbReceived} BNB`, 'SUCCESS');
     log(`📝 TX: ${receipt.transactionHash}`, 'INFO');
     
-    // إرسال البيانات للوحة التحكم
-    await sendTradeToDashboard('sell', 'BNB', amountToken, price, profit, 'closed');
-    
-    return receipt;
+    return { success: true, bnbReceived, tx: receipt.transactionHash };
   } catch (error) {
     log(`❌ فشل البيع: ${error.message}`, 'ERROR');
-    return null;
+    return { success: false, error: error.message };
   }
 }
 
 // ==========================================
-// إرسال البيانات للوحة التحكم
+// بيع العملة الحالية (لبدء البحث من جديد)
 // ==========================================
 
-async function sendTradeToDashboard(type, token, amount, price, profit, status) {
-  try {
-    await axios.post('http://localhost:8080/api/add-trade', {
-      type,
-      token,
-      amount,
-      price,
-      profit,
-      status
-    });
-  } catch (error) {
-    // لا نعرض خطأ حتى لا نوقف البوت
-    if (DEBUG) {
-      log(`⚠️ فشل إرسال البيانات للوحة التحكم: ${error.message}`, 'WARNING');
-    }
+async function sellCurrentPosition() {
+  if (!currentPosition) {
+    log('⚠️ لا توجد صفقة مفتوحة لبيعها', 'WARNING');
+    return false;
   }
+
+  log(`💰 جاري بيع العملة الحالية: ${currentPosition.name} (${currentPosition.address})`, 'INFO');
+  
+  const result = await sellToken(currentPosition.address, currentPosition.amount);
+  if (result.success) {
+    log(`✅ تم بيع العملة الحالية بنجاح! جاري البحث عن فرصة جديدة...`, 'SUCCESS');
+    currentPosition = null;
+    // تحديث الأسعار بعد البيع
+    await updatePriceHistory();
+    return true;
+  } else {
+    log(`❌ فشل بيع العملة الحالية: ${result.error}`, 'ERROR');
+    return false;
+  }
+}
+
+// ==========================================
+// تحديث تاريخ الأسعار
+// ==========================================
+
+async function updatePriceHistory() {
+  const currentPrices = await getAllPrices();
+  for (const [address, data] of Object.entries(currentPrices)) {
+    priceHistory[address] = data.price;
+  }
+  log(`📊 تم تحديث تاريخ الأسعار (${Object.keys(priceHistory).length} عملة)`, 'INFO');
 }
 
 // ==========================================
@@ -175,50 +227,95 @@ async function tradingCycle() {
     const bnbBalance = parseFloat(ethers.utils.formatEther(balance));
     log(`💰 رصيد BNB: ${bnbBalance.toFixed(6)} BNB`, 'INFO');
 
-    // 2. إذا لم تكن هناك صفقة مفتوحة، افتح واحدة
-    if (!currentPosition) {
-      if (bnbBalance < TRADE_AMOUNT) {
-        log(`⚠️ رصيد غير كافٍ (يحتاج ${TRADE_AMOUNT} BNB)`, 'WARNING');
-        isRunning = false;
-        return;
-      }
-
-      // حساب كمية الشراء مع الرافعة
-      const tradeAmount = TRADE_AMOUNT * LEVERAGE;
-      const currentPrice = await getPrice(TOKEN_ADDRESS);
-      log(`📊 فتح صفقة شراء: ${tradeAmount.toFixed(6)} BNB (رافعة x${LEVERAGE})`, 'INFO');
-      
-      const receipt = await buyToken(tradeAmount);
-      if (receipt) {
-        currentPosition = {
-          entryPrice: currentPrice,
-          amount: tradeAmount,
-          timestamp: Date.now()
-        };
-        log(`✅ تم فتح الصفقة بنجاح`, 'SUCCESS');
-      }
-    } else {
-      // 3. إذا كانت هناك صفقة مفتوحة، تحقق من الربح
-      const currentPrice = await getPrice(TOKEN_ADDRESS);
+    // 2. إذا كانت هناك صفقة مفتوحة، تحقق من الربح
+    if (currentPosition) {
+      const currentPrice = await getTokenPriceBNB(currentPosition.address);
       if (!currentPrice) {
         isRunning = false;
         return;
       }
 
       const profitPercent = ((currentPrice - currentPosition.entryPrice) / currentPosition.entryPrice) * 100;
-      const profitAmount = (currentPrice - currentPosition.entryPrice) * currentPosition.amount;
-      log(`📊 السعر الحالي: ${currentPrice.toFixed(6)} USDT، الربح: ${profitPercent.toFixed(2)}%`, 'INFO');
+      log(`📊 العملة: ${currentPosition.name} - السعر الحالي: ${currentPrice.toFixed(4)} BNB - الربح: ${profitPercent.toFixed(2)}%`, 'INFO');
 
+      // إذا وصل الربح للهدف → بيع
       if (profitPercent >= PROFIT_PERCENT) {
-        log(`✅ جني ربح: ${profitPercent.toFixed(2)}% (${profitAmount.toFixed(4)} USDT)`, 'SUCCESS');
-        await sellToken(currentPosition.amount, profitAmount);
-        currentPosition = null;
-        log(`🔄 جاري التحضير للصفقة التالية...`, 'INFO');
-      } else if (profitPercent <= -5) {
-        log(`⚠️ وقف الخسارة مفعل! الخسارة ${profitPercent.toFixed(2)}%`, 'WARNING');
-        await sellToken(currentPosition.amount, profitAmount);
-        currentPosition = null;
+        log(`✅ تحقيق الربح: ${profitPercent.toFixed(2)}%`, 'SUCCESS');
+        const result = await sellToken(currentPosition.address, currentPosition.amount);
+        if (result.success) {
+          currentPosition = null;
+          log(`🔄 تم البيع، جاري البحث عن عملة جديدة...`, 'INFO');
+          // تحديث الأسعار بعد البيع
+          await updatePriceHistory();
+        }
+      } 
+      // إذا وصلت الخسارة إلى 5% → بيع (وقف خسارة)
+      else if (profitPercent <= -5) {
+        log(`⚠️ وقف الخسارة: ${profitPercent.toFixed(2)}%`, 'WARNING');
+        const result = await sellToken(currentPosition.address, currentPosition.amount);
+        if (result.success) {
+          currentPosition = null;
+          log(`🔄 تم البيع بخسارة، جاري البحث عن عملة جديدة...`, 'INFO');
+          await updatePriceHistory();
+        }
       }
+      
+      isRunning = false;
+      return;
+    }
+
+    // 3. إذا لم تكن هناك صفقة مفتوحة، ابحث عن فرصة شراء جديدة
+    if (bnbBalance < TRADE_AMOUNT * LEVERAGE) {
+      log(`⚠️ رصيد غير كافٍ (يحتاج ${(TRADE_AMOUNT * LEVERAGE).toFixed(6)} BNB)`, 'WARNING');
+      isRunning = false;
+      return;
+    }
+
+    // جلب الأسعار الحالية
+    const currentPrices = await getAllPrices();
+    if (!currentPrices || Object.keys(currentPrices).length === 0) {
+      log('⚠️ لا توجد أسعار متاحة', 'WARNING');
+      isRunning = false;
+      return;
+    }
+
+    // تحديث تاريخ الأسعار (إذا كانت فارغة)
+    if (Object.keys(priceHistory).length === 0) {
+      for (const [address, data] of Object.entries(currentPrices)) {
+        priceHistory[address] = data.price;
+      }
+      log('📊 تم تهيئة تاريخ الأسعار', 'INFO');
+      isRunning = false;
+      return;
+    }
+
+    // البحث عن عملات متزايدة
+    const risingTokens = findRisingTokens(currentPrices);
+    
+    if (risingTokens.length > 0) {
+      // اختر العملة الأعلى ارتفاعاً
+      const best = risingTokens[0];
+      log(`📈 اكتشاف ارتفاع: ${best.name} - ${best.changePercent.toFixed(2)}% (من ${best.oldPrice.toFixed(6)} إلى ${best.price.toFixed(6)})`, 'INFO');
+
+      // حساب المبلغ مع الرافعة
+      const tradeAmount = TRADE_AMOUNT * LEVERAGE;
+      log(`📊 فتح صفقة شراء: ${tradeAmount.toFixed(6)} BNB (رافعة x${LEVERAGE}) على ${best.name}`, 'INFO');
+      
+      const result = await buyToken(best.address, tradeAmount);
+      if (result.success) {
+        currentPosition = {
+          address: best.address,
+          name: best.name,
+          amount: result.tokenAmount,
+          entryPrice: best.price,
+          timestamp: Date.now()
+        };
+        log(`✅ تم فتح الصفقة على ${best.name}`, 'SUCCESS');
+        // تحديث تاريخ الأسعار بعد الشراء
+        await updatePriceHistory();
+      }
+    } else {
+      log(`📊 لا توجد عملات متزايدة (الحد: ${PRICE_CHANGE_THRESHOLD}%)`, 'INFO');
     }
 
   } catch (error) {
@@ -233,12 +330,15 @@ async function tradingCycle() {
 // ==========================================
 
 async function startBot() {
-  log(`🚀 بدء تشغيل بوت التداول الشبكي (Grid)`, 'START');
-  log(`📊 العملة: ${TOKEN_ADDRESS}`, 'INFO');
-  log(`💰 المبلغ: ${TRADE_AMOUNT} BNB (رافعة x${LEVERAGE})`, 'INFO');
-  log(`📈 نسبة الربح: ${PROFIT_PERCENT}%`, 'INFO');
-  log(`⏱️ الفحص كل ${CHECK_INTERVAL/1000} ثانية`, 'INFO');
-  log(`📡 لوحة التحكم: http://localhost:8080`, 'INFO');
+  log(`🚀 بدء تشغيل بوت صيد الزخم (Momentum Sniping)`, 'START');
+  log(`📊 العملات المراقبة: ${TOKENS.map(t => t.name).join(', ')}`, 'INFO');
+  log(`💰 المبلغ: ${TRADE_AMOUNT} BNB (رافعة x${LEVERAGE})`, 'INFO`);
+  log(`📈 حد الارتفاع: ${PRICE_CHANGE_THRESHOLD}%`, 'INFO`);
+  log(`🎯 هدف الربح: ${PROFIT_PERCENT}%`, 'INFO`);
+  log(`⏱️ الفحص كل ${CHECK_INTERVAL/1000} ثانية`, 'INFO`);
+
+  // تحديث الأسعار الأولية
+  await updatePriceHistory();
 
   // تشغيل الدورة الأولى
   await tradingCycle();
