@@ -69,7 +69,6 @@
     }
     .btn-google:hover { background: #f5f5f5; border-color: #aaa; }
     .btn-google img { width: 20px; height: 20px; }
-    .btn-google:disabled { opacity: 0.6; cursor: not-allowed; }
     .divider {
       display: flex;
       align-items: center;
@@ -205,46 +204,27 @@
 
       <!-- إنشاء حساب -->
       <div id="registerForm" class="hidden">
-        <div id="registerStep1">
-          <div class="input-group">
-            <label>👤 اسم المستخدم</label>
-            <input type="text" id="regName" placeholder="أدخل اسمك">
-          </div>
-          <div class="input-group">
-            <label>📧 البريد الإلكتروني</label>
-            <input type="email" id="regEmail" placeholder="example@email.com">
-          </div>
-          <div class="input-group">
-            <label>🔒 كلمة المرور</label>
-            <input type="password" id="regPassword" placeholder="********">
-          </div>
-          <div class="input-group">
-            <label>✔️ تأكيد كلمة المرور</label>
-            <input type="password" id="regConfirmPassword" placeholder="********">
-          </div>
-          <div class="input-group">
-            <label>🎁 رمز الدعوة (اختياري)</label>
-            <input type="text" id="regReferral" placeholder="XXXXXX">
-          </div>
-          <button class="btn" id="requestVerificationBtn">📧 إرسال رمز التحقق</button>
+        <div class="input-group">
+          <label>👤 اسم المستخدم</label>
+          <input type="text" id="regName" placeholder="أدخل اسمك">
         </div>
-
-        <div id="registerStep2" class="hidden">
-          <div style="background:#f8f9fa;border-radius:12px;padding:16px;margin:12px 0;border:1px solid #00aa55;">
-            <p style="color:#00aa55;font-weight:bold;text-align:center;margin-bottom:12px;">✅ تم إرسال رمز التحقق</p>
-            <p style="color:#666;font-size:13px;text-align:center;">أدخل الرمز المكون من 6 أرقام</p>
-            <div class="input-group">
-              <label>🔑 رمز التحقق</label>
-              <input type="text" id="verificationCode" style="font-size:24px;letter-spacing:8px;text-align:center;direction:ltr;width:100%;padding:12px;border-radius:12px;border:1px solid #ddd;" placeholder="_ _ _ _ _ _" maxlength="6" inputmode="numeric">
-            </div>
-            <div style="display:flex;gap:8px;margin-top:8px;">
-              <button class="btn" id="resendCodeBtn" style="background:#7c3aed;font-size:13px;padding:10px;">🔄 إعادة إرسال</button>
-              <button class="btn" id="backToStep1Btn" style="background:#ff4444;font-size:13px;padding:10px;">🔙 تغيير البريد</button>
-            </div>
-            <p id="timerDisplay" style="color:#888;font-size:12px;text-align:center;margin-top:8px;">⏳ صلاحية الرمز: 10:00</p>
-          </div>
-          <button class="btn" id="completeRegisterBtn">✅ إنشاء الحساب</button>
+        <div class="input-group">
+          <label>📧 البريد الإلكتروني</label>
+          <input type="email" id="regEmail" placeholder="example@email.com">
         </div>
+        <div class="input-group">
+          <label>🔒 كلمة المرور</label>
+          <input type="password" id="regPassword" placeholder="********">
+        </div>
+        <div class="input-group">
+          <label>✔️ تأكيد كلمة المرور</label>
+          <input type="password" id="regConfirmPassword" placeholder="********">
+        </div>
+        <div class="input-group">
+          <label>🎁 رمز الدعوة (اختياري)</label>
+          <input type="text" id="regReferral" placeholder="XXXXXX">
+        </div>
+        <button class="btn" id="doRegisterBtn">إنشاء حساب</button>
       </div>
 
       <div id="message"></div>
@@ -260,7 +240,6 @@
     // ==========================================
     const API_URL = window.location.origin;
     let currentTheme = localStorage.getItem('theme') || 'light';
-    let timerInterval = null;
 
     // ==========================================
     // دوال مساعدة
@@ -292,36 +271,6 @@
       }
     }
 
-    function resetRegisterForm() {
-      document.getElementById('registerStep1').classList.remove('hidden');
-      document.getElementById('registerStep2').classList.add('hidden');
-      document.getElementById('verificationCode').value = '';
-      if (timerInterval) {
-        clearInterval(timerInterval);
-        timerInterval = null;
-      }
-      document.getElementById('timerDisplay').textContent = '⏳ صلاحية الرمز: 10:00';
-      document.getElementById('timerDisplay').style.color = '#888';
-    }
-
-    function startTimer() {
-      let seconds = 600;
-      const timerDisplay = document.getElementById('timerDisplay');
-      if (timerInterval) clearInterval(timerInterval);
-      timerInterval = setInterval(() => {
-        seconds--;
-        const minutes = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        timerDisplay.textContent = '⏳ صلاحية الرمز: ' + String(minutes).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
-        if (seconds <= 0) {
-          clearInterval(timerInterval);
-          timerInterval = null;
-          timerDisplay.textContent = '⏳ انتهت صلاحية الرمز. يرجى طلب رمز جديد';
-          timerDisplay.style.color = '#ff4444';
-        }
-      }, 1000);
-    }
-
     // ==========================================
     // الوضع النهاري/الليلي
     // ==========================================
@@ -345,7 +294,6 @@
       document.getElementById('loginForm').classList.remove('hidden');
       document.getElementById('registerForm').classList.add('hidden');
       document.getElementById('message').innerHTML = '';
-      resetRegisterForm();
     };
 
     document.getElementById('registerTab').onclick = function() {
@@ -354,11 +302,10 @@
       document.getElementById('loginForm').classList.add('hidden');
       document.getElementById('registerForm').classList.remove('hidden');
       document.getElementById('message').innerHTML = '';
-      resetRegisterForm();
     };
 
     // ==========================================
-    // تسجيل الدخول (يعمل)
+    // تسجيل الدخول
     // ==========================================
     document.getElementById('doLoginBtn').onclick = async function() {
       var email = document.getElementById('loginEmail').value.trim();
@@ -398,13 +345,14 @@
     };
 
     // ==========================================
-    // طلب رمز التحقق (يعمل)
+    // إنشاء حساب
     // ==========================================
-    document.getElementById('requestVerificationBtn').onclick = async function() {
+    document.getElementById('doRegisterBtn').onclick = async function() {
       var name = document.getElementById('regName').value.trim();
       var email = document.getElementById('regEmail').value.trim();
       var password = document.getElementById('regPassword').value;
       var confirm = document.getElementById('regConfirmPassword').value;
+      var referral = document.getElementById('regReferral').value.trim();
       var btn = this;
 
       if (!name || !email || !password || !confirm) {
@@ -423,54 +371,6 @@
       setLoading(btn, true);
 
       try {
-        var response = await fetch(API_URL + '/api/request-verification', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: email, name: name })
-        });
-
-        var data = await response.json();
-
-        if (data.success) {
-          showMessage('✅ ' + data.message, 'success');
-          document.getElementById('registerStep1').classList.add('hidden');
-          document.getElementById('registerStep2').classList.remove('hidden');
-          document.getElementById('registerStep2').dataset.email = email;
-          document.getElementById('registerStep2').dataset.name = name;
-          document.getElementById('registerStep2').dataset.password = password;
-          document.getElementById('registerStep2').dataset.referral = document.getElementById('regReferral').value.trim();
-          startTimer();
-        } else {
-          showMessage('❌ ' + (data.error || 'فشل إرسال الرمز'), 'error');
-        }
-      } catch (error) {
-        showMessage('❌ خطأ في الاتصال بالخادم', 'error');
-      }
-
-      setLoading(btn, false);
-    };
-
-    // ==========================================
-    // إكمال التسجيل (يعمل)
-    // ==========================================
-    document.getElementById('completeRegisterBtn').onclick = async function() {
-      var code = document.getElementById('verificationCode').value.trim();
-      var btn = this;
-      var step2 = document.getElementById('registerStep2');
-
-      if (!code || code.length !== 6) {
-        showMessage('⚠️ يرجى إدخال رمز مكون من 6 أرقام', 'error');
-        return;
-      }
-
-      var email = step2.dataset.email;
-      var name = step2.dataset.name;
-      var password = step2.dataset.password;
-      var referral = step2.dataset.referral;
-
-      setLoading(btn, true);
-
-      try {
         var fingerprint = getDeviceFingerprint();
         var response = await fetch(API_URL + '/api/register', {
           method: 'POST',
@@ -480,7 +380,6 @@
             email: email,
             password: password,
             referralCode: referral,
-            verificationCode: code,
             deviceFingerprint: fingerprint
           }),
           credentials: 'include'
@@ -503,89 +402,40 @@
     };
 
     // ==========================================
-    // إعادة إرسال الرمز (يعمل)
-    // ==========================================
-    document.getElementById('resendCodeBtn').onclick = async function() {
-      var btn = this;
-      var email = document.getElementById('registerStep2').dataset.email;
-
-      if (!email) {
-        showMessage('⚠️ البريد الإلكتروني غير موجود', 'error');
-        return;
-      }
-
-      setLoading(btn, true);
-
-      try {
-        var response = await fetch(API_URL + '/api/resend-verification', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: email })
-        });
-
-        var data = await response.json();
-
-        if (data.success) {
-          showMessage('✅ ' + data.message, 'success');
-          if (timerInterval) clearInterval(timerInterval);
-          startTimer();
-        } else {
-          showMessage('❌ ' + (data.error || 'فشل إعادة الإرسال'), 'error');
-        }
-      } catch (error) {
-        showMessage('❌ خطأ في الاتصال بالخادم', 'error');
-      }
-
-      setLoading(btn, false);
-    };
-
-    // ==========================================
-    // العودة للخطوة 1 (يعمل)
-    // ==========================================
-    document.getElementById('backToStep1Btn').onclick = function() {
-      resetRegisterForm();
-      document.getElementById('registerStep1').classList.remove('hidden');
-      document.getElementById('registerStep2').classList.add('hidden');
-    };
-
-    // ==========================================
-    // نسيت كلمة المرور (يعمل)
-    // ==========================================
-    document.getElementById('forgotPasswordLink').onclick = function(e) {
-      e.preventDefault();
-      var email = prompt('📧 أدخل بريدك الإلكتروني:');
-      if (!email) return;
-      showMessage('⚠️ سيتم إرسال رابط إعادة التعيين إلى بريدك قريباً', 'warning');
-    };
-
-    // ==========================================
-    // ⭐⭐⭐ تسجيل الدخول عبر Google (يعمل 100%) ⭐⭐⭐
+    // تسجيل الدخول عبر Google
     // ==========================================
     document.getElementById('googleSignInBtn').onclick = function() {
       var btn = this;
       btn.disabled = true;
       btn.innerHTML = '⏳ جاري...';
 
-      // فتح نافذة تسجيل الدخول عبر Google
       var popup = window.open(
         API_URL + '/auth/google',
         'Google Sign-In',
         'width=500,height=600,left=' + (window.screen.width / 2 - 250) + ',top=' + (window.screen.height / 2 - 300)
       );
 
-      // التحقق من إغلاق النافذة
       var checkPopup = setInterval(function() {
         if (popup && popup.closed) {
           clearInterval(checkPopup);
           btn.disabled = false;
           btn.innerHTML = '<img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" style="width:20px;height:20px;"> تسجيل الدخول عبر Google';
-          // التحقق من حالة تسجيل الدخول
           var user = JSON.parse(localStorage.getItem('user') || '{}');
           if (user && user.id) {
             window.location.href = '/dashboard.html';
           }
         }
       }, 1000);
+    };
+
+    // ==========================================
+    // نسيت كلمة المرور
+    // ==========================================
+    document.getElementById('forgotPasswordLink').onclick = function(e) {
+      e.preventDefault();
+      var email = prompt('📧 أدخل بريدك الإلكتروني:');
+      if (!email) return;
+      showMessage('⚠️ سيتم إرسال رابط إعادة التعيين إلى بريدك قريباً', 'warning');
     };
 
     // ==========================================
@@ -596,11 +446,7 @@
     });
 
     document.getElementById('regConfirmPassword').addEventListener('keydown', function(e) {
-      if (e.key === 'Enter') document.getElementById('requestVerificationBtn').click();
-    });
-
-    document.getElementById('verificationCode').addEventListener('keydown', function(e) {
-      if (e.key === 'Enter') document.getElementById('completeRegisterBtn').click();
+      if (e.key === 'Enter') document.getElementById('doRegisterBtn').click();
     });
 
     // ==========================================
@@ -617,7 +463,7 @@
       }
     })();
 
-    console.log('✅ CryptoShop - كل شيء يعمل');
+    console.log('✅ CryptoShop - النظام المبسط جاهز');
     console.log('📡 API URL:', API_URL);
   </script>
 </body>
