@@ -23,7 +23,7 @@ const PRICE_CHANGE_THRESHOLD = parseFloat(process.env.PRICE_CHANGE_THRESHOLD) ||
 const CHECK_INTERVAL = parseInt(process.env.CHECK_INTERVAL) || 30000;
 const SLIPPAGE = parseFloat(process.env.SLIPPAGE) || 0.5;
 
-// قائمة العملات
+// قائمة العملات للمراقبة
 const TOKENS = [
   { address: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c", name: "WBNB" },
   { address: "0x0E09FaBB73Bd3Ade0a17ECC321fD13a19e81cE82", name: "CAKE" },
@@ -60,21 +60,32 @@ function log(message, type = 'INFO') {
   console.log(`[${timestamp}] [${type}] ${message}`);
 }
 
+// ==========================================
+// إدارة tradesHistory
+// ==========================================
+
 function loadTrades() {
   try {
     if (fs.existsSync(TRADES_FILE)) {
       const data = fs.readFileSync(TRADES_FILE, 'utf8');
-      tradesHistory = JSON.parse(data);
-      return tradesHistory;
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed)) {
+        tradesHistory = parsed;
+        return parsed;
+      }
     }
   } catch (error) {
     console.error('خطأ في قراءة trades.json:', error);
   }
+  tradesHistory = [];
   return [];
 }
 
 function saveTrades() {
   try {
+    if (!Array.isArray(tradesHistory)) {
+      tradesHistory = [];
+    }
     const dir = path.dirname(TRADES_FILE);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
@@ -363,6 +374,11 @@ app.get('/', async (req, res) => {
 // API: جلب جميع البيانات
 app.get('/api/status-full', async (req, res) => {
   try {
+    // تأكد من أن tradesHistory مصفوفة
+    if (!Array.isArray(tradesHistory)) {
+      tradesHistory = [];
+    }
+    
     const balance = await wallet.getBalance();
     const bnbBalance = parseFloat(ethers.utils.formatEther(balance));
     
