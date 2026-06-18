@@ -43,12 +43,12 @@ const STOP_LOSS_PERCENT = null;
 
 // ✅ إعدادات الشمعة (1 دقيقة)
 const CANDLE_INTERVAL = '1m';
-const CANDLE_LIMIT = 100; // نحتاج 100 شمعة للبيانات الكافية
+const CANDLE_LIMIT = 100;
 
-// ✅ إعدادات الفلاتر
-const MIN_VOLUME = 10000000; // 10,000,000
-const MIN_PRICE = 0.01;
-const MAX_CHANGE_24H = 15; // تجاهل العملات المتقلبة أكثر من 15%
+// ✅ إعدادات الفلاتر (معطلة حالياً)
+const MIN_VOLUME = 0; // معطل
+const MIN_PRICE = 0; // معطل
+const MAX_CHANGE_24H = 100; // معطل
 
 // ✅ المتغيرات
 let lastPrices = {};
@@ -190,31 +190,24 @@ async function getFilteredSymbols() {
     return [];
   }
 
-  // ✅ الفلاتر
-  const filtered = contracts.filter(c => {
-    const volume = Number(c.volume) || 0;
-    const lastPrice = Number(c.lastPrice) || 0;
-    const change24h = Number(c.priceChangePercent) || 0;
-    
-    // ✅ فلتر 1: العملات المقترنة بـ USDT فقط
-    if (!c.symbol.endsWith('USDT')) return false;
-    
-    // ✅ فلتر 2: حجم التداول > 10,000,000
-    if (volume < MIN_VOLUME) return false;
-    
-    // ✅ فلتر 3: السعر > 0.01
-    if (lastPrice < MIN_PRICE) return false;
-    
-    // ✅ فلتر 4: التقلب أقل من 15%
-    if (Math.abs(change24h) > MAX_CHANGE_24H) return false;
-    
-    return true;
-  });
+  // ✅ طباعة أول عنصر للتحقق من البنية
+  if (contracts.length > 0) {
+    console.log('📋 أول عنصر في contracts:');
+    console.log(JSON.stringify(contracts[0], null, 2));
+  }
 
-  // ✅ استخراج الرموز فقط
-  const symbols = filtered.map(c => c.symbol);
+  // ✅ فلتر بسيط: فقط العملات المقترنة بـ USDT
+  const filtered = contracts.filter(c =>
+    c.symbol && c.symbol.endsWith('USDT')
+  );
+
+  // ✅ أخذ أول 50 عملة فقط (مؤقت)
+  const limited = filtered.slice(0, 50);
+
+  console.log(`✅ تم العثور على ${filtered.length} عملة USDT (تم أخذ ${limited.length} عملة فقط)`);
   
-  console.log(`✅ تم العثور على ${symbols.length} عملة مطابقة للفلاتر (من أصل ${contracts.length})`);
+  // ✅ استخراج الرموز فقط
+  const symbols = limited.map(c => c.symbol);
   
   // ✅ تحديث الكاش
   cachedSymbols = symbols;
@@ -724,12 +717,6 @@ async function tradingCycle() {
         `${symbol} | EMA9=${ema9?.toFixed(2) || 'N/A'} | EMA21=${ema21?.toFixed(2) || 'N/A'} | RSI=${rsi?.toFixed(2) || 'N/A'} | change=${changePercent.toFixed(3)}% | 24h=${changePercent24h.toFixed(2)}%`
       );
 
-      // ✅ فلتر الحجم
-      if (volume24h < MIN_VOLUME) {
-        console.log(`📊 ${symbol}: حجم منخفض (${volume24h.toFixed(0)}) - تم التخطي`);
-        continue;
-      }
-
       // ✅ التحقق من صحة المؤشرات
       if (ema9 === null || ema21 === null || rsi === null) {
         console.log(`📊 ${symbol}: بيانات غير كافية للمؤشرات`);
@@ -958,9 +945,8 @@ app.get('/dashboard', (req, res) => {
             🎯 هدف: <span class="highlight-gold">0.05 USDT</span> &nbsp;|&nbsp;
             📈 شراء: <span class="highlight-green">EMA9>EMA21 + RSI&lt;35</span> &nbsp;|&nbsp;
             📉 بيع: <span class="highlight-red">EMA9&lt;EMA21 + RSI&gt;65</span> &nbsp;|&nbsp;
-            📊 حجم: <span class="highlight-purple">≥ 10M</span> &nbsp;|&nbsp;
-            📊 تقلب: <span class="highlight-purple">&lt; 15%</span> &nbsp;|&nbsp;
-            🔄 مسح: <span class="highlight-purple">15 ثانية</span>
+            🔄 مسح: <span class="highlight-purple">15 ثانية</span> &nbsp;|&nbsp;
+            📊 أول 50 عملة USDT
           </div>
         </div>
 
@@ -1044,8 +1030,6 @@ app.get('/', async (req, res) => {
         profitTarget: `${PROFIT_USDT_TARGET} USDT`,
         rsiOversold: RSI_OVERSOLD,
         rsiOverbought: RSI_OVERBOUGHT,
-        minVolume: `${(MIN_VOLUME/1000000).toFixed(0)}M`,
-        maxChange24h: `${MAX_CHANGE_24H}%`,
         scanInterval: `${SCAN_INTERVAL/1000} ثانية`,
         leverage: `${LEVERAGE}x`,
         symbolsCount: cachedSymbols.length
@@ -1069,8 +1053,6 @@ async function startBot() {
     console.log(`🎯 هدف الربح: ${PROFIT_USDT_TARGET} USDT`);
     console.log(`📈 شراء: EMA9 > EMA21 + RSI < ${RSI_OVERSOLD}`);
     console.log(`📉 بيع: EMA9 < EMA21 + RSI > ${RSI_OVERBOUGHT}`);
-    console.log(`📊 فلتر الحجم: ≥ ${(MIN_VOLUME/1000000).toFixed(0)}M`);
-    console.log(`📊 فلتر التقلب: < ${MAX_CHANGE_24H}%`);
     console.log(`📊 عدد الشموع: ≥ ${CANDLE_LIMIT}`);
     console.log(`🔄 سرعة المسح: كل ${SCAN_INTERVAL/1000} ثانية`);
     console.log('================================');
@@ -1121,8 +1103,7 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   ║   🎯 هدف: ${PROFIT_USDT_TARGET} USDT                          ║
   ║   📈 شراء: EMA9>EMA21 + RSI<${RSI_OVERSOLD}                   ║
   ║   📉 بيع: EMA9<EMA21 + RSI>${RSI_OVERBOUGHT}                  ║
-  ║   📊 حجم: ≥ ${(MIN_VOLUME/1000000).toFixed(0)}M | تقلب: < ${MAX_CHANGE_24H}%  ║
-  ║   🔄 مسح: ${SCAN_INTERVAL/1000} ثانية | 📊 كاش: ${cachedSymbols.length} عملة ║
+  ║   🔄 مسح: ${SCAN_INTERVAL/1000} ثانية | 📊 أول 50 عملة USDT   ║
   ║   ⚠️ تداول حقيقي - استخدم بحذر!                              ║
   ╚═══════════════════════════════════════════════════════════════╝
   `);
