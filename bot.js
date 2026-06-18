@@ -25,13 +25,13 @@ const API_SECRET = process.env.BINGX_API_SECRET;
 const LEVERAGE = 5;
 const TRADE_AMOUNT = 1.4;
 const PROFIT_PERCENT = 5;
-const PRICE_CHANGE_THRESHOLD = 0.1;  // نسبة الارتداد من القاع
-const CHECK_INTERVAL = 5000;  // 5 ثواني
-const STOP_LOSS_PERCENT = null;  // معطل
+const PRICE_CHANGE_THRESHOLD = 0.1;
+const CHECK_INTERVAL = 5000;
+const STOP_LOSS_PERCENT = null;
 
 // ✅ إعدادات شمعة 15 دقيقة
-const CANDLE_INTERVAL = '15m';  // شمعة 15 دقيقة
-const CANDLE_LIMIT = 2;  // جلب آخر شمعتين
+const CANDLE_INTERVAL = '15m';
+const CANDLE_LIMIT = 2;
 
 // قائمة العملات
 const SYMBOLS = [
@@ -49,7 +49,7 @@ const ENDPOINTS = {
   FUTURES_PRICE: '/openApi/swap/v2/quote/price',
   FUTURES_LEVERAGE: '/openApi/swap/v2/trade/leverage',
   FUTURES_ORDER: '/openApi/swap/v2/trade/order',
-  FUTURES_CANDLE: '/openApi/swap/v2/quote/klines',  // ✅ نقطة نهاية الشموع
+  FUTURES_CANDLE: '/openApi/swap/v2/quote/klines',
 };
 
 // ==========================================
@@ -119,21 +119,24 @@ async function bingxRequest(method, endpoint, params = {}, signed = true) {
 }
 
 // ==========================================
-// ✅ جلب بيانات الشمعة (15 دقيقة)
+// جلب بيانات الشمعة
 // ==========================================
 
 async function getCandleData(symbol) {
   try {
     const response = await bingxRequest('GET', ENDPOINTS.FUTURES_CANDLE, {
-      symbol: symbol,
+      symbol,
       interval: CANDLE_INTERVAL,
       limit: CANDLE_LIMIT
     }, false);
-    
-    if (response && response.code === 0 && response.data) {
-      return response.data;
-    }
-    return null;
+
+    if (!response) return null;
+
+    const data = response?.data?.data || response?.data || response;
+
+    if (!Array.isArray(data)) return null;
+
+    return data;
   } catch (error) {
     console.error(`❌ فشل جلب شمعة ${symbol}:`, error);
     return null;
@@ -141,43 +144,62 @@ async function getCandleData(symbol) {
 }
 
 // ==========================================
-// ✅ تحليل الشمعة: أدنى سعر وبداية الارتداد
+// ✅ تحليل الشمعة (شراء + بيع)
 // ==========================================
 
 async function analyzeCandle(symbol) {
   try {
     const candleData = await getCandleData(symbol);
-    if (!candleData || !candleData.length || candleData.length < 2) {
+    
+    if (!candleData || !Array.isArray(candleData) || candleData.length < 2) {
       return null;
     }
 
+    const currentCandle = candleData[candleData.length - 1];
+    const previousCandle = candleData[candleData.length - 2];
+
+    if (!currentCandle || !previousCandle) return null;
+
     // ✅ بيانات الشمعة: [time, open, high, low, close, volume]
-    const currentCandle = candleData[candleData.length - 1];  // الشمعة الحالية
-    const previousCandle = candleData[candleData.length - 2];  // الشمعة السابقة
+    const currentLow = Number(currentCandle[3]);
+    const currentHigh = Number(currentCandle[2]);
+    const currentClose = Number(currentCandle[4]);
+    const previousClose = Number(previousCandle[4]);
 
-    const currentLow = parseFloat(currentCandle[3]);  // أدنى سعر في الشمعة الحالية
-    const currentClose = parseFloat(currentCandle[4]);  // سعر الإغلاق الحالي
-    const previousClose = parseFloat(previousCandle[4]);  // سعر إغلاق الشمعة السابقة
+    if (isNaN(currentLow) || isNaN(currentHigh) || isNaN(currentClose) || isNaN(previousClose)) {
+      return null;
+    }
 
-    // ✅ حساب نسبة الارتداد من القاع
+    if (currentLow === 0 || currentHigh === 0) return null;
+
+    // ✅ حساب نسبة الارتداد من القاع (شراء)
     const bouncePercent = ((currentClose - currentLow) / currentLow) * 100;
 
-    // ✅ التحقق من بداية الارتداد
-    const isBouncing = bouncePercent >= PRICE_CHANGE_THRESHOLD;
+    // ✅ حساب نسبة النزول من القمة (بيع)
+    const dropPercent = ((currentHigh - currentClose) / currentHigh) * 100;
 
-    // ✅ التحقق من أن السعر الحالي أكبر من إغلاق الشمعة السابقة (ارتفاع فعلي)
+    // ✅ شروط الشراء: ارتداد من القاع + السعر أعلى من الشمعة السابقة
+    const isBouncing = bouncePercent >= PRICE_CHANGE_THRESHOLD;
     const isRising = currentClose > previousClose;
+    const shouldBuy = isBouncing && isRising;
+
+    // ✅ شروط البيع: نزول من القمة + السعر أقل من الشمعة السابقة
+    const isDropping = dropPercent >= PRICE_CHANGE_THRESHOLD;
+    const isFalling = currentClose < previousClose;
+    const shouldSell = isDropping && isFalling;
 
     return {
       symbol,
       currentLow,
+      currentHigh,
       currentClose,
       previousClose,
       bouncePercent,
-      isBouncing,
-      isRising,
-      // ✅ شرط الدخول: ارتداد + ارتفاع فعلي
-      shouldBuy: isBouncing && isRising
+      dropPercent,
+      shouldBuy,
+      shouldSell,
+      // ✅ تحديد أفضل إشارة (أولوية للشراء ثم البيع)
+      bestSignal: shouldBuy ? 'BUY' : (shouldSell ? 'SELL' : null)
     };
   } catch (error) {
     console.error(`❌ فشل تحليل الشمعة ${symbol}:`, error);
@@ -274,14 +296,14 @@ async function setLeverage(symbol) {
 }
 
 // ==========================================
-// فتح صفقة شراء
+// ✅ فتح صفقة شراء (Long)
 // ==========================================
 
 async function openLongPosition(symbol, amount) {
   try {
     const price = await getPrice(symbol);
     if (!price) {
-      console.log(`⚠️ لا يمكن فتح صفقة: سعر ${symbol} غير متوفر`);
+      console.log(`⚠️ لا يمكن فتح صفقة شراء: سعر ${symbol} غير متوفر`);
       return null;
     }
 
@@ -293,7 +315,7 @@ async function openLongPosition(symbol, amount) {
       return null;
     }
 
-    console.log(`📊 فتح صفقة شراء: ${roundedQuantity} ${symbol} بسعر ${price}`);
+    console.log(`📊 فتح صفقة شراء (Long): ${roundedQuantity} ${symbol} بسعر ${price}`);
     console.log(`📊 حجم الصفقة: ${(roundedQuantity * price).toFixed(2)} USDT (رافعة x${LEVERAGE})`);
 
     const params = {
@@ -312,20 +334,73 @@ async function openLongPosition(symbol, amount) {
         symbol,
         entryPrice: price,
         quantity: roundedQuantity,
+        type: 'LONG',
         orderId: response.data?.orderId || Date.now(),
         timestamp: Date.now()
       };
     }
-    console.log(`⚠️ فشل فتح الصفقة:`, JSON.stringify(response, null, 2));
+    console.log(`⚠️ فشل فتح صفقة شراء:`, JSON.stringify(response, null, 2));
     return null;
   } catch (error) {
-    console.error(`❌ فشل فتح الصفقة:`, error);
+    console.error(`❌ فشل فتح صفقة شراء:`, error);
     return null;
   }
 }
 
 // ==========================================
-// إغلاق صفقة
+// ✅ فتح صفقة بيع (Short)
+// ==========================================
+
+async function openShortPosition(symbol, amount) {
+  try {
+    const price = await getPrice(symbol);
+    if (!price) {
+      console.log(`⚠️ لا يمكن فتح صفقة بيع: سعر ${symbol} غير متوفر`);
+      return null;
+    }
+
+    const quantity = (amount * LEVERAGE) / price;
+    const roundedQuantity = Number(quantity.toFixed(1));
+
+    if (roundedQuantity <= 0) {
+      console.log(`⚠️ الكمية صغيرة جداً: ${roundedQuantity}`);
+      return null;
+    }
+
+    console.log(`📊 فتح صفقة بيع (Short): ${roundedQuantity} ${symbol} بسعر ${price}`);
+    console.log(`📊 حجم الصفقة: ${(roundedQuantity * price).toFixed(2)} USDT (رافعة x${LEVERAGE})`);
+
+    const params = {
+      symbol: symbol,
+      side: 'SELL',
+      type: 'MARKET',
+      quantity: roundedQuantity,
+      positionSide: 'SHORT'
+    };
+
+    const response = await bingxRequest('POST', ENDPOINTS.FUTURES_ORDER, params);
+
+    if (response && response.code === 0) {
+      console.log(`✅ تم فتح صفقة بيع: ${roundedQuantity} ${symbol}`);
+      return {
+        symbol,
+        entryPrice: price,
+        quantity: roundedQuantity,
+        type: 'SHORT',
+        orderId: response.data?.orderId || Date.now(),
+        timestamp: Date.now()
+      };
+    }
+    console.log(`⚠️ فشل فتح صفقة بيع:`, JSON.stringify(response, null, 2));
+    return null;
+  } catch (error) {
+    console.error(`❌ فشل فتح صفقة بيع:`, error);
+    return null;
+  }
+}
+
+// ==========================================
+// ✅ إغلاق صفقة (عكس الاتجاه)
 // ==========================================
 
 async function closePosition(position) {
@@ -336,20 +411,24 @@ async function closePosition(position) {
       return false;
     }
 
-    console.log(`📊 إغلاق صفقة: ${position.quantity} ${position.symbol} بسعر ${currentPrice}`);
+    console.log(`📊 إغلاق صفقة ${position.type}: ${position.quantity} ${position.symbol} بسعر ${currentPrice}`);
+
+    // ✅ إذا كانت الصفقة LONG، نبيع لإغلاقها. وإذا كانت SHORT، نشتري لإغلاقها.
+    const closeSide = position.type === 'LONG' ? 'SELL' : 'BUY';
+    const closePositionSide = position.type === 'LONG' ? 'LONG' : 'SHORT';
 
     const params = {
       symbol: position.symbol,
-      side: 'SELL',
+      side: closeSide,
       type: 'MARKET',
       quantity: position.quantity,
-      positionSide: 'LONG'
+      positionSide: closePositionSide
     };
 
     const response = await bingxRequest('POST', ENDPOINTS.FUTURES_ORDER, params);
 
     if (response && response.code === 0) {
-      console.log(`✅ تم إغلاق الصفقة: ${position.symbol}`);
+      console.log(`✅ تم إغلاق صفقة ${position.type}: ${position.symbol}`);
       return true;
     }
     console.log(`⚠️ فشل إغلاق الصفقة:`, response?.msg || response);
@@ -366,10 +445,10 @@ async function closePosition(position) {
 
 let currentPosition = null;
 let isRunning = false;
-let lastCandleAnalysis = {};  // ✅ تخزين آخر تحليل لكل عملة
+let lastCandleAnalysis = {};
 
 // ==========================================
-// ✅ دورة التداول الرئيسية (مع شمعة 15 دقيقة)
+// دورة التداول الرئيسية
 // ==========================================
 
 async function tradingCycle() {
@@ -391,10 +470,15 @@ async function tradingCycle() {
       const currentPrice = await getPrice(currentPosition.symbol);
       if (!currentPrice) { isRunning = false; return; }
 
-      const profitPercent = ((currentPrice - currentPosition.entryPrice) / currentPosition.entryPrice) * 100 * LEVERAGE;
-      console.log(`⚡ ${currentPosition.symbol} - الربح: ${profitPercent.toFixed(2)}% | الدخول: ${currentPosition.entryPrice} | الحالي: ${currentPrice}`);
+      let profitPercent;
+      if (currentPosition.type === 'LONG') {
+        profitPercent = ((currentPrice - currentPosition.entryPrice) / currentPosition.entryPrice) * 100 * LEVERAGE;
+      } else { // SHORT
+        profitPercent = ((currentPosition.entryPrice - currentPrice) / currentPosition.entryPrice) * 100 * LEVERAGE;
+      }
+      
+      console.log(`⚡ ${currentPosition.symbol} (${currentPosition.type}) - الربح: ${profitPercent.toFixed(2)}% | الدخول: ${currentPosition.entryPrice} | الحالي: ${currentPrice}`);
 
-      // ✅ جني ربح 5%
       if (profitPercent >= PROFIT_PERCENT) {
         console.log(`✅ جني ربح: ${profitPercent.toFixed(2)}% (الهدف ${PROFIT_PERCENT}%)`);
         const result = await closePosition(currentPosition);
@@ -402,7 +486,6 @@ async function tradingCycle() {
           currentPosition = null;
         }
       }
-      // ❌ وقف الخسارة معطل
 
       isRunning = false;
       return;
@@ -415,42 +498,74 @@ async function tradingCycle() {
       return;
     }
 
-    // ✅ تحليل الشموع لكل العملات
+    // ✅ تحليل الشموع
     console.log(`📊 تحليل شموع 15 دقيقة لـ ${SYMBOLS.length} عملة...`);
     
-    let bestOpportunity = null;
+    let bestBuyOpportunity = null;
+    let bestSellOpportunity = null;
 
     for (const symbol of SYMBOLS) {
       const analysis = await analyzeCandle(symbol);
       if (!analysis) continue;
 
-      // ✅ تخزين التحليل
       lastCandleAnalysis[symbol] = analysis;
 
-      console.log(`📊 ${symbol}: القاع=${analysis.currentLow}, الإغلاق=${analysis.currentClose}, الارتداد=${analysis.bouncePercent.toFixed(2)}%, ${analysis.shouldBuy ? '✅ إشارة شراء' : '⏳ انتظار'}`);
+      // عرض معلومات التحليل
+      let signals = [];
+      if (analysis.shouldBuy) signals.push('🟢 شراء');
+      if (analysis.shouldSell) signals.push('🔴 بيع');
+      const signalText = signals.length > 0 ? signals.join(' | ') : '⏳ انتظار';
+      
+      console.log(`📊 ${symbol}: القاع=${analysis.currentLow}, القمة=${analysis.currentHigh}, الارتداد=${analysis.bouncePercent.toFixed(2)}%, النزول=${analysis.dropPercent.toFixed(2)}% → ${signalText}`);
 
-      // ✅ البحث عن أفضل فرصة (أكبر نسبة ارتداد)
+      // ✅ أفضل فرصة شراء
       if (analysis.shouldBuy) {
-        if (!bestOpportunity || analysis.bouncePercent > bestOpportunity.bouncePercent) {
-          bestOpportunity = analysis;
+        if (!bestBuyOpportunity || analysis.bouncePercent > bestBuyOpportunity.bouncePercent) {
+          bestBuyOpportunity = analysis;
+        }
+      }
+
+      // ✅ أفضل فرصة بيع
+      if (analysis.shouldSell) {
+        if (!bestSellOpportunity || analysis.dropPercent > bestSellOpportunity.dropPercent) {
+          bestSellOpportunity = analysis;
         }
       }
     }
 
-    // ✅ إذا وجدت فرصة، افتح صفقة
-    if (bestOpportunity) {
-      console.log(`📈 ✅ إشارة شراء قوية: ${bestOpportunity.symbol} - ارتداد ${bestOpportunity.bouncePercent.toFixed(2)}% من القاع (${bestOpportunity.currentLow})`);
+    // ✅ تحديد الأولوية: الشراء له الأولوية على البيع
+    let selectedOpportunity = null;
+    let signalType = null;
+
+    if (bestBuyOpportunity) {
+      selectedOpportunity = bestBuyOpportunity;
+      signalType = 'BUY';
+      console.log(`📈 ✅ إشارة شراء قوية: ${selectedOpportunity.symbol} - ارتداد ${selectedOpportunity.bouncePercent.toFixed(2)}% من القاع (${selectedOpportunity.currentLow})`);
+    } else if (bestSellOpportunity) {
+      selectedOpportunity = bestSellOpportunity;
+      signalType = 'SELL';
+      console.log(`📉 ✅ إشارة بيع قوية: ${selectedOpportunity.symbol} - نزول ${selectedOpportunity.dropPercent.toFixed(2)}% من القمة (${selectedOpportunity.currentHigh})`);
+    }
+
+    // ✅ تنفيذ الصفقة
+    if (selectedOpportunity && signalType) {
+      await setLeverage(selectedOpportunity.symbol);
       
-      await setLeverage(bestOpportunity.symbol);
-      const position = await openLongPosition(bestOpportunity.symbol, TRADE_AMOUNT);
+      let position;
+      if (signalType === 'BUY') {
+        position = await openLongPosition(selectedOpportunity.symbol, TRADE_AMOUNT);
+      } else {
+        position = await openShortPosition(selectedOpportunity.symbol, TRADE_AMOUNT);
+      }
+      
       if (position) {
         currentPosition = position;
-        console.log(`✅ تم فتح الصفقة على ${bestOpportunity.symbol}`);
+        console.log(`✅ تم فتح الصفقة على ${selectedOpportunity.symbol} (${signalType})`);
         console.log(`📊 نقطة الدخول: ${position.entryPrice} | الكمية: ${position.quantity}`);
         console.log(`🎯 هدف الربح: ${PROFIT_PERCENT}% | ⛔ وقف الخسارة: معطل`);
       }
     } else {
-      console.log(`📊 لا توجد إشارات شراء حالياً. انتظار ارتداد من القاع...`);
+      console.log(`📊 لا توجد إشارات شراء أو بيع حالياً.`);
     }
 
   } catch (error) {
@@ -469,10 +584,6 @@ const PORT = process.env.PORT || 10000;
 
 app.use(cors());
 app.use(express.json());
-
-// ==========================================
-// واجهة HTML
-// ==========================================
 
 app.get('/dashboard', (req, res) => {
   res.send(`
@@ -503,18 +614,8 @@ app.get('/dashboard', (req, res) => {
           box-shadow: 0 10px 30px rgba(0, 170, 85, 0.2);
           border: 1px solid #00aa55;
         }
-        h1 {
-          text-align: center;
-          color: #00aa55;
-          font-size: 28px;
-          margin-bottom: 5px;
-        }
-        .subtitle {
-          text-align: center;
-          color: #8899bb;
-          margin-bottom: 25px;
-          font-size: 14px;
-        }
+        h1 { text-align: center; color: #00aa55; font-size: 28px; margin-bottom: 5px; }
+        .subtitle { text-align: center; color: #8899bb; margin-bottom: 25px; font-size: 14px; }
         .status-grid {
           display: grid;
           grid-template-columns: 1fr 1fr;
@@ -527,21 +628,9 @@ app.get('/dashboard', (req, res) => {
           border-left: 4px solid #00aa55;
           transition: 0.3s;
         }
-        .card:hover {
-          background: #1f2a40;
-        }
-        .card .label {
-          font-size: 11px;
-          color: #8899bb;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-        }
-        .card .value {
-          font-size: 18px;
-          font-weight: bold;
-          margin-top: 4px;
-          color: #fff;
-        }
+        .card:hover { background: #1f2a40; }
+        .card .label { font-size: 11px; color: #8899bb; text-transform: uppercase; letter-spacing: 0.5px; }
+        .card .value { font-size: 18px; font-weight: bold; margin-top: 4px; color: #fff; }
         .card .value.green { color: #00aa55; }
         .card .value.gold { color: #f0b90b; }
         .card .value.blue { color: #4a9eff; }
@@ -575,10 +664,7 @@ app.get('/dashboard', (req, res) => {
           cursor: pointer;
           transition: 0.3s;
         }
-        .refresh-btn:hover {
-          background: #008844;
-          transform: scale(1.02);
-        }
+        .refresh-btn:hover { background: #008844; transform: scale(1.02); }
         .settings-box {
           background: #1a2335;
           border-radius: 14px;
@@ -586,36 +672,13 @@ app.get('/dashboard', (req, res) => {
           margin-top: 16px;
           border: 1px solid #2a3a55;
         }
-        .settings-box .label {
-          font-size: 11px;
-          color: #8899bb;
-          text-transform: uppercase;
-        }
-        .settings-box .value {
-          font-size: 15px;
-          font-weight: bold;
-          color: #aabbdd;
-          margin-top: 4px;
-        }
+        .settings-box .label { font-size: 11px; color: #8899bb; text-transform: uppercase; }
+        .settings-box .value { font-size: 15px; font-weight: bold; color: #aabbdd; margin-top: 4px; }
         .settings-box .value .highlight-green { color: #00aa55; }
         .settings-box .value .highlight-gold { color: #f0b90b; }
         .settings-box .value .highlight-red { color: #ff4444; }
         .settings-box .value .highlight-gray { color: #8899bb; }
         .settings-box .value .highlight-purple { color: #a855f7; }
-        .token-tag {
-          display: inline-block;
-          background: #1a2335;
-          padding: 2px 10px;
-          border-radius: 12px;
-          font-size: 12px;
-          color: #aabbdd;
-          margin: 2px;
-          border: 1px solid #2a3a55;
-        }
-        .token-tag.new {
-          border-color: #f0b90b;
-          color: #f0b90b;
-        }
         @media (max-width: 500px) {
           .status-grid { grid-template-columns: 1fr; }
           .container { padding: 20px; }
@@ -625,8 +688,7 @@ app.get('/dashboard', (req, res) => {
     <body>
       <div class="container">
         <h1>🤖 بوت BingX Futures</h1>
-        <p class="subtitle">📡 استراتيجية شمعة 15 دقيقة - الارتداد من القاع</p>
-
+        <p class="subtitle">📡 استراتيجية شمعة 15 دقيقة - شراء من القاع + بيع من القمة</p>
         <div class="status-grid" id="statusGrid">
           <div class="card">
             <div class="label">📊 الحالة</div>
@@ -644,12 +706,7 @@ app.get('/dashboard', (req, res) => {
             <div class="label">📈 الصفقة</div>
             <div class="value blue" id="position">لا توجد</div>
           </div>
-          <div class="card" style="grid-column: span 2;">
-            <div class="label">📊 إشارات الشمعة</div>
-            <div class="value" id="signals" style="font-size: 13px; color: #aabbdd;">جاري التحليل...</div>
-          </div>
         </div>
-
         <div class="settings-box">
           <div class="label">⚙️ إعدادات التداول</div>
           <div class="value">
@@ -661,31 +718,22 @@ app.get('/dashboard', (req, res) => {
             🕐 الشمعة: <span class="highlight-purple">15 دقيقة</span>
           </div>
         </div>
-
         <button class="refresh-btn" onclick="fetchStatus()">🔄 تحديث</button>
         <div class="footer" id="lastUpdate">🕐 آخر تحديث: --</div>
       </div>
-
       <script>
         async function fetchStatus() {
           try {
             const res = await fetch('/');
             const data = await res.json();
-            
             document.getElementById('balance').textContent = data.balance || '0.00 USDT';
             document.getElementById('leverage').textContent = data.leverage || '--';
             document.getElementById('position').textContent = data.currentPosition || 'لا توجد';
             document.getElementById('lastUpdate').textContent = '🕐 آخر تحديث: ' + new Date().toLocaleTimeString('ar-EG');
-            
-            // عرض الإشارات
-            if (data.signals) {
-              document.getElementById('signals').innerHTML = data.signals;
-            }
           } catch (error) {
             console.error('خطأ في جلب البيانات:', error);
           }
         }
-        
         fetchStatus();
         setInterval(fetchStatus, 10000);
       </script>
@@ -693,10 +741,6 @@ app.get('/dashboard', (req, res) => {
     </html>
   `);
 });
-
-// ==========================================
-// نقاط نهاية JSON
-// ==========================================
 
 app.get('/health', (req, res) => {
   res.json({ 
@@ -709,24 +753,12 @@ app.get('/health', (req, res) => {
 app.get('/', async (req, res) => {
   try {
     const usdtBalance = await getFuturesBalance();
-    
-    // ✅ بناء رسالة الإشارات
-    let signalsHtml = '';
-    for (const [symbol, analysis] of Object.entries(lastCandleAnalysis)) {
-      if (analysis) {
-        const status = analysis.shouldBuy ? '✅ إشارة شراء' : '⏳ انتظار';
-        signalsHtml += `<span style="color: ${analysis.shouldBuy ? '#00aa55' : '#8899bb'}">${symbol}: ${analysis.bouncePercent.toFixed(2)}% ${status}</span> `;
-      }
-    }
-    if (!signalsHtml) signalsHtml = '⏳ جاري تحليل الشموع...';
-    
     res.json({
-      status: '⚡ بوت BingX Futures يعمل (شمعة 15 دقيقة)',
+      status: '⚡ بوت BingX Futures يعمل (شراء + بيع)',
       timestamp: new Date().toISOString(),
       balance: `${usdtBalance.toFixed(4)} USDT`,
       leverage: `${LEVERAGE}x`,
-      currentPosition: currentPosition ? `${currentPosition.symbol} - مفتوح` : 'لا توجد صفقة',
-      signals: signalsHtml,
+      currentPosition: currentPosition ? `${currentPosition.symbol} (${currentPosition.type}) - مفتوح` : 'لا توجد صفقة',
       settings: {
         tradeAmount: `${TRADE_AMOUNT} USDT`,
         profitTarget: `${PROFIT_PERCENT}%`,
@@ -753,7 +785,7 @@ async function startBot() {
     console.log(`⚡ الرافعة المالية: ${LEVERAGE}x`);
     console.log(`🎯 هدف جني الأرباح: ${PROFIT_PERCENT}%`);
     console.log(`⛔ وقف الخسارة: معطل`);
-    console.log(`📈 عتبة الارتداد: ${PRICE_CHANGE_THRESHOLD}% من القاع`);
+    console.log(`📈 عتبة الارتداد/النزول: ${PRICE_CHANGE_THRESHOLD}%`);
     console.log(`🕐 الشمعة: 15 دقيقة`);
     console.log(`📊 العملات: ${SYMBOLS.join(', ')}`);
     console.log('================================');
@@ -794,12 +826,13 @@ async function startBot() {
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`
   ╔═══════════════════════════════════════════════════════════════╗
-  ║   ⚡ بوت العقود الآجلة - شمعة 15 دقيقة                      ║
+  ║   ⚡ بوت العقود الآجلة - شراء + بيع                        ║
   ║   📡 http://localhost:${PORT}                                  ║
   ║   📊 لوحة التحكم: http://localhost:${PORT}/dashboard          ║
   ║   🚀 رافعة: ${LEVERAGE}x | 💰 مبلغ: ${TRADE_AMOUNT} USDT      ║
   ║   🎯 جني ربح: ${PROFIT_PERCENT}% | ⛔ وقف خسارة: معطل          ║
-  ║   🕐 الشمعة: 15 دقيقة | 📈 عتبة الارتداد: 0.1%               ║
+  ║   📈 شراء من القاع (0.1%) + بيع من القمة (0.1%)              ║
+  ║   🕐 الشمعة: 15 دقيقة                                        ║
   ║   ⚠️ تداول حقيقي - استخدم بحذر!                              ║
   ╚═══════════════════════════════════════════════════════════════╝
   `);
