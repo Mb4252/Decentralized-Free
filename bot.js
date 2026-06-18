@@ -24,7 +24,7 @@ const API_KEY = process.env.BINGX_API_KEY;
 const API_SECRET = process.env.BINGX_API_SECRET;
 
 // ✅ إعدادات رأس المال
-const TRADE_AMOUNT = 0.8; // ✅ تم التعديل إلى 0.8
+const TRADE_AMOUNT = 0.8;
 const USE_FULL_BALANCE = false;
 
 // ✅ الرافعة المالية
@@ -42,6 +42,30 @@ const STOP_LOSS_PERCENT = null;
 const CANDLE_INTERVAL = '15m';
 const CANDLE_LIMIT = 50;
 
+// ✅ قائمة العملات المحددة
+const SYMBOLS = [
+  'BTC-USDT',
+  'ETH-USDT',
+  'BNB-USDT',
+  'SOL-USDT',
+  'XRP-USDT',
+  'DOGE-USDT',
+  'ADA-USDT',
+  'LINK-USDT',
+  'AVAX-USDT',
+  'SUI-USDT',
+  'TON-USDT',
+  'HBAR-USDT',
+  'TRX-USDT',
+  'APT-USDT',
+  'NEAR-USDT',
+  'ATOM-USDT',
+  'BCH-USDT',
+  'LTC-USDT',
+  'ETC-USDT',
+  'DOT-USDT'
+];
+
 // ✅ المتغيرات
 let lastPrices = {};
 let currentPosition = null;
@@ -57,7 +81,7 @@ const MIN_SCORE = 0.08;
 
 // ✅ إعدادات الفلاتر الجديدة
 const MIN_CANDLE_RANGE = 0.08;
-const MAX_SYMBOLS_TO_SCAN = 50;
+const MIN_VOLUME_24H = 10000000; // ✅ فلتر حجم التداول
 
 // ✅ إعدادات وقف الخسارة
 const STOP_LOSS_ENABLED = false;
@@ -76,6 +100,7 @@ const ENDPOINTS = {
   FUTURES_ORDER: '/openApi/swap/v2/trade/order',
   FUTURES_CANDLE: '/openApi/swap/v2/quote/klines',
   FUTURES_CONTRACTS: '/openApi/swap/v2/quote/contracts',
+  FUTURES_TICKER: '/openApi/swap/v2/quote/ticker', // ✅ نقطة نهاية التيكر للحجم
 };
 
 // ==========================================
@@ -145,38 +170,6 @@ async function bingxRequest(method, endpoint, params = {}, signed = true) {
 }
 
 // ==========================================
-// ✅ جلب جميع الرموز من السوق (مع حد أقصى)
-// ==========================================
-
-async function getAllSymbols() {
-  try {
-    const res = await bingxRequest(
-      'GET',
-      '/openApi/swap/v2/quote/contracts',
-      {},
-      false
-    );
-
-    if (res && res.code === 0 && res.data) {
-      let symbols = res.data.map(c => c.symbol);
-      
-      if (symbols.length > MAX_SYMBOLS_TO_SCAN) {
-        symbols = symbols.slice(0, MAX_SYMBOLS_TO_SCAN);
-        console.log(`📊 تم تقليص الرموز إلى ${MAX_SYMBOLS_TO_SCAN} رمز (من ${res.data.length})`);
-      } else {
-        console.log(`📊 تم جلب ${symbols.length} رمز من السوق`);
-      }
-      
-      return symbols;
-    }
-    return [];
-  } catch (error) {
-    console.error('❌ فشل جلب الرموز:', error);
-    return [];
-  }
-}
-
-// ==========================================
 // جلب سعر العملة الفوري
 // ==========================================
 
@@ -193,6 +186,30 @@ async function getPrice(symbol) {
   } catch (error) {
     console.error(`❌ فشل جلب سعر ${symbol}:`, error);
     return null;
+  }
+}
+
+// ==========================================
+// ✅ جلب حجم التداول اليومي
+// ==========================================
+
+async function getVolume24h(symbol) {
+  try {
+    const response = await bingxRequest('GET', ENDPOINTS.FUTURES_TICKER, {
+      symbol: symbol
+    }, false);
+    
+    if (response && response.code === 0 && response.data) {
+      // BingX ترجع volume في data.volume أو data.quoteVolume
+      const volume = parseFloat(response.data.volume) || 0;
+      const quoteVolume = parseFloat(response.data.quoteVolume) || 0;
+      // نستخدم quoteVolume لأنه يعبر عن الحجم بالـ USDT
+      return quoteVolume || volume;
+    }
+    return 0;
+  } catch (error) {
+    console.error(`❌ فشل جلب حجم ${symbol}:`, error);
+    return 0;
   }
 }
 
@@ -263,25 +280,22 @@ async function getTrend(symbol) {
 }
 
 // ==========================================
-// ✅ مسح السوق بالكامل مع اكتشاف الانعكاسات
+// ✅ مسح العملات المحددة مع فلتر الحجم
 // ==========================================
 
 async function scanMarket() {
-  const symbols = await getAllSymbols();
-  if (!symbols || symbols.length === 0) {
-    console.log('⚠️ لا توجد رموز في السوق');
-    return { best: null, bestScore: 0, bestDirection: null };
-  }
-
   let best = null;
   let bestScore = 0;
   let bestDirection = null;
   let scanned = 0;
 
-  console.log(`🔍 جاري مسح ${symbols.length} رمز...`);
+  console.log(`🔍 جاري مسح ${SYMBOLS.length} عملة محددة...`);
 
-  for (const symbol of symbols) {
-    if (symbol.includes('USDC') || symbol.includes('BUSD') || symbol.includes('DAI')) {
+  for (const symbol of SYMBOLS) {
+    // ✅ فلتر حجم التداول
+    const volume24h = await getVolume24h(symbol);
+    if (volume24h < MIN_VOLUME_24H) {
+      console.log(`📊 ${symbol}: حجم التداول منخفض (${volume24h.toFixed(0)} < ${MIN_VOLUME_24H}) - تم التخطي`);
       continue;
     }
 
@@ -300,7 +314,7 @@ async function scanMarket() {
     // ✅ اكتشاف الانعكاسات
     const reversalSignal = detectReversal(priceHistory[symbol]);
     if (reversalSignal) {
-      console.log(`🔄 انعكاس على ${symbol}: ${reversalSignal}`);
+      console.log(`🔄 انعكاس على ${symbol}: ${reversalSignal} (حجم: ${volume24h.toFixed(0)})`);
       
       let score = 0.5;
       if (reversalSignal === 'BUY') {
@@ -330,10 +344,8 @@ async function scanMarket() {
     if (trend.trend === 'UP') score += trend.strength;
     if (trend.trend === 'DOWN') score += trend.strength;
 
-    const knownSymbols = ['BTC-USDT', 'ETH-USDT', 'BNB-USDT', 'SOL-USDT', 'XRP-USDT'];
-    if (knownSymbols.includes(symbol)) {
-      score *= 1.2;
-    }
+    // ✅ مكافأة للعملات المعروفة (جميعها في القائمة معروفة)
+    score *= 1.1;
 
     if (score > bestScore) {
       bestScore = score;
@@ -342,12 +354,10 @@ async function scanMarket() {
     }
 
     scanned++;
-    if (scanned % 10 === 0) {
-      console.log(`📊 تم مسح ${scanned}/${symbols.length} رمز`);
-    }
+    console.log(`📊 ${symbol}: حجم=${volume24h.toFixed(0)}, تغير=${change.toFixed(3)}%, سكور=${score.toFixed(2)}`);
   }
 
-  console.log(`✅ اكتمل المسح: ${scanned} رمز`);
+  console.log(`✅ اكتمل المسح: ${scanned} عملة`);
   return { best, bestScore, bestDirection };
 }
 
@@ -654,8 +664,8 @@ async function tradingCycle() {
       return;
     }
 
-    // ✅ مسح السوق بالكامل
-    console.log('🔍 جاري مسح السوق بالكامل...');
+    // ✅ مسح العملات المحددة
+    console.log('🔍 جاري مسح العملات المحددة...');
     const result = await scanMarket();
 
     if (result.best && result.bestScore > MIN_SCORE) {
@@ -942,7 +952,7 @@ app.get('/', async (req, res) => {
         scanInterval: `${SCAN_INTERVAL/1000} ثانية`,
         leverage: `${LEVERAGE}x`,
         cooldown: `${cooldown/1000} ثانية`,
-        maxSymbols: MAX_SYMBOLS_TO_SCAN
+        symbols: SYMBOLS.length
       }
     });
   } catch (error) {
@@ -966,7 +976,8 @@ async function startBot() {
     console.log(`📈 عتبة الدخول: ${CHANGE_THRESHOLD}%`);
     console.log(`🔄 سرعة المسح: كل ${SCAN_INTERVAL/1000} ثانية`);
     console.log(`⏱️ كولداون: ${cooldown/1000} ثانية`);
-    console.log(`📊 الحد الأقصى للرموز: ${MAX_SYMBOLS_TO_SCAN}`);
+    console.log(`📊 عدد العملات: ${SYMBOLS.length}`);
+    console.log(`📊 الحد الأدنى للحجم: ${MIN_VOLUME_24H.toLocaleString()}`);
     console.log('================================');
 
     const balance = await getFuturesBalance();
@@ -1011,6 +1022,7 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   ║   🚀 رافعة: ${LEVERAGE}x | 💰 مبلغ: ${TRADE_AMOUNT} USDT      ║
   ║   🎯 هدف: ${PROFIT_USDT_TARGET} USDT | ⛔ وقف: ${STOP_LOSS_ENABLED ? 'مفعل' : 'معطل'}  ║
   ║   📈 عتبة: ${CHANGE_THRESHOLD}% | 🔄 مسح: ${SCAN_INTERVAL/1000}ثانية ║
+  ║   📊 ${SYMBOLS.length} عملة محددة | فلتر حجم: ${(MIN_VOLUME_24H/1000000).toFixed(0)}M ║
   ║   🔄 اكتشاف الانعكاسات من القمة والقاع                       ║
   ║   ⚠️ تداول حقيقي - استخدم بحذر!                              ║
   ╚═══════════════════════════════════════════════════════════════╝
