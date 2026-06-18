@@ -31,7 +31,7 @@ const STOP_LOSS_PERCENT = null;
 
 // ✅ إعدادات شمعة 15 دقيقة
 const CANDLE_INTERVAL = '15m';
-const CANDLE_LIMIT = 50;  // ✅ تغيير من 2 إلى 50
+const CANDLE_LIMIT = 50;  // ✅ جلب 50 شمعة لضمان وجود شمعات مكتملة
 
 // قائمة العملات
 const SYMBOLS = [
@@ -119,7 +119,7 @@ async function bingxRequest(method, endpoint, params = {}, signed = true) {
 }
 
 // ==========================================
-// ✅ جلب بيانات الشمعة (معدل بالكامل)
+// ✅ جلب بيانات الشمعة (احترافي)
 // ==========================================
 
 async function getCandleData(symbol) {
@@ -132,11 +132,11 @@ async function getCandleData(symbol) {
 
     const raw = response?.data;
 
-    console.log(`📦 RAW ${symbol}:`, JSON.stringify(raw));
+    console.log(`📦 RAW ${symbol}:`, JSON.stringify(raw).substring(0, 300));
 
     let data = null;
 
-    // كل احتمالات BingX
+    // ✅ كل احتمالات BingX
     if (Array.isArray(raw)) {
       data = raw;
     } 
@@ -155,7 +155,17 @@ async function getCandleData(symbol) {
       return null;
     }
 
-    return data;
+    // ✅ تصفية الشمعات المكتملة فقط
+    const closedCandles = data.filter(c => c && c[4] && c[3]);
+    
+    if (closedCandles.length < 2) {
+      console.log(`⚠️ لا توجد شمعات مكتملة كافية لـ ${symbol}`);
+      return null;
+    }
+
+    console.log(`✅ ${symbol}: ${closedCandles.length} شمعة مكتملة من ${data.length}`);
+
+    return closedCandles;
 
   } catch (err) {
     console.log(`❌ خطأ شموع ${symbol}:`, err.message);
@@ -164,7 +174,7 @@ async function getCandleData(symbol) {
 }
 
 // ==========================================
-// ✅ تحليل الشمعة (مع حماية أقوى)
+// ✅ تحليل الشمعة (احترافي)
 // ==========================================
 
 async function analyzeCandle(symbol) {
@@ -176,11 +186,16 @@ async function analyzeCandle(symbol) {
       return null;
     }
 
-    // ✅ نأخذ آخر شمعتين مكتملتين
-    const currentCandle = candleData[candleData.length - 1];
-    const previousCandle = candleData[candleData.length - 2];
+    // ✅ استخدام آخر شمعتين مكتملتين فقط
+    const currentCandle = candleData.at(-1);
+    const previousCandle = candleData.at(-2);
 
-    // ✅ حماية أقوى للتحقق من صحة البيانات
+    // ✅ حماية احترافية
+    if (!currentCandle || !previousCandle) {
+      console.log(`⚠️ لا توجد شمعات كافية لـ ${symbol}`);
+      return null;
+    }
+
     if (!Array.isArray(currentCandle) || !Array.isArray(previousCandle)) {
       console.log(`⚠️ ليست array لـ ${symbol}`);
       return null;
