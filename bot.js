@@ -81,7 +81,7 @@ const cooldown = 3000; // 3 ثواني بين الصفقات
 const SCAN_INTERVAL = 1000; // مسح كل ثانية
 
 // ✅ إعدادات الفلاتر
-const MIN_VOLUME = 100000; // ✅ تم التعديل إلى 100,000
+const MIN_VOLUME = 1000000; // ✅ تم التعديل إلى 1,000,000
 
 // ✅ إعدادات وقف الخسارة
 const STOP_LOSS_ENABLED = false;
@@ -578,7 +578,7 @@ async function tradingCycle() {
     let bestScore = 0;
 
     for (const symbol of SYMBOLS) {
-      // ✅ فلتر حجم التداول (100,000)
+      // ✅ فلتر حجم التداول (1,000,000)
       const volume24h = await getVolume24h(symbol);
       if (volume24h < MIN_VOLUME) {
         console.log(`📊 ${symbol}: حجم التداول منخفض (${volume24h.toFixed(0)} < ${MIN_VOLUME}) - تم التخطي`);
@@ -589,10 +589,12 @@ async function tradingCycle() {
       const candleData = await getCandleData(symbol);
       if (!candleData) continue;
 
-      const { changePercent } = candleData;
+      const { changePercent, previousClose, currentClose } = candleData;
       
-      // ✅ طباعة نسبة التغير لكل عملة
-      console.log(`${symbol} changePercent = ${changePercent}`);
+      // ✅ طباعة تفاصيل السعر لكل عملة
+      console.log(
+        `${symbol} | prev=${previousClose} | current=${currentClose} | change=${changePercent.toFixed(3)}%`
+      );
 
       // ✅ تحديد الإشارة بناءً على نسبة التغير
       let signal = null;
@@ -818,7 +820,7 @@ app.get('/dashboard', (req, res) => {
             📉 بيع: <span class="highlight-red">≥ 0.05%</span> &nbsp;|&nbsp;
             ⚡ رافعة: <span class="highlight-gold">10x</span> &nbsp;|&nbsp;
             🕐 شمعة: <span class="highlight-purple">1 دقيقة</span> &nbsp;|&nbsp;
-            📊 حجم: <span class="highlight-purple">≥ 100K</span> &nbsp;|&nbsp;
+            📊 حجم: <span class="highlight-purple">≥ 1M</span> &nbsp;|&nbsp;
             ⏱️ كولداون: <span class="highlight-purple">3 ثواني</span>
           </div>
         </div>
@@ -979,7 +981,7 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   ║   🚀 رافعة: ${LEVERAGE}x | 💰 مبلغ: ${TRADE_AMOUNT} USDT      ║
   ║   🎯 هدف: ${PROFIT_USDT_TARGET} USDT                          ║
   ║   📈 شراء: ≤ ${BUY_THRESHOLD}% | 📉 بيع: ≥ ${SELL_THRESHOLD}% ║
-  ║   🕐 شمعة: ${CANDLE_INTERVAL} | 📊 حجم: ≥ ${(MIN_VOLUME/1000).toFixed(0)}K ║
+  ║   🕐 شمعة: ${CANDLE_INTERVAL} | 📊 حجم: ≥ ${(MIN_VOLUME/1000000).toFixed(0)}M ║
   ║   ⏱️ كولداون: ${cooldown/1000}ثانية | 🔄 مسح: ${SCAN_INTERVAL/1000}ثانية ║
   ║   📊 ${SYMBOLS.length} عملة | ⚡ دخول سريع جداً               ║
   ║   ⚠️ تداول حقيقي - استخدم بحذر!                              ║
