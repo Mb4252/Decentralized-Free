@@ -35,15 +35,15 @@ const PROFIT_USDT_TARGET = 0.05;
 const MIN_PROFIT_USDT = 0.05;
 
 // ✅ إعدادات الإشارات (RSI)
-const RSI_OVERSOLD = 45;   // تم التعديل
-const RSI_OVERBOUGHT = 55; // تم التعديل
+const RSI_OVERSOLD = 45;
+const RSI_OVERBOUGHT = 55;
 
 const CHECK_INTERVAL = 5000;
 const STOP_LOSS_PERCENT = null;
 
-// ✅ إعدادات الشمعة (1 دقيقة)
-const CANDLE_INTERVAL = '1m';
-const CANDLE_LIMIT = 50; // تم التعديل إلى 50
+// ✅ إعدادات الشمعة (15 دقيقة)
+const CANDLE_INTERVAL = '15m'; // ✅ تم التعديل إلى 15 دقيقة
+const CANDLE_LIMIT = 100; // ✅ تم التعديل إلى 100
 
 // ✅ إعدادات الفلاتر (معطلة حالياً)
 const MIN_VOLUME = 0;
@@ -59,7 +59,7 @@ let lastTradeTime = 0;
 const cooldown = 3000;
 
 // ✅ سرعة المسح
-const SCAN_INTERVAL = 15000;
+const SCAN_INTERVAL = 60000; // ✅ تم التعديل إلى 60 ثانية (دقيقة واحدة)
 
 // ✅ تخزين العملات مؤقتاً
 let cachedSymbols = [];
@@ -337,9 +337,9 @@ async function getCandleData(symbol) {
 
     if (!data || !Array.isArray(data)) return null;
     
-    // ✅ تم التعديل: 50 شمعة كافية
-    if (data.length < 50) {
-      console.log(`📊 ${symbol}: بيانات غير كافية (${data.length} < 50)`);
+    // ✅ 100 شمعة كافية لشمعة 15 دقيقة
+    if (data.length < 100) {
+      console.log(`📊 ${symbol}: بيانات غير كافية (${data.length} < 100)`);
       return null;
     }
 
@@ -709,7 +709,7 @@ async function tradingCycle() {
         continue;
       }
 
-      // ✅ منطق الإشارة الجديد مع سكور الاتجاه
+      // ✅ منطق الإشارة مع سكور الاتجاه
       let signal = null;
       let score = 0;
 
@@ -729,13 +729,13 @@ async function tradingCycle() {
 
       // ✅ إذا كانت الإشارة شراء و RSI في منطقة التشبع البيعي (RSI < 45)
       if (signal === 'BUY' && rsi < RSI_OVERSOLD) {
-        score *= 1.5; // مضاعفة السكور
+        score *= 1.5;
         console.log(`📊 ${symbol}: ✅ RSI=${rsi.toFixed(2)} < ${RSI_OVERSOLD} (تشبع بيع) - تعزيز الشراء`);
       }
 
       // ✅ إذا كانت الإشارة بيع و RSI في منطقة التشبع الشرائي (RSI > 55)
       if (signal === 'SELL' && rsi > RSI_OVERBOUGHT) {
-        score *= 1.5; // مضاعفة السكور
+        score *= 1.5;
         console.log(`📊 ${symbol}: ✅ RSI=${rsi.toFixed(2)} > ${RSI_OVERBOUGHT} (تشبع شراء) - تعزيز البيع`);
       }
 
@@ -910,7 +910,7 @@ app.get('/dashboard', (req, res) => {
     <body>
       <div class="container">
         <h1>🤖 بوت BingX - V7 Pro</h1>
-        <p class="subtitle">📡 اتجاه EMA + RSI</p>
+        <p class="subtitle">📡 شموع 15 دقيقة - EMA + RSI</p>
         
         <div class="status-grid" id="statusGrid">
           <div class="card">
@@ -937,14 +937,15 @@ app.get('/dashboard', (req, res) => {
         </div>
 
         <div class="settings-box">
-          <div class="label">⚙️ إعدادات V7 Pro</div>
+          <div class="label">⚙️ إعدادات V7 Pro - 15 دقيقة</div>
           <div class="value">
             💰 <span class="highlight-green">0.80 USDT</span> &nbsp;|&nbsp;
             🎯 هدف: <span class="highlight-gold">0.05 USDT</span> &nbsp;|&nbsp;
             📈 شراء: <span class="highlight-green">EMA9>EMA21 + RSI&lt;45</span> &nbsp;|&nbsp;
             📉 بيع: <span class="highlight-red">EMA9&lt;EMA21 + RSI&gt;55</span> &nbsp;|&nbsp;
-            📊 شموع: <span class="highlight-purple">50</span> &nbsp;|&nbsp;
-            🔄 مسح: <span class="highlight-purple">15 ثانية</span>
+            🕐 شمعة: <span class="highlight-purple">15 دقيقة</span> &nbsp;|&nbsp;
+            📊 شموع: <span class="highlight-purple">100</span> &nbsp;|&nbsp;
+            🔄 مسح: <span class="highlight-purple">60 ثانية</span>
           </div>
         </div>
 
@@ -1014,7 +1015,7 @@ app.get('/', async (req, res) => {
     }
     
     res.json({
-      status: '⚡ بوت BingX - V7 Pro (اتجاه EMA + RSI)',
+      status: '⚡ بوت BingX - V7 Pro (شموع 15 دقيقة)',
       timestamp: new Date().toISOString(),
       balance: `${usdtBalance.toFixed(4)} USDT`,
       leverage: `${LEVERAGE}x`,
@@ -1028,6 +1029,7 @@ app.get('/', async (req, res) => {
         profitTarget: `${PROFIT_USDT_TARGET} USDT`,
         rsiOversold: RSI_OVERSOLD,
         rsiOverbought: RSI_OVERBOUGHT,
+        candleInterval: '15 دقيقة',
         candleLimit: CANDLE_LIMIT,
         scanInterval: `${SCAN_INTERVAL/1000} ثانية`,
         leverage: `${LEVERAGE}x`,
@@ -1045,13 +1047,14 @@ app.get('/', async (req, res) => {
 
 async function startBot() {
   try {
-    console.log('⚡⚡ بدء تشغيل بوت V7 Pro - اتجاه EMA + RSI');
+    console.log('⚡⚡ بدء تشغيل بوت V7 Pro - شموع 15 دقيقة');
     console.log('📊 ===== إعدادات V7 Pro =====');
     console.log(`💰 مبلغ التداول الثابت: ${TRADE_AMOUNT} USDT`);
     console.log(`⚡ الرافعة المالية: ${LEVERAGE}x`);
     console.log(`🎯 هدف الربح: ${PROFIT_USDT_TARGET} USDT`);
     console.log(`📈 شراء: EMA9 > EMA21 (RSI < ${RSI_OVERSOLD} تعزيز)`);
     console.log(`📉 بيع: EMA9 < EMA21 (RSI > ${RSI_OVERBOUGHT} تعزيز)`);
+    console.log(`🕐 فترة الشمعة: ${CANDLE_INTERVAL}`);
     console.log(`📊 عدد الشموع: ${CANDLE_LIMIT}`);
     console.log(`🔄 سرعة المسح: كل ${SCAN_INTERVAL/1000} ثانية`);
     console.log('================================');
@@ -1094,14 +1097,15 @@ async function startBot() {
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`
   ╔═══════════════════════════════════════════════════════════════╗
-  ║   ⚡ بوت V7 Pro - اتجاه EMA + RSI                          ║
+  ║   ⚡ بوت V7 Pro - شموع 15 دقيقة                            ║
   ║   📡 http://localhost:${PORT}                                  ║
   ║   📊 لوحة التحكم: http://localhost:${PORT}/dashboard          ║
   ║   🚀 رافعة: ${LEVERAGE}x | 💰 مبلغ: ${TRADE_AMOUNT} USDT      ║
   ║   🎯 هدف: ${PROFIT_USDT_TARGET} USDT                          ║
   ║   📈 شراء: EMA9>EMA21 + RSI<${RSI_OVERSOLD}                   ║
   ║   📉 بيع: EMA9<EMA21 + RSI>${RSI_OVERBOUGHT}                  ║
-  ║   📊 شموع: ${CANDLE_LIMIT} | 🔄 مسح: ${SCAN_INTERVAL/1000}ثانية ║
+  ║   🕐 شمعة: ${CANDLE_INTERVAL} | 📊 شموع: ${CANDLE_LIMIT}      ║
+  ║   🔄 مسح: ${SCAN_INTERVAL/1000} ثانية                         ║
   ║   ⚠️ تداول حقيقي - استخدم بحذر!                              ║
   ╚═══════════════════════════════════════════════════════════════╝
   `);
