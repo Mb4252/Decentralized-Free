@@ -35,8 +35,8 @@ const PROFIT_USDT_TARGET = 0.05;
 const MIN_PROFIT_USDT = 0.05;
 
 // ✅ إعدادات الإشارات
-const BUY_THRESHOLD = -0.15;   // هبوط 0.15% → شراء
-const SELL_THRESHOLD = 0.15;   // صعود 0.15% → بيع
+const BUY_THRESHOLD = -0.05;   // هبوط 0.05% → شراء
+const SELL_THRESHOLD = 0.05;   // صعود 0.05% → بيع
 
 const CHECK_INTERVAL = 5000;
 const STOP_LOSS_PERCENT = null;
@@ -75,13 +75,13 @@ let currentPosition = null;
 let isRunning = false;
 
 let lastTradeTime = 0;
-const cooldown = 5000; // 5 ثواني فقط بين الصفقات
+const cooldown = 3000; // 3 ثواني بين الصفقات
 
 // ✅ تم تعديل الحساسية
 const SCAN_INTERVAL = 1000; // مسح كل ثانية
 
 // ✅ إعدادات الفلاتر
-const MIN_VOLUME = 500000; // ✅ تم التعديل إلى 500,000
+const MIN_VOLUME = 100000; // ✅ تم التعديل إلى 100,000
 
 // ✅ إعدادات وقف الخسارة
 const STOP_LOSS_ENABLED = false;
@@ -197,6 +197,9 @@ async function getVolume24h(symbol) {
     const response = await bingxRequest('GET', ENDPOINTS.FUTURES_TICKER, {
       symbol: symbol
     }, false);
+    
+    // ✅ طباعة البيانات للتشخيص
+    console.log(`📊 ${symbol} - Ticker:`, response?.data);
     
     if (response && response.code === 0 && response.data) {
       const volume = parseFloat(response.data.volume) || 0;
@@ -575,7 +578,7 @@ async function tradingCycle() {
     let bestScore = 0;
 
     for (const symbol of SYMBOLS) {
-      // ✅ فلتر حجم التداول (500,000)
+      // ✅ فلتر حجم التداول (100,000)
       const volume24h = await getVolume24h(symbol);
       if (volume24h < MIN_VOLUME) {
         console.log(`📊 ${symbol}: حجم التداول منخفض (${volume24h.toFixed(0)} < ${MIN_VOLUME}) - تم التخطي`);
@@ -776,7 +779,7 @@ app.get('/dashboard', (req, res) => {
     <body>
       <div class="container">
         <h1>🤖 بوت BingX - V7 Pro</h1>
-        <p class="subtitle">📡 شموع 1 دقيقة - سكالبينج سريع</p>
+        <p class="subtitle">📡 شموع 1 دقيقة - سكالبينج فائق السرعة</p>
         
         <div class="status-grid" id="statusGrid">
           <div class="card">
@@ -803,16 +806,17 @@ app.get('/dashboard', (req, res) => {
         </div>
 
         <div class="settings-box">
-          <div class="label">⚙️ إعدادات V7 Pro - سكالبينج سريع</div>
+          <div class="label">⚙️ إعدادات V7 Pro - سكالبينج فائق السرعة</div>
           <div class="value">
             💰 <span class="highlight-green">0.80 USDT</span> &nbsp;|&nbsp;
             🎯 هدف: <span class="highlight-gold">0.05 USDT</span> &nbsp;|&nbsp;
             ⛔ وقف: <span class="highlight-gray">معطل</span> &nbsp;|&nbsp;
-            📈 شراء: <span class="highlight-green">≤ -0.15%</span> &nbsp;|&nbsp;
-            📉 بيع: <span class="highlight-red">≥ 0.15%</span> &nbsp;|&nbsp;
+            📈 شراء: <span class="highlight-green">≤ -0.05%</span> &nbsp;|&nbsp;
+            📉 بيع: <span class="highlight-red">≥ 0.05%</span> &nbsp;|&nbsp;
             ⚡ رافعة: <span class="highlight-gold">10x</span> &nbsp;|&nbsp;
             🕐 شمعة: <span class="highlight-purple">1 دقيقة</span> &nbsp;|&nbsp;
-            📊 حجم: <span class="highlight-purple">≥ 500K</span>
+            📊 حجم: <span class="highlight-purple">≥ 100K</span> &nbsp;|&nbsp;
+            ⏱️ كولداون: <span class="highlight-purple">3 ثواني</span>
           </div>
         </div>
 
@@ -926,6 +930,7 @@ async function startBot() {
     console.log(`🕐 فترة الشمعة: ${CANDLE_INTERVAL}`);
     console.log(`📊 فلتر الحجم الأدنى: ${MIN_VOLUME.toLocaleString()}`);
     console.log(`🔄 سرعة المسح: كل ${SCAN_INTERVAL/1000} ثانية`);
+    console.log(`⏱️ كولداون: ${cooldown/1000} ثانية`);
     console.log(`📊 عدد العملات: ${SYMBOLS.length}`);
     console.log('================================');
 
@@ -965,14 +970,15 @@ async function startBot() {
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`
   ╔═══════════════════════════════════════════════════════════════╗
-  ║   ⚡ بوت V7 Pro - سكالبينج 1 دقيقة                         ║
+  ║   ⚡ بوت V7 Pro - سكالبينج فائق السرعة                     ║
   ║   📡 http://localhost:${PORT}                                  ║
   ║   📊 لوحة التحكم: http://localhost:${PORT}/dashboard          ║
   ║   🚀 رافعة: ${LEVERAGE}x | 💰 مبلغ: ${TRADE_AMOUNT} USDT      ║
   ║   🎯 هدف: ${PROFIT_USDT_TARGET} USDT                          ║
   ║   📈 شراء: ≤ ${BUY_THRESHOLD}% | 📉 بيع: ≥ ${SELL_THRESHOLD}% ║
   ║   🕐 شمعة: ${CANDLE_INTERVAL} | 📊 حجم: ≥ ${(MIN_VOLUME/1000).toFixed(0)}K ║
-  ║   📊 ${SYMBOLS.length} عملة | 🔄 مسح: ${SCAN_INTERVAL/1000}ثانية ║
+  ║   ⏱️ كولداون: ${cooldown/1000}ثانية | 🔄 مسح: ${SCAN_INTERVAL/1000}ثانية ║
+  ║   📊 ${SYMBOLS.length} عملة | ⚡ دخول سريع جداً               ║
   ║   ⚠️ تداول حقيقي - استخدم بحذر!                              ║
   ╚═══════════════════════════════════════════════════════════════╝
   `);
