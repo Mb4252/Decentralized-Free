@@ -35,39 +35,20 @@ const PROFIT_USDT_TARGET = 0.05;
 const MIN_PROFIT_USDT = 0.05;
 
 // ✅ إعدادات الإشارات (RSI)
-const RSI_OVERSOLD = 35;  // منطقة تشبع شراء
-const RSI_OVERBOUGHT = 65; // منطقة تشبع بيع
+const RSI_OVERSOLD = 35;
+const RSI_OVERBOUGHT = 65;
 
 const CHECK_INTERVAL = 5000;
 const STOP_LOSS_PERCENT = null;
 
 // ✅ إعدادات الشمعة (1 دقيقة)
 const CANDLE_INTERVAL = '1m';
-const CANDLE_LIMIT = 50; // نحتاج 50 شمعة لحساب EMA و RSI
+const CANDLE_LIMIT = 100; // نحتاج 100 شمعة للبيانات الكافية
 
-// ✅ قائمة العملات المحددة
-const SYMBOLS = [
-  'BTC-USDT',
-  'ETH-USDT',
-  'BNB-USDT',
-  'SOL-USDT',
-  'XRP-USDT',
-  'DOGE-USDT',
-  'ADA-USDT',
-  'LINK-USDT',
-  'AVAX-USDT',
-  'TRX-USDT',
-  'SUI-USDT',
-  'TON-USDT',
-  'HBAR-USDT',
-  'APT-USDT',
-  'NEAR-USDT',
-  'DOT-USDT',
-  'ATOM-USDT',
-  'LTC-USDT',
-  'BCH-USDT',
-  'ETC-USDT'
-];
+// ✅ إعدادات الفلاتر
+const MIN_VOLUME = 10000000; // 10,000,000
+const MIN_PRICE = 0.01;
+const MAX_CHANGE_24H = 15; // تجاهل العملات المتقلبة أكثر من 15%
 
 // ✅ المتغيرات
 let lastPrices = {};
@@ -75,19 +56,18 @@ let currentPosition = null;
 let isRunning = false;
 
 let lastTradeTime = 0;
-const cooldown = 3000; // 3 ثواني بين الصفقات
+const cooldown = 3000;
 
-// ✅ تم تعديل الحساسية
-const SCAN_INTERVAL = 1000; // مسح كل ثانية
+// ✅ سرعة المسح
+const SCAN_INTERVAL = 15000; // 15 ثانية
 
-// ✅ إعدادات الفلاتر
-const MIN_VOLUME = 1000000; // 1,000,000
+// ✅ تخزين العملات مؤقتاً
+let cachedSymbols = [];
+let lastSymbolsUpdate = 0;
+const SYMBOLS_CACHE_TTL = 60000; // تحديث كل دقيقة
 
 // ✅ إعدادات وقف الخسارة
 const STOP_LOSS_ENABLED = false;
-
-// ✅ تخزين تاريخ الأسعار
-let priceHistory = {};
 
 // ==========================================
 // نقاط النهاية
@@ -100,6 +80,7 @@ const ENDPOINTS = {
   FUTURES_ORDER: '/openApi/swap/v2/trade/order',
   FUTURES_CANDLE: '/openApi/swap/v2/quote/klines',
   FUTURES_TICKER: '/openApi/swap/v2/quote/ticker',
+  FUTURES_CONTRACTS: '/openApi/swap/v2/quote/contracts',
 };
 
 // ==========================================
@@ -166,6 +147,80 @@ async function bingxRequest(method, endpoint, params = {}, signed = true) {
     console.error('❌ BingX error:', error.response?.data || error.message);
     return null;
   }
+}
+
+// ==========================================
+// ✅ جلب جميع العملات من السوق
+// ==========================================
+
+async function getAllSymbols() {
+  const response = await bingxRequest(
+    'GET',
+    '/openApi/swap/v2/quote/contracts',
+    {},
+    false
+  );
+
+  if (!response || response.code !== 0) {
+    return [];
+  }
+
+  return response.data;
+}
+
+// ==========================================
+// ✅ جلب العملات المفلترة (مع كاش)
+// ==========================================
+
+async function getFilteredSymbols() {
+  const now = Date.now();
+  
+  // ✅ استخدام الكاش إذا كان حديثاً
+  if (cachedSymbols.length > 0 && (now - lastSymbolsUpdate) < SYMBOLS_CACHE_TTL) {
+    console.log(`📊 استخدام الكاش: ${cachedSymbols.length} عملة (منذ ${((now - lastSymbolsUpdate)/1000).toFixed(0)} ثانية)`);
+    return cachedSymbols;
+  }
+
+  console.log('🔄 جلب العملات من السوق...');
+  
+  const contracts = await getAllSymbols();
+  
+  if (!contracts || contracts.length === 0) {
+    console.log('⚠️ لم يتم جلب أي عملات');
+    return [];
+  }
+
+  // ✅ الفلاتر
+  const filtered = contracts.filter(c => {
+    const volume = Number(c.volume) || 0;
+    const lastPrice = Number(c.lastPrice) || 0;
+    const change24h = Number(c.priceChangePercent) || 0;
+    
+    // ✅ فلتر 1: العملات المقترنة بـ USDT فقط
+    if (!c.symbol.endsWith('USDT')) return false;
+    
+    // ✅ فلتر 2: حجم التداول > 10,000,000
+    if (volume < MIN_VOLUME) return false;
+    
+    // ✅ فلتر 3: السعر > 0.01
+    if (lastPrice < MIN_PRICE) return false;
+    
+    // ✅ فلتر 4: التقلب أقل من 15%
+    if (Math.abs(change24h) > MAX_CHANGE_24H) return false;
+    
+    return true;
+  });
+
+  // ✅ استخراج الرموز فقط
+  const symbols = filtered.map(c => c.symbol);
+  
+  console.log(`✅ تم العثور على ${symbols.length} عملة مطابقة للفلاتر (من أصل ${contracts.length})`);
+  
+  // ✅ تحديث الكاش
+  cachedSymbols = symbols;
+  lastSymbolsUpdate = now;
+  
+  return symbols;
 }
 
 // ==========================================
@@ -237,7 +292,6 @@ function calculateRSI(data, period = 14) {
   let gains = 0;
   let losses = 0;
   
-  // حساب التغيرات الأولى
   for (let i = 1; i <= period; i++) {
     const change = data[i] - data[i - 1];
     if (change >= 0) {
@@ -250,7 +304,6 @@ function calculateRSI(data, period = 14) {
   let avgGain = gains / period;
   let avgLoss = losses / period;
   
-  // حساب RSI للبيانات المتبقية
   for (let i = period + 1; i < data.length; i++) {
     const change = data[i] - data[i - 1];
     
@@ -295,7 +348,11 @@ async function getCandleData(symbol) {
       data = response.data.data;
     }
 
-    if (!data || !Array.isArray(data) || data.length < 20) {
+    if (!data || !Array.isArray(data)) return null;
+    
+    // ✅ فلتر: البيانات كافية (أكثر من 100 شمعة)
+    if (data.length < 100) {
+      console.log(`📊 ${symbol}: بيانات غير كافية (${data.length} < 100)`);
       return null;
     }
 
@@ -331,7 +388,6 @@ async function getCandleData(symbol) {
       rsi,
       changePercent24h,
       volume24h,
-      // ✅ تغير فوري للطباعة
       changePercent: ((currentClose - previousClose) / previousClose) * 100
     };
   } catch (error) {
@@ -575,7 +631,7 @@ async function getFuturesBalance() {
 }
 
 // ==========================================
-// ✅ الدورة الرئيسية مع المؤشرات
+// ✅ الدورة الرئيسية
 // ==========================================
 
 async function tradingCycle() {
@@ -641,23 +697,31 @@ async function tradingCycle() {
       return;
     }
 
-    // ✅ مسح العملات المحددة
-    console.log(`🔍 جاري مسح ${SYMBOLS.length} عملة محددة...`);
+    // ✅ جلب العملات المفلترة (مع كاش)
+    const symbols = await getFilteredSymbols();
+    
+    if (!symbols || symbols.length === 0) {
+      console.log('⚠️ لا توجد عملات مطابقة للفلاتر');
+      isRunning = false;
+      return;
+    }
+
+    console.log(`🔍 جاري مسح ${symbols.length} عملة محددة...`);
     
     let bestSymbol = null;
     let bestSignal = null;
     let bestScore = 0;
 
-    for (const symbol of SYMBOLS) {
+    for (const symbol of symbols) {
       // ✅ جلب بيانات المؤشرات
       const data = await getCandleData(symbol);
       if (!data) continue;
 
-      const { ema9, ema21, rsi, volume24h, currentClose, previousClose, changePercent } = data;
+      const { ema9, ema21, rsi, volume24h, currentClose, previousClose, changePercent, changePercent24h } = data;
 
       // ✅ طباعة المؤشرات
       console.log(
-        `${symbol} | EMA9=${ema9?.toFixed(2) || 'N/A'} | EMA21=${ema21?.toFixed(2) || 'N/A'} | RSI=${rsi?.toFixed(2) || 'N/A'} | change=${changePercent.toFixed(3)}%`
+        `${symbol} | EMA9=${ema9?.toFixed(2) || 'N/A'} | EMA21=${ema21?.toFixed(2) || 'N/A'} | RSI=${rsi?.toFixed(2) || 'N/A'} | change=${changePercent.toFixed(3)}% | 24h=${changePercent24h.toFixed(2)}%`
       );
 
       // ✅ فلتر الحجم
@@ -672,18 +736,18 @@ async function tradingCycle() {
         continue;
       }
 
-      // ✅ منطق الإشارة الجديد باستخدام المؤشرات
+      // ✅ منطق الإشارة
       let signal = null;
       let score = 0;
 
-      // ✅ شراء: EMA9 > EMA21 (اتجاه صاعد) + RSI < 35 (تشبع بيع)
+      // ✅ شراء: EMA9 > EMA21 + RSI < 35
       if (ema9 > ema21 && rsi < RSI_OVERSOLD) {
         signal = 'BUY';
         score = (ema9 - ema21) / ema21 * 10 + (RSI_OVERSOLD - rsi);
         console.log(`📊 ${symbol}: ✅ إشارة شراء | EMA9>EMA21 | RSI=${rsi.toFixed(2)} < ${RSI_OVERSOLD}`);
       }
 
-      // ✅ بيع: EMA9 < EMA21 (اتجاه هابط) + RSI > 65 (تشبع شراء)
+      // ✅ بيع: EMA9 < EMA21 + RSI > 65
       if (ema9 < ema21 && rsi > RSI_OVERBOUGHT) {
         signal = 'SELL';
         score = (ema21 - ema9) / ema21 * 10 + (rsi - RSI_OVERBOUGHT);
@@ -692,7 +756,6 @@ async function tradingCycle() {
 
       if (!signal) continue;
 
-      // ✅ اختيار أفضل فرصة
       if (score > bestScore) {
         bestScore = score;
         bestSymbol = symbol;
@@ -704,7 +767,6 @@ async function tradingCycle() {
     if (bestSymbol && bestSignal && bestScore > 0) {
       console.log(`🚀 أفضل فرصة: ${bestSymbol} | ${bestSignal} | سكور: ${bestScore.toFixed(2)}`);
 
-      // ✅ التحقق من الرافعة قبل فتح الصفقة
       console.log(`⚡ سيتم فتح الصفقة على ${bestSymbol} برافعة x${LEVERAGE}`);
       
       const leverageSet = await setLeverage(bestSymbol);
@@ -890,15 +952,15 @@ app.get('/dashboard', (req, res) => {
         </div>
 
         <div class="settings-box">
-          <div class="label">⚙️ إعدادات V7 Pro - المؤشرات</div>
+          <div class="label">⚙️ إعدادات V7 Pro</div>
           <div class="value">
             💰 <span class="highlight-green">0.80 USDT</span> &nbsp;|&nbsp;
             🎯 هدف: <span class="highlight-gold">0.05 USDT</span> &nbsp;|&nbsp;
-            ⛔ وقف: <span class="highlight-gray">معطل</span> &nbsp;|&nbsp;
             📈 شراء: <span class="highlight-green">EMA9>EMA21 + RSI&lt;35</span> &nbsp;|&nbsp;
             📉 بيع: <span class="highlight-red">EMA9&lt;EMA21 + RSI&gt;65</span> &nbsp;|&nbsp;
-            ⚡ رافعة: <span class="highlight-gold">10x</span> &nbsp;|&nbsp;
-            🕐 شمعة: <span class="highlight-purple">1 دقيقة</span>
+            📊 حجم: <span class="highlight-purple">≥ 10M</span> &nbsp;|&nbsp;
+            📊 تقلب: <span class="highlight-purple">&lt; 15%</span> &nbsp;|&nbsp;
+            🔄 مسح: <span class="highlight-purple">15 ثانية</span>
           </div>
         </div>
 
@@ -933,7 +995,7 @@ app.get('/dashboard', (req, res) => {
         }
         
         fetchStatus();
-        setInterval(fetchStatus, 5000);
+        setInterval(fetchStatus, 10000);
       </script>
     </body>
     </html>
@@ -980,16 +1042,13 @@ app.get('/', async (req, res) => {
       settings: {
         tradeAmount: `${TRADE_AMOUNT} USDT`,
         profitTarget: `${PROFIT_USDT_TARGET} USDT`,
-        stopLoss: STOP_LOSS_ENABLED ? '-0.03 USDT' : 'معطل',
         rsiOversold: RSI_OVERSOLD,
         rsiOverbought: RSI_OVERBOUGHT,
-        candleInterval: '1 دقيقة',
-        candleLimit: CANDLE_LIMIT,
-        minVolume: `${MIN_VOLUME.toLocaleString()}`,
+        minVolume: `${(MIN_VOLUME/1000000).toFixed(0)}M`,
+        maxChange24h: `${MAX_CHANGE_24H}%`,
         scanInterval: `${SCAN_INTERVAL/1000} ثانية`,
         leverage: `${LEVERAGE}x`,
-        cooldown: `${cooldown/1000} ثانية`,
-        symbols: SYMBOLS.length
+        symbolsCount: cachedSymbols.length
       }
     });
   } catch (error) {
@@ -1010,12 +1069,10 @@ async function startBot() {
     console.log(`🎯 هدف الربح: ${PROFIT_USDT_TARGET} USDT`);
     console.log(`📈 شراء: EMA9 > EMA21 + RSI < ${RSI_OVERSOLD}`);
     console.log(`📉 بيع: EMA9 < EMA21 + RSI > ${RSI_OVERBOUGHT}`);
-    console.log(`🕐 فترة الشمعة: ${CANDLE_INTERVAL}`);
-    console.log(`📊 عدد الشموع: ${CANDLE_LIMIT}`);
-    console.log(`📊 فلتر الحجم الأدنى: ${MIN_VOLUME.toLocaleString()}`);
+    console.log(`📊 فلتر الحجم: ≥ ${(MIN_VOLUME/1000000).toFixed(0)}M`);
+    console.log(`📊 فلتر التقلب: < ${MAX_CHANGE_24H}%`);
+    console.log(`📊 عدد الشموع: ≥ ${CANDLE_LIMIT}`);
     console.log(`🔄 سرعة المسح: كل ${SCAN_INTERVAL/1000} ثانية`);
-    console.log(`⏱️ كولداون: ${cooldown/1000} ثانية`);
-    console.log(`📊 عدد العملات: ${SYMBOLS.length}`);
     console.log('================================');
 
     const balance = await getFuturesBalance();
@@ -1028,6 +1085,9 @@ async function startBot() {
     if (balance < TRADE_AMOUNT) {
       console.log(`⚠️ تحذير: الرصيد (${balance.toFixed(4)}) أقل من مبلغ التداول (${TRADE_AMOUNT})`);
     }
+
+    // ✅ جلب العملات أول مرة
+    await getFilteredSymbols();
 
     await tradingCycle();
 
@@ -1061,8 +1121,8 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   ║   🎯 هدف: ${PROFIT_USDT_TARGET} USDT                          ║
   ║   📈 شراء: EMA9>EMA21 + RSI<${RSI_OVERSOLD}                   ║
   ║   📉 بيع: EMA9<EMA21 + RSI>${RSI_OVERBOUGHT}                  ║
-  ║   🕐 شمعة: ${CANDLE_INTERVAL} | 📊 شموع: ${CANDLE_LIMIT}      ║
-  ║   📊 ${SYMBOLS.length} عملة | 🔄 مسح: ${SCAN_INTERVAL/1000}ثانية ║
+  ║   📊 حجم: ≥ ${(MIN_VOLUME/1000000).toFixed(0)}M | تقلب: < ${MAX_CHANGE_24H}%  ║
+  ║   🔄 مسح: ${SCAN_INTERVAL/1000} ثانية | 📊 كاش: ${cachedSymbols.length} عملة ║
   ║   ⚠️ تداول حقيقي - استخدم بحذر!                              ║
   ╚═══════════════════════════════════════════════════════════════╝
   `);
