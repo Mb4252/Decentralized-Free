@@ -29,10 +29,11 @@ const PRICE_CHANGE_THRESHOLD = parseFloat(process.env.PRICE_CHANGE_THRESHOLD) ||
 const CHECK_INTERVAL = parseInt(process.env.CHECK_INTERVAL) || 5000;
 const STOP_LOSS_PERCENT = parseFloat(process.env.STOP_LOSS_PERCENT) || 2;
 
-// قائمة العملات للمراقبة
+// قائمة العملات للمراقبة - تم تحديثها حسب الرسالة
 const SYMBOLS = [
   'BTC-USDT', 'ETH-USDT', 'BNB-USDT', 'SOL-USDT', 'XRP-USDT',
-  'ADA-USDT', 'DOGE-USDT', 'AVAX-USDT', 'MATIC-USDT', 'LINK-USDT'
+  'ADA-USDT', 'DOGE-USDT', 'AVAX-USDT', 'LINK-USDT'
+  // تم إزالة MATIC-USDT لأنها غير مدعومة حالياً
 ];
 
 // ==========================================
@@ -61,7 +62,6 @@ function generateSignature(params, secret) {
 }
 
 async function bingxRequest(method, endpoint, params = {}, signed = true) {
-  // ✅ تم التعديل هنا: استخدام النطاق open-api.bingx.com
   const baseURL = 'https://open-api.bingx.com';
   
   const timestamp = Date.now();
@@ -100,7 +100,6 @@ async function bingxRequest(method, endpoint, params = {}, signed = true) {
     }
     return response.data;
   } catch (error) {
-    // ✅ جزء تسجيل الأخطاء المطلوب
     console.error('❌ خطأ في طلب BingX:', {
       endpoint: endpoint,
       url: url,
@@ -137,14 +136,13 @@ async function getAllPrices() {
   for (const symbol of SYMBOLS) {
     const price = await getPrice(symbol);
     if (price) prices[symbol] = { price, name: symbol };
-    // تأخير بسيط لتجنب الإفراط في الطلبات
     await new Promise(resolve => setTimeout(resolve, 100));
   }
   return prices;
 }
 
 // ==========================================
-// جلب الرصيد
+// ✅ جلب الرصيد - تم التعديل هنا
 // ==========================================
 
 async function getFuturesBalance() {
@@ -156,25 +154,28 @@ async function getFuturesBalance() {
     if (response && response.code === 0) {
       const data = response.data || {};
       
-      // محاولة قراءة الرصيد بعدة طرق
-      if (data.balance) {
-        return parseFloat(data.balance) || 0;
-      }
-      
-      if (data.USDT) {
-        return parseFloat(data.USDT.available) || 0;
-      }
-      
-      if (data.assets && Array.isArray(data.assets)) {
-        const usdt = data.assets.find(a => a.asset === 'USDT');
-        if (usdt) {
-          return parseFloat(usdt.available) || 0;
+      // ✅ الطريقة الصحيحة لقراءة الرصيد من استجابة BingX
+      if (data.balance && typeof data.balance === 'object') {
+        // الرصيد في الكائن balance
+        if (data.balance.balance) {
+          return parseFloat(data.balance.balance) || 0;
+        }
+        if (data.balance.availableMargin) {
+          return parseFloat(data.balance.availableMargin) || 0;
+        }
+        if (data.balance.equity) {
+          return parseFloat(data.balance.equity) || 0;
         }
       }
       
-      // البحث في أي حقل يحتوي على USDT
+      // إذا كان الرصيد مباشرة في data
+      if (data.balance && typeof data.balance === 'string') {
+        return parseFloat(data.balance) || 0;
+      }
+      
+      // البحث في أي حقل يحتوي على رصيد
       for (const key of Object.keys(data)) {
-        if (key.includes('USDT') || key.includes('balance')) {
+        if (key.includes('balance') || key.includes('equity') || key.includes('available')) {
           const val = parseFloat(data[key]);
           if (!isNaN(val) && val > 0) {
             return val;
@@ -334,7 +335,7 @@ async function tradingCycle() {
 
   try {
     const usdtBalance = await getFuturesBalance();
-    console.log(`💰 رصيد USDT: ${usdtBalance.toFixed(2)}`);
+    console.log(`💰 رصيد USDT: ${usdtBalance.toFixed(4)}`);
 
     if (usdtBalance === 0) {
       console.log('⚠️ رصيد USDT: 0 أو غير متوفر');
@@ -428,7 +429,7 @@ app.get('/', async (req, res) => {
     res.json({
       status: '⚡ بوت BingX Futures يعمل',
       timestamp: new Date().toISOString(),
-      balance: `${usdtBalance.toFixed(2)} USDT`,
+      balance: `${usdtBalance.toFixed(4)} USDT`,
       leverage: `${LEVERAGE}x`,
       currentPosition: currentPosition ? `${currentPosition.symbol} - مفتوح` : 'لا توجد صفقة',
       watching: SYMBOLS.join(', ')
@@ -449,7 +450,7 @@ async function startBot() {
     console.log(`💰 المبلغ: ${TRADE_AMOUNT} USDT (رافعة x${LEVERAGE})`);
 
     const balance = await getFuturesBalance();
-    console.log(`💰 رصيد USDT في Futures: ${balance.toFixed(2)}`);
+    console.log(`💰 رصيد USDT في Futures: ${balance.toFixed(4)}`);
 
     if (balance === 0) {
       console.log('⚠️ تحذير: الرصيد 0 أو غير متوفر.');
