@@ -52,18 +52,21 @@ const ENDPOINTS = {
 // ==========================================
 
 function generateSignature(params, secret) {
-  // ✅ بناء query string بترتيب أبجدي
-  const sortedKeys = Object.keys(params).sort();
-  const queryString = sortedKeys
+  // ✅ بناء query string من نفس الـ object بترتيب أبجدي
+  const queryString = Object.keys(params)
+    .sort()
     .map(key => `${key}=${params[key]}`)
     .join('&');
   
   console.log(`📝 التوقيع: ${queryString}`);
   
-  return crypto
-    .createHmac('sha256', secret)
+  // ✅ التوقيع المباشر
+  const signature = crypto
+    .createHmac('sha256', secret.trim())
     .update(queryString)
     .digest('hex');
+  
+  return signature;
 }
 
 // ==========================================
@@ -73,13 +76,13 @@ function generateSignature(params, secret) {
 async function bingxRequest(method, endpoint, params = {}, signed = true) {
   const baseURL = 'https://open-api.bingx.com';
   
-  // ✅ timestamp يجب أن يكون داخل params وليس خارجه
+  // ✅ بناء params كامل مع timestamp
   const allParams = {
     timestamp: Date.now().toString(),
     ...params
   };
   
-  // ✅ بناء التوقيع من query string
+  // ✅ إذا كان الطلب موقع، نضيف التوقيع
   if (signed) {
     allParams.signature = generateSignature(allParams, API_SECRET);
   }
@@ -213,23 +216,42 @@ async function getFuturesBalance() {
 
 async function setLeverage(symbol) {
   try {
+    // ✅ بناء params كامل مع timestamp
     const params = {
       symbol: symbol,
-      leverage: LEVERAGE
+      leverage: LEVERAGE,
+      timestamp: Date.now().toString()
     };
+    
+    // ✅ إضافة التوقيع
+    params.signature = generateSignature(params, API_SECRET);
     
     console.log("🔧 LEVERAGE REQUEST:", JSON.stringify(params, null, 2));
     
-    const response = await bingxRequest('POST', ENDPOINTS.FUTURES_LEVERAGE, params);
+    const url = 'https://open-api.bingx.com' + ENDPOINTS.FUTURES_LEVERAGE;
+    const headers = {
+      'X-BX-APIKEY': API_KEY,
+      'Content-Type': 'application/json'
+    };
     
-    if (response && response.code === 0) {
+    const response = await axios.post(
+      url,
+      null,
+      {
+        params: params,
+        headers: headers,
+        timeout: 10000
+      }
+    );
+    
+    if (response.data && response.data.code === 0) {
       console.log(`✅ تم تعيين الرافعة x${LEVERAGE} لـ ${symbol}`);
       return true;
     }
-    console.log(`⚠️ فشل تعيين الرافعة:`, response?.msg || response);
+    console.log(`⚠️ فشل تعيين الرافعة:`, response.data?.msg || response.data);
     return false;
   } catch (error) {
-    console.error(`❌ فشل تعيين الرافعة:`, error);
+    console.error(`❌ فشل تعيين الرافعة:`, error.response?.data || error.message);
     return false;
   }
 }
@@ -257,32 +279,51 @@ async function openLongPosition(symbol, amount) {
     console.log(`📊 فتح صفقة شراء: ${roundedQuantity} ${symbol} بسعر ${price}`);
     console.log(`📊 حجم الصفقة: ${(roundedQuantity * price).toFixed(2)} USDT (رافعة x${LEVERAGE})`);
 
+    // ✅ بناء params كامل مع timestamp
     const params = {
       symbol: symbol,
       side: 'BUY',
       type: 'MARKET',
       quantity: roundedQuantity,
-      positionSide: 'LONG'
+      positionSide: 'LONG',
+      timestamp: Date.now().toString()
     };
+    
+    // ✅ إضافة التوقيع
+    params.signature = generateSignature(params, API_SECRET);
     
     console.log("📝 ORDER REQUEST:", JSON.stringify(params, null, 2));
 
-    const response = await bingxRequest('POST', ENDPOINTS.FUTURES_ORDER, params);
+    const url = 'https://open-api.bingx.com' + ENDPOINTS.FUTURES_ORDER;
+    const headers = {
+      'X-BX-APIKEY': API_KEY,
+      'Content-Type': 'application/json'
+    };
+    
+    const response = await axios.post(
+      url,
+      null,
+      {
+        params: params,
+        headers: headers,
+        timeout: 10000
+      }
+    );
 
-    if (response && response.code === 0) {
+    if (response.data && response.data.code === 0) {
       console.log(`✅ تم فتح صفقة شراء: ${roundedQuantity} ${symbol}`);
       return {
         symbol,
         entryPrice: price,
         quantity: roundedQuantity,
-        orderId: response.data?.orderId || Date.now(),
+        orderId: response.data.data?.orderId || Date.now(),
         timestamp: Date.now()
       };
     }
-    console.log(`⚠️ فشل فتح الصفقة:`, JSON.stringify(response, null, 2));
+    console.log(`⚠️ فشل فتح الصفقة:`, JSON.stringify(response.data, null, 2));
     return null;
   } catch (error) {
-    console.error(`❌ فشل فتح الصفقة:`, error);
+    console.error(`❌ فشل فتح الصفقة:`, error.response?.data || error.message);
     return null;
   }
 }
@@ -301,24 +342,43 @@ async function closePosition(position) {
 
     console.log(`📊 إغلاق صفقة: ${position.quantity} ${position.symbol} بسعر ${currentPrice}`);
 
+    // ✅ بناء params كامل مع timestamp
     const params = {
       symbol: position.symbol,
       side: 'SELL',
       type: 'MARKET',
       quantity: position.quantity,
-      positionSide: 'LONG'
+      positionSide: 'LONG',
+      timestamp: Date.now().toString()
     };
+    
+    // ✅ إضافة التوقيع
+    params.signature = generateSignature(params, API_SECRET);
 
-    const response = await bingxRequest('POST', ENDPOINTS.FUTURES_ORDER, params);
+    const url = 'https://open-api.bingx.com' + ENDPOINTS.FUTURES_ORDER;
+    const headers = {
+      'X-BX-APIKEY': API_KEY,
+      'Content-Type': 'application/json'
+    };
+    
+    const response = await axios.post(
+      url,
+      null,
+      {
+        params: params,
+        headers: headers,
+        timeout: 10000
+      }
+    );
 
-    if (response && response.code === 0) {
+    if (response.data && response.data.code === 0) {
       console.log(`✅ تم إغلاق الصفقة: ${position.symbol}`);
       return true;
     }
-    console.log(`⚠️ فشل إغلاق الصفقة:`, response?.msg || response);
+    console.log(`⚠️ فشل إغلاق الصفقة:`, response.data?.msg || response.data);
     return false;
   } catch (error) {
-    console.error(`❌ فشل إغلاق الصفقة:`, error);
+    console.error(`❌ فشل إغلاق الصفقة:`, error.response?.data || error.message);
     return false;
   }
 }
