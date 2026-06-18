@@ -41,13 +41,14 @@ let isRunning = false;
 let lastTradeTime = 0;
 const cooldown = 15000; // 15 ثانية بين الصفقات
 
-const SCAN_INTERVAL = 3000;
-const CHANGE_THRESHOLD = 0.06; // أقوى من قبل (فلترة الضوضاء)
+// ✅ تم تعديل الحساسية
+const SCAN_INTERVAL = 1500; // 1.5 ثانية (أسرع)
+const CHANGE_THRESHOLD = 0.03; // 0.03% (أكثر حساسية)
 const PROFIT_USDT_TARGET = 0.1;
 
 // ✅ إعدادات الفلاتر الجديدة
 const MIN_CANDLE_RANGE = 0.08; // أقل نطاق شمعة مقبول
-const MIN_SCORE = 0.3; // أقل سكور للدخول
+const MIN_SCORE = 0.1; // ✅ تم التخفيض من 0.3 إلى 0.1
 
 // قائمة العملات
 const SYMBOLS = [
@@ -531,7 +532,7 @@ async function closePosition(position) {
 }
 
 // ==========================================
-// ✅ سكالبينج احترافي - المسح السريع (معدل)
+// ✅ سكالبينج احترافي - المسح السريع (معدل للحساسية العالية)
 // ==========================================
 
 async function fastScan() {
@@ -605,24 +606,28 @@ async function fastScan() {
       const change = ((price - oldPrice) / oldPrice) * 100;
       lastPrices[symbol] = price;
 
-      if (Math.abs(change) < CHANGE_THRESHOLD) continue;
+      // ✅ التقاط الميكرو موف - حساسية عالية جداً (0.02%)
+      if (Math.abs(change) < 0.02) {
+        console.log(`📊 ${symbol}: حركة صغيرة جداً (${change.toFixed(3)}%) - تم تجاهلها`);
+        continue;
+      }
 
       const trend = await getTrend(symbol);
       if (!trend) continue;
 
       /**
-       * 🔥 SCORE SYSTEM (الذكاء الحقيقي)
+       * 🔥 SCORE SYSTEM (الذكاء الحقيقي) - معدل للحساسية العالية
        */
-      let score = Math.abs(change) + trend.strength;
+      let score = Math.abs(change) * 2 + trend.strength * 1.5;
 
       // ✅ إضافة قوة الشمعة إلى السكور
       if (candleAnalysis.candleRange) {
-        score += candleAnalysis.candleRange * 0.5;
+        score += candleAnalysis.candleRange * 0.8;
       }
 
       // ✅ دعم الاتجاه من تحليل الشمعة
-      if (candleAnalysis.shouldBuy && trend.trend === 'UP') score *= 1.8;
-      if (candleAnalysis.shouldSell && trend.trend === 'DOWN') score *= 1.8;
+      if (candleAnalysis.shouldBuy && trend.trend === 'UP') score *= 2.0;
+      if (candleAnalysis.shouldSell && trend.trend === 'DOWN') score *= 2.0;
 
       // ✅ تأكيد الاتجاه مع إشارة الشمعة
       let direction = null;
@@ -631,7 +636,7 @@ async function fastScan() {
 
       if (!direction) continue;
 
-      // ✅ منع الدخول المباشر - يجب أن يكون السكور أعلى من الحد الأدنى
+      // ✅ منع الدخول المباشر - السكور أقل من 0.1
       if (score < MIN_SCORE) {
         console.log(`📊 ${symbol}: السكور منخفض (${score.toFixed(2)} < ${MIN_SCORE})`);
         continue;
@@ -647,10 +652,12 @@ async function fastScan() {
       console.log(`📊 ${symbol} | change=${change.toFixed(3)}% | trend=${trend.trend} | score=${score.toFixed(2)} | signal=${direction}`);
     }
 
-    // تنفيذ الصفقة
-    if (bestSymbol && bestDirection && bestScore > MIN_SCORE) {
+    // تنفيذ الصفقة - شرط القوة مخفض إلى 0.1
+    if (bestSymbol && bestDirection && bestScore > 0.1) {
       console.log(`🚀 أفضل فرصة: ${bestSymbol} | ${bestDirection} | score=${bestScore.toFixed(2)}`);
-      console.log(`📊 تفاصيل الشمعة: قاع=${bestCandleAnalysis.currentLow}, قمة=${bestCandleAnalysis.currentHigh}, نطاق=${bestCandleAnalysis.candleRange.toFixed(2)}%`);
+      if (bestCandleAnalysis) {
+        console.log(`📊 تفاصيل الشمعة: قاع=${bestCandleAnalysis.currentLow}, قمة=${bestCandleAnalysis.currentHigh}, نطاق=${bestCandleAnalysis.candleRange.toFixed(2)}%`);
+      }
 
       await setLeverage(bestSymbol);
 
@@ -789,7 +796,7 @@ app.get('/dashboard', (req, res) => {
     <body>
       <div class="container">
         <h1>🤖 بوت BingX Futures</h1>
-        <p class="subtitle">📡 سكالبينج احترافي - فلاتر قوية</p>
+        <p class="subtitle">📡 سكالبينج فائق الحساسية - مايكرو موف</p>
         <div class="status-grid" id="statusGrid">
           <div class="card">
             <div class="label">📊 الحالة</div>
@@ -809,14 +816,14 @@ app.get('/dashboard', (req, res) => {
           </div>
         </div>
         <div class="settings-box">
-          <div class="label">⚙️ إعدادات التداول</div>
+          <div class="label">⚙️ إعدادات التداول - حساسية عالية</div>
           <div class="value">
             💰 <span class="highlight-green">1.40 USDT</span> &nbsp;|&nbsp;
             🎯 هدف: <span class="highlight-gold">0.10 USDT</span> &nbsp;|&nbsp;
-            📈 عتبة: <span class="highlight-gold">0.06%</span> &nbsp;|&nbsp;
+            📈 عتبة: <span class="highlight-gold">0.03%</span> &nbsp;|&nbsp;
             ⚡ رافعة: <span class="highlight-gold">5x</span> &nbsp;|&nbsp;
             ⏱️ كولداون: <span class="highlight-purple">15 ثانية</span> &nbsp;|&nbsp;
-            🕯️ نطاق شمعة: <span class="highlight-purple">≥0.08%</span>
+            🔄 مسح: <span class="highlight-purple">1.5 ثانية</span>
           </div>
         </div>
         <button class="refresh-btn" onclick="fetchStatus()">🔄 تحديث</button>
@@ -855,7 +862,7 @@ app.get('/', async (req, res) => {
   try {
     const usdtBalance = await getFuturesBalance();
     res.json({
-      status: '⚡ بوت BingX Futures - سكالبينج احترافي',
+      status: '⚡ بوت BingX Futures - سكالبينج فائق الحساسية',
       timestamp: new Date().toISOString(),
       balance: `${usdtBalance.toFixed(4)} USDT`,
       leverage: `${LEVERAGE}x`,
@@ -866,6 +873,7 @@ app.get('/', async (req, res) => {
         changeThreshold: `${CHANGE_THRESHOLD}%`,
         minCandleRange: `${MIN_CANDLE_RANGE}%`,
         minScore: `${MIN_SCORE}`,
+        scanInterval: `${SCAN_INTERVAL/1000} ثانية`,
         leverage: `${LEVERAGE}x`,
         cooldown: `${cooldown/1000} ثانية`
       }
@@ -886,10 +894,11 @@ async function startBot() {
     console.log(`💰 مبلغ التداول: ${TRADE_AMOUNT} USDT`);
     console.log(`⚡ الرافعة المالية: ${LEVERAGE}x`);
     console.log(`🎯 هدف الربح: ${PROFIT_USDT_TARGET} USDT`);
-    console.log(`📈 عتبة التغير: ${CHANGE_THRESHOLD}%`);
+    console.log(`📈 عتبة التغير: ${CHANGE_THRESHOLD}% (حساسية عالية)`);
     console.log(`🕯️ الحد الأدنى لنطاق الشمعة: ${MIN_CANDLE_RANGE}%`);
-    console.log(`📊 الحد الأدنى للسكور: ${MIN_SCORE}`);
+    console.log(`📊 الحد الأدنى للسكور: ${MIN_SCORE} (حساسية عالية)`);
     console.log(`⏱️ كولداون: ${cooldown/1000} ثانية`);
+    console.log(`🔄 سرعة المسح: كل ${SCAN_INTERVAL/1000} ثانية`);
     console.log(`📊 العملات: ${SYMBOLS.join(', ')}`);
     console.log('================================');
 
@@ -930,13 +939,14 @@ async function startBot() {
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`
   ╔═══════════════════════════════════════════════════════════════╗
-  ║   ⚡ بوت العقود الآجلة - سكالبينج احترافي                  ║
+  ║   ⚡ بوت العقود الآجلة - سكالبينج فائق الحساسية            ║
   ║   📡 http://localhost:${PORT}                                  ║
   ║   📊 لوحة التحكم: http://localhost:${PORT}/dashboard          ║
   ║   🚀 رافعة: ${LEVERAGE}x | 💰 مبلغ: ${TRADE_AMOUNT} USDT      ║
   ║   🎯 هدف: ${PROFIT_USDT_TARGET} USDT | 📈 عتبة: ${CHANGE_THRESHOLD}%  ║
   ║   🕯️ نطاق شمعة: ≥${MIN_CANDLE_RANGE}% | 📊 سكور: ≥${MIN_SCORE}  ║
-  ║   ⏱️ كولداون: ${cooldown/1000} ثانية                          ║
+  ║   ⏱️ كولداون: ${cooldown/1000} ثانية | 🔄 مسح: ${SCAN_INTERVAL/1000} ثانية ║
+  ║   📡 التقاط مايكرو موف (0.02%)                               ║
   ║   ⚠️ تداول حقيقي - استخدم بحذر!                              ║
   ╚═══════════════════════════════════════════════════════════════╝
   `);
