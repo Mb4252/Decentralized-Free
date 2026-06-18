@@ -24,7 +24,7 @@ const API_KEY = process.env.BINGX_API_KEY;
 const API_SECRET = process.env.BINGX_API_SECRET;
 
 // ✅ إعدادات رأس المال
-const TRADE_AMOUNT = 1.2;
+const TRADE_AMOUNT = 0.8; // ✅ تم التعديل إلى 0.8
 const USE_FULL_BALANCE = false;
 
 // ✅ الرافعة المالية
@@ -302,7 +302,6 @@ async function scanMarket() {
     if (reversalSignal) {
       console.log(`🔄 انعكاس على ${symbol}: ${reversalSignal}`);
       
-      // نقاط إضافية للانعكاس
       let score = 0.5;
       if (reversalSignal === 'BUY') {
         score += 0.3;
@@ -850,7 +849,7 @@ app.get('/dashboard', (req, res) => {
         <div class="settings-box">
           <div class="label">⚙️ إعدادات V7 Pro</div>
           <div class="value">
-            💰 <span class="highlight-green">1.20 USDT</span> &nbsp;|&nbsp;
+            💰 <span class="highlight-green">0.80 USDT</span> &nbsp;|&nbsp;
             🎯 هدف: <span class="highlight-gold">0.05 USDT</span> &nbsp;|&nbsp;
             ⛔ وقف: <span class="highlight-gray">معطل</span> &nbsp;|&nbsp;
             📈 عتبة: <span class="highlight-gold">0.01%</span> &nbsp;|&nbsp;
