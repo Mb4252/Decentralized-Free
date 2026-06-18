@@ -42,8 +42,8 @@ const CHECK_INTERVAL = 5000;
 const STOP_LOSS_PERCENT = null;
 
 // ✅ إعدادات الشمعة (15 دقيقة)
-const CANDLE_INTERVAL = '15m'; // ✅ تم التعديل إلى 15 دقيقة
-const CANDLE_LIMIT = 100; // ✅ تم التعديل إلى 100
+const CANDLE_INTERVAL = '15m';
+const CANDLE_LIMIT = 100;
 
 // ✅ إعدادات الفلاتر (معطلة حالياً)
 const MIN_VOLUME = 0;
@@ -59,7 +59,7 @@ let lastTradeTime = 0;
 const cooldown = 3000;
 
 // ✅ سرعة المسح
-const SCAN_INTERVAL = 60000; // ✅ تم التعديل إلى 60 ثانية (دقيقة واحدة)
+const SCAN_INTERVAL = 60000;
 
 // ✅ تخزين العملات مؤقتاً
 let cachedSymbols = [];
@@ -337,9 +337,9 @@ async function getCandleData(symbol) {
 
     if (!data || !Array.isArray(data)) return null;
     
-    // ✅ 100 شمعة كافية لشمعة 15 دقيقة
-    if (data.length < 100) {
-      console.log(`📊 ${symbol}: بيانات غير كافية (${data.length} < 100)`);
+    // ✅ تم التعديل: 50 شمعة كافية
+    if (data.length < 50) {
+      console.log(`📊 ${symbol}: بيانات غير كافية (${data.length} < 50)`);
       return null;
     }
 
@@ -699,6 +699,9 @@ async function tradingCycle() {
     let bestScore = 0;
 
     for (const symbol of symbols) {
+      // ✅ طباعة اسم العملة قبل جلب البيانات
+      console.log(`🔍 فحص ${symbol}`);
+      
       const data = await getCandleData(symbol);
       if (!data) continue;
 
@@ -944,7 +947,7 @@ app.get('/dashboard', (req, res) => {
             📈 شراء: <span class="highlight-green">EMA9>EMA21 + RSI&lt;45</span> &nbsp;|&nbsp;
             📉 بيع: <span class="highlight-red">EMA9&lt;EMA21 + RSI&gt;55</span> &nbsp;|&nbsp;
             🕐 شمعة: <span class="highlight-purple">15 دقيقة</span> &nbsp;|&nbsp;
-            📊 شموع: <span class="highlight-purple">100</span> &nbsp;|&nbsp;
+            📊 شموع: <span class="highlight-purple">≥50</span> &nbsp;|&nbsp;
             🔄 مسح: <span class="highlight-purple">60 ثانية</span>
           </div>
         </div>
@@ -1055,7 +1058,7 @@ async function startBot() {
     console.log(`📈 شراء: EMA9 > EMA21 (RSI < ${RSI_OVERSOLD} تعزيز)`);
     console.log(`📉 بيع: EMA9 < EMA21 (RSI > ${RSI_OVERBOUGHT} تعزيز)`);
     console.log(`🕐 فترة الشمعة: ${CANDLE_INTERVAL}`);
-    console.log(`📊 عدد الشموع: ${CANDLE_LIMIT}`);
+    console.log(`📊 عدد الشموع: ≥50`);
     console.log(`🔄 سرعة المسح: كل ${SCAN_INTERVAL/1000} ثانية`);
     console.log('================================');
 
@@ -1104,7 +1107,7 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   ║   🎯 هدف: ${PROFIT_USDT_TARGET} USDT                          ║
   ║   📈 شراء: EMA9>EMA21 + RSI<${RSI_OVERSOLD}                   ║
   ║   📉 بيع: EMA9<EMA21 + RSI>${RSI_OVERBOUGHT}                  ║
-  ║   🕐 شمعة: ${CANDLE_INTERVAL} | 📊 شموع: ${CANDLE_LIMIT}      ║
+  ║   🕐 شمعة: ${CANDLE_INTERVAL} | 📊 شموع: ≥50                  ║
   ║   🔄 مسح: ${SCAN_INTERVAL/1000} ثانية                         ║
   ║   ⚠️ تداول حقيقي - استخدم بحذر!                              ║
   ╚═══════════════════════════════════════════════════════════════╝
