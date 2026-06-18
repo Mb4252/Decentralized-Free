@@ -27,7 +27,7 @@ const SYMBOLS = [
 ];
 
 // ==========================================
-// دوال مساعدة (BingX API)
+// دوال مساعدة (BingX API - نقاط النهاية الصحيحة)
 // ==========================================
 
 function generateSignature(params, secret) {
@@ -100,18 +100,29 @@ async function getAllPrices() {
 }
 
 // ==========================================
-// جلب الرصيد من BingX Futures
+// جلب الرصيد من BingX Futures (نقطة النهاية الصحيحة)
 // ==========================================
 
 async function getFuturesBalance() {
   try {
-    const response = await bingxRequest('GET', '/openApi/swap/v2/user/balance', {});
-    if (response && response.data && response.data.balance) {
-      const usdtAsset = response.data.balance.find(asset => asset.asset === 'USDT');
-      if (usdtAsset) {
-        return parseFloat(usdtAsset.available) || 0;
+    // نقطة النهاية الصحيحة لـ BingX Futures
+    const response = await bingxRequest('GET', '/openApi/swap/v1/user/balance', {});
+    
+    if (response && response.code === 0) {
+      const balance = response.data || {};
+      // البحث عن USDT في الأصول
+      if (balance.USDT) {
+        return parseFloat(balance.USDT.available) || 0;
+      }
+      // إذا كان على شكل مصفوفة
+      if (Array.isArray(balance)) {
+        const usdtAsset = balance.find(asset => asset.asset === 'USDT');
+        if (usdtAsset) {
+          return parseFloat(usdtAsset.available) || 0;
+        }
       }
     }
+    console.log('⚠️ استجابة الرصيد:', JSON.stringify(response, null, 2));
     return 0;
   } catch (error) {
     console.error('❌ فشل جلب الرصيد:', error);
@@ -120,12 +131,12 @@ async function getFuturesBalance() {
 }
 
 // ==========================================
-// تعيين الرافعة المالية
+// تعيين الرافعة المالية (نقطة النهاية الصحيحة)
 // ==========================================
 
 async function setLeverage(symbol) {
   try {
-    const response = await bingxRequest('POST', '/openApi/swap/v2/trade/leverage', {
+    const response = await bingxRequest('POST', '/openApi/swap/v1/trade/leverage', {
       symbol: symbol,
       leverage: LEVERAGE
     });
@@ -133,6 +144,7 @@ async function setLeverage(symbol) {
       console.log(`✅ تم تعيين الرافعة x${LEVERAGE} لـ ${symbol}`);
       return true;
     }
+    console.log(`⚠️ فشل تعيين الرافعة لـ ${symbol}:`, response);
     return false;
   } catch (error) {
     console.error(`❌ فشل تعيين الرافعة:`, error);
@@ -154,7 +166,7 @@ async function openLongPosition(symbol, amount) {
 
     console.log(`📊 فتح صفقة شراء: ${roundedQuantity} ${symbol} بسعر ${price} (رافعة x${LEVERAGE})`);
 
-    const response = await bingxRequest('POST', '/openApi/swap/v2/trade/order', {
+    const response = await bingxRequest('POST', '/openApi/swap/v1/trade/order', {
       symbol: symbol,
       side: 'BUY',
       type: 'MARKET',
@@ -171,6 +183,7 @@ async function openLongPosition(symbol, amount) {
         timestamp: Date.now()
       };
     }
+    console.log(`⚠️ فشل فتح الصفقة:`, response);
     return null;
   } catch (error) {
     console.error(`❌ فشل فتح الصفقة:`, error);
@@ -189,7 +202,7 @@ async function closePosition(position) {
 
     console.log(`📊 إغلاق صفقة: ${position.quantity} ${position.symbol} بسعر ${currentPrice}`);
 
-    const response = await bingxRequest('POST', '/openApi/swap/v2/trade/order', {
+    const response = await bingxRequest('POST', '/openApi/swap/v1/trade/order', {
       symbol: position.symbol,
       side: 'SELL',
       type: 'MARKET',
@@ -200,6 +213,7 @@ async function closePosition(position) {
       console.log(`✅ تم إغلاق الصفقة: ${position.symbol}`);
       return true;
     }
+    console.log(`⚠️ فشل إغلاق الصفقة:`, response);
     return false;
   } catch (error) {
     console.error(`❌ فشل إغلاق الصفقة:`, error);
