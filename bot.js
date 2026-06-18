@@ -34,7 +34,10 @@ const LEVERAGE = 10;
 const PROFIT_USDT_TARGET = 0.05;
 const MIN_PROFIT_USDT = 0.05;
 
-const PRICE_CHANGE_THRESHOLD = 0.1;
+// ✅ إعدادات الإشارات
+const BUY_THRESHOLD = -0.50;   // هبوط 0.50% → شراء
+const SELL_THRESHOLD = 0.50;   // صعود 0.50% → بيع
+
 const CHECK_INTERVAL = 5000;
 const STOP_LOSS_PERCENT = null;
 
@@ -53,17 +56,17 @@ const SYMBOLS = [
   'ADA-USDT',
   'LINK-USDT',
   'AVAX-USDT',
+  'TRX-USDT',
   'SUI-USDT',
   'TON-USDT',
   'HBAR-USDT',
-  'TRX-USDT',
   'APT-USDT',
   'NEAR-USDT',
+  'DOT-USDT',
   'ATOM-USDT',
-  'BCH-USDT',
   'LTC-USDT',
-  'ETC-USDT',
-  'DOT-USDT'
+  'BCH-USDT',
+  'ETC-USDT'
 ];
 
 // ✅ المتغيرات
@@ -76,17 +79,14 @@ const cooldown = 5000; // 5 ثواني فقط بين الصفقات
 
 // ✅ تم تعديل الحساسية
 const SCAN_INTERVAL = 1000; // مسح كل ثانية
-const CHANGE_THRESHOLD = 0.01;
-const MIN_SCORE = 0.08;
 
-// ✅ إعدادات الفلاتر الجديدة
-const MIN_CANDLE_RANGE = 0.08;
-const MIN_VOLUME_24H = 10000000; // ✅ فلتر حجم التداول
+// ✅ إعدادات الفلاتر
+const MIN_VOLUME_24H = 10000000; // فلتر حجم التداول
 
 // ✅ إعدادات وقف الخسارة
 const STOP_LOSS_ENABLED = false;
 
-// ✅ تخزين تاريخ الأسعار للانعكاسات
+// ✅ تخزين تاريخ الأسعار
 let priceHistory = {};
 
 // ==========================================
@@ -99,8 +99,7 @@ const ENDPOINTS = {
   FUTURES_LEVERAGE: '/openApi/swap/v2/trade/leverage',
   FUTURES_ORDER: '/openApi/swap/v2/trade/order',
   FUTURES_CANDLE: '/openApi/swap/v2/quote/klines',
-  FUTURES_CONTRACTS: '/openApi/swap/v2/quote/contracts',
-  FUTURES_TICKER: '/openApi/swap/v2/quote/ticker', // ✅ نقطة نهاية التيكر للحجم
+  FUTURES_TICKER: '/openApi/swap/v2/quote/ticker',
 };
 
 // ==========================================
@@ -190,7 +189,7 @@ async function getPrice(symbol) {
 }
 
 // ==========================================
-// ✅ جلب حجم التداول اليومي
+// جلب حجم التداول اليومي
 // ==========================================
 
 async function getVolume24h(symbol) {
@@ -200,10 +199,8 @@ async function getVolume24h(symbol) {
     }, false);
     
     if (response && response.code === 0 && response.data) {
-      // BingX ترجع volume في data.volume أو data.quoteVolume
       const volume = parseFloat(response.data.volume) || 0;
       const quoteVolume = parseFloat(response.data.quoteVolume) || 0;
-      // نستخدم quoteVolume لأنه يعبر عن الحجم بالـ USDT
       return quoteVolume || volume;
     }
     return 0;
@@ -214,151 +211,59 @@ async function getVolume24h(symbol) {
 }
 
 // ==========================================
-// ✅ دالة اكتشاف الانعكاسات (Reversal Detection)
+// ✅ جلب بيانات الشمعة وتحليل الإشارة
 // ==========================================
 
-function detectReversal(prices) {
-  if (!prices || prices.length < 10) return null;
+async function getCandleData(symbol) {
+  try {
+    const response = await bingxRequest('GET', ENDPOINTS.FUTURES_CANDLE, {
+      symbol,
+      interval: CANDLE_INTERVAL,
+      limit: 2
+    }, false);
 
-  const current = prices[prices.length - 1];
-  const highest = Math.max(...prices.slice(-10));
-  const lowest = Math.min(...prices.slice(-10));
+    const raw = response?.data;
 
-  const riseFromLow = ((current - lowest) / lowest) * 100;
-  const dropFromHigh = ((highest - current) / highest) * 100;
+    let data = null;
 
-  // ارتفع كثير ثم بدأ يهبط → إشارة بيع
-  if (dropFromHigh >= 0.15) {
-    return 'SELL';
+    if (Array.isArray(raw)) {
+      data = raw;
+    } else if (Array.isArray(raw?.data)) {
+      data = raw.data;
+    } else if (Array.isArray(response?.data?.data)) {
+      data = response.data.data;
+    }
+
+    if (!data || !Array.isArray(data) || data.length < 2) {
+      return null;
+    }
+
+    const currentCandle = data[data.length - 1];
+    const previousCandle = data[data.length - 2];
+
+    if (!currentCandle || !previousCandle) return null;
+    if (!Array.isArray(currentCandle) || !Array.isArray(previousCandle)) return null;
+    if (currentCandle.length < 5 || previousCandle.length < 5) return null;
+
+    const currentClose = Number(currentCandle[4]);
+    const previousClose = Number(previousCandle[4]);
+
+    if (isNaN(currentClose) || isNaN(previousClose)) return null;
+    if (previousClose === 0) return null;
+
+    // ✅ حساب نسبة التغير
+    const changePercent = ((currentClose - previousClose) / previousClose) * 100;
+
+    return {
+      symbol,
+      currentClose,
+      previousClose,
+      changePercent
+    };
+  } catch (error) {
+    console.error(`❌ فشل جلب شمعة ${symbol}:`, error);
+    return null;
   }
-
-  // هبط كثير ثم بدأ يرتد → إشارة شراء
-  if (riseFromLow >= 0.15) {
-    return 'BUY';
-  }
-
-  return null;
-}
-
-// ==========================================
-// ✅ جلب تغير السعر (من آخر سعر مسجل)
-// ==========================================
-
-async function getPriceChange(symbol) {
-  const price = await getPrice(symbol);
-  if (!price) return 0;
-
-  if (!lastPrices[symbol]) {
-    lastPrices[symbol] = price;
-    return 0;
-  }
-
-  const last = lastPrices[symbol];
-  const change = ((price - last) / last) * 100;
-  lastPrices[symbol] = price;
-
-  return change;
-}
-
-// ==========================================
-// ✅ فلتر الاتجاه العام
-// ==========================================
-
-async function getTrend(symbol) {
-  const p1 = await getPrice(symbol);
-  await new Promise(r => setTimeout(r, 2000));
-  const p2 = await getPrice(symbol);
-
-  if (!p1 || !p2) return null;
-
-  const change = ((p2 - p1) / p1) * 100;
-
-  return {
-    trend: change > 0 ? 'UP' : 'DOWN',
-    strength: Math.abs(change)
-  };
-}
-
-// ==========================================
-// ✅ مسح العملات المحددة مع فلتر الحجم
-// ==========================================
-
-async function scanMarket() {
-  let best = null;
-  let bestScore = 0;
-  let bestDirection = null;
-  let scanned = 0;
-
-  console.log(`🔍 جاري مسح ${SYMBOLS.length} عملة محددة...`);
-
-  for (const symbol of SYMBOLS) {
-    // ✅ فلتر حجم التداول
-    const volume24h = await getVolume24h(symbol);
-    if (volume24h < MIN_VOLUME_24H) {
-      console.log(`📊 ${symbol}: حجم التداول منخفض (${volume24h.toFixed(0)} < ${MIN_VOLUME_24H}) - تم التخطي`);
-      continue;
-    }
-
-    const price = await getPrice(symbol);
-    if (!price) continue;
-
-    // ✅ تحديث تاريخ الأسعار
-    if (!priceHistory[symbol]) {
-      priceHistory[symbol] = [];
-    }
-    priceHistory[symbol].push(price);
-    if (priceHistory[symbol].length > 20) {
-      priceHistory[symbol].shift();
-    }
-
-    // ✅ اكتشاف الانعكاسات
-    const reversalSignal = detectReversal(priceHistory[symbol]);
-    if (reversalSignal) {
-      console.log(`🔄 انعكاس على ${symbol}: ${reversalSignal} (حجم: ${volume24h.toFixed(0)})`);
-      
-      let score = 0.5;
-      if (reversalSignal === 'BUY') {
-        score += 0.3;
-        bestDirection = 'BUY';
-      } else {
-        score += 0.3;
-        bestDirection = 'SELL';
-      }
-
-      if (score > bestScore) {
-        bestScore = score;
-        best = symbol;
-        bestDirection = reversalSignal;
-      }
-      continue;
-    }
-
-    const change = await getPriceChange(symbol);
-    if (Math.abs(change) < CHANGE_THRESHOLD) continue;
-
-    const trend = await getTrend(symbol);
-    if (!trend) continue;
-
-    let score = Math.abs(change) * 2;
-
-    if (trend.trend === 'UP') score += trend.strength;
-    if (trend.trend === 'DOWN') score += trend.strength;
-
-    // ✅ مكافأة للعملات المعروفة (جميعها في القائمة معروفة)
-    score *= 1.1;
-
-    if (score > bestScore) {
-      bestScore = score;
-      best = symbol;
-      bestDirection = change > 0 ? 'BUY' : 'SELL';
-    }
-
-    scanned++;
-    console.log(`📊 ${symbol}: حجم=${volume24h.toFixed(0)}, تغير=${change.toFixed(3)}%, سكور=${score.toFixed(2)}`);
-  }
-
-  console.log(`✅ اكتمل المسح: ${scanned} عملة`);
-  return { best, bestScore, bestDirection };
 }
 
 // ==========================================
@@ -372,12 +277,11 @@ function calculateQuantity(price, amount) {
 }
 
 // ==========================================
-// ✅ تعيين الرافعة (LONG + SHORT) - تثبيت نهائي
+// ✅ تعيين الرافعة (LONG + SHORT)
 // ==========================================
 
 async function setLeverage(symbol) {
   try {
-    // ✅ تثبيت الرافعة للـ LONG
     const longResponse = await bingxRequest(
       'POST',
       ENDPOINTS.FUTURES_LEVERAGE,
@@ -388,7 +292,6 @@ async function setLeverage(symbol) {
       }
     );
 
-    // ✅ تثبيت الرافعة للـ SHORT
     const shortResponse = await bingxRequest(
       'POST',
       ENDPOINTS.FUTURES_LEVERAGE,
@@ -598,7 +501,7 @@ async function getFuturesBalance() {
 }
 
 // ==========================================
-// ✅ الدورة الرئيسية مع اكتشاف الانعكاسات
+// ✅ الدورة الرئيسية
 // ==========================================
 
 async function tradingCycle() {
@@ -665,16 +568,59 @@ async function tradingCycle() {
     }
 
     // ✅ مسح العملات المحددة
-    console.log('🔍 جاري مسح العملات المحددة...');
-    const result = await scanMarket();
+    console.log(`🔍 جاري مسح ${SYMBOLS.length} عملة محددة...`);
+    
+    let bestSymbol = null;
+    let bestSignal = null;
+    let bestScore = 0;
 
-    if (result.best && result.bestScore > MIN_SCORE) {
-      console.log(`🚀 أفضل فرصة: ${result.best} | ${result.bestDirection} | score=${result.bestScore.toFixed(2)}`);
+    for (const symbol of SYMBOLS) {
+      // ✅ فلتر حجم التداول
+      const volume24h = await getVolume24h(symbol);
+      if (volume24h < MIN_VOLUME_24H) {
+        console.log(`📊 ${symbol}: حجم التداول منخفض (${volume24h.toFixed(0)} < ${MIN_VOLUME_24H}) - تم التخطي`);
+        continue;
+      }
+
+      // ✅ جلب بيانات الشمعة
+      const candleData = await getCandleData(symbol);
+      if (!candleData) continue;
+
+      const { changePercent } = candleData;
+
+      // ✅ تحديد الإشارة بناءً على نسبة التغير
+      let signal = null;
+      if (changePercent <= BUY_THRESHOLD) {
+        signal = 'BUY';
+      }
+      if (changePercent >= SELL_THRESHOLD) {
+        signal = 'SELL';
+      }
+
+      if (!signal) {
+        console.log(`📊 ${symbol}: تغير ${changePercent.toFixed(2)}% - لا توجد إشارة (عتبة: شراء ${BUY_THRESHOLD}%, بيع ${SELL_THRESHOLD}%)`);
+        continue;
+      }
+
+      // ✅ حساب السكور
+      const score = Math.abs(changePercent);
+      console.log(`📊 ${symbol}: تغير ${changePercent.toFixed(2)}% → إشارة ${signal} (سكور: ${score.toFixed(2)})`);
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestSymbol = symbol;
+        bestSignal = signal;
+      }
+    }
+
+    // ✅ تنفيذ الصفقة
+    if (bestSymbol && bestSignal && bestScore > 0) {
+      console.log(`🚀 أفضل فرصة: ${bestSymbol} | ${bestSignal} | تغير: ${bestScore.toFixed(2)}%`);
 
       // ✅ التحقق من الرافعة قبل فتح الصفقة
-      console.log(`⚡ سيتم فتح الصفقة على ${result.best} برافعة x${LEVERAGE}`);
+      console.log(`⚡ سيتم فتح الصفقة على ${bestSymbol} برافعة x${LEVERAGE}`);
       
-      const leverageSet = await setLeverage(result.best);
+      const leverageSet = await setLeverage(bestSymbol);
 
       if (!leverageSet) {
         console.log(`❌ تم إلغاء الصفقة لأن الرافعة لم تُضبط على x${LEVERAGE}`);
@@ -683,19 +629,19 @@ async function tradingCycle() {
       }
 
       let position;
-      if (result.bestDirection === 'BUY') {
-        position = await openLongPosition(result.best, tradeAmount);
+      if (bestSignal === 'BUY') {
+        position = await openLongPosition(bestSymbol, tradeAmount);
       } else {
-        position = await openShortPosition(result.best, tradeAmount);
+        position = await openShortPosition(bestSymbol, tradeAmount);
       }
 
       if (position) {
         currentPosition = position;
         lastTradeTime = Date.now();
-        console.log(`✅ تم الدخول: ${result.best} (${result.bestDirection})`);
+        console.log(`✅ تم الدخول: ${bestSymbol} (${bestSignal})`);
       }
     } else {
-      console.log(`⏳ لا توجد فرصة قوية (أفضل سكور: ${result.bestScore.toFixed(2)})`);
+      console.log(`⏳ لا توجد إشارات قوية (أفضل سكور: ${bestScore.toFixed(2)})`);
     }
 
   } catch (err) {
@@ -830,7 +776,7 @@ app.get('/dashboard', (req, res) => {
     <body>
       <div class="container">
         <h1>🤖 بوت BingX - V7 Pro</h1>
-        <p class="subtitle">📡 اكتشاف الانعكاسات + سكالبينج ذكي</p>
+        <p class="subtitle">📡 إشارات الشموع - هبوط/صعود</p>
         
         <div class="status-grid" id="statusGrid">
           <div class="card">
@@ -862,10 +808,10 @@ app.get('/dashboard', (req, res) => {
             💰 <span class="highlight-green">0.80 USDT</span> &nbsp;|&nbsp;
             🎯 هدف: <span class="highlight-gold">0.05 USDT</span> &nbsp;|&nbsp;
             ⛔ وقف: <span class="highlight-gray">معطل</span> &nbsp;|&nbsp;
-            📈 عتبة: <span class="highlight-gold">0.01%</span> &nbsp;|&nbsp;
+            📈 شراء: <span class="highlight-green">≤ -0.50%</span> &nbsp;|&nbsp;
+            📉 بيع: <span class="highlight-red">≥ 0.50%</span> &nbsp;|&nbsp;
             ⚡ رافعة: <span class="highlight-gold">10x</span> &nbsp;|&nbsp;
-            🔄 مسح: <span class="highlight-purple">1 ثانية</span> &nbsp;|&nbsp;
-            ⏱️ كولداون: <span class="highlight-purple">5 ثواني</span>
+            🔄 مسح: <span class="highlight-purple">1 ثانية</span>
           </div>
         </div>
 
@@ -935,7 +881,7 @@ app.get('/', async (req, res) => {
     }
     
     res.json({
-      status: '⚡ بوت BingX - V7 Pro (اكتشاف الانعكاسات)',
+      status: '⚡ بوت BingX - V7 Pro (إشارات الشموع)',
       timestamp: new Date().toISOString(),
       balance: `${usdtBalance.toFixed(4)} USDT`,
       leverage: `${LEVERAGE}x`,
@@ -948,7 +894,8 @@ app.get('/', async (req, res) => {
         tradeAmount: `${TRADE_AMOUNT} USDT`,
         profitTarget: `${PROFIT_USDT_TARGET} USDT`,
         stopLoss: STOP_LOSS_ENABLED ? '-0.03 USDT' : 'معطل',
-        changeThreshold: `${CHANGE_THRESHOLD}%`,
+        buyThreshold: `${BUY_THRESHOLD}%`,
+        sellThreshold: `${SELL_THRESHOLD}%`,
         scanInterval: `${SCAN_INTERVAL/1000} ثانية`,
         leverage: `${LEVERAGE}x`,
         cooldown: `${cooldown/1000} ثانية`,
@@ -966,16 +913,14 @@ app.get('/', async (req, res) => {
 
 async function startBot() {
   try {
-    console.log('⚡⚡ بدء تشغيل بوت V7 Pro - اكتشاف الانعكاسات');
+    console.log('⚡⚡ بدء تشغيل بوت V7 Pro - إشارات الشموع');
     console.log('📊 ===== إعدادات V7 Pro =====');
     console.log(`💰 مبلغ التداول الثابت: ${TRADE_AMOUNT} USDT`);
-    console.log(`📊 استخدام الرصيد بالكامل: ${USE_FULL_BALANCE ? 'نعم' : 'لا'}`);
     console.log(`⚡ الرافعة المالية: ${LEVERAGE}x`);
     console.log(`🎯 هدف الربح: ${PROFIT_USDT_TARGET} USDT`);
-    console.log(`⛔ وقف الخسارة: ${STOP_LOSS_ENABLED ? 'مفعل (-0.03 USDT)' : 'معطل'}`);
-    console.log(`📈 عتبة الدخول: ${CHANGE_THRESHOLD}%`);
+    console.log(`📈 عتبة الشراء: ≤ ${BUY_THRESHOLD}% (هبوط)`);
+    console.log(`📉 عتبة البيع: ≥ ${SELL_THRESHOLD}% (صعود)`);
     console.log(`🔄 سرعة المسح: كل ${SCAN_INTERVAL/1000} ثانية`);
-    console.log(`⏱️ كولداون: ${cooldown/1000} ثانية`);
     console.log(`📊 عدد العملات: ${SYMBOLS.length}`);
     console.log(`📊 الحد الأدنى للحجم: ${MIN_VOLUME_24H.toLocaleString()}`);
     console.log('================================');
@@ -1016,14 +961,13 @@ async function startBot() {
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`
   ╔═══════════════════════════════════════════════════════════════╗
-  ║   ⚡ بوت V7 Pro - اكتشاف الانعكاسات                        ║
+  ║   ⚡ بوت V7 Pro - إشارات الشموع                            ║
   ║   📡 http://localhost:${PORT}                                  ║
   ║   📊 لوحة التحكم: http://localhost:${PORT}/dashboard          ║
   ║   🚀 رافعة: ${LEVERAGE}x | 💰 مبلغ: ${TRADE_AMOUNT} USDT      ║
-  ║   🎯 هدف: ${PROFIT_USDT_TARGET} USDT | ⛔ وقف: ${STOP_LOSS_ENABLED ? 'مفعل' : 'معطل'}  ║
-  ║   📈 عتبة: ${CHANGE_THRESHOLD}% | 🔄 مسح: ${SCAN_INTERVAL/1000}ثانية ║
-  ║   📊 ${SYMBOLS.length} عملة محددة | فلتر حجم: ${(MIN_VOLUME_24H/1000000).toFixed(0)}M ║
-  ║   🔄 اكتشاف الانعكاسات من القمة والقاع                       ║
+  ║   🎯 هدف: ${PROFIT_USDT_TARGET} USDT                          ║
+  ║   📈 شراء: ≤ ${BUY_THRESHOLD}% | 📉 بيع: ≥ ${SELL_THRESHOLD}% ║
+  ║   📊 ${SYMBOLS.length} عملة | فلتر حجم: ${(MIN_VOLUME_24H/1000000).toFixed(0)}M ║
   ║   ⚠️ تداول حقيقي - استخدم بحذر!                              ║
   ╚═══════════════════════════════════════════════════════════════╝
   `);
