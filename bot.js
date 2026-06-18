@@ -22,12 +22,14 @@ if (!process.env.BINGX_API_KEY || !process.env.BINGX_API_SECRET) {
 
 const API_KEY = process.env.BINGX_API_KEY;
 const API_SECRET = process.env.BINGX_API_SECRET;
-const LEVERAGE = 5;
-const TRADE_AMOUNT = 1.4;
+
+// ✅ إعدادات رأس المال الثابت
+const TRADE_AMOUNT = 1.35; // مبلغ ثابت لكل صفقة
+const LEVERAGE = 5; // الرافعة المالية المثالية للسكالبينج
 
 // ✅ أهداف سكالبينج سريعة
-const PROFIT_PERCENT = 0.08; // سكالب سريع 0.08%
-const PROFIT_USDT_TARGET = 0.05; // أرباح صغيرة متكررة 0.05 USDT
+const PROFIT_PERCENT = 0.08;
+const PROFIT_USDT_TARGET = 0.05;
 
 const PRICE_CHANGE_THRESHOLD = 0.1;
 const CHECK_INTERVAL = 5000;
@@ -47,11 +49,11 @@ const cooldown = 15000; // 15 ثانية بين الصفقات
 
 // ✅ تم تعديل الحساسية
 const SCAN_INTERVAL = 1500; // 1.5 ثانية (أسرع)
-const CHANGE_THRESHOLD = 0.03; // 0.03% (أكثر حساسية)
+const CHANGE_THRESHOLD = 0.03;
 
 // ✅ إعدادات الفلاتر الجديدة
-const MIN_CANDLE_RANGE = 0.08; // أقل نطاق شمعة مقبول
-const MIN_SCORE = 0.1; // ✅ تم التخفيض من 0.3 إلى 0.1
+const MIN_CANDLE_RANGE = 0.08;
+const MIN_SCORE = 0.1;
 
 // قائمة العملات
 const SYMBOLS = [
@@ -171,7 +173,6 @@ async function getCandleData(symbol) {
       return null;
     }
 
-    // تصفية الشمعات المكتملة فقط
     const closedCandles = data.filter(c => c && c[4] && c[3]);
     
     if (closedCandles.length < 2) {
@@ -187,7 +188,7 @@ async function getCandleData(symbol) {
 }
 
 // ==========================================
-// ✅ تحليل الشمعة (مع فلاتر قوية)
+// تحليل الشمعة
 // ==========================================
 
 async function analyzeCandle(symbol) {
@@ -226,42 +227,33 @@ async function analyzeCandle(symbol) {
       return null;
     }
 
-    // ✅ فلترة قوة الشموع
     const candleRange = ((currentHigh - currentLow) / currentLow) * 100;
     if (candleRange < MIN_CANDLE_RANGE) {
       console.log(`📊 ${symbol}: نطاق الشمعة ضعيف (${candleRange.toFixed(2)}% < ${MIN_CANDLE_RANGE}%)`);
       return null;
     }
 
-    // ✅ حساب نسب الارتداد والنزول
     const bouncePercent = ((currentClose - currentLow) / currentLow) * 100;
     const dropPercent = ((currentHigh - currentClose) / currentHigh) * 100;
 
-    // ✅ منع التذبذب - إذا كانت النسب متقاربة، نرفض الصفقة
     if (Math.abs(bouncePercent - dropPercent) < 0.02) {
-      console.log(`📊 ${symbol}: تذبذب عالي (ارتداد=${bouncePercent.toFixed(2)}%, نزول=${dropPercent.toFixed(2)}%)`);
+      console.log(`📊 ${symbol}: تذبذب عالي`);
       return null;
     }
 
-    // ✅ شروط الشراء
     const isBouncing = bouncePercent >= PRICE_CHANGE_THRESHOLD;
     const isRising = currentClose > previousClose;
     let shouldBuy = isBouncing && isRising;
 
-    // ✅ تأكيد الاتجاه - منع الشراء إذا كان السعر أقل من الشمعة السابقة
     if (currentClose < previousClose && shouldBuy) {
-      console.log(`📊 ${symbol}: اتجاه هابط، تم تجاهل إشارة الشراء`);
       shouldBuy = false;
     }
 
-    // ✅ شروط البيع
     const isDropping = dropPercent >= PRICE_CHANGE_THRESHOLD;
     const isFalling = currentClose < previousClose;
     let shouldSell = isDropping && isFalling;
 
-    // ✅ تأكيد الاتجاه - منع البيع إذا كان السعر أعلى من الشمعة السابقة
     if (currentClose > previousClose && shouldSell) {
-      console.log(`📊 ${symbol}: اتجاه صاعد، تم تجاهل إشارة البيع`);
       shouldSell = false;
     }
 
@@ -305,10 +297,103 @@ async function getPrice(symbol) {
 }
 
 // ==========================================
-// ✅ V7 Pro Scalp - استراتيجية سكالبينج فائقة السرعة
+// ✅ حساب كمية العقد بدقة
 // ==========================================
 
-async function v7ProScalp(symbol) {
+function calculateQuantity(price) {
+  const margin = TRADE_AMOUNT;
+  const quantity = (margin * LEVERAGE) / price;
+
+  if (quantity <= 0) return null;
+
+  return parseFloat(quantity.toFixed(3));
+}
+
+// ==========================================
+// ✅ تعيين الرافعة - إصلاح نهائي
+// ==========================================
+
+async function setLeverage(symbol) {
+  try {
+    const params = {
+      symbol,
+      side: 'LONG',
+      leverage: LEVERAGE
+    };
+
+    const res = await bingxRequest(
+      'POST',
+      '/openApi/swap/v2/trade/leverage',
+      params
+    );
+
+    if (res && res.code === 0) {
+      console.log(`✅ تم تعيين الرافعة x${LEVERAGE} لـ ${symbol}`);
+      return true;
+    }
+    console.log(`⚠️ فشل تعيين الرافعة:`, res?.msg || res);
+    return false;
+
+  } catch (e) {
+    console.log("❌ leverage error", e.message);
+    return false;
+  }
+}
+
+// ==========================================
+// ✅ دخول سريع جداً
+// ==========================================
+
+async function fastEntry(symbol, side) {
+  const price = await getPrice(symbol);
+  if (!price) {
+    console.log(`⚠️ لا يمكن الدخول: سعر ${symbol} غير متوفر`);
+    return null;
+  }
+
+  const quantity = calculateQuantity(price);
+  if (!quantity) {
+    console.log(`⚠️ الكمية غير صالحة: ${quantity}`);
+    return null;
+  }
+
+  console.log(`📊 دخول ${side}: ${symbol} | كمية: ${quantity} | سعر: ${price} | حجم: ${(quantity * price).toFixed(2)} USDT`);
+
+  const params = {
+    symbol,
+    side: side === 'BUY' ? 'BUY' : 'SELL',
+    type: 'MARKET',
+    quantity,
+    positionSide: side === 'BUY' ? 'LONG' : 'SHORT'
+  };
+
+  const res = await bingxRequest(
+    'POST',
+    '/openApi/swap/v2/trade/order',
+    params
+  );
+
+  if (res && res.code === 0) {
+    console.log(`🚀 دخول ${side}: ${symbol} | $${TRADE_AMOUNT} | رافعة x${LEVERAGE}`);
+    return {
+      symbol,
+      entryPrice: price,
+      quantity: quantity,
+      type: side === 'BUY' ? 'LONG' : 'SHORT',
+      orderId: res.data?.orderId || Date.now(),
+      timestamp: Date.now()
+    };
+  }
+
+  console.log(`⚠️ فشل دخول ${side}:`, res?.msg || res);
+  return null;
+}
+
+// ==========================================
+// ✅ إشارة ذكية لقرار الدخول
+// ==========================================
+
+async function smartSignal(symbol) {
   const price = await getPrice(symbol);
   if (!price) return null;
 
@@ -317,38 +402,17 @@ async function v7ProScalp(symbol) {
     return null;
   }
 
-  const lastPrice = lastPrices[symbol];
-  const change = ((price - lastPrice) / lastPrice) * 100;
+  const last = lastPrices[symbol];
+  const change = ((price - last) / last) * 100;
 
   lastPrices[symbol] = price;
 
-  // ⚡ فلتر الضوضاء
+  // ⚡ فلتر ضوضاء
   if (Math.abs(change) < 0.02) return null;
 
-  // 🧠 اتجاه السوق
-  const trend = price > lastPrice ? 'UP' : 'DOWN';
-
-  // 🚀 شروط الدخول الذكي
-  const buySignal = change > 0 && trend === 'UP';
-  const sellSignal = change < 0 && trend === 'DOWN';
-
-  if (buySignal) {
-    return {
-      symbol,
-      side: 'BUY',
-      change,
-      trend
-    };
-  }
-
-  if (sellSignal) {
-    return {
-      symbol,
-      side: 'SELL',
-      change,
-      trend
-    };
-  }
+  // 🔥 قرار سريع
+  if (change > 0) return 'BUY';
+  if (change < 0) return 'SELL';
 
   return null;
 }
@@ -397,135 +461,6 @@ async function getFuturesBalance() {
 }
 
 // ==========================================
-// تعيين الرافعة
-// ==========================================
-
-async function setLeverage(symbol) {
-  try {
-    const params = {
-      symbol: symbol,
-      leverage: LEVERAGE
-    };
-    
-    const response = await bingxRequest('POST', ENDPOINTS.FUTURES_LEVERAGE, params);
-    
-    if (response && response.code === 0) {
-      console.log(`✅ تم تعيين الرافعة x${LEVERAGE} لـ ${symbol}`);
-      return true;
-    }
-    console.log(`⚠️ فشل تعيين الرافعة:`, response?.msg || response);
-    return false;
-  } catch (error) {
-    console.error(`❌ فشل تعيين الرافعة:`, error);
-    return false;
-  }
-}
-
-// ==========================================
-// فتح صفقة شراء (Long)
-// ==========================================
-
-async function openLongPosition(symbol, amount) {
-  try {
-    const price = await getPrice(symbol);
-    if (!price) {
-      console.log(`⚠️ لا يمكن فتح صفقة شراء: سعر ${symbol} غير متوفر`);
-      return null;
-    }
-
-    const quantity = (amount * LEVERAGE) / price;
-    const roundedQuantity = Number(quantity.toFixed(1));
-
-    if (roundedQuantity <= 0) {
-      console.log(`⚠️ الكمية صغيرة جداً: ${roundedQuantity}`);
-      return null;
-    }
-
-    console.log(`📊 فتح صفقة شراء (Long): ${roundedQuantity} ${symbol} بسعر ${price}`);
-    console.log(`📊 حجم الصفقة: ${(roundedQuantity * price).toFixed(2)} USDT (رافعة x${LEVERAGE})`);
-
-    const params = {
-      symbol: symbol,
-      side: 'BUY',
-      type: 'MARKET',
-      quantity: roundedQuantity,
-      positionSide: 'LONG'
-    };
-
-    const response = await bingxRequest('POST', ENDPOINTS.FUTURES_ORDER, params);
-
-    if (response && response.code === 0) {
-      console.log(`✅ تم فتح صفقة شراء: ${roundedQuantity} ${symbol}`);
-      return {
-        symbol,
-        entryPrice: price,
-        quantity: roundedQuantity,
-        type: 'LONG',
-        orderId: response.data?.orderId || Date.now(),
-        timestamp: Date.now()
-      };
-    }
-    console.log(`⚠️ فشل فتح صفقة شراء:`, JSON.stringify(response, null, 2));
-    return null;
-  } catch (error) {
-    console.error(`❌ فشل فتح صفقة شراء:`, error);
-    return null;
-  }
-}
-
-// ==========================================
-// فتح صفقة بيع (Short)
-// ==========================================
-
-async function openShortPosition(symbol, amount) {
-  try {
-    const price = await getPrice(symbol);
-    if (!price) {
-      console.log(`⚠️ لا يمكن فتح صفقة بيع: سعر ${symbol} غير متوفر`);
-      return null;
-    }
-
-    const quantity = (amount * LEVERAGE) / price;
-    const roundedQuantity = Number(quantity.toFixed(1));
-
-    if (roundedQuantity <= 0) {
-      console.log(`⚠️ الكمية صغيرة جداً: ${roundedQuantity}`);
-      return null;
-    }
-
-    console.log(`📊 فتح صفقة بيع (Short): ${roundedQuantity} ${symbol} بسعر ${price}`);
-    console.log(`📊 حجم الصفقة: ${(roundedQuantity * price).toFixed(2)} USDT (رافعة x${LEVERAGE})`);
-
-    const params = {
-      symbol: symbol,
-      side: 'SELL',
-      type: 'MARKET',
-      quantity: roundedQuantity,
-      positionSide: 'SHORT'
-    };
-
-    const response = await bingxRequest('POST', ENDPOINTS.FUTURES_ORDER, params);
-
-    if (response && response.code === 0) {
-      console.log(`✅ تم فتح صفقة بيع: ${roundedQuantity} ${symbol}`);
-      return {
-        symbol,
-        entryPrice: price,
-        quantity: roundedQuantity,
-        type: 'SHORT',
-        orderId: response.data?.orderId || Date.now(),
-        timestamp: Date.now()
-      };
-    }
-    console.log(`⚠️ فشل فتح صفقة بيع:`, JSON.stringify(response, null, 2));
-    return null;
-  } catch (error) {
-    console.error(`❌ فشل فتح صفقة بيع:`, error);
-    return null;
-  }
-}
-
-// ==========================================
 // إغلاق صفقة
 // ==========================================
 
@@ -565,7 +500,7 @@ async function closePosition(position) {
 }
 
 // ==========================================
-// ✅ سكالبينج احترافي V7 - المسح السريع
+// ✅ سكالبينج احترافي V7 Pro - المسح السريع
 // ==========================================
 
 async function fastScan() {
@@ -623,24 +558,19 @@ async function fastScan() {
 
     // ✅ V7 Pro Scalp - مسح سريع
     for (const symbol of SYMBOLS) {
-      const signal = await v7ProScalp(symbol);
+      const signal = await smartSignal(symbol);
       if (!signal) continue;
 
-      console.log(`🚀 إشارة ${signal.side}: ${symbol} | change=${signal.change.toFixed(3)}% | trend=${signal.trend}`);
+      console.log(`🚀 إشارة ${signal}: ${symbol}`);
 
       await setLeverage(symbol);
 
-      let position;
-      if (signal.side === 'BUY') {
-        position = await openLongPosition(symbol, TRADE_AMOUNT);
-      } else {
-        position = await openShortPosition(symbol, TRADE_AMOUNT);
-      }
+      const position = await fastEntry(symbol, signal);
 
       if (position) {
         currentPosition = position;
         lastTradeTime = Date.now();
-        console.log(`✅ تم الدخول: ${symbol} (${signal.side})`);
+        console.log(`✅ تم الدخول: ${symbol} (${signal})`);
         break; // صفقة واحدة فقط
       }
     }
@@ -765,7 +695,7 @@ app.get('/dashboard', (req, res) => {
     <body>
       <div class="container">
         <h1>🤖 بوت BingX Futures - V7 Pro</h1>
-        <p class="subtitle">📡 سكالبينج فائق السرعة - مايكرو موف</p>
+        <p class="subtitle">📡 سكالبينج فائق السرعة - رأس مال ثابت</p>
         <div class="status-grid" id="statusGrid">
           <div class="card">
             <div class="label">📊 الحالة</div>
@@ -787,9 +717,9 @@ app.get('/dashboard', (req, res) => {
         <div class="settings-box">
           <div class="label">⚙️ إعدادات V7 Pro Scalp</div>
           <div class="value">
-            💰 <span class="highlight-green">1.40 USDT</span> &nbsp;|&nbsp;
+            💰 <span class="highlight-green">1.35 USDT</span> &nbsp;|&nbsp;
             🎯 هدف: <span class="highlight-gold">0.05 USDT</span> &nbsp;|&nbsp;
-            📈 عتبة: <span class="highlight-gold">0.03%</span> &nbsp;|&nbsp;
+            📈 عتبة: <span class="highlight-gold">0.02%</span> &nbsp;|&nbsp;
             ⚡ رافعة: <span class="highlight-gold">5x</span> &nbsp;|&nbsp;
             ⏱️ كولداون: <span class="highlight-purple">15 ثانية</span> &nbsp;|&nbsp;
             🔄 مسح: <span class="highlight-purple">1.5 ثانية</span>
@@ -835,12 +765,13 @@ app.get('/', async (req, res) => {
       timestamp: new Date().toISOString(),
       balance: `${usdtBalance.toFixed(4)} USDT`,
       leverage: `${LEVERAGE}x`,
+      tradeAmount: `${TRADE_AMOUNT} USDT`,
       currentPosition: currentPosition ? `${currentPosition.symbol} (${currentPosition.type})` : 'لا توجد',
       settings: {
         tradeAmount: `${TRADE_AMOUNT} USDT`,
         profitTarget: `${PROFIT_USDT_TARGET} USDT`,
         profitPercent: `${PROFIT_PERCENT}%`,
-        changeThreshold: `${CHANGE_THRESHOLD}%`,
+        changeThreshold: `0.02%`,
         scanInterval: `${SCAN_INTERVAL/1000} ثانية`,
         leverage: `${LEVERAGE}x`,
         cooldown: `${cooldown/1000} ثانية`
@@ -859,10 +790,10 @@ async function startBot() {
   try {
     console.log('⚡⚡ بدء تشغيل بوت العقود الآجلة V7 Pro');
     console.log('📊 ===== إعدادات V7 Pro Scalp =====');
-    console.log(`💰 مبلغ التداول: ${TRADE_AMOUNT} USDT`);
+    console.log(`💰 مبلغ التداول الثابت: ${TRADE_AMOUNT} USDT`);
     console.log(`⚡ الرافعة المالية: ${LEVERAGE}x`);
     console.log(`🎯 هدف الربح: ${PROFIT_USDT_TARGET} USDT (${PROFIT_PERCENT}%)`);
-    console.log(`📈 عتبة التغير: ${CHANGE_THRESHOLD}%`);
+    console.log(`📈 عتبة الدخول: 0.02%`);
     console.log(`⏱️ كولداون: ${cooldown/1000} ثانية`);
     console.log(`🔄 سرعة المسح: كل ${SCAN_INTERVAL/1000} ثانية`);
     console.log(`📊 العملات: ${SYMBOLS.join(', ')}`);
@@ -908,10 +839,10 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   ║   ⚡ بوت العقود الآجلة - V7 Pro Scalp                      ║
   ║   📡 http://localhost:${PORT}                                  ║
   ║   📊 لوحة التحكم: http://localhost:${PORT}/dashboard          ║
-  ║   🚀 رافعة: ${LEVERAGE}x | 💰 مبلغ: ${TRADE_AMOUNT} USDT      ║
+  ║   🚀 رافعة: ${LEVERAGE}x | 💰 مبلغ ثابت: ${TRADE_AMOUNT} USDT  ║
   ║   🎯 هدف: ${PROFIT_USDT_TARGET} USDT (${PROFIT_PERCENT}%)      ║
-  ║   📈 عتبة: ${CHANGE_THRESHOLD}% | 🔄 مسح: ${SCAN_INTERVAL/1000}ثانية ║
-  ║   📡 V7 Pro - مايكرو موف (0.02%)                            ║
+  ║   📈 دخول: 0.02% | 🔄 مسح: ${SCAN_INTERVAL/1000}ثانية          ║
+  ║   📡 V7 Pro - رأس مال ثابت + دخول سريع                      ║
   ║   ⚠️ تداول حقيقي - استخدم بحذر!                              ║
   ╚═══════════════════════════════════════════════════════════════╝
   `);
