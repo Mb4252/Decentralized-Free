@@ -43,7 +43,7 @@ const STOP_LOSS_PERCENT = null;
 
 // ✅ إعدادات الشمعة (1 دقيقة)
 const CANDLE_INTERVAL = '1m';
-const CANDLE_LIMIT = 2;
+const CANDLE_LIMIT = 10; // ✅ تم التعديل إلى 10
 
 // ✅ قائمة العملات المحددة
 const SYMBOLS = [
@@ -81,7 +81,7 @@ const cooldown = 3000; // 3 ثواني بين الصفقات
 const SCAN_INTERVAL = 1000; // مسح كل ثانية
 
 // ✅ إعدادات الفلاتر
-const MIN_VOLUME = 1000000; // ✅ تم التعديل إلى 1,000,000
+const MIN_VOLUME = 1000000; // 1,000,000
 
 // ✅ إعدادات وقف الخسارة
 const STOP_LOSS_ENABLED = false;
@@ -198,9 +198,6 @@ async function getVolume24h(symbol) {
       symbol: symbol
     }, false);
     
-    // ✅ طباعة البيانات للتشخيص
-    console.log(`📊 ${symbol} - Ticker:`, response?.data);
-    
     if (response && response.code === 0 && response.data) {
       const volume = parseFloat(response.data.volume) || 0;
       const quoteVolume = parseFloat(response.data.quoteVolume) || 0;
@@ -257,11 +254,19 @@ async function getCandleData(symbol) {
     // ✅ حساب نسبة التغير
     const changePercent = ((currentClose - previousClose) / previousClose) * 100;
 
+    // ✅ جلب تغير 24 ساعة
+    const ticker = await bingxRequest('GET', ENDPOINTS.FUTURES_TICKER, {
+      symbol
+    }, false);
+
+    const changePercent24h = parseFloat(ticker?.data?.priceChangePercent || 0);
+
     return {
       symbol,
       currentClose,
       previousClose,
-      changePercent
+      changePercent,
+      changePercent24h
     };
   } catch (error) {
     console.error(`❌ فشل جلب شمعة ${symbol}:`, error);
@@ -578,40 +583,43 @@ async function tradingCycle() {
     let bestScore = 0;
 
     for (const symbol of SYMBOLS) {
-      // ✅ فلتر حجم التداول (1,000,000)
+      // ✅ فلتر حجم التداول
       const volume24h = await getVolume24h(symbol);
       if (volume24h < MIN_VOLUME) {
         console.log(`📊 ${symbol}: حجم التداول منخفض (${volume24h.toFixed(0)} < ${MIN_VOLUME}) - تم التخطي`);
         continue;
       }
 
-      // ✅ جلب بيانات الشمعة (1 دقيقة)
+      // ✅ جلب بيانات الشمعة (1 دقيقة) + تغير 24 ساعة
       const candleData = await getCandleData(symbol);
       if (!candleData) continue;
 
-      const { changePercent, previousClose, currentClose } = candleData;
+      const { changePercent, changePercent24h, previousClose, currentClose } = candleData;
       
       // ✅ طباعة تفاصيل السعر لكل عملة
       console.log(
-        `${symbol} | prev=${previousClose} | current=${currentClose} | change=${changePercent.toFixed(3)}%`
+        `${symbol} | prev=${previousClose} | current=${currentClose} | change=${changePercent.toFixed(3)}% | 24h=${changePercent24h.toFixed(2)}%`
       );
 
-      // ✅ تحديد الإشارة بناءً على نسبة التغير
+      // ✅ تحديد الإشارة بناءً على الدمج بين التغير الفوري واتجاه 24 ساعة
       let signal = null;
-      if (changePercent <= BUY_THRESHOLD) {
+
+      // سكالب سريع + اتجاه قوي
+      if (changePercent <= -0.05 && changePercent24h < 0) {
         signal = 'BUY';
       }
-      if (changePercent >= SELL_THRESHOLD) {
+
+      if (changePercent >= 0.05 && changePercent24h > 0) {
         signal = 'SELL';
       }
 
       if (!signal) {
-        console.log(`📊 ${symbol}: تغير ${changePercent.toFixed(2)}% - لا توجد إشارة (عتبة: شراء ${BUY_THRESHOLD}%, بيع ${SELL_THRESHOLD}%)`);
+        console.log(`📊 ${symbol}: تغير ${changePercent.toFixed(2)}% | 24h=${changePercent24h.toFixed(2)}% - لا توجد إشارة`);
         continue;
       }
 
       // ✅ حساب السكور
-      const score = Math.abs(changePercent);
+      const score = Math.abs(changePercent) + Math.abs(changePercent24h) * 0.5;
       console.log(`📊 ${symbol}: تغير ${changePercent.toFixed(2)}% → إشارة ${signal} (سكور: ${score.toFixed(2)}) | حجم: ${volume24h.toFixed(0)}`);
 
       if (score > bestScore) {
@@ -623,7 +631,7 @@ async function tradingCycle() {
 
     // ✅ تنفيذ الصفقة
     if (bestSymbol && bestSignal && bestScore > 0) {
-      console.log(`🚀 أفضل فرصة: ${bestSymbol} | ${bestSignal} | تغير: ${bestScore.toFixed(2)}%`);
+      console.log(`🚀 أفضل فرصة: ${bestSymbol} | ${bestSignal} | سكور: ${bestScore.toFixed(2)}`);
 
       // ✅ التحقق من الرافعة قبل فتح الصفقة
       console.log(`⚡ سيتم فتح الصفقة على ${bestSymbol} برافعة x${LEVERAGE}`);
@@ -784,7 +792,7 @@ app.get('/dashboard', (req, res) => {
     <body>
       <div class="container">
         <h1>🤖 بوت BingX - V7 Pro</h1>
-        <p class="subtitle">📡 شموع 1 دقيقة - سكالبينج فائق السرعة</p>
+        <p class="subtitle">📡 سكالبينج + اتجاه 24 ساعة</p>
         
         <div class="status-grid" id="statusGrid">
           <div class="card">
@@ -811,17 +819,16 @@ app.get('/dashboard', (req, res) => {
         </div>
 
         <div class="settings-box">
-          <div class="label">⚙️ إعدادات V7 Pro - سكالبينج فائق السرعة</div>
+          <div class="label">⚙️ إعدادات V7 Pro - سكالبينج + اتجاه</div>
           <div class="value">
             💰 <span class="highlight-green">0.80 USDT</span> &nbsp;|&nbsp;
             🎯 هدف: <span class="highlight-gold">0.05 USDT</span> &nbsp;|&nbsp;
             ⛔ وقف: <span class="highlight-gray">معطل</span> &nbsp;|&nbsp;
-            📈 شراء: <span class="highlight-green">≤ -0.05%</span> &nbsp;|&nbsp;
-            📉 بيع: <span class="highlight-red">≥ 0.05%</span> &nbsp;|&nbsp;
+            📈 شراء: <span class="highlight-green">≤ -0.05% + هبوط 24h</span> &nbsp;|&nbsp;
+            📉 بيع: <span class="highlight-red">≥ 0.05% + صعود 24h</span> &nbsp;|&nbsp;
             ⚡ رافعة: <span class="highlight-gold">10x</span> &nbsp;|&nbsp;
             🕐 شمعة: <span class="highlight-purple">1 دقيقة</span> &nbsp;|&nbsp;
-            📊 حجم: <span class="highlight-purple">≥ 1M</span> &nbsp;|&nbsp;
-            ⏱️ كولداون: <span class="highlight-purple">3 ثواني</span>
+            📊 حجم: <span class="highlight-purple">≥ 1M</span>
           </div>
         </div>
 
@@ -891,7 +898,7 @@ app.get('/', async (req, res) => {
     }
     
     res.json({
-      status: '⚡ بوت BingX - V7 Pro (سكالبينج 1 دقيقة)',
+      status: '⚡ بوت BingX - V7 Pro (سكالبينج + اتجاه 24h)',
       timestamp: new Date().toISOString(),
       balance: `${usdtBalance.toFixed(4)} USDT`,
       leverage: `${LEVERAGE}x`,
@@ -907,6 +914,7 @@ app.get('/', async (req, res) => {
         buyThreshold: `${BUY_THRESHOLD}%`,
         sellThreshold: `${SELL_THRESHOLD}%`,
         candleInterval: '1 دقيقة',
+        candleLimit: CANDLE_LIMIT,
         minVolume: `${MIN_VOLUME.toLocaleString()}`,
         scanInterval: `${SCAN_INTERVAL/1000} ثانية`,
         leverage: `${LEVERAGE}x`,
@@ -925,14 +933,15 @@ app.get('/', async (req, res) => {
 
 async function startBot() {
   try {
-    console.log('⚡⚡ بدء تشغيل بوت V7 Pro - سكالبينج 1 دقيقة');
+    console.log('⚡⚡ بدء تشغيل بوت V7 Pro - سكالبينج + اتجاه 24h');
     console.log('📊 ===== إعدادات V7 Pro =====');
     console.log(`💰 مبلغ التداول الثابت: ${TRADE_AMOUNT} USDT`);
     console.log(`⚡ الرافعة المالية: ${LEVERAGE}x`);
     console.log(`🎯 هدف الربح: ${PROFIT_USDT_TARGET} USDT`);
-    console.log(`📈 عتبة الشراء: ≤ ${BUY_THRESHOLD}% (هبوط)`);
-    console.log(`📉 عتبة البيع: ≥ ${SELL_THRESHOLD}% (صعود)`);
+    console.log(`📈 عتبة الشراء: ≤ ${BUY_THRESHOLD}% + اتجاه هابط 24h`);
+    console.log(`📉 عتبة البيع: ≥ ${SELL_THRESHOLD}% + اتجاه صاعد 24h`);
     console.log(`🕐 فترة الشمعة: ${CANDLE_INTERVAL}`);
+    console.log(`📊 عدد الشموع: ${CANDLE_LIMIT}`);
     console.log(`📊 فلتر الحجم الأدنى: ${MIN_VOLUME.toLocaleString()}`);
     console.log(`🔄 سرعة المسح: كل ${SCAN_INTERVAL/1000} ثانية`);
     console.log(`⏱️ كولداون: ${cooldown/1000} ثانية`);
@@ -975,15 +984,16 @@ async function startBot() {
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`
   ╔═══════════════════════════════════════════════════════════════╗
-  ║   ⚡ بوت V7 Pro - سكالبينج فائق السرعة                     ║
+  ║   ⚡ بوت V7 Pro - سكالبينج + اتجاه 24h                     ║
   ║   📡 http://localhost:${PORT}                                  ║
   ║   📊 لوحة التحكم: http://localhost:${PORT}/dashboard          ║
   ║   🚀 رافعة: ${LEVERAGE}x | 💰 مبلغ: ${TRADE_AMOUNT} USDT      ║
   ║   🎯 هدف: ${PROFIT_USDT_TARGET} USDT                          ║
-  ║   📈 شراء: ≤ ${BUY_THRESHOLD}% | 📉 بيع: ≥ ${SELL_THRESHOLD}% ║
-  ║   🕐 شمعة: ${CANDLE_INTERVAL} | 📊 حجم: ≥ ${(MIN_VOLUME/1000000).toFixed(0)}M ║
-  ║   ⏱️ كولداون: ${cooldown/1000}ثانية | 🔄 مسح: ${SCAN_INTERVAL/1000}ثانية ║
-  ║   📊 ${SYMBOLS.length} عملة | ⚡ دخول سريع جداً               ║
+  ║   📈 شراء: ≤ ${BUY_THRESHOLD}% + هبوط 24h                    ║
+  ║   📉 بيع: ≥ ${SELL_THRESHOLD}% + صعود 24h                    ║
+  ║   🕐 شمعة: ${CANDLE_INTERVAL} | 📊 شموع: ${CANDLE_LIMIT}      ║
+  ║   📊 حجم: ≥ ${(MIN_VOLUME/1000000).toFixed(0)}M | 🔄 مسح: ${SCAN_INTERVAL/1000}ثانية ║
+  ║   📊 ${SYMBOLS.length} عملة | ⚡ دخول ذكي                     ║
   ║   ⚠️ تداول حقيقي - استخدم بحذر!                              ║
   ╚═══════════════════════════════════════════════════════════════╝
   `);
