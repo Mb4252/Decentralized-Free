@@ -789,7 +789,7 @@ app.get('/dashboard', (req, res) => {
               const profitPercent = data.profitPercent || 0;
               const isPositive = profit >= 0;
               const sign = isPositive ? '+' : '';
-              profitDisplay.innerHTML = `<span class="${isPositive ? 'profit-positive' : 'profit-negative'}">${sign}${profit.toFixed(4)} USDT (${sign}${profitPercent.toFixed(2)}%)</span>`;
+              profitDisplay.innerHTML = '<span class="' + (isPositive ? 'profit-positive' : 'profit-negative') + '">' + sign + profit.toFixed(4) + ' USDT (' + sign + profitPercent.toFixed(2) + '%)</span>';
             } else {
               profitDisplay.textContent = '0.0000 USDT (0.00%)';
             }
