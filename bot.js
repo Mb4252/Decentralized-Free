@@ -24,12 +24,13 @@ const API_KEY = process.env.BINGX_API_KEY;
 const API_SECRET = process.env.BINGX_API_SECRET;
 
 // ✅ إعدادات رأس المال الثابت
-const TRADE_AMOUNT = 1.35; // مبلغ ثابت لكل صفقة
+const TRADE_AMOUNT = 1.3; // مبلغ ثابت لكل صفقة
 const LEVERAGE = 5; // الرافعة المالية المثالية للسكالبينج
 
 // ✅ أهداف سكالبينج سريعة
 const PROFIT_PERCENT = 0.08;
 const PROFIT_USDT_TARGET = 0.05;
+const MIN_PROFIT_USDT = 0.05; // أقل ربح مسموح
 
 const PRICE_CHANGE_THRESHOLD = 0.1;
 const CHECK_INTERVAL = 5000;
@@ -301,12 +302,12 @@ async function getPrice(symbol) {
 // ==========================================
 
 function calculateQuantity(price) {
-  const margin = TRADE_AMOUNT;
-  const quantity = (margin * LEVERAGE) / price;
-
-  if (quantity <= 0) return null;
-
-  return parseFloat(quantity.toFixed(3));
+  const quantity = (TRADE_AMOUNT * LEVERAGE) / price;
+  
+  // تحسين الدقة بدون تكسير الصفقة
+  const roundedQuantity = Number(quantity.toFixed(3));
+  
+  return roundedQuantity;
 }
 
 // ==========================================
@@ -351,19 +352,21 @@ async function fastEntry(symbol, side) {
     return null;
   }
 
-  const quantity = calculateQuantity(price);
-  if (!quantity) {
-    console.log(`⚠️ الكمية غير صالحة: ${quantity}`);
+  const roundedQuantity = calculateQuantity(price);
+  
+  // ✅ حماية مهمة: التحقق من صحة الكمية
+  if (roundedQuantity <= 0) {
+    console.log('⚠️ كمية غير صالحة، تم إلغاء الصفقة');
     return null;
   }
 
-  console.log(`📊 دخول ${side}: ${symbol} | كمية: ${quantity} | سعر: ${price} | حجم: ${(quantity * price).toFixed(2)} USDT`);
+  console.log(`📊 دخول ${side}: ${symbol} | كمية: ${roundedQuantity} | سعر: ${price} | حجم: ${(roundedQuantity * price).toFixed(2)} USDT`);
 
   const params = {
     symbol,
     side: side === 'BUY' ? 'BUY' : 'SELL',
     type: 'MARKET',
-    quantity,
+    quantity: roundedQuantity,
     positionSide: side === 'BUY' ? 'LONG' : 'SHORT'
   };
 
@@ -378,7 +381,7 @@ async function fastEntry(symbol, side) {
     return {
       symbol,
       entryPrice: price,
-      quantity: quantity,
+      quantity: roundedQuantity,
       type: side === 'BUY' ? 'LONG' : 'SHORT',
       orderId: res.data?.orderId || Date.now(),
       timestamp: Date.now()
@@ -513,27 +516,35 @@ async function fastScan() {
 
     // إدارة الصفقة المفتوحة - خروج سريع
     if (currentPosition) {
-      const price = await getPrice(currentPosition.symbol);
-      if (!price) {
+      const currentPrice = await getPrice(currentPosition.symbol);
+      if (!currentPrice) {
         isRunning = false;
         return;
       }
 
-      let profitUSDT =
-        currentPosition.type === 'LONG'
-          ? (price - currentPosition.entryPrice) * currentPosition.quantity * LEVERAGE
-          : (currentPosition.entryPrice - price) * currentPosition.quantity * LEVERAGE;
+      // ✅ حساب الربح بالطريقة الدقيقة
+      let profitUSDT = (currentPrice - currentPosition.entryPrice) * currentPosition.quantity;
+      
+      // ✅ إذا كانت الصفقة SHORT، نعكس الإشارة
+      if (currentPosition.type === 'SHORT') {
+        profitUSDT = (currentPosition.entryPrice - currentPrice) * currentPosition.quantity;
+      }
 
-      let profitPercent =
-        currentPosition.type === 'LONG'
-          ? ((price - currentPosition.entryPrice) / currentPosition.entryPrice) * 100 * LEVERAGE
-          : ((currentPosition.entryPrice - price) / currentPosition.entryPrice) * 100 * LEVERAGE;
+      let profitPercent = (profitUSDT / (currentPosition.entryPrice * currentPosition.quantity)) * 100;
 
       console.log(`⚡ الربح الحالي: ${profitUSDT.toFixed(4)} USDT (${profitPercent.toFixed(2)}%)`);
 
-      // ✅ خروج سريع عند تحقيق هدف صغير
-      if (profitUSDT >= PROFIT_USDT_TARGET || profitPercent >= PROFIT_PERCENT) {
-        console.log(`🎯 هدف تحقق: ${profitUSDT.toFixed(4)} USDT / ${profitPercent.toFixed(2)}%`);
+      // ✅ إغلاق الصفقة عند تحقيق أقل ربح مسموح
+      if (profitUSDT >= MIN_PROFIT_USDT) {
+        console.log(`🎯 إغلاق الصفقة: ربح كافي ${profitUSDT.toFixed(4)} USDT`);
+        await closePosition(currentPosition);
+        currentPosition = null;
+        lastTradeTime = Date.now();
+      }
+      
+      // ✅ وقف خسارة سريع
+      if (profitUSDT < -0.03) {
+        console.log(`⛔ وقف خسارة سريع: ${profitUSDT.toFixed(4)} USDT`);
         await closePosition(currentPosition);
         currentPosition = null;
         lastTradeTime = Date.now();
@@ -717,8 +728,9 @@ app.get('/dashboard', (req, res) => {
         <div class="settings-box">
           <div class="label">⚙️ إعدادات V7 Pro Scalp</div>
           <div class="value">
-            💰 <span class="highlight-green">1.35 USDT</span> &nbsp;|&nbsp;
+            💰 <span class="highlight-green">1.30 USDT</span> &nbsp;|&nbsp;
             🎯 هدف: <span class="highlight-gold">0.05 USDT</span> &nbsp;|&nbsp;
+            ⛔ وقف خسارة: <span class="highlight-red">-0.03 USDT</span> &nbsp;|&nbsp;
             📈 عتبة: <span class="highlight-gold">0.02%</span> &nbsp;|&nbsp;
             ⚡ رافعة: <span class="highlight-gold">5x</span> &nbsp;|&nbsp;
             ⏱️ كولداون: <span class="highlight-purple">15 ثانية</span> &nbsp;|&nbsp;
@@ -769,8 +781,8 @@ app.get('/', async (req, res) => {
       currentPosition: currentPosition ? `${currentPosition.symbol} (${currentPosition.type})` : 'لا توجد',
       settings: {
         tradeAmount: `${TRADE_AMOUNT} USDT`,
-        profitTarget: `${PROFIT_USDT_TARGET} USDT`,
-        profitPercent: `${PROFIT_PERCENT}%`,
+        profitTarget: `${MIN_PROFIT_USDT} USDT`,
+        stopLoss: `-0.03 USDT`,
         changeThreshold: `0.02%`,
         scanInterval: `${SCAN_INTERVAL/1000} ثانية`,
         leverage: `${LEVERAGE}x`,
@@ -792,7 +804,8 @@ async function startBot() {
     console.log('📊 ===== إعدادات V7 Pro Scalp =====');
     console.log(`💰 مبلغ التداول الثابت: ${TRADE_AMOUNT} USDT`);
     console.log(`⚡ الرافعة المالية: ${LEVERAGE}x`);
-    console.log(`🎯 هدف الربح: ${PROFIT_USDT_TARGET} USDT (${PROFIT_PERCENT}%)`);
+    console.log(`🎯 هدف الربح: ${MIN_PROFIT_USDT} USDT`);
+    console.log(`⛔ وقف الخسارة: -0.03 USDT`);
     console.log(`📈 عتبة الدخول: 0.02%`);
     console.log(`⏱️ كولداون: ${cooldown/1000} ثانية`);
     console.log(`🔄 سرعة المسح: كل ${SCAN_INTERVAL/1000} ثانية`);
@@ -840,9 +853,9 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   ║   📡 http://localhost:${PORT}                                  ║
   ║   📊 لوحة التحكم: http://localhost:${PORT}/dashboard          ║
   ║   🚀 رافعة: ${LEVERAGE}x | 💰 مبلغ ثابت: ${TRADE_AMOUNT} USDT  ║
-  ║   🎯 هدف: ${PROFIT_USDT_TARGET} USDT (${PROFIT_PERCENT}%)      ║
+  ║   🎯 هدف: ${MIN_PROFIT_USDT} USDT | ⛔ وقف: -0.03 USDT        ║
   ║   📈 دخول: 0.02% | 🔄 مسح: ${SCAN_INTERVAL/1000}ثانية          ║
-  ║   📡 V7 Pro - رأس مال ثابت + دخول سريع                      ║
+  ║   📡 V7 Pro - رأس مال ثابت + حماية متقدمة                    ║
   ║   ⚠️ تداول حقيقي - استخدم بحذر!                              ║
   ╚═══════════════════════════════════════════════════════════════╝
   `);
