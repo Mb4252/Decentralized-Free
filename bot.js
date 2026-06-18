@@ -31,7 +31,7 @@ const STOP_LOSS_PERCENT = null;
 
 // ✅ إعدادات شمعة 15 دقيقة
 const CANDLE_INTERVAL = '15m';
-const CANDLE_LIMIT = 2;
+const CANDLE_LIMIT = 50;  // ✅ تغيير من 2 إلى 50
 
 // قائمة العملات
 const SYMBOLS = [
@@ -132,31 +132,39 @@ async function getCandleData(symbol) {
 
     const raw = response?.data;
 
-    // 🔥 معالجة كل احتمالات شكل البيانات
+    console.log(`📦 RAW ${symbol}:`, JSON.stringify(raw));
+
     let data = null;
 
+    // كل احتمالات BingX
     if (Array.isArray(raw)) {
       data = raw;
-    } else if (Array.isArray(raw?.data)) {
+    } 
+    else if (Array.isArray(raw?.data)) {
       data = raw.data;
-    } else if (Array.isArray(response?.data?.data)) {
+    } 
+    else if (Array.isArray(response?.data?.data)) {
       data = response.data.data;
     }
+    else if (Array.isArray(response?.data)) {
+      data = response.data;
+    }
 
-    if (!data || data.length < 2) {
-      console.log(`⚠️ بيانات غير صالحة لـ ${symbol}`);
+    if (!data || !Array.isArray(data) || data.length < 2) {
+      console.log(`❌ شكل البيانات غير مدعوم لـ ${symbol}`);
       return null;
     }
 
     return data;
-  } catch (error) {
-    console.error(`❌ فشل جلب شمعة ${symbol}:`, error.message);
+
+  } catch (err) {
+    console.log(`❌ خطأ شموع ${symbol}:`, err.message);
     return null;
   }
 }
 
 // ==========================================
-// ✅ تحليل الشمعة (مع حماية إضافية)
+// ✅ تحليل الشمعة (مع حماية أقوى)
 // ==========================================
 
 async function analyzeCandle(symbol) {
@@ -168,16 +176,17 @@ async function analyzeCandle(symbol) {
       return null;
     }
 
+    // ✅ نأخذ آخر شمعتين مكتملتين
     const currentCandle = candleData[candleData.length - 1];
     const previousCandle = candleData[candleData.length - 2];
 
-    // ✅ حماية إضافية للتحقق من صحة البيانات
-    if (
-      !Array.isArray(currentCandle) ||
-      currentCandle.length < 5 ||
-      !Array.isArray(previousCandle) ||
-      previousCandle.length < 5
-    ) {
+    // ✅ حماية أقوى للتحقق من صحة البيانات
+    if (!Array.isArray(currentCandle) || !Array.isArray(previousCandle)) {
+      console.log(`⚠️ ليست array لـ ${symbol}`);
+      return null;
+    }
+
+    if (currentCandle.length < 5 || previousCandle.length < 5) {
       console.log(`⚠️ بيانات الشمعة غير مكتملة لـ ${symbol}`);
       return null;
     }
@@ -190,7 +199,7 @@ async function analyzeCandle(symbol) {
 
     // ✅ التحقق من صحة القيم
     if (isNaN(currentLow) || isNaN(currentHigh) || isNaN(currentClose) || isNaN(previousClose)) {
-      console.log(`⚠️ قيم غير صالحة لـ ${symbol}: Low=${currentLow}, High=${currentHigh}, Close=${currentClose}, PrevClose=${previousClose}`);
+      console.log(`⚠️ قيم غير صالحة لـ ${symbol}`);
       return null;
     }
 
