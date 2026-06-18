@@ -90,10 +90,16 @@ async function bingxRequest(method, endpoint, params = {}, signed = true) {
         timeout: 10000
       });
     } else {
-      response = await axios.post(url, allParams, {
-        headers: headers,
-        timeout: 10000
-      });
+      // ✅ التعديل المهم: إرسال المعاملات في query string وليس في body
+      response = await axios.post(
+        url,
+        null,
+        {
+          params: allParams,
+          headers: headers,
+          timeout: 10000
+        }
+      );
     }
     return response.data;
   } catch (error) {
@@ -186,16 +192,21 @@ async function getFuturesBalance() {
 }
 
 // ==========================================
-// ✅ تعيين الرافعة (تم التعديل)
+// ✅ تعيين الرافعة (مع طباعة الطلب)
 // ==========================================
 
 async function setLeverage(symbol) {
   try {
-    const response = await bingxRequest('POST', ENDPOINTS.FUTURES_LEVERAGE, {
+    const leverageParams = {
       symbol: symbol,
-      side: "LONG",  // ✅ إضافة side كما هو مطلوب في BingX V2
       leverage: LEVERAGE
-    });
+    };
+    
+    // ✅ طباعة الطلب للتشخيص
+    console.log("🔧 LEVERAGE REQUEST:", JSON.stringify(leverageParams, null, 2));
+    
+    const response = await bingxRequest('POST', ENDPOINTS.FUTURES_LEVERAGE, leverageParams);
+    
     if (response && response.code === 0) {
       console.log(`✅ تم تعيين الرافعة x${LEVERAGE} لـ ${symbol}`);
       return true;
@@ -209,7 +220,7 @@ async function setLeverage(symbol) {
 }
 
 // ==========================================
-// ✅ فتح صفقة شراء (تم التعديل)
+// ✅ فتح صفقة شراء (مع طباعة الطلب)
 // ==========================================
 
 async function openLongPosition(symbol, amount) {
@@ -221,7 +232,6 @@ async function openLongPosition(symbol, amount) {
     }
 
     const quantity = (amount * LEVERAGE) / price;
-    // ✅ تعديل دقة الكمية إلى رقم واحد بعد العلامة العشرية
     const roundedQuantity = Number(quantity.toFixed(1));
 
     if (roundedQuantity <= 0) {
@@ -232,12 +242,18 @@ async function openLongPosition(symbol, amount) {
     console.log(`📊 فتح صفقة شراء: ${roundedQuantity} ${symbol} بسعر ${price}`);
     console.log(`📊 حجم الصفقة: ${(roundedQuantity * price).toFixed(2)} USDT (رافعة x${LEVERAGE})`);
 
-    const response = await bingxRequest('POST', ENDPOINTS.FUTURES_ORDER, {
+    const orderParams = {
       symbol: symbol,
       side: 'BUY',
       type: 'MARKET',
-      quantity: roundedQuantity
-    });
+      quantity: roundedQuantity,
+      positionSide: 'LONG'
+    };
+    
+    // ✅ طباعة الطلب للتشخيص
+    console.log("📝 ORDER REQUEST:", JSON.stringify(orderParams, null, 2));
+
+    const response = await bingxRequest('POST', ENDPOINTS.FUTURES_ORDER, orderParams);
 
     if (response && response.code === 0) {
       console.log(`✅ تم فتح صفقة شراء: ${roundedQuantity} ${symbol}`);
