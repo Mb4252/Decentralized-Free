@@ -17,7 +17,7 @@ if (!process.env.BINGX_API_KEY || !process.env.BINGX_API_SECRET) {
 }
 
 // ==========================================
-// إعدادات البوت
+// إعدادات البوت (BingX Futures)
 // ==========================================
 
 const API_KEY = process.env.BINGX_API_KEY;
@@ -36,19 +36,18 @@ const SYMBOLS = [
 ];
 
 // ==========================================
-// ✅ نقاط النهاية الصحيحة لـ BingX (API الجديد)
+// نقاط النهاية (Endpoints)
 // ==========================================
 
 const ENDPOINTS = {
-  // العقود الآجلة (Futures)
-  FUTURES_BALANCE: '/api/v1/user/balance',  // الرصيد
-  FUTURES_PRICE: '/api/v1/market/price',    // السعر
-  FUTURES_LEVERAGE: '/api/v1/trade/leverage', // الرافعة
-  FUTURES_ORDER: '/api/v1/trade/order',     // الأوامر
+  FUTURES_BALANCE: '/openApi/swap/v2/user/balance',
+  FUTURES_PRICE: '/openApi/swap/v2/quote/price',
+  FUTURES_LEVERAGE: '/openApi/swap/v2/trade/leverage',
+  FUTURES_ORDER: '/openApi/swap/v2/trade/order',
 };
 
 // ==========================================
-// دوال مساعدة
+// دوال مساعدة (BingX API)
 // ==========================================
 
 function generateSignature(params, secret) {
@@ -62,8 +61,10 @@ function generateSignature(params, secret) {
 }
 
 async function bingxRequest(method, endpoint, params = {}, signed = true) {
-  // ✅ استخدام النطاق الصحيح
-  const baseURL = 'https://open-api.bingx.com';
+  // تجربة النطاقين المحتملين
+  const baseURL = 'https://api.bingx.com'; // جرب هذا النطاق أولاً
+  // const baseURL = 'https://open-api.bingx.com'; // جرب هذا إذا لم يعمل الأول
+  
   const timestamp = Date.now();
   
   const allParams = {
@@ -82,6 +83,9 @@ async function bingxRequest(method, endpoint, params = {}, signed = true) {
   };
   
   try {
+    console.log(`🚀 إرسال طلب: ${method} ${url}`);
+    console.log(`📦 المعاملات:`, JSON.stringify(allParams, null, 2));
+    
     let response;
     if (method === 'GET') {
       response = await axios.get(url, {
@@ -97,18 +101,19 @@ async function bingxRequest(method, endpoint, params = {}, signed = true) {
     }
     return response.data;
   } catch (error) {
+    // ✅ جزء تسجيل الأخطاء المطلوب
     console.error('❌ خطأ في طلب BingX:', {
+      endpoint: endpoint,
+      url: url,
       status: error.response?.status,
-      data: error.response?.data,
-      message: error.message,
-      endpoint: endpoint
+      data: error.response?.data
     });
     return null;
   }
 }
 
 // ==========================================
-// ✅ جلب سعر العملة
+// جلب سعر العملة
 // ==========================================
 
 async function getPrice(symbol) {
@@ -120,6 +125,7 @@ async function getPrice(symbol) {
     if (response && response.code === 0 && response.data) {
       return parseFloat(response.data.price);
     }
+    console.log(`⚠️ فشل جلب سعر ${symbol}:`, response?.msg || response);
     return null;
   } catch (error) {
     console.error(`❌ فشل جلب سعر ${symbol}:`, error);
@@ -139,7 +145,7 @@ async function getAllPrices() {
 }
 
 // ==========================================
-// ✅ جلب الرصيد
+// جلب الرصيد
 // ==========================================
 
 async function getFuturesBalance() {
@@ -185,7 +191,7 @@ async function getFuturesBalance() {
 }
 
 // ==========================================
-// ✅ تعيين الرافعة
+// تعيين الرافعة
 // ==========================================
 
 async function setLeverage(symbol) {
@@ -198,7 +204,7 @@ async function setLeverage(symbol) {
       console.log(`✅ تم تعيين الرافعة x${LEVERAGE} لـ ${symbol}`);
       return true;
     }
-    console.log(`⚠️ فشل تعيين الرافعة:`, response?.msg);
+    console.log(`⚠️ فشل تعيين الرافعة:`, response?.msg || response);
     return false;
   } catch (error) {
     console.error(`❌ فشل تعيين الرافعة:`, error);
@@ -207,13 +213,16 @@ async function setLeverage(symbol) {
 }
 
 // ==========================================
-// ✅ فتح صفقة
+// فتح صفقة شراء (Long)
 // ==========================================
 
 async function openLongPosition(symbol, amount) {
   try {
     const price = await getPrice(symbol);
-    if (!price) return null;
+    if (!price) {
+      console.log(`⚠️ لا يمكن فتح صفقة: سعر ${symbol} غير متوفر`);
+      return null;
+    }
 
     const quantity = (amount * LEVERAGE) / price;
     const roundedQuantity = Math.floor(quantity * 1000) / 1000;
@@ -243,7 +252,7 @@ async function openLongPosition(symbol, amount) {
         timestamp: Date.now()
       };
     }
-    console.log(`⚠️ فشل فتح الصفقة:`, response?.msg);
+    console.log(`⚠️ فشل فتح الصفقة:`, response?.msg || response);
     return null;
   } catch (error) {
     console.error(`❌ فشل فتح الصفقة:`, error);
@@ -252,13 +261,16 @@ async function openLongPosition(symbol, amount) {
 }
 
 // ==========================================
-// ✅ إغلاق صفقة
+// إغلاق صفقة (بيع)
 // ==========================================
 
 async function closePosition(position) {
   try {
     const currentPrice = await getPrice(position.symbol);
-    if (!currentPrice) return false;
+    if (!currentPrice) {
+      console.log(`⚠️ لا يمكن إغلاق الصفقة: سعر ${position.symbol} غير متوفر`);
+      return false;
+    }
 
     console.log(`📊 إغلاق صفقة: ${position.quantity} ${position.symbol} بسعر ${currentPrice}`);
 
@@ -274,7 +286,7 @@ async function closePosition(position) {
       console.log(`✅ تم إغلاق الصفقة: ${position.symbol}`);
       return true;
     }
-    console.log(`⚠️ فشل إغلاق الصفقة:`, response?.msg);
+    console.log(`⚠️ فشل إغلاق الصفقة:`, response?.msg || response);
     return false;
   } catch (error) {
     console.error(`❌ فشل إغلاق الصفقة:`, error);
@@ -486,7 +498,26 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   startBot();
 });
 
-process.on('SIGTERM', () => server.close(() => process.exit(0)));
-process.on('SIGINT', () => server.close(() => process.exit(0)));
-process.on('uncaughtException', (error) => console.error('❌ خطأ:', error));
-process.on('unhandledRejection', (reason) => console.error('❌ رفض:', reason));
+// ==========================================
+// معالجة إشارات الإيقاف والأخطاء
+// ==========================================
+
+process.on('SIGTERM', () => {
+  console.log('🛑 إيقاف البوت...');
+  server.close(() => process.exit(0));
+});
+
+process.on('SIGINT', () => {
+  console.log('🛑 إيقاف البوت...');
+  server.close(() => process.exit(0));
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('❌ خطأ غير متوقع:', error);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('❌ رفض غير معالج:', reason);
+});
+
+console.log('🚀 جاري تشغيل البوت...');
