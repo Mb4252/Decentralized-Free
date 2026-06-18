@@ -35,20 +35,20 @@ const PROFIT_USDT_TARGET = 0.05;
 const MIN_PROFIT_USDT = 0.05;
 
 // ✅ إعدادات الإشارات (RSI)
-const RSI_OVERSOLD = 35;
-const RSI_OVERBOUGHT = 65;
+const RSI_OVERSOLD = 45;   // تم التعديل
+const RSI_OVERBOUGHT = 55; // تم التعديل
 
 const CHECK_INTERVAL = 5000;
 const STOP_LOSS_PERCENT = null;
 
 // ✅ إعدادات الشمعة (1 دقيقة)
 const CANDLE_INTERVAL = '1m';
-const CANDLE_LIMIT = 100;
+const CANDLE_LIMIT = 50; // تم التعديل إلى 50
 
 // ✅ إعدادات الفلاتر (معطلة حالياً)
-const MIN_VOLUME = 0; // معطل
-const MIN_PRICE = 0; // معطل
-const MAX_CHANGE_24H = 100; // معطل
+const MIN_VOLUME = 0;
+const MIN_PRICE = 0;
+const MAX_CHANGE_24H = 100;
 
 // ✅ المتغيرات
 let lastPrices = {};
@@ -59,12 +59,12 @@ let lastTradeTime = 0;
 const cooldown = 3000;
 
 // ✅ سرعة المسح
-const SCAN_INTERVAL = 15000; // 15 ثانية
+const SCAN_INTERVAL = 15000;
 
 // ✅ تخزين العملات مؤقتاً
 let cachedSymbols = [];
 let lastSymbolsUpdate = 0;
-const SYMBOLS_CACHE_TTL = 60000; // تحديث كل دقيقة
+const SYMBOLS_CACHE_TTL = 60000;
 
 // ✅ إعدادات وقف الخسارة
 const STOP_LOSS_ENABLED = false;
@@ -175,7 +175,6 @@ async function getAllSymbols() {
 async function getFilteredSymbols() {
   const now = Date.now();
   
-  // ✅ استخدام الكاش إذا كان حديثاً
   if (cachedSymbols.length > 0 && (now - lastSymbolsUpdate) < SYMBOLS_CACHE_TTL) {
     console.log(`📊 استخدام الكاش: ${cachedSymbols.length} عملة (منذ ${((now - lastSymbolsUpdate)/1000).toFixed(0)} ثانية)`);
     return cachedSymbols;
@@ -190,26 +189,21 @@ async function getFilteredSymbols() {
     return [];
   }
 
-  // ✅ طباعة أول عنصر للتحقق من البنية
   if (contracts.length > 0) {
     console.log('📋 أول عنصر في contracts:');
     console.log(JSON.stringify(contracts[0], null, 2));
   }
 
-  // ✅ فلتر بسيط: فقط العملات المقترنة بـ USDT
   const filtered = contracts.filter(c =>
     c.symbol && c.symbol.endsWith('USDT')
   );
 
-  // ✅ أخذ أول 50 عملة فقط (مؤقت)
   const limited = filtered.slice(0, 50);
 
   console.log(`✅ تم العثور على ${filtered.length} عملة USDT (تم أخذ ${limited.length} عملة فقط)`);
   
-  // ✅ استخراج الرموز فقط
   const symbols = limited.map(c => c.symbol);
   
-  // ✅ تحديث الكاش
   cachedSymbols = symbols;
   lastSymbolsUpdate = now;
   
@@ -259,7 +253,7 @@ async function getVolume24h(symbol) {
 }
 
 // ==========================================
-// ✅ حساب EMA (Exponential Moving Average)
+// ✅ حساب EMA
 // ==========================================
 
 function calculateEMA(data, period) {
@@ -276,7 +270,7 @@ function calculateEMA(data, period) {
 }
 
 // ==========================================
-// ✅ حساب RSI (Relative Strength Index)
+// ✅ حساب RSI
 // ==========================================
 
 function calculateRSI(data, period = 14) {
@@ -343,13 +337,12 @@ async function getCandleData(symbol) {
 
     if (!data || !Array.isArray(data)) return null;
     
-    // ✅ فلتر: البيانات كافية (أكثر من 100 شمعة)
-    if (data.length < 100) {
-      console.log(`📊 ${symbol}: بيانات غير كافية (${data.length} < 100)`);
+    // ✅ تم التعديل: 50 شمعة كافية
+    if (data.length < 50) {
+      console.log(`📊 ${symbol}: بيانات غير كافية (${data.length} < 50)`);
       return null;
     }
 
-    // استخراج أسعار الإغلاق
     const closes = data.map(candle => Number(candle[4])).filter(price => !isNaN(price) && price > 0);
     
     if (closes.length < 20) return null;
@@ -357,20 +350,21 @@ async function getCandleData(symbol) {
     const currentClose = closes[closes.length - 1];
     const previousClose = closes[closes.length - 2];
 
-    // ✅ حساب EMA 9 و EMA 21
     const ema9 = calculateEMA(closes, 9);
     const ema21 = calculateEMA(closes, 21);
-
-    // ✅ حساب RSI (فترة 14)
     const rsi = calculateRSI(closes, 14);
 
-    // ✅ جلب تغير 24 ساعة
     const ticker = await bingxRequest('GET', ENDPOINTS.FUTURES_TICKER, {
       symbol
     }, false);
 
     const changePercent24h = parseFloat(ticker?.data?.priceChangePercent || 0);
     const volume24h = parseFloat(ticker?.data?.volume || 0);
+
+    // ✅ طباعة المؤشرات
+    console.log(
+      `${symbol} | EMA9=${ema9?.toFixed(4)} | EMA21=${ema21?.toFixed(4)} | RSI=${rsi?.toFixed(2)}`
+    );
 
     return {
       symbol,
@@ -390,7 +384,7 @@ async function getCandleData(symbol) {
 }
 
 // ==========================================
-// ✅ حساب كمية العقد بدقة (6 أرقام عشرية)
+// ✅ حساب كمية العقد
 // ==========================================
 
 function calculateQuantity(price, amount) {
@@ -400,7 +394,7 @@ function calculateQuantity(price, amount) {
 }
 
 // ==========================================
-// ✅ تعيين الرافعة (LONG + SHORT)
+// ✅ تعيين الرافعة
 // ==========================================
 
 async function setLeverage(symbol) {
@@ -440,7 +434,7 @@ async function setLeverage(symbol) {
 }
 
 // ==========================================
-// فتح صفقة شراء (Long)
+// فتح صفقة شراء
 // ==========================================
 
 async function openLongPosition(symbol, amount) {
@@ -491,7 +485,7 @@ async function openLongPosition(symbol, amount) {
 }
 
 // ==========================================
-// فتح صفقة بيع (Short)
+// فتح صفقة بيع
 // ==========================================
 
 async function openShortPosition(symbol, amount) {
@@ -690,7 +684,6 @@ async function tradingCycle() {
       return;
     }
 
-    // ✅ جلب العملات المفلترة (مع كاش)
     const symbols = await getFilteredSymbols();
     
     if (!symbols || symbols.length === 0) {
@@ -706,39 +699,44 @@ async function tradingCycle() {
     let bestScore = 0;
 
     for (const symbol of symbols) {
-      // ✅ جلب بيانات المؤشرات
       const data = await getCandleData(symbol);
       if (!data) continue;
 
       const { ema9, ema21, rsi, volume24h, currentClose, previousClose, changePercent, changePercent24h } = data;
 
-      // ✅ طباعة المؤشرات
-      console.log(
-        `${symbol} | EMA9=${ema9?.toFixed(2) || 'N/A'} | EMA21=${ema21?.toFixed(2) || 'N/A'} | RSI=${rsi?.toFixed(2) || 'N/A'} | change=${changePercent.toFixed(3)}% | 24h=${changePercent24h.toFixed(2)}%`
-      );
-
-      // ✅ التحقق من صحة المؤشرات
       if (ema9 === null || ema21 === null || rsi === null) {
         console.log(`📊 ${symbol}: بيانات غير كافية للمؤشرات`);
         continue;
       }
 
-      // ✅ منطق الإشارة
+      // ✅ منطق الإشارة الجديد مع سكور الاتجاه
       let signal = null;
       let score = 0;
 
-      // ✅ شراء: EMA9 > EMA21 + RSI < 35
-      if (ema9 > ema21 && rsi < RSI_OVERSOLD) {
+      // ✅ اتجاه صاعد: EMA9 > EMA21
+      if (ema9 > ema21) {
         signal = 'BUY';
-        score = (ema9 - ema21) / ema21 * 10 + (RSI_OVERSOLD - rsi);
-        console.log(`📊 ${symbol}: ✅ إشارة شراء | EMA9>EMA21 | RSI=${rsi.toFixed(2)} < ${RSI_OVERSOLD}`);
+        score = ((ema9 - ema21) / ema21) * 100;
+        console.log(`📊 ${symbol}: 📈 اتجاه صاعد | سكور=${score.toFixed(2)}`);
       }
 
-      // ✅ بيع: EMA9 < EMA21 + RSI > 65
-      if (ema9 < ema21 && rsi > RSI_OVERBOUGHT) {
+      // ✅ اتجاه هابط: EMA9 < EMA21
+      if (ema9 < ema21) {
         signal = 'SELL';
-        score = (ema21 - ema9) / ema21 * 10 + (rsi - RSI_OVERBOUGHT);
-        console.log(`📊 ${symbol}: ✅ إشارة بيع | EMA9<EMA21 | RSI=${rsi.toFixed(2)} > ${RSI_OVERBOUGHT}`);
+        score = ((ema21 - ema9) / ema21) * 100;
+        console.log(`📊 ${symbol}: 📉 اتجاه هابط | سكور=${score.toFixed(2)}`);
+      }
+
+      // ✅ إذا كانت الإشارة شراء و RSI في منطقة التشبع البيعي (RSI < 45)
+      if (signal === 'BUY' && rsi < RSI_OVERSOLD) {
+        score *= 1.5; // مضاعفة السكور
+        console.log(`📊 ${symbol}: ✅ RSI=${rsi.toFixed(2)} < ${RSI_OVERSOLD} (تشبع بيع) - تعزيز الشراء`);
+      }
+
+      // ✅ إذا كانت الإشارة بيع و RSI في منطقة التشبع الشرائي (RSI > 55)
+      if (signal === 'SELL' && rsi > RSI_OVERBOUGHT) {
+        score *= 1.5; // مضاعفة السكور
+        console.log(`📊 ${symbol}: ✅ RSI=${rsi.toFixed(2)} > ${RSI_OVERBOUGHT} (تشبع شراء) - تعزيز البيع`);
       }
 
       if (!signal) continue;
@@ -912,7 +910,7 @@ app.get('/dashboard', (req, res) => {
     <body>
       <div class="container">
         <h1>🤖 بوت BingX - V7 Pro</h1>
-        <p class="subtitle">📡 مؤشرات EMA + RSI</p>
+        <p class="subtitle">📡 اتجاه EMA + RSI</p>
         
         <div class="status-grid" id="statusGrid">
           <div class="card">
@@ -943,10 +941,10 @@ app.get('/dashboard', (req, res) => {
           <div class="value">
             💰 <span class="highlight-green">0.80 USDT</span> &nbsp;|&nbsp;
             🎯 هدف: <span class="highlight-gold">0.05 USDT</span> &nbsp;|&nbsp;
-            📈 شراء: <span class="highlight-green">EMA9>EMA21 + RSI&lt;35</span> &nbsp;|&nbsp;
-            📉 بيع: <span class="highlight-red">EMA9&lt;EMA21 + RSI&gt;65</span> &nbsp;|&nbsp;
-            🔄 مسح: <span class="highlight-purple">15 ثانية</span> &nbsp;|&nbsp;
-            📊 أول 50 عملة USDT
+            📈 شراء: <span class="highlight-green">EMA9>EMA21 + RSI&lt;45</span> &nbsp;|&nbsp;
+            📉 بيع: <span class="highlight-red">EMA9&lt;EMA21 + RSI&gt;55</span> &nbsp;|&nbsp;
+            📊 شموع: <span class="highlight-purple">50</span> &nbsp;|&nbsp;
+            🔄 مسح: <span class="highlight-purple">15 ثانية</span>
           </div>
         </div>
 
@@ -1016,7 +1014,7 @@ app.get('/', async (req, res) => {
     }
     
     res.json({
-      status: '⚡ بوت BingX - V7 Pro (EMA + RSI)',
+      status: '⚡ بوت BingX - V7 Pro (اتجاه EMA + RSI)',
       timestamp: new Date().toISOString(),
       balance: `${usdtBalance.toFixed(4)} USDT`,
       leverage: `${LEVERAGE}x`,
@@ -1030,6 +1028,7 @@ app.get('/', async (req, res) => {
         profitTarget: `${PROFIT_USDT_TARGET} USDT`,
         rsiOversold: RSI_OVERSOLD,
         rsiOverbought: RSI_OVERBOUGHT,
+        candleLimit: CANDLE_LIMIT,
         scanInterval: `${SCAN_INTERVAL/1000} ثانية`,
         leverage: `${LEVERAGE}x`,
         symbolsCount: cachedSymbols.length
@@ -1046,14 +1045,14 @@ app.get('/', async (req, res) => {
 
 async function startBot() {
   try {
-    console.log('⚡⚡ بدء تشغيل بوت V7 Pro - EMA + RSI');
+    console.log('⚡⚡ بدء تشغيل بوت V7 Pro - اتجاه EMA + RSI');
     console.log('📊 ===== إعدادات V7 Pro =====');
     console.log(`💰 مبلغ التداول الثابت: ${TRADE_AMOUNT} USDT`);
     console.log(`⚡ الرافعة المالية: ${LEVERAGE}x`);
     console.log(`🎯 هدف الربح: ${PROFIT_USDT_TARGET} USDT`);
-    console.log(`📈 شراء: EMA9 > EMA21 + RSI < ${RSI_OVERSOLD}`);
-    console.log(`📉 بيع: EMA9 < EMA21 + RSI > ${RSI_OVERBOUGHT}`);
-    console.log(`📊 عدد الشموع: ≥ ${CANDLE_LIMIT}`);
+    console.log(`📈 شراء: EMA9 > EMA21 (RSI < ${RSI_OVERSOLD} تعزيز)`);
+    console.log(`📉 بيع: EMA9 < EMA21 (RSI > ${RSI_OVERBOUGHT} تعزيز)`);
+    console.log(`📊 عدد الشموع: ${CANDLE_LIMIT}`);
     console.log(`🔄 سرعة المسح: كل ${SCAN_INTERVAL/1000} ثانية`);
     console.log('================================');
 
@@ -1068,7 +1067,6 @@ async function startBot() {
       console.log(`⚠️ تحذير: الرصيد (${balance.toFixed(4)}) أقل من مبلغ التداول (${TRADE_AMOUNT})`);
     }
 
-    // ✅ جلب العملات أول مرة
     await getFilteredSymbols();
 
     await tradingCycle();
@@ -1096,14 +1094,14 @@ async function startBot() {
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`
   ╔═══════════════════════════════════════════════════════════════╗
-  ║   ⚡ بوت V7 Pro - EMA + RSI                                ║
+  ║   ⚡ بوت V7 Pro - اتجاه EMA + RSI                          ║
   ║   📡 http://localhost:${PORT}                                  ║
   ║   📊 لوحة التحكم: http://localhost:${PORT}/dashboard          ║
   ║   🚀 رافعة: ${LEVERAGE}x | 💰 مبلغ: ${TRADE_AMOUNT} USDT      ║
   ║   🎯 هدف: ${PROFIT_USDT_TARGET} USDT                          ║
   ║   📈 شراء: EMA9>EMA21 + RSI<${RSI_OVERSOLD}                   ║
   ║   📉 بيع: EMA9<EMA21 + RSI>${RSI_OVERBOUGHT}                  ║
-  ║   🔄 مسح: ${SCAN_INTERVAL/1000} ثانية | 📊 أول 50 عملة USDT   ║
+  ║   📊 شموع: ${CANDLE_LIMIT} | 🔄 مسح: ${SCAN_INTERVAL/1000}ثانية ║
   ║   ⚠️ تداول حقيقي - استخدم بحذر!                              ║
   ╚═══════════════════════════════════════════════════════════════╝
   `);
