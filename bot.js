@@ -52,8 +52,8 @@ const cooldown = 5000; // 5 ثواني فقط بين الصفقات
 
 // ✅ تم تعديل الحساسية
 const SCAN_INTERVAL = 1000; // مسح كل ثانية
-const CHANGE_THRESHOLD = 0.01; // دخول أسرع
-const MIN_SCORE = 0.08; // قبول فرص أكثر
+const CHANGE_THRESHOLD = 0.01;
+const MIN_SCORE = 0.08;
 
 // ✅ إعدادات الفلاتر الجديدة
 const MIN_CANDLE_RANGE = 0.08;
@@ -61,6 +61,9 @@ const MAX_SYMBOLS_TO_SCAN = 50;
 
 // ✅ إعدادات وقف الخسارة
 const STOP_LOSS_ENABLED = false;
+
+// ✅ تخزين تاريخ الأسعار للانعكاسات
+let priceHistory = {};
 
 // ==========================================
 // نقاط النهاية
@@ -194,6 +197,33 @@ async function getPrice(symbol) {
 }
 
 // ==========================================
+// ✅ دالة اكتشاف الانعكاسات (Reversal Detection)
+// ==========================================
+
+function detectReversal(prices) {
+  if (!prices || prices.length < 10) return null;
+
+  const current = prices[prices.length - 1];
+  const highest = Math.max(...prices.slice(-10));
+  const lowest = Math.min(...prices.slice(-10));
+
+  const riseFromLow = ((current - lowest) / lowest) * 100;
+  const dropFromHigh = ((highest - current) / highest) * 100;
+
+  // ارتفع كثير ثم بدأ يهبط → إشارة بيع
+  if (dropFromHigh >= 0.15) {
+    return 'SELL';
+  }
+
+  // هبط كثير ثم بدأ يرتد → إشارة شراء
+  if (riseFromLow >= 0.15) {
+    return 'BUY';
+  }
+
+  return null;
+}
+
+// ==========================================
 // ✅ جلب تغير السعر (من آخر سعر مسجل)
 // ==========================================
 
@@ -233,7 +263,7 @@ async function getTrend(symbol) {
 }
 
 // ==========================================
-// ✅ مسح السوق بالكامل
+// ✅ مسح السوق بالكامل مع اكتشاف الانعكاسات
 // ==========================================
 
 async function scanMarket() {
@@ -257,6 +287,38 @@ async function scanMarket() {
 
     const price = await getPrice(symbol);
     if (!price) continue;
+
+    // ✅ تحديث تاريخ الأسعار
+    if (!priceHistory[symbol]) {
+      priceHistory[symbol] = [];
+    }
+    priceHistory[symbol].push(price);
+    if (priceHistory[symbol].length > 20) {
+      priceHistory[symbol].shift();
+    }
+
+    // ✅ اكتشاف الانعكاسات
+    const reversalSignal = detectReversal(priceHistory[symbol]);
+    if (reversalSignal) {
+      console.log(`🔄 انعكاس على ${symbol}: ${reversalSignal}`);
+      
+      // نقاط إضافية للانعكاس
+      let score = 0.5;
+      if (reversalSignal === 'BUY') {
+        score += 0.3;
+        bestDirection = 'BUY';
+      } else {
+        score += 0.3;
+        bestDirection = 'SELL';
+      }
+
+      if (score > bestScore) {
+        bestScore = score;
+        best = symbol;
+        bestDirection = reversalSignal;
+      }
+      continue;
+    }
 
     const change = await getPriceChange(symbol);
     if (Math.abs(change) < CHANGE_THRESHOLD) continue;
@@ -301,33 +363,35 @@ function calculateQuantity(price, amount) {
 }
 
 // ==========================================
-// ✅ تعيين الرافعة (LONG + SHORT)
+// ✅ تعيين الرافعة (LONG + SHORT) - تثبيت نهائي
 // ==========================================
 
 async function setLeverage(symbol) {
   try {
+    // ✅ تثبيت الرافعة للـ LONG
     const longResponse = await bingxRequest(
       'POST',
       ENDPOINTS.FUTURES_LEVERAGE,
       {
         symbol,
-        side: 'LONG',
-        leverage: LEVERAGE
+        leverage: LEVERAGE,
+        side: 'LONG'
       }
     );
 
+    // ✅ تثبيت الرافعة للـ SHORT
     const shortResponse = await bingxRequest(
       'POST',
       ENDPOINTS.FUTURES_LEVERAGE,
       {
         symbol,
-        side: 'SHORT',
-        leverage: LEVERAGE
+        leverage: LEVERAGE,
+        side: 'SHORT'
       }
     );
 
     if (longResponse?.code === 0 && shortResponse?.code === 0) {
-      console.log(`✅ تم تثبيت الرافعة x${LEVERAGE} على ${symbol}`);
+      console.log(`✅ تم تثبيت الرافعة x${LEVERAGE} على ${symbol} (LONG + SHORT)`);
       return true;
     }
 
@@ -525,7 +589,7 @@ async function getFuturesBalance() {
 }
 
 // ==========================================
-// ✅ الدورة الرئيسية مع مسح السوق بالكامل
+// ✅ الدورة الرئيسية مع اكتشاف الانعكاسات
 // ==========================================
 
 async function tradingCycle() {
@@ -536,10 +600,9 @@ async function tradingCycle() {
     const balance = await getFuturesBalance();
     console.log(`💰 الرصيد: ${balance.toFixed(4)} USDT`);
 
-    // تحديد مبلغ التداول
     let tradeAmount = TRADE_AMOUNT;
     if (USE_FULL_BALANCE) {
-      tradeAmount = balance * 0.95; // استخدام 95% من الرصيد
+      tradeAmount = balance * 0.95;
       console.log(`📊 استخدام الرصيد بالكامل: ${tradeAmount.toFixed(4)} USDT`);
     }
 
@@ -642,10 +705,6 @@ const PORT = process.env.PORT || 10000;
 
 app.use(cors());
 app.use(express.json());
-
-// ==========================================
-// ✅ لوحة تحكم HTML
-// ==========================================
 
 app.get('/dashboard', (req, res) => {
   res.send(`
@@ -762,7 +821,7 @@ app.get('/dashboard', (req, res) => {
     <body>
       <div class="container">
         <h1>🤖 بوت BingX - V7 Pro</h1>
-        <p class="subtitle">📡 مسح السوق بالكامل + سكالبينج ذكي</p>
+        <p class="subtitle">📡 اكتشاف الانعكاسات + سكالبينج ذكي</p>
         
         <div class="status-grid" id="statusGrid">
           <div class="card">
@@ -847,10 +906,6 @@ app.get('/health', (req, res) => {
   });
 });
 
-// ==========================================
-// ✅ API مع عرض الربح/الخسارة
-// ==========================================
-
 app.get('/', async (req, res) => {
   try {
     const usdtBalance = await getFuturesBalance();
@@ -871,7 +926,7 @@ app.get('/', async (req, res) => {
     }
     
     res.json({
-      status: '⚡ بوت BingX - V7 Pro (مسح السوق بالكامل)',
+      status: '⚡ بوت BingX - V7 Pro (اكتشاف الانعكاسات)',
       timestamp: new Date().toISOString(),
       balance: `${usdtBalance.toFixed(4)} USDT`,
       leverage: `${LEVERAGE}x`,
@@ -902,7 +957,7 @@ app.get('/', async (req, res) => {
 
 async function startBot() {
   try {
-    console.log('⚡⚡ بدء تشغيل بوت V7 Pro - مسح السوق بالكامل');
+    console.log('⚡⚡ بدء تشغيل بوت V7 Pro - اكتشاف الانعكاسات');
     console.log('📊 ===== إعدادات V7 Pro =====');
     console.log(`💰 مبلغ التداول الثابت: ${TRADE_AMOUNT} USDT`);
     console.log(`📊 استخدام الرصيد بالكامل: ${USE_FULL_BALANCE ? 'نعم' : 'لا'}`);
@@ -951,13 +1006,13 @@ async function startBot() {
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`
   ╔═══════════════════════════════════════════════════════════════╗
-  ║   ⚡ بوت V7 Pro - مسح السوق بالكامل                        ║
+  ║   ⚡ بوت V7 Pro - اكتشاف الانعكاسات                        ║
   ║   📡 http://localhost:${PORT}                                  ║
   ║   📊 لوحة التحكم: http://localhost:${PORT}/dashboard          ║
   ║   🚀 رافعة: ${LEVERAGE}x | 💰 مبلغ: ${TRADE_AMOUNT} USDT      ║
   ║   🎯 هدف: ${PROFIT_USDT_TARGET} USDT | ⛔ وقف: ${STOP_LOSS_ENABLED ? 'مفعل' : 'معطل'}  ║
   ║   📈 عتبة: ${CHANGE_THRESHOLD}% | 🔄 مسح: ${SCAN_INTERVAL/1000}ثانية ║
-  ║   📡 مسح السوق بالكامل + سكالبينج ذكي                       ║
+  ║   🔄 اكتشاف الانعكاسات من القمة والقاع                       ║
   ║   ⚠️ تداول حقيقي - استخدم بحذر!                              ║
   ╚═══════════════════════════════════════════════════════════════╝
   `);
