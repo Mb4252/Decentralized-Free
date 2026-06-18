@@ -323,6 +323,16 @@ async function getCandleData(symbol) {
       limit: CANDLE_LIMIT
     }, false);
 
+    // ✅ طباعة معلومات الاستجابة
+    console.log(
+      `📊 ${symbol} response code=${response?.code} dataType=${typeof response?.data}`
+    );
+
+    // ✅ طباعة البيانات الخام لأول 500 حرف
+    if (response) {
+      console.log(`📊 ${symbol} raw data (first 500 chars):`, JSON.stringify(response).slice(0, 500));
+    }
+
     const raw = response?.data;
 
     let data = null;
@@ -335,7 +345,10 @@ async function getCandleData(symbol) {
       data = response.data.data;
     }
 
-    if (!data || !Array.isArray(data)) return null;
+    if (!data || !Array.isArray(data)) {
+      console.log(`❌ ${symbol} raw data:`, JSON.stringify(response).slice(0, 300));
+      return null;
+    }
     
     // ✅ تم التعديل: 50 شمعة كافية
     if (data.length < 50) {
