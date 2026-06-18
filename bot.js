@@ -23,12 +23,14 @@ if (!process.env.BINGX_API_KEY || !process.env.BINGX_API_SECRET) {
 const API_KEY = process.env.BINGX_API_KEY;
 const API_SECRET = process.env.BINGX_API_SECRET;
 
-// ✅ إعدادات رأس المال الثابت
-const TRADE_AMOUNT = 1.3;
+// ✅ إعدادات رأس المال
+const TRADE_AMOUNT = 1.2;
+const USE_FULL_BALANCE = false;
+
+// ✅ الرافعة المالية
 const LEVERAGE = 10;
 
 // ✅ أهداف سكالبينج سريعة
-const PROFIT_PERCENT = 0.08;
 const PROFIT_USDT_TARGET = 0.05;
 const MIN_PROFIT_USDT = 0.05;
 
@@ -50,7 +52,7 @@ const cooldown = 5000; // 5 ثواني فقط بين الصفقات
 
 // ✅ تم تعديل الحساسية
 const SCAN_INTERVAL = 1000; // مسح كل ثانية
-const CHANGE_THRESHOLD = 0.015; // دخول أسرع
+const CHANGE_THRESHOLD = 0.01; // دخول أسرع
 const MIN_SCORE = 0.08; // قبول فرص أكثر
 
 // ✅ إعدادات الفلاتر الجديدة
@@ -155,7 +157,6 @@ async function getAllSymbols() {
     if (res && res.code === 0 && res.data) {
       let symbols = res.data.map(c => c.symbol);
       
-      // ✅ تطبيق الحد الأقصى للرموز
       if (symbols.length > MAX_SYMBOLS_TO_SCAN) {
         symbols = symbols.slice(0, MAX_SYMBOLS_TO_SCAN);
         console.log(`📊 تم تقليص الرموز إلى ${MAX_SYMBOLS_TO_SCAN} رمز (من ${res.data.length})`);
@@ -250,7 +251,6 @@ async function scanMarket() {
   console.log(`🔍 جاري مسح ${symbols.length} رمز...`);
 
   for (const symbol of symbols) {
-    // تجاهل العملات المستقرة
     if (symbol.includes('USDC') || symbol.includes('BUSD') || symbol.includes('DAI')) {
       continue;
     }
@@ -269,7 +269,6 @@ async function scanMarket() {
     if (trend.trend === 'UP') score += trend.strength;
     if (trend.trend === 'DOWN') score += trend.strength;
 
-    // ✅ إضافة مكافأة للعملات المعروفة
     const knownSymbols = ['BTC-USDT', 'ETH-USDT', 'BNB-USDT', 'SOL-USDT', 'XRP-USDT'];
     if (knownSymbols.includes(symbol)) {
       score *= 1.2;
@@ -292,38 +291,47 @@ async function scanMarket() {
 }
 
 // ==========================================
-// حساب كمية العقد بدقة
+// ✅ حساب كمية العقد بدقة (6 أرقام عشرية)
 // ==========================================
 
-function calculateQuantity(price) {
-  const quantity = (TRADE_AMOUNT * LEVERAGE) / price;
-  const roundedQuantity = Number(quantity.toFixed(3));
+function calculateQuantity(price, amount) {
+  const quantity = (amount * LEVERAGE) / price;
+  const roundedQuantity = parseFloat(quantity.toFixed(6));
   return roundedQuantity;
 }
 
 // ==========================================
-// تعيين الرافعة
+// ✅ تعيين الرافعة (LONG + SHORT)
 // ==========================================
 
 async function setLeverage(symbol) {
   try {
-    const params = {
-      symbol,
-      side: 'LONG',
-      leverage: LEVERAGE
-    };
-
-    const res = await bingxRequest(
+    const longResponse = await bingxRequest(
       'POST',
-      '/openApi/swap/v2/trade/leverage',
-      params
+      ENDPOINTS.FUTURES_LEVERAGE,
+      {
+        symbol,
+        side: 'LONG',
+        leverage: LEVERAGE
+      }
     );
 
-    if (res && res.code === 0) {
-      console.log(`✅ تم تعيين الرافعة x${LEVERAGE} لـ ${symbol}`);
+    const shortResponse = await bingxRequest(
+      'POST',
+      ENDPOINTS.FUTURES_LEVERAGE,
+      {
+        symbol,
+        side: 'SHORT',
+        leverage: LEVERAGE
+      }
+    );
+
+    if (longResponse?.code === 0 && shortResponse?.code === 0) {
+      console.log(`✅ تم تثبيت الرافعة x${LEVERAGE} على ${symbol}`);
       return true;
     }
-    console.log(`⚠️ فشل تعيين الرافعة:`, res?.msg || res);
+
+    console.log(`⚠️ فشل تثبيت الرافعة: LONG=${longResponse?.code}, SHORT=${shortResponse?.code}`);
     return false;
 
   } catch (e) {
@@ -344,7 +352,7 @@ async function openLongPosition(symbol, amount) {
       return null;
     }
 
-    const roundedQuantity = calculateQuantity(price);
+    const roundedQuantity = calculateQuantity(price, amount);
     
     if (roundedQuantity <= 0) {
       console.log('⚠️ كمية غير صالحة، تم إلغاء الصفقة');
@@ -395,7 +403,7 @@ async function openShortPosition(symbol, amount) {
       return null;
     }
 
-    const roundedQuantity = calculateQuantity(price);
+    const roundedQuantity = calculateQuantity(price, amount);
     
     if (roundedQuantity <= 0) {
       console.log('⚠️ كمية غير صالحة، تم إلغاء الصفقة');
@@ -528,6 +536,13 @@ async function tradingCycle() {
     const balance = await getFuturesBalance();
     console.log(`💰 الرصيد: ${balance.toFixed(4)} USDT`);
 
+    // تحديد مبلغ التداول
+    let tradeAmount = TRADE_AMOUNT;
+    if (USE_FULL_BALANCE) {
+      tradeAmount = balance * 0.95; // استخدام 95% من الرصيد
+      console.log(`📊 استخدام الرصيد بالكامل: ${tradeAmount.toFixed(4)} USDT`);
+    }
+
     // إدارة الصفقة المفتوحة
     if (currentPosition) {
       const currentPrice = await getPrice(currentPosition.symbol);
@@ -546,7 +561,6 @@ async function tradingCycle() {
 
       console.log(`⚡ الربح الحالي: ${profitUSDT.toFixed(4)} USDT (${profitPercent.toFixed(2)}%)`);
 
-      // ✅ إغلاق الصفقة عند تحقيق أقل ربح مسموح
       if (profitUSDT >= PROFIT_USDT_TARGET) {
         console.log(`🎯 إغلاق الصفقة: ربح كافي ${profitUSDT.toFixed(4)} USDT`);
         await closePosition(currentPosition);
@@ -554,7 +568,6 @@ async function tradingCycle() {
         lastTradeTime = Date.now();
       }
       
-      // ✅ وقف خسارة سريع (إذا كان مفعلاً)
       if (STOP_LOSS_ENABLED && profitUSDT < -0.03) {
         console.log(`⛔ وقف خسارة سريع: ${profitUSDT.toFixed(4)} USDT`);
         await closePosition(currentPosition);
@@ -573,7 +586,7 @@ async function tradingCycle() {
       return;
     }
 
-    if (balance < TRADE_AMOUNT) {
+    if (balance < tradeAmount) {
       console.log('⚠️ رصيد غير كافي');
       isRunning = false;
       return;
@@ -586,13 +599,22 @@ async function tradingCycle() {
     if (result.best && result.bestScore > MIN_SCORE) {
       console.log(`🚀 أفضل فرصة: ${result.best} | ${result.bestDirection} | score=${result.bestScore.toFixed(2)}`);
 
-      await setLeverage(result.best);
+      // ✅ التحقق من الرافعة قبل فتح الصفقة
+      console.log(`⚡ سيتم فتح الصفقة على ${result.best} برافعة x${LEVERAGE}`);
+      
+      const leverageSet = await setLeverage(result.best);
+
+      if (!leverageSet) {
+        console.log(`❌ تم إلغاء الصفقة لأن الرافعة لم تُضبط على x${LEVERAGE}`);
+        isRunning = false;
+        return;
+      }
 
       let position;
       if (result.bestDirection === 'BUY') {
-        position = await openLongPosition(result.best, TRADE_AMOUNT);
+        position = await openLongPosition(result.best, tradeAmount);
       } else {
-        position = await openShortPosition(result.best, TRADE_AMOUNT);
+        position = await openShortPosition(result.best, tradeAmount);
       }
 
       if (position) {
@@ -622,7 +644,7 @@ app.use(cors());
 app.use(express.json());
 
 // ==========================================
-// ✅ لوحة تحكم HTML مع عرض الربح/الخسارة
+// ✅ لوحة تحكم HTML
 // ==========================================
 
 app.get('/dashboard', (req, res) => {
@@ -676,7 +698,6 @@ app.get('/dashboard', (req, res) => {
         .card .value.blue { color: #4a9eff; }
         .card .value.red { color: #ff4444; }
         .card .value.purple { color: #a855f7; }
-        .card .value.big { font-size: 24px; }
         .status-badge {
           display: inline-block;
           padding: 4px 12px;
@@ -685,8 +706,6 @@ app.get('/dashboard', (req, res) => {
           font-weight: bold;
         }
         .status-badge.online { background: #00aa55; color: #fff; }
-        .status-badge.in-trade { background: #f0b90b; color: #000; }
-        .status-badge.offline { background: #ff4444; color: #fff; }
         .footer {
           text-align: center;
           margin-top: 25px;
@@ -764,7 +783,6 @@ app.get('/dashboard', (req, res) => {
           </div>
         </div>
 
-        <!-- ✅ عرض الربح/الخسارة الحالي -->
         <div class="trade-info" id="tradeInfo">
           <div class="label">💰 الربح / الخسارة الحالي</div>
           <div class="value" id="profitDisplay">0.0000 USDT (0.00%)</div>
@@ -773,10 +791,10 @@ app.get('/dashboard', (req, res) => {
         <div class="settings-box">
           <div class="label">⚙️ إعدادات V7 Pro</div>
           <div class="value">
-            💰 <span class="highlight-green">1.30 USDT</span> &nbsp;|&nbsp;
+            💰 <span class="highlight-green">1.20 USDT</span> &nbsp;|&nbsp;
             🎯 هدف: <span class="highlight-gold">0.05 USDT</span> &nbsp;|&nbsp;
             ⛔ وقف: <span class="highlight-gray">معطل</span> &nbsp;|&nbsp;
-            📈 عتبة: <span class="highlight-gold">0.015%</span> &nbsp;|&nbsp;
+            📈 عتبة: <span class="highlight-gold">0.01%</span> &nbsp;|&nbsp;
             ⚡ رافعة: <span class="highlight-gold">10x</span> &nbsp;|&nbsp;
             🔄 مسح: <span class="highlight-purple">1 ثانية</span> &nbsp;|&nbsp;
             ⏱️ كولداون: <span class="highlight-purple">5 ثواني</span>
@@ -796,7 +814,6 @@ app.get('/dashboard', (req, res) => {
             document.getElementById('leverage').textContent = data.leverage || '--';
             document.getElementById('position').textContent = data.currentPosition || 'لا توجد صفقة';
             
-            // ✅ عرض الربح/الخسارة
             const profitDisplay = document.getElementById('profitDisplay');
             if (data.profit !== undefined && data.profit !== null) {
               const profit = data.profit;
@@ -859,6 +876,7 @@ app.get('/', async (req, res) => {
       balance: `${usdtBalance.toFixed(4)} USDT`,
       leverage: `${LEVERAGE}x`,
       tradeAmount: `${TRADE_AMOUNT} USDT`,
+      useFullBalance: USE_FULL_BALANCE,
       currentPosition: currentPosition ? `${currentPosition.symbol} (${currentPosition.type})` : 'لا توجد صفقة',
       profit: profit,
       profitPercent: profitPercent,
@@ -887,6 +905,7 @@ async function startBot() {
     console.log('⚡⚡ بدء تشغيل بوت V7 Pro - مسح السوق بالكامل');
     console.log('📊 ===== إعدادات V7 Pro =====');
     console.log(`💰 مبلغ التداول الثابت: ${TRADE_AMOUNT} USDT`);
+    console.log(`📊 استخدام الرصيد بالكامل: ${USE_FULL_BALANCE ? 'نعم' : 'لا'}`);
     console.log(`⚡ الرافعة المالية: ${LEVERAGE}x`);
     console.log(`🎯 هدف الربح: ${PROFIT_USDT_TARGET} USDT`);
     console.log(`⛔ وقف الخسارة: ${STOP_LOSS_ENABLED ? 'مفعل (-0.03 USDT)' : 'معطل'}`);
@@ -907,7 +926,6 @@ async function startBot() {
       console.log(`⚠️ تحذير: الرصيد (${balance.toFixed(4)}) أقل من مبلغ التداول (${TRADE_AMOUNT})`);
     }
 
-    // ✅ تشغيل الدورة الرئيسية
     await tradingCycle();
 
     setInterval(async () => {
