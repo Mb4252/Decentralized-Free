@@ -24,7 +24,11 @@ const API_KEY = process.env.BINGX_API_KEY;
 const API_SECRET = process.env.BINGX_API_SECRET;
 const LEVERAGE = 5;
 const TRADE_AMOUNT = 1.4;
-const PROFIT_PERCENT = 5;
+
+// ✅ أهداف سكالبينج سريعة
+const PROFIT_PERCENT = 0.08; // سكالب سريع 0.08%
+const PROFIT_USDT_TARGET = 0.05; // أرباح صغيرة متكررة 0.05 USDT
+
 const PRICE_CHANGE_THRESHOLD = 0.1;
 const CHECK_INTERVAL = 5000;
 const STOP_LOSS_PERCENT = null;
@@ -44,7 +48,6 @@ const cooldown = 15000; // 15 ثانية بين الصفقات
 // ✅ تم تعديل الحساسية
 const SCAN_INTERVAL = 1500; // 1.5 ثانية (أسرع)
 const CHANGE_THRESHOLD = 0.03; // 0.03% (أكثر حساسية)
-const PROFIT_USDT_TARGET = 0.1;
 
 // ✅ إعدادات الفلاتر الجديدة
 const MIN_CANDLE_RANGE = 0.08; // أقل نطاق شمعة مقبول
@@ -302,22 +305,52 @@ async function getPrice(symbol) {
 }
 
 // ==========================================
-// ✅ فلتر الاتجاه العام (معدل)
+// ✅ V7 Pro Scalp - استراتيجية سكالبينج فائقة السرعة
 // ==========================================
 
-async function getTrend(symbol) {
-  const p1 = await getPrice(symbol);
-  await new Promise(r => setTimeout(r, 2000));
-  const p2 = await getPrice(symbol);
+async function v7ProScalp(symbol) {
+  const price = await getPrice(symbol);
+  if (!price) return null;
 
-  if (!p1 || !p2) return null;
+  if (!lastPrices[symbol]) {
+    lastPrices[symbol] = price;
+    return null;
+  }
 
-  const change = ((p2 - p1) / p1) * 100;
+  const lastPrice = lastPrices[symbol];
+  const change = ((price - lastPrice) / lastPrice) * 100;
 
-  return {
-    trend: change > 0 ? 'UP' : 'DOWN',
-    strength: Math.abs(change)
-  };
+  lastPrices[symbol] = price;
+
+  // ⚡ فلتر الضوضاء
+  if (Math.abs(change) < 0.02) return null;
+
+  // 🧠 اتجاه السوق
+  const trend = price > lastPrice ? 'UP' : 'DOWN';
+
+  // 🚀 شروط الدخول الذكي
+  const buySignal = change > 0 && trend === 'UP';
+  const sellSignal = change < 0 && trend === 'DOWN';
+
+  if (buySignal) {
+    return {
+      symbol,
+      side: 'BUY',
+      change,
+      trend
+    };
+  }
+
+  if (sellSignal) {
+    return {
+      symbol,
+      side: 'SELL',
+      change,
+      trend
+    };
+  }
+
+  return null;
 }
 
 // ==========================================
@@ -532,7 +565,7 @@ async function closePosition(position) {
 }
 
 // ==========================================
-// ✅ سكالبينج احترافي - المسح السريع (معدل للحساسية العالية)
+// ✅ سكالبينج احترافي V7 - المسح السريع
 // ==========================================
 
 async function fastScan() {
@@ -543,7 +576,7 @@ async function fastScan() {
     const balance = await getFuturesBalance();
     console.log(`💰 الرصيد: ${balance.toFixed(4)} USDT`);
 
-    // إدارة الصفقة المفتوحة
+    // إدارة الصفقة المفتوحة - خروج سريع
     if (currentPosition) {
       const price = await getPrice(currentPosition.symbol);
       if (!price) {
@@ -556,12 +589,19 @@ async function fastScan() {
           ? (price - currentPosition.entryPrice) * currentPosition.quantity * LEVERAGE
           : (currentPosition.entryPrice - price) * currentPosition.quantity * LEVERAGE;
 
-      console.log(`⚡ الربح الحالي: ${profitUSDT.toFixed(4)} USDT`);
+      let profitPercent =
+        currentPosition.type === 'LONG'
+          ? ((price - currentPosition.entryPrice) / currentPosition.entryPrice) * 100 * LEVERAGE
+          : ((currentPosition.entryPrice - price) / currentPosition.entryPrice) * 100 * LEVERAGE;
 
-      if (profitUSDT >= PROFIT_USDT_TARGET) {
-        console.log(`🎯 هدف تحقق: ${profitUSDT.toFixed(4)} USDT`);
+      console.log(`⚡ الربح الحالي: ${profitUSDT.toFixed(4)} USDT (${profitPercent.toFixed(2)}%)`);
+
+      // ✅ خروج سريع عند تحقيق هدف صغير
+      if (profitUSDT >= PROFIT_USDT_TARGET || profitPercent >= PROFIT_PERCENT) {
+        console.log(`🎯 هدف تحقق: ${profitUSDT.toFixed(4)} USDT / ${profitPercent.toFixed(2)}%`);
         await closePosition(currentPosition);
         currentPosition = null;
+        lastTradeTime = Date.now();
       }
 
       isRunning = false;
@@ -581,99 +621,28 @@ async function fastScan() {
       return;
     }
 
-    let bestSymbol = null;
-    let bestScore = 0;
-    let bestDirection = null;
-    let bestCandleAnalysis = null;
-
+    // ✅ V7 Pro Scalp - مسح سريع
     for (const symbol of SYMBOLS) {
-      // ✅ تحليل الشمعة أولاً
-      const candleAnalysis = await analyzeCandle(symbol);
-      if (!candleAnalysis) continue;
+      const signal = await v7ProScalp(symbol);
+      if (!signal) continue;
 
-      // ✅ إذا لم تكن هناك إشارة شراء أو بيع من الشمعة، تخطي
-      if (!candleAnalysis.shouldBuy && !candleAnalysis.shouldSell) continue;
+      console.log(`🚀 إشارة ${signal.side}: ${symbol} | change=${signal.change.toFixed(3)}% | trend=${signal.trend}`);
 
-      const price = await getPrice(symbol);
-      if (!price) continue;
+      await setLeverage(symbol);
 
-      if (!lastPrices[symbol]) {
-        lastPrices[symbol] = price;
-        continue;
+      let position;
+      if (signal.side === 'BUY') {
+        position = await openLongPosition(symbol, TRADE_AMOUNT);
+      } else {
+        position = await openShortPosition(symbol, TRADE_AMOUNT);
       }
-
-      const oldPrice = lastPrices[symbol];
-      const change = ((price - oldPrice) / oldPrice) * 100;
-      lastPrices[symbol] = price;
-
-      // ✅ التقاط الميكرو موف - حساسية عالية جداً (0.02%)
-      if (Math.abs(change) < 0.02) {
-        console.log(`📊 ${symbol}: حركة صغيرة جداً (${change.toFixed(3)}%) - تم تجاهلها`);
-        continue;
-      }
-
-      const trend = await getTrend(symbol);
-      if (!trend) continue;
-
-      /**
-       * 🔥 SCORE SYSTEM (الذكاء الحقيقي) - معدل للحساسية العالية
-       */
-      let score = Math.abs(change) * 2 + trend.strength * 1.5;
-
-      // ✅ إضافة قوة الشمعة إلى السكور
-      if (candleAnalysis.candleRange) {
-        score += candleAnalysis.candleRange * 0.8;
-      }
-
-      // ✅ دعم الاتجاه من تحليل الشمعة
-      if (candleAnalysis.shouldBuy && trend.trend === 'UP') score *= 2.0;
-      if (candleAnalysis.shouldSell && trend.trend === 'DOWN') score *= 2.0;
-
-      // ✅ تأكيد الاتجاه مع إشارة الشمعة
-      let direction = null;
-      if (candleAnalysis.shouldBuy && change > 0) direction = 'BUY';
-      if (candleAnalysis.shouldSell && change < 0) direction = 'SELL';
-
-      if (!direction) continue;
-
-      // ✅ منع الدخول المباشر - السكور أقل من 0.1
-      if (score < MIN_SCORE) {
-        console.log(`📊 ${symbol}: السكور منخفض (${score.toFixed(2)} < ${MIN_SCORE})`);
-        continue;
-      }
-
-      if (score > bestScore) {
-        bestScore = score;
-        bestSymbol = symbol;
-        bestDirection = direction;
-        bestCandleAnalysis = candleAnalysis;
-      }
-
-      console.log(`📊 ${symbol} | change=${change.toFixed(3)}% | trend=${trend.trend} | score=${score.toFixed(2)} | signal=${direction}`);
-    }
-
-    // تنفيذ الصفقة - شرط القوة مخفض إلى 0.1
-    if (bestSymbol && bestDirection && bestScore > 0.1) {
-      console.log(`🚀 أفضل فرصة: ${bestSymbol} | ${bestDirection} | score=${bestScore.toFixed(2)}`);
-      if (bestCandleAnalysis) {
-        console.log(`📊 تفاصيل الشمعة: قاع=${bestCandleAnalysis.currentLow}, قمة=${bestCandleAnalysis.currentHigh}, نطاق=${bestCandleAnalysis.candleRange.toFixed(2)}%`);
-      }
-
-      await setLeverage(bestSymbol);
-
-      let position =
-        bestDirection === 'BUY'
-          ? await openLongPosition(bestSymbol, TRADE_AMOUNT)
-          : await openShortPosition(bestSymbol, TRADE_AMOUNT);
 
       if (position) {
         currentPosition = position;
         lastTradeTime = Date.now();
-
-        console.log(`✅ تم الدخول: ${bestSymbol} (${bestDirection})`);
+        console.log(`✅ تم الدخول: ${symbol} (${signal.side})`);
+        break; // صفقة واحدة فقط
       }
-    } else {
-      console.log('⏳ لا توجد فرصة قوية الآن');
     }
 
   } catch (err) {
@@ -795,8 +764,8 @@ app.get('/dashboard', (req, res) => {
     </head>
     <body>
       <div class="container">
-        <h1>🤖 بوت BingX Futures</h1>
-        <p class="subtitle">📡 سكالبينج فائق الحساسية - مايكرو موف</p>
+        <h1>🤖 بوت BingX Futures - V7 Pro</h1>
+        <p class="subtitle">📡 سكالبينج فائق السرعة - مايكرو موف</p>
         <div class="status-grid" id="statusGrid">
           <div class="card">
             <div class="label">📊 الحالة</div>
@@ -816,10 +785,10 @@ app.get('/dashboard', (req, res) => {
           </div>
         </div>
         <div class="settings-box">
-          <div class="label">⚙️ إعدادات التداول - حساسية عالية</div>
+          <div class="label">⚙️ إعدادات V7 Pro Scalp</div>
           <div class="value">
             💰 <span class="highlight-green">1.40 USDT</span> &nbsp;|&nbsp;
-            🎯 هدف: <span class="highlight-gold">0.10 USDT</span> &nbsp;|&nbsp;
+            🎯 هدف: <span class="highlight-gold">0.05 USDT</span> &nbsp;|&nbsp;
             📈 عتبة: <span class="highlight-gold">0.03%</span> &nbsp;|&nbsp;
             ⚡ رافعة: <span class="highlight-gold">5x</span> &nbsp;|&nbsp;
             ⏱️ كولداون: <span class="highlight-purple">15 ثانية</span> &nbsp;|&nbsp;
@@ -862,7 +831,7 @@ app.get('/', async (req, res) => {
   try {
     const usdtBalance = await getFuturesBalance();
     res.json({
-      status: '⚡ بوت BingX Futures - سكالبينج فائق الحساسية',
+      status: '⚡ بوت BingX Futures - V7 Pro Scalp',
       timestamp: new Date().toISOString(),
       balance: `${usdtBalance.toFixed(4)} USDT`,
       leverage: `${LEVERAGE}x`,
@@ -870,9 +839,8 @@ app.get('/', async (req, res) => {
       settings: {
         tradeAmount: `${TRADE_AMOUNT} USDT`,
         profitTarget: `${PROFIT_USDT_TARGET} USDT`,
+        profitPercent: `${PROFIT_PERCENT}%`,
         changeThreshold: `${CHANGE_THRESHOLD}%`,
-        minCandleRange: `${MIN_CANDLE_RANGE}%`,
-        minScore: `${MIN_SCORE}`,
         scanInterval: `${SCAN_INTERVAL/1000} ثانية`,
         leverage: `${LEVERAGE}x`,
         cooldown: `${cooldown/1000} ثانية`
@@ -889,14 +857,12 @@ app.get('/', async (req, res) => {
 
 async function startBot() {
   try {
-    console.log('⚡⚡ بدء تشغيل بوت العقود الآجلة (BingX)');
-    console.log('📊 ===== إعدادات التداول =====');
+    console.log('⚡⚡ بدء تشغيل بوت العقود الآجلة V7 Pro');
+    console.log('📊 ===== إعدادات V7 Pro Scalp =====');
     console.log(`💰 مبلغ التداول: ${TRADE_AMOUNT} USDT`);
     console.log(`⚡ الرافعة المالية: ${LEVERAGE}x`);
-    console.log(`🎯 هدف الربح: ${PROFIT_USDT_TARGET} USDT`);
-    console.log(`📈 عتبة التغير: ${CHANGE_THRESHOLD}% (حساسية عالية)`);
-    console.log(`🕯️ الحد الأدنى لنطاق الشمعة: ${MIN_CANDLE_RANGE}%`);
-    console.log(`📊 الحد الأدنى للسكور: ${MIN_SCORE} (حساسية عالية)`);
+    console.log(`🎯 هدف الربح: ${PROFIT_USDT_TARGET} USDT (${PROFIT_PERCENT}%)`);
+    console.log(`📈 عتبة التغير: ${CHANGE_THRESHOLD}%`);
     console.log(`⏱️ كولداون: ${cooldown/1000} ثانية`);
     console.log(`🔄 سرعة المسح: كل ${SCAN_INTERVAL/1000} ثانية`);
     console.log(`📊 العملات: ${SYMBOLS.join(', ')}`);
@@ -924,7 +890,7 @@ async function startBot() {
       }
     }, SCAN_INTERVAL);
 
-    console.log(`✅ البوت يعمل بنجاح! يتم التحديث كل ${SCAN_INTERVAL/1000} ثانية`);
+    console.log(`✅ البوت V7 Pro يعمل بنجاح! يتم التحديث كل ${SCAN_INTERVAL/1000} ثانية`);
 
   } catch (error) {
     console.error(`❌ فشل بدء البوت: ${error.message}`);
@@ -939,14 +905,13 @@ async function startBot() {
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`
   ╔═══════════════════════════════════════════════════════════════╗
-  ║   ⚡ بوت العقود الآجلة - سكالبينج فائق الحساسية            ║
+  ║   ⚡ بوت العقود الآجلة - V7 Pro Scalp                      ║
   ║   📡 http://localhost:${PORT}                                  ║
   ║   📊 لوحة التحكم: http://localhost:${PORT}/dashboard          ║
   ║   🚀 رافعة: ${LEVERAGE}x | 💰 مبلغ: ${TRADE_AMOUNT} USDT      ║
-  ║   🎯 هدف: ${PROFIT_USDT_TARGET} USDT | 📈 عتبة: ${CHANGE_THRESHOLD}%  ║
-  ║   🕯️ نطاق شمعة: ≥${MIN_CANDLE_RANGE}% | 📊 سكور: ≥${MIN_SCORE}  ║
-  ║   ⏱️ كولداون: ${cooldown/1000} ثانية | 🔄 مسح: ${SCAN_INTERVAL/1000} ثانية ║
-  ║   📡 التقاط مايكرو موف (0.02%)                               ║
+  ║   🎯 هدف: ${PROFIT_USDT_TARGET} USDT (${PROFIT_PERCENT}%)      ║
+  ║   📈 عتبة: ${CHANGE_THRESHOLD}% | 🔄 مسح: ${SCAN_INTERVAL/1000}ثانية ║
+  ║   📡 V7 Pro - مايكرو موف (0.02%)                            ║
   ║   ⚠️ تداول حقيقي - استخدم بحذر!                              ║
   ╚═══════════════════════════════════════════════════════════════╝
   `);
@@ -976,4 +941,4 @@ process.on('unhandledRejection', (reason) => {
   console.error('❌ رفض غير معالج:', reason);
 });
 
-console.log('🚀 جاري تشغيل البوت...');
+console.log('🚀 جاري تشغيل البوت V7 Pro...');
