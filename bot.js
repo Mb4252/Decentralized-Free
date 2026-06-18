@@ -37,7 +37,7 @@ const SYMBOLS = [
 ];
 
 // ==========================================
-// نقاط النهاية (Endpoints)
+// ✅ نقاط النهاية الصحيحة لـ Swap (Futures)
 // ==========================================
 
 const ENDPOINTS = {
@@ -48,40 +48,54 @@ const ENDPOINTS = {
 };
 
 // ==========================================
-// دوال مساعدة (BingX API)
+// ✅ دالة التوقيع الصحيحة لـ BingX Futures
 // ==========================================
 
 function generateSignature(params, secret) {
+  // ✅ بناء query string بترتيب أبجدي
   const sortedKeys = Object.keys(params).sort();
-  let queryString = '';
-  for (const key of sortedKeys) {
-    if (queryString) queryString += '&';
-    queryString += key + '=' + params[key];
-  }
-  return crypto.createHmac('sha256', secret).update(queryString).digest('hex');
+  const queryString = sortedKeys
+    .map(key => `${key}=${params[key]}`)
+    .join('&');
+  
+  console.log(`📝 التوقيع: ${queryString}`);
+  
+  return crypto
+    .createHmac('sha256', secret)
+    .update(queryString)
+    .digest('hex');
 }
+
+// ==========================================
+// ✅ طلب BingX الصحيح (Futures/Swap)
+// ==========================================
 
 async function bingxRequest(method, endpoint, params = {}, signed = true) {
   const baseURL = 'https://open-api.bingx.com';
   
-  const timestamp = Date.now();
-  
+  // ✅ timestamp يجب أن يكون داخل params وليس خارجه
   const allParams = {
-    timestamp: timestamp.toString(),
+    timestamp: Date.now().toString(),
     ...params
   };
   
+  // ✅ بناء التوقيع من query string
   if (signed) {
     allParams.signature = generateSignature(allParams, API_SECRET);
   }
   
   const url = baseURL + endpoint;
+  
+  // ✅ إرسال المعاملات في query string (وليس body)
   const headers = {
     'X-BX-APIKEY': API_KEY,
     'Content-Type': 'application/json'
   };
   
   try {
+    console.log(`🚀 إرسال طلب ${method} إلى: ${url}`);
+    console.log(`📦 المعاملات:`, JSON.stringify(allParams, null, 2));
+    
     let response;
     if (method === 'GET') {
       response = await axios.get(url, {
@@ -90,7 +104,7 @@ async function bingxRequest(method, endpoint, params = {}, signed = true) {
         timeout: 10000
       });
     } else {
-      // ✅ التعديل المهم: إرسال المعاملات في query string وليس في body
+      // ✅ POST مع query string
       response = await axios.post(
         url,
         null,
@@ -101,13 +115,15 @@ async function bingxRequest(method, endpoint, params = {}, signed = true) {
         }
       );
     }
+    
     return response.data;
   } catch (error) {
     console.error('❌ خطأ في طلب BingX:', {
       endpoint: endpoint,
       url: url,
       status: error.response?.status,
-      data: error.response?.data
+      data: error.response?.data,
+      message: error.message
     });
     return null;
   }
@@ -192,20 +208,19 @@ async function getFuturesBalance() {
 }
 
 // ==========================================
-// ✅ تعيين الرافعة (مع طباعة الطلب)
+// ✅ تعيين الرافعة (Futures)
 // ==========================================
 
 async function setLeverage(symbol) {
   try {
-    const leverageParams = {
+    const params = {
       symbol: symbol,
       leverage: LEVERAGE
     };
     
-    // ✅ طباعة الطلب للتشخيص
-    console.log("🔧 LEVERAGE REQUEST:", JSON.stringify(leverageParams, null, 2));
+    console.log("🔧 LEVERAGE REQUEST:", JSON.stringify(params, null, 2));
     
-    const response = await bingxRequest('POST', ENDPOINTS.FUTURES_LEVERAGE, leverageParams);
+    const response = await bingxRequest('POST', ENDPOINTS.FUTURES_LEVERAGE, params);
     
     if (response && response.code === 0) {
       console.log(`✅ تم تعيين الرافعة x${LEVERAGE} لـ ${symbol}`);
@@ -220,7 +235,7 @@ async function setLeverage(symbol) {
 }
 
 // ==========================================
-// ✅ فتح صفقة شراء (مع طباعة الطلب)
+// ✅ فتح صفقة شراء (Futures)
 // ==========================================
 
 async function openLongPosition(symbol, amount) {
@@ -242,7 +257,7 @@ async function openLongPosition(symbol, amount) {
     console.log(`📊 فتح صفقة شراء: ${roundedQuantity} ${symbol} بسعر ${price}`);
     console.log(`📊 حجم الصفقة: ${(roundedQuantity * price).toFixed(2)} USDT (رافعة x${LEVERAGE})`);
 
-    const orderParams = {
+    const params = {
       symbol: symbol,
       side: 'BUY',
       type: 'MARKET',
@@ -250,10 +265,9 @@ async function openLongPosition(symbol, amount) {
       positionSide: 'LONG'
     };
     
-    // ✅ طباعة الطلب للتشخيص
-    console.log("📝 ORDER REQUEST:", JSON.stringify(orderParams, null, 2));
+    console.log("📝 ORDER REQUEST:", JSON.stringify(params, null, 2));
 
-    const response = await bingxRequest('POST', ENDPOINTS.FUTURES_ORDER, orderParams);
+    const response = await bingxRequest('POST', ENDPOINTS.FUTURES_ORDER, params);
 
     if (response && response.code === 0) {
       console.log(`✅ تم فتح صفقة شراء: ${roundedQuantity} ${symbol}`);
@@ -265,7 +279,6 @@ async function openLongPosition(symbol, amount) {
         timestamp: Date.now()
       };
     }
-    // ✅ طباعة الاستجابة كاملة لتشخيص الخطأ
     console.log(`⚠️ فشل فتح الصفقة:`, JSON.stringify(response, null, 2));
     return null;
   } catch (error) {
@@ -288,12 +301,15 @@ async function closePosition(position) {
 
     console.log(`📊 إغلاق صفقة: ${position.quantity} ${position.symbol} بسعر ${currentPrice}`);
 
-    const response = await bingxRequest('POST', ENDPOINTS.FUTURES_ORDER, {
+    const params = {
       symbol: position.symbol,
       side: 'SELL',
       type: 'MARKET',
-      quantity: position.quantity
-    });
+      quantity: position.quantity,
+      positionSide: 'LONG'
+    };
+
+    const response = await bingxRequest('POST', ENDPOINTS.FUTURES_ORDER, params);
 
     if (response && response.code === 0) {
       console.log(`✅ تم إغلاق الصفقة: ${position.symbol}`);
