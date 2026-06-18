@@ -1,4 +1,5 @@
-const Binance = require('node-binance-api');
+const axios = require('axios');
+const crypto = require('crypto');
 const dotenv = require('dotenv');
 const express = require('express');
 const cors = require('cors');
@@ -7,81 +8,68 @@ const path = require('path');
 dotenv.config();
 
 // ==========================================
-// إعدادات البوت (Binance Futures - حقيقي)
+// إعدادات البوت (BingX Futures - حقيقي)
 // ==========================================
 
-const API_KEY = process.env.BINANCE_API_KEY;
-const API_SECRET = process.env.BINANCE_API_SECRET;
-const SYMBOL = process.env.SYMBOL || 'BTCUSDT';
+const API_KEY = process.env.BINGX_API_KEY;
+const API_SECRET = process.env.BINGX_API_SECRET;
 const LEVERAGE = parseInt(process.env.LEVERAGE) || 10;
-const TRADE_AMOUNT = parseFloat(process.env.TRADE_AMOUNT) || 0.5;
+const TRADE_AMOUNT = parseFloat(process.env.TRADE_AMOUNT) || 10;
 const PROFIT_PERCENT = parseFloat(process.env.PROFIT_PERCENT) || 0.3;
 const PRICE_CHANGE_THRESHOLD = parseFloat(process.env.PRICE_CHANGE_THRESHOLD) || 0.1;
 const CHECK_INTERVAL = parseInt(process.env.CHECK_INTERVAL) || 5000;
 const STOP_LOSS_PERCENT = parseFloat(process.env.STOP_LOSS_PERCENT) || 2;
 
-// قائمة العملات للمراقبة (Futures)
+// قائمة العملات للمراقبة (Futures على BingX)
 const SYMBOLS = [
-  'BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT',
-  'ADAUSDT', 'DOGEUSDT', 'AVAXUSDT', 'MATICUSDT', 'LINKUSDT'
+  'BTC-USDT', 'ETH-USDT', 'BNB-USDT', 'SOL-USDT', 'XRP-USDT',
+  'ADA-USDT', 'DOGE-USDT', 'AVAX-USDT', 'MATIC-USDT', 'LINK-USDT'
 ];
 
 // ==========================================
-// الاتصال بـ Binance
+// دوال مساعدة (BingX API)
 // ==========================================
 
-const binance = new Binance().options({
-  APIKEY: API_KEY,
-  APISECRET: API_SECRET,
-  useServerTime: true,
-  recvWindow: 60000,
-  verbose: true
-});
-
-let currentPosition = null;
-let priceHistory = {};
-let isRunning = false;
-let tradesHistory = [];
-const TRADES_FILE = path.join(__dirname, 'data', 'trades.json');
-
-// ==========================================
-// دوال مساعدة
-// ==========================================
-
-function log(message, type = 'INFO') {
-  const timestamp = new Date().toISOString();
-  console.log(`[${timestamp}] [${type}] ${message}`);
-}
-
-function loadTrades() {
-  try {
-    if (fs.existsSync(TRADES_FILE)) {
-      const data = fs.readFileSync(TRADES_FILE, 'utf8');
-      const parsed = JSON.parse(data);
-      if (Array.isArray(parsed)) {
-        tradesHistory = parsed;
-        return parsed;
-      }
-    }
-  } catch (error) {
-    console.error('خطأ في قراءة trades.json:', error);
+function generateSignature(params, secret) {
+  const sortedKeys = Object.keys(params).sort();
+  let queryString = '';
+  for (const key of sortedKeys) {
+    if (queryString) queryString += '&';
+    queryString += key + '=' + params[key];
   }
-  tradesHistory = [];
-  return [];
+  return crypto.createHmac('sha256', secret).update(queryString).digest('hex');
 }
 
-function saveTrades() {
+async function bingxRequest(method, endpoint, params = {}, signed = true) {
+  const baseURL = 'https://api.bingx.com';
+  const timestamp = Date.now();
+  
+  const allParams = {
+    timestamp: timestamp,
+    ...params
+  };
+  
+  if (signed) {
+    allParams.signature = generateSignature(allParams, API_SECRET);
+  }
+  
+  const url = baseURL + endpoint;
+  const headers = {
+    'X-BX-APIKEY': API_KEY,
+    'Content-Type': 'application/json'
+  };
+  
   try {
-    if (!Array.isArray(tradesHistory)) {
-      tradesHistory = [];
-    }
-    const dir = path.dirname(TRADES_FILE);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    fs.writeFileSync(TRADES_FILE, JSON.stringify(tradesHistory, null, 2));
+    const response = await axios({
+      method: method,
+      url: url,
+      params: allParams,
+      headers: headers
+    });
+    return response.data;
   } catch (error) {
-    console.error('خطأ في حفظ trades.json:', error);
+    console.error('❌ خطأ في طلب BingX:', error.response?.data || error.message);
+    return null;
   }
 }
 
@@ -91,10 +79,13 @@ function saveTrades() {
 
 async function getPrice(symbol) {
   try {
-    const ticker = await binance.futuresPrices(symbol);
-    return parseFloat(ticker[symbol]);
+    const response = await bingxRequest('GET', '/openApi/swap/v2/quote/price', { symbol }, false);
+    if (response && response.data) {
+      return parseFloat(response.data.price);
+    }
+    return null;
   } catch (error) {
-    log(`❌ فشل جلب سعر ${symbol}: ${error.message}`, 'ERROR');
+    console.error(`❌ فشل جلب سعر ${symbol}:`, error);
     return null;
   }
 }
@@ -109,8 +100,120 @@ async function getAllPrices() {
 }
 
 // ==========================================
+// جلب الرصيد من BingX Futures
+// ==========================================
+
+async function getFuturesBalance() {
+  try {
+    const response = await bingxRequest('GET', '/openApi/swap/v2/user/balance', {});
+    if (response && response.data && response.data.balance) {
+      const usdtAsset = response.data.balance.find(asset => asset.asset === 'USDT');
+      if (usdtAsset) {
+        return parseFloat(usdtAsset.available) || 0;
+      }
+    }
+    return 0;
+  } catch (error) {
+    console.error('❌ فشل جلب الرصيد:', error);
+    return 0;
+  }
+}
+
+// ==========================================
+// تعيين الرافعة المالية
+// ==========================================
+
+async function setLeverage(symbol) {
+  try {
+    const response = await bingxRequest('POST', '/openApi/swap/v2/trade/leverage', {
+      symbol: symbol,
+      leverage: LEVERAGE
+    });
+    if (response && response.code === 0) {
+      console.log(`✅ تم تعيين الرافعة x${LEVERAGE} لـ ${symbol}`);
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error(`❌ فشل تعيين الرافعة:`, error);
+    return false;
+  }
+}
+
+// ==========================================
+// فتح صفقة شراء (Long) - حقيقي
+// ==========================================
+
+async function openLongPosition(symbol, amount) {
+  try {
+    const price = await getPrice(symbol);
+    if (!price) return null;
+
+    const quantity = (amount * LEVERAGE) / price;
+    const roundedQuantity = Math.floor(quantity * 1000) / 1000;
+
+    console.log(`📊 فتح صفقة شراء: ${roundedQuantity} ${symbol} بسعر ${price} (رافعة x${LEVERAGE})`);
+
+    const response = await bingxRequest('POST', '/openApi/swap/v2/trade/order', {
+      symbol: symbol,
+      side: 'BUY',
+      type: 'MARKET',
+      quantity: roundedQuantity
+    });
+
+    if (response && response.code === 0) {
+      console.log(`✅ تم فتح صفقة شراء: ${roundedQuantity} ${symbol}`);
+      return {
+        symbol,
+        entryPrice: price,
+        quantity: roundedQuantity,
+        orderId: response.data.orderId,
+        timestamp: Date.now()
+      };
+    }
+    return null;
+  } catch (error) {
+    console.error(`❌ فشل فتح الصفقة:`, error);
+    return null;
+  }
+}
+
+// ==========================================
+// إغلاق صفقة (بيع) - حقيقي
+// ==========================================
+
+async function closePosition(position) {
+  try {
+    const currentPrice = await getPrice(position.symbol);
+    if (!currentPrice) return false;
+
+    console.log(`📊 إغلاق صفقة: ${position.quantity} ${position.symbol} بسعر ${currentPrice}`);
+
+    const response = await bingxRequest('POST', '/openApi/swap/v2/trade/order', {
+      symbol: position.symbol,
+      side: 'SELL',
+      type: 'MARKET',
+      quantity: position.quantity
+    });
+
+    if (response && response.code === 0) {
+      console.log(`✅ تم إغلاق الصفقة: ${position.symbol}`);
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error(`❌ فشل إغلاق الصفقة:`, error);
+    return false;
+  }
+}
+
+// ==========================================
 // تحليل العملات المتزايدة
 // ==========================================
+
+let priceHistory = {};
+let currentPosition = null;
+let isRunning = false;
 
 function findRisingTokens(currentPrices) {
   const rising = [];
@@ -128,148 +231,6 @@ function findRisingTokens(currentPrices) {
   return rising;
 }
 
-// ==========================================
-// تعيين الرافعة المالية
-// ==========================================
-
-async function setLeverage(symbol) {
-  try {
-    await binance.futuresLeverage(symbol, LEVERAGE);
-    log(`✅ تم تعيين الرافعة x${LEVERAGE} لـ ${symbol}`, 'SUCCESS');
-  } catch (error) {
-    log(`❌ فشل تعيين الرافعة: ${error.message}`, 'ERROR');
-  }
-}
-
-// ==========================================
-// جلب رصيد USDT من Binance Futures (نسخة متطورة)
-// ==========================================
-
-async function getFuturesBalance() {
-  try {
-    const balances = await binance.futuresBalance();
-    
-    // إذا كانت الاستجابة غير متوقعة، سجلها للتشخيص
-    if (!balances) {
-      log('⚠️ استجابة Binance فارغة', 'WARNING');
-      return 0;
-    }
-    
-    // محاولة قراءة الرصيد بعدة طرق
-    let usdtBalance = 0;
-    
-    // طريقة 1: مباشرة
-    if (balances.USDT) {
-      usdtBalance = parseFloat(balances.USDT.available) || 0;
-      if (usdtBalance > 0) {
-        log(`✅ طريقة 1: وجدت ${usdtBalance} USDT`, 'SUCCESS');
-        return usdtBalance;
-      }
-    }
-    
-    // طريقة 2: في data
-    if (balances.data && balances.data.USDT) {
-      usdtBalance = parseFloat(balances.data.USDT.available) || 0;
-      if (usdtBalance > 0) {
-        log(`✅ طريقة 2: وجدت ${usdtBalance} USDT في data`, 'SUCCESS');
-        return usdtBalance;
-      }
-    }
-    
-    // طريقة 3: مصفوفة
-    if (Array.isArray(balances)) {
-      const usdtAsset = balances.find(a => a.asset === 'USDT');
-      if (usdtAsset) {
-        usdtBalance = parseFloat(usdtAsset.available) || 0;
-        if (usdtBalance > 0) {
-          log(`✅ طريقة 3: وجدت ${usdtBalance} USDT في المصفوفة`, 'SUCCESS');
-          return usdtBalance;
-        }
-      }
-    }
-    
-    // طريقة 4: البحث في جميع المفاتيح
-    for (const key of Object.keys(balances)) {
-      if (balances[key] && typeof balances[key] === 'object') {
-        if (balances[key].USDT) {
-          usdtBalance = parseFloat(balances[key].USDT.available) || 0;
-          if (usdtBalance > 0) {
-            log(`✅ طريقة 4: وجدت ${usdtBalance} USDT في ${key}`, 'SUCCESS');
-            return usdtBalance;
-          }
-        }
-      }
-    }
-    
-    // إذا لم نجد رصيداً، سجل الاستجابة للتشخيص
-    log(`⚠️ لم يتم العثور على USDT في الاستجابة.`, 'WARNING');
-    
-    return 0;
-  } catch (error) {
-    log(`❌ فشل جلب الرصيد: ${error.message}`, 'ERROR');
-    return 0;
-  }
-}
-
-// ==========================================
-// فتح صفقة شراء (Long) - حقيقي
-// ==========================================
-
-async function openLongPosition(symbol, amount) {
-  try {
-    const price = await getPrice(symbol);
-    if (!price) return null;
-
-    // حساب الكمية مع الرافعة
-    const quantity = (amount * LEVERAGE) / price;
-    const roundedQuantity = Math.floor(quantity * 1000) / 1000;
-
-    log(`📊 فتح صفقة شراء: ${roundedQuantity} ${symbol} بسعر ${price} (رافعة x${LEVERAGE})`, 'INFO');
-
-    // ✅ تنفيذ الأمر (حقيقي)
-    const order = await binance.futuresMarketBuy(symbol, roundedQuantity);
-    
-    log(`✅ تم فتح صفقة شراء: ${roundedQuantity} ${symbol} (ID: ${order.orderId})`, 'SUCCESS');
-    
-    return {
-      symbol,
-      entryPrice: price,
-      quantity: roundedQuantity,
-      orderId: order.orderId,
-      timestamp: Date.now()
-    };
-  } catch (error) {
-    log(`❌ فشل فتح الصفقة: ${error.message}`, 'ERROR');
-    return null;
-  }
-}
-
-// ==========================================
-// إغلاق صفقة (بيع) - حقيقي
-// ==========================================
-
-async function closePosition(position, profit) {
-  try {
-    const currentPrice = await getPrice(position.symbol);
-    if (!currentPrice) return false;
-
-    log(`📊 إغلاق صفقة: ${position.quantity} ${position.symbol} بسعر ${currentPrice}`, 'INFO');
-
-    // ✅ تنفيذ البيع (حقيقي)
-    const order = await binance.futuresMarketSell(position.symbol, position.quantity);
-    
-    log(`✅ تم إغلاق الصفقة: ${position.symbol} (ID: ${order.orderId})`, 'SUCCESS');
-    return true;
-  } catch (error) {
-    log(`❌ فشل إغلاق الصفقة: ${error.message}`, 'ERROR');
-    return false;
-  }
-}
-
-// ==========================================
-// تحديث تاريخ الأسعار
-// ==========================================
-
 async function updatePriceHistory() {
   const currentPrices = await getAllPrices();
   for (const [symbol, data] of Object.entries(currentPrices)) {
@@ -278,7 +239,7 @@ async function updatePriceHistory() {
 }
 
 // ==========================================
-// دورة التداول الرئيسية (معدلة)
+// دورة التداول الرئيسية
 // ==========================================
 
 async function tradingCycle() {
@@ -286,67 +247,47 @@ async function tradingCycle() {
   isRunning = true;
 
   try {
-    // جلب الرصيد باستخدام الدالة الجديدة
     const usdtBalance = await getFuturesBalance();
-    
     if (usdtBalance === 0) {
-      log(`⚠️ رصيد USDT: 0 أو غير متوفر`, 'WARNING');
+      console.log('⚠️ رصيد USDT: 0 أو غير متوفر');
       isRunning = false;
       return;
     }
-    
-    log(`💰 رصيد USDT: ${usdtBalance.toFixed(2)}`, 'INFO');
 
-    // إذا كانت هناك صفقة مفتوحة
+    console.log(`💰 رصيد USDT: ${usdtBalance.toFixed(2)}`);
+
     if (currentPosition) {
       const currentPrice = await getPrice(currentPosition.symbol);
       if (!currentPrice) { isRunning = false; return; }
 
       const profitPercent = ((currentPrice - currentPosition.entryPrice) / currentPosition.entryPrice) * 100 * LEVERAGE;
-      log(`⚡ ${currentPosition.symbol} - الربح: ${profitPercent.toFixed(2)}%`, 'INFO');
+      console.log(`⚡ ${currentPosition.symbol} - الربح: ${profitPercent.toFixed(2)}%`);
 
-      // جني ربح
       if (profitPercent >= PROFIT_PERCENT) {
-        log(`✅ جني ربح: ${profitPercent.toFixed(2)}%`, 'SUCCESS');
-        const result = await closePosition(currentPosition, profitPercent);
+        console.log(`✅ جني ربح: ${profitPercent.toFixed(2)}%`);
+        const result = await closePosition(currentPosition);
         if (result) {
-          tradesHistory.push({
-            id: Date.now(),
-            type: 'sell',
-            symbol: currentPosition.symbol,
-            quantity: currentPosition.quantity,
-            price: currentPrice,
-            profit: (currentPrice - currentPosition.entryPrice) * currentPosition.quantity,
-            status: 'closed',
-            timestamp: new Date().toISOString()
-          });
-          saveTrades();
           currentPosition = null;
           await updatePriceHistory();
         }
-      } 
-      // وقف خسارة
-      else if (profitPercent <= -STOP_LOSS_PERCENT) {
-        log(`⚠️ وقف الخسارة: ${profitPercent.toFixed(2)}%`, 'WARNING');
-        const result = await closePosition(currentPosition, profitPercent);
+      } else if (profitPercent <= -STOP_LOSS_PERCENT) {
+        console.log(`⚠️ وقف الخسارة: ${profitPercent.toFixed(2)}%`);
+        const result = await closePosition(currentPosition);
         if (result) {
           currentPosition = null;
           await updatePriceHistory();
         }
       }
-      
       isRunning = false;
       return;
     }
 
-    // التحقق من الرصيد
     if (usdtBalance < TRADE_AMOUNT) {
-      log(`⚠️ رصيد غير كافٍ (يحتاج ${TRADE_AMOUNT} USDT)`, 'WARNING');
+      console.log(`⚠️ رصيد غير كافٍ (يحتاج ${TRADE_AMOUNT} USDT)`);
       isRunning = false;
       return;
     }
 
-    // جلب الأسعار الحالية
     const currentPrices = await getAllPrices();
     if (Object.keys(priceHistory).length === 0) {
       for (const [symbol, data] of Object.entries(currentPrices)) {
@@ -356,38 +297,22 @@ async function tradingCycle() {
       return;
     }
 
-    // البحث عن عملات متزايدة
     const risingTokens = findRisingTokens(currentPrices);
-    
     if (risingTokens.length > 0) {
       const best = risingTokens[0];
-      log(`📈 اكتشاف ارتفاع: ${best.symbol} - ${best.changePercent.toFixed(2)}%`, 'INFO');
+      console.log(`📈 اكتشاف ارتفاع: ${best.symbol} - ${best.changePercent.toFixed(2)}%`);
 
-      // تعيين الرافعة
       await setLeverage(best.symbol);
-
-      // فتح صفقة
       const position = await openLongPosition(best.symbol, TRADE_AMOUNT);
       if (position) {
         currentPosition = position;
-        tradesHistory.push({
-          id: Date.now(),
-          type: 'buy',
-          symbol: best.symbol,
-          quantity: position.quantity,
-          price: position.entryPrice,
-          profit: 0,
-          status: 'open',
-          timestamp: new Date().toISOString()
-        });
-        saveTrades();
         await updatePriceHistory();
-        log(`✅ تم فتح الصفقة على ${best.symbol} (رافعة x${LEVERAGE})`, 'SUCCESS');
+        console.log(`✅ تم فتح الصفقة على ${best.symbol}`);
       }
     }
 
   } catch (error) {
-    log(`❌ خطأ: ${error.message}`, 'ERROR');
+    console.error(`❌ خطأ: ${error.message}`);
   }
 
   isRunning = false;
@@ -405,77 +330,15 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/', async (req, res) => {
-  let positionStatus = 'لا توجد صفقة مفتوحة';
-  let profit = '0%';
-  
-  if (currentPosition) {
-    const currentPrice = await getPrice(currentPosition.symbol);
-    if (currentPrice) {
-      profit = (((currentPrice - currentPosition.entryPrice) / currentPosition.entryPrice) * 100 * LEVERAGE).toFixed(2) + '%';
-      positionStatus = `${currentPosition.symbol} - الربح: ${profit}`;
-    }
-  }
-  
   const usdtBalance = await getFuturesBalance();
-  
   res.json({
-    status: '⚡ بوت العقود الآجلة يعمل (حقيقي)',
-    version: '4.0.0',
+    status: '⚡ بوت BingX Futures يعمل (حقيقي)',
     timestamp: new Date().toISOString(),
     balance: `${usdtBalance.toFixed(2)} USDT`,
     leverage: `${LEVERAGE}x`,
-    currentPosition: positionStatus,
-    watching: SYMBOLS.join(', '),
-    settings: {
-      tradeAmount: TRADE_AMOUNT,
-      leverage: LEVERAGE,
-      profitTarget: PROFIT_PERCENT + '%',
-      priceChangeThreshold: PRICE_CHANGE_THRESHOLD + '%',
-      stopLoss: STOP_LOSS_PERCENT + '%',
-      checkInterval: CHECK_INTERVAL / 1000 + ' ثانية'
-    }
+    currentPosition: currentPosition ? `${currentPosition.symbol} - مفتوح` : 'لا توجد صفقة',
+    watching: SYMBOLS.join(', ')
   });
-});
-
-app.get('/api/status-full', async (req, res) => {
-  try {
-    const usdtBalance = await getFuturesBalance();
-    
-    loadTrades();
-    const openTrades = tradesHistory.filter(t => t.status === 'open');
-    
-    res.json({
-      balance: usdtBalance,
-      position: currentPosition,
-      trades: tradesHistory,
-      openTrades: openTrades.length,
-      totalTrades: tradesHistory.length,
-      watching: SYMBOLS,
-      settings: {
-        tradeAmount: TRADE_AMOUNT,
-        leverage: LEVERAGE,
-        profitTarget: PROFIT_PERCENT,
-        priceChangeThreshold: PRICE_CHANGE_THRESHOLD
-      }
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.get('/api/trades', async (req, res) => {
-  loadTrades();
-  res.json(tradesHistory);
-});
-
-app.delete('/api/clear-trades', (req, res) => {
-  tradesHistory = [];
-  saveTrades();
-  res.json({ success: true });
-});
-
-app.get('/dashboard.html', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // ==========================================
@@ -483,33 +346,14 @@ app.get('/dashboard.html', (req, res) => {
 // ==========================================
 
 async function startBot() {
-  log(`⚡⚡ بدء تشغيل بوت العقود الآجلة (Futures - حقيقي)`, 'START');
-  log(`📊 العملات: ${SYMBOLS.join(', ')}`, 'INFO');
-  log(`💰 المبلغ: ${TRADE_AMOUNT} USDT (رافعة x${LEVERAGE})`, 'INFO');
-  log(`📈 حد الارتفاع: ${PRICE_CHANGE_THRESHOLD}%`, 'INFO');
-  log(`🎯 هدف الربح: ${PROFIT_PERCENT}%`, 'INFO');
-  log(`🛑 وقف الخسارة: ${STOP_LOSS_PERCENT}%`, 'INFO');
-  log(`⏱️ الفحص كل ${CHECK_INTERVAL/1000} ثانية`, 'INFO');
-  log(`⚠️ تحذير: هذا البوت يستخدم أموالاً حقيقية!`, 'WARNING');
+  console.log(`⚡⚡ بدء تشغيل بوت العقود الآجلة (BingX - حقيقي)`);
+  console.log(`📊 العملات: ${SYMBOLS.join(', ')}`);
+  console.log(`💰 المبلغ: ${TRADE_AMOUNT} USDT (رافعة x${LEVERAGE})`);
+  console.log(`⚠️ تحذير: هذا البوت يستخدم أموالاً حقيقية!`);
 
-  // التحقق من الاتصال والرصيد
-  try {
-    const usdtBalance = await getFuturesBalance();
-    log(`✅ الاتصال بـ Binance ناجح`, 'SUCCESS');
-    log(`💰 رصيد USDT في Futures: ${usdtBalance.toFixed(2)}`, 'INFO');
-    
-    if (usdtBalance < TRADE_AMOUNT) {
-      log(`⚠️ تحذير: الرصيد (${usdtBalance}) أقل من مبلغ التداول (${TRADE_AMOUNT})`, 'WARNING');
-    }
-  } catch (error) {
-    log(`❌ فشل الاتصال بـ Binance: ${error.message}`, 'ERROR');
-    log(`📝 تأكد من:`, 'ERROR');
-    log(`   1. صحة API_KEY و API_SECRET`, 'ERROR');
-    log(`   2. صلاحية "Enable Futures" مفعلة`, 'ERROR');
-    process.exit(1);
-  }
+  const balance = await getFuturesBalance();
+  console.log(`💰 رصيد USDT في Futures: ${balance.toFixed(2)}`);
 
-  loadTrades();
   await updatePriceHistory();
   await tradingCycle();
 
@@ -517,22 +361,21 @@ async function startBot() {
     await tradingCycle();
   }, CHECK_INTERVAL);
 
-  log(`✅ البوت يعمل بنجاح! (تداول حقيقي)`, 'SUCCESS');
+  console.log(`✅ البوت يعمل بنجاح!`);
 }
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`
   ╔═══════════════════════════════════════════════════════════════╗
-  ║   ⚡ بوت العقود الآجلة - Futures Bot (حقيقي)                ║
+  ║   ⚡ بوت العقود الآجلة - BingX Futures (حقيقي)              ║
   ║   📡 http://localhost:${PORT}                                  ║
-  ║   📊 لوحة التحكم: http://localhost:${PORT}/dashboard.html     ║
-  ║   🚀 رافعة حقيقية x${LEVERAGE} - يشتري عند أي ارتفاع 0.1%      ║
+  ║   🚀 رافعة حقيقية x${LEVERAGE}                               ║
   ║   ⚠️ تداول حقيقي - استخدم بحذر!                              ║
   ╚═══════════════════════════════════════════════════════════════╝
   `);
 });
 
 startBot().catch(error => {
-  log(`❌ فشل التشغيل: ${error.message}`, 'ERROR');
+  console.error(`❌ فشل التشغيل: ${error.message}`);
   process.exit(1);
 });
