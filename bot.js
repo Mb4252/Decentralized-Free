@@ -590,6 +590,9 @@ async function tradingCycle() {
       if (!candleData) continue;
 
       const { changePercent } = candleData;
+      
+      // ✅ طباعة نسبة التغير لكل عملة
+      console.log(`${symbol} changePercent = ${changePercent}`);
 
       // ✅ تحديد الإشارة بناءً على نسبة التغير
       let signal = null;
