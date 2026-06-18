@@ -22,17 +22,18 @@ if (!process.env.BINGX_API_KEY || !process.env.BINGX_API_SECRET) {
 
 const API_KEY = process.env.BINGX_API_KEY;
 const API_SECRET = process.env.BINGX_API_SECRET;
-const LEVERAGE = 10;  // ✅ الرافعة 10x
-const TRADE_AMOUNT = 1.45;  // ✅ مبلغ التداول 1.45 USDT
-const PROFIT_PERCENT = 2;  // ✅ جني الأرباح 2%
-const PRICE_CHANGE_THRESHOLD = 0.1;  // عتبة ارتفاع السعر 0.1%
+const LEVERAGE = 10;
+const TRADE_AMOUNT = 1.45;
+const PROFIT_PERCENT = 2;
+const PRICE_CHANGE_THRESHOLD = 0.1;
 const CHECK_INTERVAL = parseInt(process.env.CHECK_INTERVAL) || 5000;
-const STOP_LOSS_PERCENT = 4;  // ✅ وقف الخسارة 4%
+const STOP_LOSS_PERCENT = 4;
 
-// قائمة العملات للمراقبة
+// ✅ قائمة العملات للمراقبة (تم إضافة eSports و SPCX)
 const SYMBOLS = [
   'BTC-USDT', 'ETH-USDT', 'BNB-USDT', 'SOL-USDT', 'XRP-USDT',
-  'ADA-USDT', 'DOGE-USDT', 'AVAX-USDT', 'LINK-USDT'
+  'ADA-USDT', 'DOGE-USDT', 'AVAX-USDT', 'LINK-USDT',
+  'ESPORTS-USDT', 'SPCX-USDT'  // ✅ العملات الجديدة
 ];
 
 // ==========================================
@@ -118,6 +119,11 @@ async function getPrice(symbol) {
     
     if (response && response.code === 0 && response.data) {
       return parseFloat(response.data.price);
+    }
+    // ✅ تجاهل العملات غير المدعومة بصمت
+    if (response?.code === 100400) {
+      console.log(`ℹ️ العملة ${symbol} غير مدعومة حالياً، سيتم تجاهلها`);
+      return null;
     }
     console.log(`⚠️ فشل جلب سعر ${symbol}:`, response?.msg || response);
     return null;
@@ -292,6 +298,7 @@ async function closePosition(position) {
 let priceHistory = {};
 let currentPosition = null;
 let isRunning = false;
+let activeSymbols = []; // ✅ قائمة العملات النشطة
 
 function findRisingTokens(currentPrices) {
   const rising = [];
@@ -311,9 +318,15 @@ function findRisingTokens(currentPrices) {
 
 async function updatePriceHistory() {
   const currentPrices = await getAllPrices();
+  // ✅ تحديث قائمة العملات النشطة
+  activeSymbols = Object.keys(currentPrices);
+  
   for (const [symbol, data] of Object.entries(currentPrices)) {
     priceHistory[symbol] = data.price;
   }
+  
+  // ✅ عرض العملات النشطة
+  console.log(`📊 العملات النشطة: ${activeSymbols.length} من ${SYMBOLS.length}`);
 }
 
 // ==========================================
@@ -334,7 +347,6 @@ async function tradingCycle() {
       return;
     }
 
-    // ✅ التحقق من وجود صفقة مفتوحة
     if (currentPosition) {
       const currentPrice = await getPrice(currentPosition.symbol);
       if (!currentPrice) { isRunning = false; return; }
@@ -342,7 +354,6 @@ async function tradingCycle() {
       const profitPercent = ((currentPrice - currentPosition.entryPrice) / currentPosition.entryPrice) * 100 * LEVERAGE;
       console.log(`⚡ ${currentPosition.symbol} - الربح: ${profitPercent.toFixed(2)}% | نقطة الدخول: ${currentPosition.entryPrice} | السعر الحالي: ${currentPrice}`);
 
-      // ✅ جني الأرباح عند 2%
       if (profitPercent >= PROFIT_PERCENT) {
         console.log(`✅ جني ربح: ${profitPercent.toFixed(2)}% (الهدف ${PROFIT_PERCENT}%)`);
         const result = await closePosition(currentPosition);
@@ -350,9 +361,7 @@ async function tradingCycle() {
           currentPosition = null;
           await updatePriceHistory();
         }
-      } 
-      // ✅ وقف الخسارة عند 4%
-      else if (profitPercent <= -STOP_LOSS_PERCENT) {
+      } else if (profitPercent <= -STOP_LOSS_PERCENT) {
         console.log(`⚠️ وقف الخسارة: ${profitPercent.toFixed(2)}% (الحد ${STOP_LOSS_PERCENT}%)`);
         const result = await closePosition(currentPosition);
         if (result) {
@@ -364,14 +373,12 @@ async function tradingCycle() {
       return;
     }
 
-    // ✅ التحقق من الرصيد الكافي
     if (usdtBalance < TRADE_AMOUNT) {
       console.log(`⚠️ رصيد غير كافٍ (يحتاج ${TRADE_AMOUNT} USDT)`);
       isRunning = false;
       return;
     }
 
-    // ✅ جلب الأسعار الحالية
     const currentPrices = await getAllPrices();
     if (Object.keys(priceHistory).length === 0) {
       for (const [symbol, data] of Object.entries(currentPrices)) {
@@ -381,7 +388,6 @@ async function tradingCycle() {
       return;
     }
 
-    // ✅ البحث عن العملات المتزايدة
     const risingTokens = findRisingTokens(currentPrices);
     if (risingTokens.length > 0) {
       const best = risingTokens[0];
@@ -562,6 +568,20 @@ app.get('/dashboard', (req, res) => {
         .settings-box .value .highlight-green { color: #00aa55; }
         .settings-box .value .highlight-gold { color: #f0b90b; }
         .settings-box .value .highlight-red { color: #ff4444; }
+        .token-tag {
+          display: inline-block;
+          background: #1a2335;
+          padding: 2px 10px;
+          border-radius: 12px;
+          font-size: 12px;
+          color: #aabbdd;
+          margin: 2px;
+          border: 1px solid #2a3a55;
+        }
+        .token-tag.new {
+          border-color: #f0b90b;
+          color: #f0b90b;
+        }
         @media (max-width: 500px) {
           .status-grid { grid-template-columns: 1fr; }
           .container { padding: 20px; }
@@ -592,7 +612,11 @@ app.get('/dashboard', (req, res) => {
           </div>
           <div class="card" style="grid-column: span 2;">
             <div class="label">👀 العملات المراقبة</div>
-            <div class="value" id="watching" style="font-size: 14px; color: #aabbdd;">BTC, ETH, BNB, SOL, XRP, ADA, DOGE, AVAX, LINK</div>
+            <div class="value" id="watching" style="font-size: 14px; color: #aabbdd;">
+              BTC, ETH, BNB, SOL, XRP, ADA, DOGE, AVAX, LINK, 
+              <span class="token-tag new">✨ ESPORTS</span>, 
+              <span class="token-tag new">✨ SPCX</span>
+            </div>
           </div>
         </div>
 
@@ -602,7 +626,8 @@ app.get('/dashboard', (req, res) => {
           <div class="value">
             💰 المبلغ: <span class="highlight-green">1.45 USDT</span> &nbsp;|&nbsp;
             🎯 جني ربح: <span class="highlight-gold">2%</span> &nbsp;|&nbsp;
-            ⛔ وقف خسارة: <span class="highlight-red">4%</span>
+            ⛔ وقف خسارة: <span class="highlight-red">4%</span> &nbsp;|&nbsp;
+            📈 عتبة: <span class="highlight-gold">0.1%</span>
           </div>
         </div>
 
@@ -661,7 +686,8 @@ app.get('/', async (req, res) => {
         tradeAmount: `${TRADE_AMOUNT} USDT`,
         profitTarget: `${PROFIT_PERCENT}%`,
         stopLoss: `${STOP_LOSS_PERCENT}%`,
-        leverage: `${LEVERAGE}x`
+        leverage: `${LEVERAGE}x`,
+        priceChangeThreshold: `${PRICE_CHANGE_THRESHOLD}%`
       }
     });
   } catch (error) {
@@ -696,10 +722,8 @@ async function startBot() {
       console.log('   3. تفعيل صلاحيات التداول للمفتاح');
     }
 
-    // ✅ التحقق من أن المبلغ المطلوب <= الرصيد
     if (balance < TRADE_AMOUNT) {
       console.log(`⚠️ تحذير: الرصيد (${balance.toFixed(4)}) أقل من مبلغ التداول (${TRADE_AMOUNT})`);
-      console.log(`📌 سيتم تقليل مبلغ التداول تلقائياً إلى ${balance.toFixed(4)}`);
     }
 
     await updatePriceHistory();
@@ -735,6 +759,7 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   ║   📊 لوحة التحكم: http://localhost:${PORT}/dashboard          ║
   ║   🚀 رافعة: ${LEVERAGE}x | 💰 مبلغ: ${TRADE_AMOUNT} USDT      ║
   ║   🎯 جني ربح: ${PROFIT_PERCENT}% | ⛔ وقف خسارة: ${STOP_LOSS_PERCENT}%  ║
+  ║   📈 العملات: ${SYMBOLS.length} عملة (بما فيها ESPORTS, SPCX) ║
   ║   ⚠️ تداول حقيقي - استخدم بحذر!                              ║
   ╚═══════════════════════════════════════════════════════════════╝
   `);
