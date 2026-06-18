@@ -36,7 +36,7 @@ const SYMBOLS = [
 ];
 
 // ==========================================
-// دوال مساعدة (BingX API)
+// دوال مساعدة (BingX API - الإصدار الصحيح)
 // ==========================================
 
 function generateSignature(params, secret) {
@@ -54,7 +54,7 @@ async function bingxRequest(method, endpoint, params = {}, signed = true) {
   const timestamp = Date.now();
   
   const allParams = {
-    timestamp: timestamp,
+    timestamp: timestamp.toString(),
     ...params
   };
   
@@ -84,21 +84,28 @@ async function bingxRequest(method, endpoint, params = {}, signed = true) {
     }
     return response.data;
   } catch (error) {
-    console.error('❌ خطأ في طلب BingX:', error.response?.data || error.message);
+    console.error('❌ خطأ في طلب BingX:', {
+      status: error.response?.status,
+      data: error.response?.data,
+      message: error.message,
+      endpoint: endpoint
+    });
     return null;
   }
 }
 
 // ==========================================
-// جلب سعر العملة
+// ✅ جلب سعر العملة - v3 الصحيح
 // ==========================================
 
 async function getPrice(symbol) {
   try {
-    const response = await bingxRequest('GET', '/openApi/swap/v2/quote/price', { symbol }, false);
+    // ✅ نقطة النهاية الصحيحة v3
+    const response = await bingxRequest('GET', '/openApi/swap/v3/quote/price', { symbol }, false);
     if (response && response.code === 0 && response.data) {
       return parseFloat(response.data.price);
     }
+    console.log(`⚠️ فشل جلب سعر ${symbol}:`, response?.msg || 'خطأ غير معروف');
     return null;
   } catch (error) {
     console.error(`❌ فشل جلب سعر ${symbol}:`, error);
@@ -116,26 +123,35 @@ async function getAllPrices() {
 }
 
 // ==========================================
-// جلب الرصيد من BingX Futures
+// ✅ جلب الرصيد من BingX Futures - v3 الصحيح
 // ==========================================
 
 async function getFuturesBalance() {
   try {
-    const response = await bingxRequest('GET', '/openApi/swap/v2/user/balance', {});
+    // ✅ نقطة النهاية الصحيحة v3
+    const response = await bingxRequest('GET', '/openApi/swap/v3/user/balance', {});
+    
+    console.log('📊 استجابة الرصيد (v3):', JSON.stringify(response, null, 2).substring(0, 200));
     
     if (response && response.code === 0) {
-      const balance = response.data || {};
-      if (balance.balance) {
-        return parseFloat(balance.balance) || 0;
+      const data = response.data || {};
+      
+      // الطريقة الصحيحة لقراءة الرصيد في v3
+      if (data.balance) {
+        return parseFloat(data.balance) || 0;
       }
-      if (balance.USDT) {
-        return parseFloat(balance.USDT.available) || 0;
-      }
-      if (Array.isArray(balance)) {
-        const usdtAsset = balance.find(asset => asset.asset === 'USDT');
+      
+      // إذا كان الرصيد في مصفوفة assets
+      if (data.assets && Array.isArray(data.assets)) {
+        const usdtAsset = data.assets.find(asset => asset.asset === 'USDT');
         if (usdtAsset) {
           return parseFloat(usdtAsset.available) || 0;
         }
+      }
+      
+      // إذا كان الرصيد مباشرة
+      if (data.USDT) {
+        return parseFloat(data.USDT.available) || 0;
       }
     }
     return 0;
@@ -146,20 +162,21 @@ async function getFuturesBalance() {
 }
 
 // ==========================================
-// تعيين الرافعة المالية
+// ✅ تعيين الرافعة المالية - v3 الصحيح
 // ==========================================
 
 async function setLeverage(symbol) {
   try {
-    const response = await bingxRequest('POST', '/openApi/swap/v2/trade/leverage', {
+    // ✅ نقطة النهاية الصحيحة v3
+    const response = await bingxRequest('POST', '/openApi/swap/v3/trade/leverage', {
       symbol: symbol,
-      leverage: LEVERAGE,
-      side: 'LONG'
+      leverage: LEVERAGE
     });
     if (response && response.code === 0) {
       console.log(`✅ تم تعيين الرافعة x${LEVERAGE} لـ ${symbol}`);
       return true;
     }
+    console.log(`⚠️ فشل تعيين الرافعة لـ ${symbol}:`, response?.msg);
     return false;
   } catch (error) {
     console.error(`❌ فشل تعيين الرافعة:`, error);
@@ -168,20 +185,29 @@ async function setLeverage(symbol) {
 }
 
 // ==========================================
-// فتح صفقة شراء (Long)
+// ✅ فتح صفقة شراء (Long) - v3 الصحيح
 // ==========================================
 
 async function openLongPosition(symbol, amount) {
   try {
     const price = await getPrice(symbol);
-    if (!price) return null;
+    if (!price) {
+      console.log(`⚠️ لا يمكن فتح صفقة: سعر ${symbol} غير متوفر`);
+      return null;
+    }
 
     const quantity = (amount * LEVERAGE) / price;
     const roundedQuantity = Math.floor(quantity * 1000) / 1000;
 
+    if (roundedQuantity <= 0) {
+      console.log(`⚠️ الكمية صغيرة جداً: ${roundedQuantity}`);
+      return null;
+    }
+
     console.log(`📊 فتح صفقة شراء: ${roundedQuantity} ${symbol} بسعر ${price}`);
 
-    const response = await bingxRequest('POST', '/openApi/swap/v2/trade/order', {
+    // ✅ نقطة النهاية الصحيحة v3
+    const response = await bingxRequest('POST', '/openApi/swap/v3/trade/order', {
       symbol: symbol,
       side: 'BUY',
       type: 'MARKET',
@@ -199,6 +225,7 @@ async function openLongPosition(symbol, amount) {
         timestamp: Date.now()
       };
     }
+    console.log(`⚠️ فشل فتح الصفقة:`, response?.msg);
     return null;
   } catch (error) {
     console.error(`❌ فشل فتح الصفقة:`, error);
@@ -207,17 +234,21 @@ async function openLongPosition(symbol, amount) {
 }
 
 // ==========================================
-// إغلاق صفقة (بيع)
+// ✅ إغلاق صفقة (بيع) - v3 الصحيح
 // ==========================================
 
 async function closePosition(position) {
   try {
     const currentPrice = await getPrice(position.symbol);
-    if (!currentPrice) return false;
+    if (!currentPrice) {
+      console.log(`⚠️ لا يمكن إغلاق الصفقة: سعر ${position.symbol} غير متوفر`);
+      return false;
+    }
 
     console.log(`📊 إغلاق صفقة: ${position.quantity} ${position.symbol} بسعر ${currentPrice}`);
 
-    const response = await bingxRequest('POST', '/openApi/swap/v2/trade/order', {
+    // ✅ نقطة النهاية الصحيحة v3
+    const response = await bingxRequest('POST', '/openApi/swap/v3/trade/order', {
       symbol: position.symbol,
       side: 'SELL',
       type: 'MARKET',
@@ -229,6 +260,7 @@ async function closePosition(position) {
       console.log(`✅ تم إغلاق الصفقة: ${position.symbol}`);
       return true;
     }
+    console.log(`⚠️ فشل إغلاق الصفقة:`, response?.msg);
     return false;
   } catch (error) {
     console.error(`❌ فشل إغلاق الصفقة:`, error);
@@ -243,7 +275,6 @@ async function closePosition(position) {
 let priceHistory = {};
 let currentPosition = null;
 let isRunning = false;
-let botStarted = false;
 
 function findRisingTokens(currentPrices) {
   const rising = [];
@@ -281,7 +312,7 @@ async function tradingCycle() {
     console.log(`💰 رصيد USDT: ${usdtBalance.toFixed(2)}`);
 
     if (usdtBalance === 0) {
-      console.log('⚠️ رصيد USDT: 0 أو غير متوفر');
+      console.log('⚠️ رصيد USDT: 0 أو غير متوفر - تأكد من المفاتيح والرصيد');
       isRunning = false;
       return;
     }
@@ -358,7 +389,6 @@ const PORT = process.env.PORT || 10000;
 app.use(cors());
 app.use(express.json());
 
-// نقطة نهاية الصحة (health check)
 app.get('/health', (req, res) => {
   res.json({ 
     status: 'ok', 
@@ -371,7 +401,7 @@ app.get('/', async (req, res) => {
   try {
     const usdtBalance = await getFuturesBalance();
     res.json({
-      status: '⚡ بوت BingX Futures يعمل',
+      status: '⚡ بوت BingX Futures يعمل (v3 API)',
       timestamp: new Date().toISOString(),
       balance: `${usdtBalance.toFixed(2)} USDT`,
       leverage: `${LEVERAGE}x`,
@@ -384,15 +414,14 @@ app.get('/', async (req, res) => {
 });
 
 // ==========================================
-// تشغيل البوت مع معالجة الأخطاء
+// تشغيل البوت
 // ==========================================
 
 async function startBot() {
   try {
-    console.log('⚡⚡ بدء تشغيل بوت العقود الآجلة (BingX)');
+    console.log('⚡⚡ بدء تشغيل بوت العقود الآجلة (BingX v3)');
     console.log(`📊 العملات: ${SYMBOLS.join(', ')}`);
     console.log(`💰 المبلغ: ${TRADE_AMOUNT} USDT (رافعة x${LEVERAGE})`);
-    console.log(`⚠️ تحذير: هذا البوت يستخدم أموالاً حقيقية!`);
 
     // اختبار الاتصال
     console.log('🧪 اختبار الاتصال بـ BingX...');
@@ -400,17 +429,18 @@ async function startBot() {
     console.log(`💰 رصيد USDT في Futures: ${balance.toFixed(2)}`);
 
     if (balance === 0) {
-      console.log('⚠️ تحذير: الرصيد 0 أو غير متوفر. تأكد من مفاتيح API.');
+      console.log('⚠️ تحذير: الرصيد 0 أو غير متوفر.');
+      console.log('📌 تأكد من:');
+      console.log('   1. صحة مفاتيح API');
+      console.log('   2. وجود رصيد في حساب العقود الآجلة');
+      console.log('   3. تفعيل صلاحيات التداول للمفتاح');
     }
 
-    // تحديث تاريخ الأسعار
     await updatePriceHistory();
     console.log('✅ تم تحديث تاريخ الأسعار');
 
-    // تنفيذ دورة تداول أولى
     await tradingCycle();
 
-    // بدء الدورة المتكررة
     setInterval(async () => {
       try {
         await tradingCycle();
@@ -419,12 +449,10 @@ async function startBot() {
       }
     }, CHECK_INTERVAL);
 
-    botStarted = true;
     console.log(`✅ البوت يعمل بنجاح! يتم التحديث كل ${CHECK_INTERVAL/1000} ثانية`);
 
   } catch (error) {
     console.error(`❌ فشل بدء البوت: ${error.message}`);
-    // لا نخرج من العملية، نستمر في المحاولة
     setTimeout(startBot, 30000);
   }
 }
@@ -436,49 +464,36 @@ async function startBot() {
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`
   ╔═══════════════════════════════════════════════════════════════╗
-  ║   ⚡ بوت العقود الآجلة - BingX Futures                      ║
+  ║   ⚡ بوت العقود الآجلة - BingX Futures (v3)                 ║
   ║   📡 http://localhost:${PORT}                                  ║
   ║   🚀 رافعة حقيقية x${LEVERAGE}                               ║
   ║   ⚠️ تداول حقيقي - استخدم بحذر!                              ║
   ╚═══════════════════════════════════════════════════════════════╝
   `);
   
-  // بدء البوت بعد الخادم
   startBot();
 });
 
 // ==========================================
-// معالجة إشارات الإيقاف
+// معالجة الإيقاف
 // ==========================================
 
 process.on('SIGTERM', () => {
-  console.log('🛑 استلام إشارة SIGTERM، إيقاف البوت...');
-  server.close(() => {
-    console.log('✅ تم إيقاف الخادم');
-    process.exit(0);
-  });
+  console.log('🛑 إيقاف البوت...');
+  server.close(() => process.exit(0));
 });
 
 process.on('SIGINT', () => {
-  console.log('🛑 استلام إشارة SIGINT، إيقاف البوت...');
-  server.close(() => {
-    console.log('✅ تم إيقاف الخادم');
-    process.exit(0);
-  });
+  console.log('🛑 إيقاف البوت...');
+  server.close(() => process.exit(0));
 });
-
-// ==========================================
-// معالجة الأخطاء غير المتوقعة
-// ==========================================
 
 process.on('uncaughtException', (error) => {
   console.error('❌ خطأ غير متوقع:', error);
-  // لا نخرج من العملية، نستمر
 });
 
-process.on('unhandledRejection', (reason, promise) => {
+process.on('unhandledRejection', (reason) => {
   console.error('❌ رفض غير معالج:', reason);
-  // لا نخرج من العملية، نستمر
 });
 
 console.log('🚀 جاري تشغيل البوت...');
