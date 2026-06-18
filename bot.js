@@ -23,11 +23,11 @@ if (!process.env.BINGX_API_KEY || !process.env.BINGX_API_SECRET) {
 const API_KEY = process.env.BINGX_API_KEY;
 const API_SECRET = process.env.BINGX_API_SECRET;
 const LEVERAGE = parseInt(process.env.LEVERAGE) || 10;
-const TRADE_AMOUNT = parseFloat(process.env.TRADE_AMOUNT) || 10;
-const PROFIT_PERCENT = parseFloat(process.env.PROFIT_PERCENT) || 0.3;
+const TRADE_AMOUNT = parseFloat(process.env.TRADE_AMOUNT) || 1.45;
+const PROFIT_PERCENT = parseFloat(process.env.PROFIT_PERCENT) || 2;
 const PRICE_CHANGE_THRESHOLD = parseFloat(process.env.PRICE_CHANGE_THRESHOLD) || 0.1;
 const CHECK_INTERVAL = parseInt(process.env.CHECK_INTERVAL) || 5000;
-const STOP_LOSS_PERCENT = parseFloat(process.env.STOP_LOSS_PERCENT) || 2;
+const STOP_LOSS_PERCENT = parseFloat(process.env.STOP_LOSS_PERCENT) || 4;
 
 // قائمة العملات للمراقبة - تم تحديثها حسب الرسالة
 const SYMBOLS = [
