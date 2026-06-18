@@ -119,7 +119,7 @@ async function bingxRequest(method, endpoint, params = {}, signed = true) {
 }
 
 // ==========================================
-// جلب بيانات الشمعة
+// ✅ جلب بيانات الشمعة (معدل بالكامل)
 // ==========================================
 
 async function getCandleData(symbol) {
@@ -130,21 +130,33 @@ async function getCandleData(symbol) {
       limit: CANDLE_LIMIT
     }, false);
 
-    if (!response) return null;
+    const raw = response?.data;
 
-    const data = response?.data?.data || response?.data || response;
+    // 🔥 معالجة كل احتمالات شكل البيانات
+    let data = null;
 
-    if (!Array.isArray(data)) return null;
+    if (Array.isArray(raw)) {
+      data = raw;
+    } else if (Array.isArray(raw?.data)) {
+      data = raw.data;
+    } else if (Array.isArray(response?.data?.data)) {
+      data = response.data.data;
+    }
+
+    if (!data || data.length < 2) {
+      console.log(`⚠️ بيانات غير صالحة لـ ${symbol}`);
+      return null;
+    }
 
     return data;
   } catch (error) {
-    console.error(`❌ فشل جلب شمعة ${symbol}:`, error);
+    console.error(`❌ فشل جلب شمعة ${symbol}:`, error.message);
     return null;
   }
 }
 
 // ==========================================
-// ✅ تحليل الشمعة (شراء + بيع)
+// ✅ تحليل الشمعة (مع حماية إضافية)
 // ==========================================
 
 async function analyzeCandle(symbol) {
@@ -152,13 +164,23 @@ async function analyzeCandle(symbol) {
     const candleData = await getCandleData(symbol);
     
     if (!candleData || !Array.isArray(candleData) || candleData.length < 2) {
+      console.log(`⚠️ لا توجد بيانات كافية للشمعة لـ ${symbol}`);
       return null;
     }
 
     const currentCandle = candleData[candleData.length - 1];
     const previousCandle = candleData[candleData.length - 2];
 
-    if (!currentCandle || !previousCandle) return null;
+    // ✅ حماية إضافية للتحقق من صحة البيانات
+    if (
+      !Array.isArray(currentCandle) ||
+      currentCandle.length < 5 ||
+      !Array.isArray(previousCandle) ||
+      previousCandle.length < 5
+    ) {
+      console.log(`⚠️ بيانات الشمعة غير مكتملة لـ ${symbol}`);
+      return null;
+    }
 
     // ✅ بيانات الشمعة: [time, open, high, low, close, volume]
     const currentLow = Number(currentCandle[3]);
@@ -166,11 +188,16 @@ async function analyzeCandle(symbol) {
     const currentClose = Number(currentCandle[4]);
     const previousClose = Number(previousCandle[4]);
 
+    // ✅ التحقق من صحة القيم
     if (isNaN(currentLow) || isNaN(currentHigh) || isNaN(currentClose) || isNaN(previousClose)) {
+      console.log(`⚠️ قيم غير صالحة لـ ${symbol}: Low=${currentLow}, High=${currentHigh}, Close=${currentClose}, PrevClose=${previousClose}`);
       return null;
     }
 
-    if (currentLow === 0 || currentHigh === 0) return null;
+    if (currentLow === 0 || currentHigh === 0) {
+      console.log(`⚠️ القاع أو القمة صفر لـ ${symbol}`);
+      return null;
+    }
 
     // ✅ حساب نسبة الارتداد من القاع (شراء)
     const bouncePercent = ((currentClose - currentLow) / currentLow) * 100;
@@ -198,7 +225,6 @@ async function analyzeCandle(symbol) {
       dropPercent,
       shouldBuy,
       shouldSell,
-      // ✅ تحديد أفضل إشارة (أولوية للشراء ثم البيع)
       bestSignal: shouldBuy ? 'BUY' : (shouldSell ? 'SELL' : null)
     };
   } catch (error) {
@@ -296,7 +322,7 @@ async function setLeverage(symbol) {
 }
 
 // ==========================================
-// ✅ فتح صفقة شراء (Long)
+// فتح صفقة شراء (Long)
 // ==========================================
 
 async function openLongPosition(symbol, amount) {
@@ -348,7 +374,7 @@ async function openLongPosition(symbol, amount) {
 }
 
 // ==========================================
-// ✅ فتح صفقة بيع (Short)
+// فتح صفقة بيع (Short)
 // ==========================================
 
 async function openShortPosition(symbol, amount) {
@@ -400,7 +426,7 @@ async function openShortPosition(symbol, amount) {
 }
 
 // ==========================================
-// ✅ إغلاق صفقة (عكس الاتجاه)
+// إغلاق صفقة
 // ==========================================
 
 async function closePosition(position) {
@@ -413,7 +439,6 @@ async function closePosition(position) {
 
     console.log(`📊 إغلاق صفقة ${position.type}: ${position.quantity} ${position.symbol} بسعر ${currentPrice}`);
 
-    // ✅ إذا كانت الصفقة LONG، نبيع لإغلاقها. وإذا كانت SHORT، نشتري لإغلاقها.
     const closeSide = position.type === 'LONG' ? 'SELL' : 'BUY';
     const closePositionSide = position.type === 'LONG' ? 'LONG' : 'SHORT';
 
@@ -473,7 +498,7 @@ async function tradingCycle() {
       let profitPercent;
       if (currentPosition.type === 'LONG') {
         profitPercent = ((currentPrice - currentPosition.entryPrice) / currentPosition.entryPrice) * 100 * LEVERAGE;
-      } else { // SHORT
+      } else {
         profitPercent = ((currentPosition.entryPrice - currentPrice) / currentPosition.entryPrice) * 100 * LEVERAGE;
       }
       
@@ -518,14 +543,12 @@ async function tradingCycle() {
       
       console.log(`📊 ${symbol}: القاع=${analysis.currentLow}, القمة=${analysis.currentHigh}, الارتداد=${analysis.bouncePercent.toFixed(2)}%, النزول=${analysis.dropPercent.toFixed(2)}% → ${signalText}`);
 
-      // ✅ أفضل فرصة شراء
       if (analysis.shouldBuy) {
         if (!bestBuyOpportunity || analysis.bouncePercent > bestBuyOpportunity.bouncePercent) {
           bestBuyOpportunity = analysis;
         }
       }
 
-      // ✅ أفضل فرصة بيع
       if (analysis.shouldSell) {
         if (!bestSellOpportunity || analysis.dropPercent > bestSellOpportunity.dropPercent) {
           bestSellOpportunity = analysis;
