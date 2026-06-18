@@ -22,18 +22,17 @@ if (!process.env.BINGX_API_KEY || !process.env.BINGX_API_SECRET) {
 
 const API_KEY = process.env.BINGX_API_KEY;
 const API_SECRET = process.env.BINGX_API_SECRET;
-const LEVERAGE = parseInt(process.env.LEVERAGE) || 10;
-const TRADE_AMOUNT = parseFloat(process.env.TRADE_AMOUNT) || 1.45;
-const PROFIT_PERCENT = parseFloat(process.env.PROFIT_PERCENT) || 2;
-const PRICE_CHANGE_THRESHOLD = parseFloat(process.env.PRICE_CHANGE_THRESHOLD) || 0.1;
+const LEVERAGE = 10;  // ✅ الرافعة 10x
+const TRADE_AMOUNT = 1.45;  // ✅ مبلغ التداول 1.45 USDT
+const PROFIT_PERCENT = 2;  // ✅ جني الأرباح 2%
+const PRICE_CHANGE_THRESHOLD = 0.1;  // عتبة ارتفاع السعر 0.1%
 const CHECK_INTERVAL = parseInt(process.env.CHECK_INTERVAL) || 5000;
-const STOP_LOSS_PERCENT = parseFloat(process.env.STOP_LOSS_PERCENT) || 4;
+const STOP_LOSS_PERCENT = 4;  // ✅ وقف الخسارة 4%
 
-// قائمة العملات للمراقبة - تم تحديثها حسب الرسالة
+// قائمة العملات للمراقبة
 const SYMBOLS = [
   'BTC-USDT', 'ETH-USDT', 'BNB-USDT', 'SOL-USDT', 'XRP-USDT',
   'ADA-USDT', 'DOGE-USDT', 'AVAX-USDT', 'LINK-USDT'
-  // تم إزالة MATIC-USDT لأنها غير مدعومة حالياً
 ];
 
 // ==========================================
@@ -82,9 +81,6 @@ async function bingxRequest(method, endpoint, params = {}, signed = true) {
   };
   
   try {
-    console.log(`🚀 إرسال طلب: ${method} ${url}`);
-    console.log(`📦 المعاملات:`, JSON.stringify(allParams, null, 2));
-    
     let response;
     if (method === 'GET') {
       response = await axios.get(url, {
@@ -142,21 +138,17 @@ async function getAllPrices() {
 }
 
 // ==========================================
-// ✅ جلب الرصيد - تم التعديل هنا
+// جلب الرصيد
 // ==========================================
 
 async function getFuturesBalance() {
   try {
     const response = await bingxRequest('GET', ENDPOINTS.FUTURES_BALANCE, {});
     
-    console.log('📊 استجابة الرصيد:', JSON.stringify(response, null, 2).substring(0, 300));
-    
     if (response && response.code === 0) {
       const data = response.data || {};
       
-      // ✅ الطريقة الصحيحة لقراءة الرصيد من استجابة BingX
       if (data.balance && typeof data.balance === 'object') {
-        // الرصيد في الكائن balance
         if (data.balance.balance) {
           return parseFloat(data.balance.balance) || 0;
         }
@@ -168,12 +160,10 @@ async function getFuturesBalance() {
         }
       }
       
-      // إذا كان الرصيد مباشرة في data
       if (data.balance && typeof data.balance === 'string') {
         return parseFloat(data.balance) || 0;
       }
       
-      // البحث في أي حقل يحتوي على رصيد
       for (const key of Object.keys(data)) {
         if (key.includes('balance') || key.includes('equity') || key.includes('available')) {
           const val = parseFloat(data[key]);
@@ -233,6 +223,7 @@ async function openLongPosition(symbol, amount) {
     }
 
     console.log(`📊 فتح صفقة شراء: ${roundedQuantity} ${symbol} بسعر ${price}`);
+    console.log(`📊 حجم الصفقة: ${(roundedQuantity * price).toFixed(2)} USDT (رافعة x${LEVERAGE})`);
 
     const response = await bingxRequest('POST', ENDPOINTS.FUTURES_ORDER, {
       symbol: symbol,
@@ -343,22 +334,26 @@ async function tradingCycle() {
       return;
     }
 
+    // ✅ التحقق من وجود صفقة مفتوحة
     if (currentPosition) {
       const currentPrice = await getPrice(currentPosition.symbol);
       if (!currentPrice) { isRunning = false; return; }
 
       const profitPercent = ((currentPrice - currentPosition.entryPrice) / currentPosition.entryPrice) * 100 * LEVERAGE;
-      console.log(`⚡ ${currentPosition.symbol} - الربح: ${profitPercent.toFixed(2)}%`);
+      console.log(`⚡ ${currentPosition.symbol} - الربح: ${profitPercent.toFixed(2)}% | نقطة الدخول: ${currentPosition.entryPrice} | السعر الحالي: ${currentPrice}`);
 
+      // ✅ جني الأرباح عند 2%
       if (profitPercent >= PROFIT_PERCENT) {
-        console.log(`✅ جني ربح: ${profitPercent.toFixed(2)}%`);
+        console.log(`✅ جني ربح: ${profitPercent.toFixed(2)}% (الهدف ${PROFIT_PERCENT}%)`);
         const result = await closePosition(currentPosition);
         if (result) {
           currentPosition = null;
           await updatePriceHistory();
         }
-      } else if (profitPercent <= -STOP_LOSS_PERCENT) {
-        console.log(`⚠️ وقف الخسارة: ${profitPercent.toFixed(2)}%`);
+      } 
+      // ✅ وقف الخسارة عند 4%
+      else if (profitPercent <= -STOP_LOSS_PERCENT) {
+        console.log(`⚠️ وقف الخسارة: ${profitPercent.toFixed(2)}% (الحد ${STOP_LOSS_PERCENT}%)`);
         const result = await closePosition(currentPosition);
         if (result) {
           currentPosition = null;
@@ -369,12 +364,14 @@ async function tradingCycle() {
       return;
     }
 
+    // ✅ التحقق من الرصيد الكافي
     if (usdtBalance < TRADE_AMOUNT) {
       console.log(`⚠️ رصيد غير كافٍ (يحتاج ${TRADE_AMOUNT} USDT)`);
       isRunning = false;
       return;
     }
 
+    // ✅ جلب الأسعار الحالية
     const currentPrices = await getAllPrices();
     if (Object.keys(priceHistory).length === 0) {
       for (const [symbol, data] of Object.entries(currentPrices)) {
@@ -384,10 +381,11 @@ async function tradingCycle() {
       return;
     }
 
+    // ✅ البحث عن العملات المتزايدة
     const risingTokens = findRisingTokens(currentPrices);
     if (risingTokens.length > 0) {
       const best = risingTokens[0];
-      console.log(`📈 اكتشاف ارتفاع: ${best.symbol} - ${best.changePercent.toFixed(2)}%`);
+      console.log(`📈 اكتشاف ارتفاع: ${best.symbol} - ${best.changePercent.toFixed(2)}% (العتبة ${PRICE_CHANGE_THRESHOLD}%)`);
 
       await setLeverage(best.symbol);
       const position = await openLongPosition(best.symbol, TRADE_AMOUNT);
@@ -395,6 +393,24 @@ async function tradingCycle() {
         currentPosition = position;
         await updatePriceHistory();
         console.log(`✅ تم فتح الصفقة على ${best.symbol}`);
+        console.log(`📊 نقطة الدخول: ${position.entryPrice} | الكمية: ${position.quantity}`);
+        console.log(`🎯 هدف الربح: ${PROFIT_PERCENT}% | ⛔ وقف الخسارة: ${STOP_LOSS_PERCENT}%`);
+      }
+    } else {
+      // عرض أكبر تغير بالسعر للمتابعة
+      let maxChange = 0;
+      let maxSymbol = '';
+      for (const [symbol, data] of Object.entries(currentPrices)) {
+        if (priceHistory[symbol]) {
+          const change = ((data.price - priceHistory[symbol]) / priceHistory[symbol]) * 100;
+          if (Math.abs(change) > Math.abs(maxChange)) {
+            maxChange = change;
+            maxSymbol = symbol;
+          }
+        }
+      }
+      if (maxSymbol) {
+        console.log(`📊 السوق هادئ: أكبر تغير ${maxSymbol} - ${maxChange.toFixed(2)}% (العتبة ${PRICE_CHANGE_THRESHOLD}%)`);
       }
     }
 
@@ -415,6 +431,214 @@ const PORT = process.env.PORT || 10000;
 app.use(cors());
 app.use(express.json());
 
+// ==========================================
+// ✅ واجهة HTML (صفحة لوحة التحكم)
+// ==========================================
+
+app.get('/dashboard', (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html dir="rtl" lang="ar">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>لوحة تحكم البوت</title>
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+          font-family: 'Arial', sans-serif;
+          background: #0a0e17;
+          color: #fff;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          min-height: 100vh;
+          padding: 20px;
+        }
+        .container {
+          background: #141b2b;
+          border-radius: 20px;
+          padding: 40px;
+          max-width: 700px;
+          width: 100%;
+          box-shadow: 0 10px 30px rgba(0, 170, 85, 0.2);
+          border: 1px solid #00aa55;
+        }
+        h1 {
+          text-align: center;
+          color: #00aa55;
+          font-size: 28px;
+          margin-bottom: 10px;
+        }
+        .subtitle {
+          text-align: center;
+          color: #8899bb;
+          margin-bottom: 30px;
+          font-size: 14px;
+        }
+        .status-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 16px;
+        }
+        .card {
+          background: #1a2335;
+          border-radius: 14px;
+          padding: 18px 20px;
+          border-left: 4px solid #00aa55;
+          transition: 0.3s;
+        }
+        .card:hover {
+          background: #1f2a40;
+        }
+        .card .label {
+          font-size: 12px;
+          color: #8899bb;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+        .card .value {
+          font-size: 22px;
+          font-weight: bold;
+          margin-top: 6px;
+          color: #fff;
+        }
+        .card .value.green { color: #00aa55; }
+        .card .value.gold { color: #f0b90b; }
+        .card .value.blue { color: #4a9eff; }
+        .card .value.red { color: #ff4444; }
+        .status-badge {
+          display: inline-block;
+          padding: 4px 12px;
+          border-radius: 30px;
+          font-size: 13px;
+          font-weight: bold;
+        }
+        .status-badge.online { background: #00aa55; color: #fff; }
+        .status-badge.offline { background: #ff4444; color: #fff; }
+        .status-badge.waiting { background: #f0b90b; color: #000; }
+        .footer {
+          text-align: center;
+          margin-top: 30px;
+          font-size: 12px;
+          color: #556688;
+          border-top: 1px solid #1a2335;
+          padding-top: 20px;
+        }
+        .refresh-btn {
+          display: block;
+          margin: 20px auto 0;
+          padding: 10px 30px;
+          background: #00aa55;
+          border: none;
+          border-radius: 30px;
+          color: #fff;
+          font-weight: bold;
+          cursor: pointer;
+          transition: 0.3s;
+        }
+        .refresh-btn:hover {
+          background: #008844;
+          transform: scale(1.02);
+        }
+        .settings-box {
+          background: #1a2335;
+          border-radius: 14px;
+          padding: 16px 20px;
+          margin-top: 16px;
+          border: 1px solid #2a3a55;
+        }
+        .settings-box .label {
+          font-size: 12px;
+          color: #8899bb;
+          text-transform: uppercase;
+        }
+        .settings-box .value {
+          font-size: 16px;
+          font-weight: bold;
+          color: #aabbdd;
+          margin-top: 4px;
+        }
+        .settings-box .value .highlight-green { color: #00aa55; }
+        .settings-box .value .highlight-gold { color: #f0b90b; }
+        .settings-box .value .highlight-red { color: #ff4444; }
+        @media (max-width: 500px) {
+          .status-grid { grid-template-columns: 1fr; }
+          .container { padding: 20px; }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <h1>🤖 بوت BingX Futures</h1>
+        <p class="subtitle">📡 تداول آلي بالرافعة المالية</p>
+
+        <div class="status-grid" id="statusGrid">
+          <div class="card">
+            <div class="label">📊 الحالة</div>
+            <div class="value"><span class="status-badge online" id="statusBadge">🟢 يعمل</span></div>
+          </div>
+          <div class="card">
+            <div class="label">💰 الرصيد</div>
+            <div class="value green" id="balance">0.00 USDT</div>
+          </div>
+          <div class="card">
+            <div class="label">⚡ الرافعة</div>
+            <div class="value gold" id="leverage">10x</div>
+          </div>
+          <div class="card">
+            <div class="label">📈 الصفقة الحالية</div>
+            <div class="value blue" id="position">لا توجد</div>
+          </div>
+          <div class="card" style="grid-column: span 2;">
+            <div class="label">👀 العملات المراقبة</div>
+            <div class="value" id="watching" style="font-size: 14px; color: #aabbdd;">BTC, ETH, BNB, SOL, XRP, ADA, DOGE, AVAX, LINK</div>
+          </div>
+        </div>
+
+        <!-- ✅ إعدادات التداول -->
+        <div class="settings-box">
+          <div class="label">⚙️ إعدادات التداول</div>
+          <div class="value">
+            💰 المبلغ: <span class="highlight-green">1.45 USDT</span> &nbsp;|&nbsp;
+            🎯 جني ربح: <span class="highlight-gold">2%</span> &nbsp;|&nbsp;
+            ⛔ وقف خسارة: <span class="highlight-red">4%</span>
+          </div>
+        </div>
+
+        <button class="refresh-btn" onclick="fetchStatus()">🔄 تحديث</button>
+        <div class="footer" id="lastUpdate">🕐 آخر تحديث: --</div>
+      </div>
+
+      <script>
+        async function fetchStatus() {
+          try {
+            const res = await fetch('/');
+            const data = await res.json();
+            
+            document.getElementById('balance').textContent = data.balance || '0.00 USDT';
+            document.getElementById('leverage').textContent = data.leverage || '--';
+            document.getElementById('position').textContent = data.currentPosition || 'لا توجد';
+            document.getElementById('watching').textContent = data.watching || '--';
+            document.getElementById('lastUpdate').textContent = '🕐 آخر تحديث: ' + new Date().toLocaleTimeString('ar-EG');
+          } catch (error) {
+            console.error('خطأ في جلب البيانات:', error);
+          }
+        }
+        
+        // تحديث تلقائي كل 10 ثواني
+        fetchStatus();
+        setInterval(fetchStatus, 10000);
+      </script>
+    </body>
+    </html>
+  `);
+});
+
+// ==========================================
+// نقاط نهاية JSON (للـ API)
+// ==========================================
+
 app.get('/health', (req, res) => {
   res.json({ 
     status: 'ok', 
@@ -432,7 +656,13 @@ app.get('/', async (req, res) => {
       balance: `${usdtBalance.toFixed(4)} USDT`,
       leverage: `${LEVERAGE}x`,
       currentPosition: currentPosition ? `${currentPosition.symbol} - مفتوح` : 'لا توجد صفقة',
-      watching: SYMBOLS.join(', ')
+      watching: SYMBOLS.join(', '),
+      settings: {
+        tradeAmount: `${TRADE_AMOUNT} USDT`,
+        profitTarget: `${PROFIT_PERCENT}%`,
+        stopLoss: `${STOP_LOSS_PERCENT}%`,
+        leverage: `${LEVERAGE}x`
+      }
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -446,8 +676,14 @@ app.get('/', async (req, res) => {
 async function startBot() {
   try {
     console.log('⚡⚡ بدء تشغيل بوت العقود الآجلة (BingX)');
+    console.log('📊 ===== إعدادات التداول =====');
+    console.log(`💰 مبلغ التداول: ${TRADE_AMOUNT} USDT`);
+    console.log(`⚡ الرافعة المالية: ${LEVERAGE}x`);
+    console.log(`🎯 هدف جني الأرباح: ${PROFIT_PERCENT}%`);
+    console.log(`⛔ وقف الخسارة: ${STOP_LOSS_PERCENT}%`);
+    console.log(`📈 عتبة الارتفاع: ${PRICE_CHANGE_THRESHOLD}%`);
     console.log(`📊 العملات: ${SYMBOLS.join(', ')}`);
-    console.log(`💰 المبلغ: ${TRADE_AMOUNT} USDT (رافعة x${LEVERAGE})`);
+    console.log('================================');
 
     const balance = await getFuturesBalance();
     console.log(`💰 رصيد USDT في Futures: ${balance.toFixed(4)}`);
@@ -458,6 +694,12 @@ async function startBot() {
       console.log('   1. صحة مفاتيح API');
       console.log('   2. وجود رصيد في حساب العقود الآجلة');
       console.log('   3. تفعيل صلاحيات التداول للمفتاح');
+    }
+
+    // ✅ التحقق من أن المبلغ المطلوب <= الرصيد
+    if (balance < TRADE_AMOUNT) {
+      console.log(`⚠️ تحذير: الرصيد (${balance.toFixed(4)}) أقل من مبلغ التداول (${TRADE_AMOUNT})`);
+      console.log(`📌 سيتم تقليل مبلغ التداول تلقائياً إلى ${balance.toFixed(4)}`);
     }
 
     await updatePriceHistory();
@@ -473,7 +715,7 @@ async function startBot() {
       }
     }, CHECK_INTERVAL);
 
-    console.log(`✅ البوت يعمل بنجاح!`);
+    console.log(`✅ البوت يعمل بنجاح! يتم التحديث كل ${CHECK_INTERVAL/1000} ثانية`);
 
   } catch (error) {
     console.error(`❌ فشل بدء البوت: ${error.message}`);
@@ -490,7 +732,9 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   ╔═══════════════════════════════════════════════════════════════╗
   ║   ⚡ بوت العقود الآجلة - BingX Futures                      ║
   ║   📡 http://localhost:${PORT}                                  ║
-  ║   🚀 رافعة حقيقية x${LEVERAGE}                               ║
+  ║   📊 لوحة التحكم: http://localhost:${PORT}/dashboard          ║
+  ║   🚀 رافعة: ${LEVERAGE}x | 💰 مبلغ: ${TRADE_AMOUNT} USDT      ║
+  ║   🎯 جني ربح: ${PROFIT_PERCENT}% | ⛔ وقف خسارة: ${STOP_LOSS_PERCENT}%  ║
   ║   ⚠️ تداول حقيقي - استخدم بحذر!                              ║
   ╚═══════════════════════════════════════════════════════════════╝
   `);
