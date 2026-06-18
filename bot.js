@@ -17,38 +17,36 @@ if (!process.env.BINGX_API_KEY || !process.env.BINGX_API_SECRET) {
 }
 
 // ==========================================
-// إعدادات البوت (BingX Futures) - PRO TRADER
+// إعدادات البوت (BingX Futures) - سكالبينج احترافي
 // ==========================================
 
 const API_KEY = process.env.BINGX_API_KEY;
 const API_SECRET = process.env.BINGX_API_SECRET;
 
-// ✅ إعدادات رأس المال
+// ✅ إعدادات رأس المال والمخاطرة
 const TRADE_AMOUNT = 0.8;
 const USE_FULL_BALANCE = false;
+const MAX_RISK_PER_TRADE = 0.01; // 1% من الرصيد
 
 // ✅ الرافعة المالية
-const LEVERAGE = 10;
+const LEVERAGE = 5; // 5x للسكالبينج الآمن
 
 // ✅ أهداف سكالبينج سريعة
 const PROFIT_USDT_TARGET = 0.05;
 const MIN_PROFIT_USDT = 0.05;
 
-// ✅ إعدادات الشمعة (1 دقيقة - سكالبينج)
+// ✅ إعدادات الشمعة (1 دقيقة)
 const CANDLE_INTERVAL = '1m';
 const CANDLE_LIMIT = 30;
 
 // ✅ المتغيرات
-let lastPrices = {};
 let currentPosition = null;
 let isRunning = false;
-
 let lastTradeTime = 0;
 const cooldown = 3000; // 3 ثواني
 
-// ✅ سرعة المسح - ديناميكية
-const BASE_SCAN_INTERVAL = 5000;
-let currentScanInterval = BASE_SCAN_INTERVAL;
+// ✅ سرعة المسح
+const SCAN_INTERVAL = 3000; // 3 ثواني
 
 // ✅ تخزين العملات مؤقتاً
 let cachedSymbols = [];
@@ -139,7 +137,7 @@ async function bingxRequest(method, endpoint, params = {}, signed = true) {
 }
 
 // ==========================================
-// ✅ جلب العملات - أعلى 5 حجم
+// ✅ جلب العملات - أعلى 10 حجم
 // ==========================================
 
 async function getTopVolumeSymbols() {
@@ -156,59 +154,91 @@ async function getTopVolumeSymbols() {
 
   const contracts = response.data || [];
   
-  // ✅ فلتر: فقط USDT + ترتيب حسب الحجم
   const usdtPairs = contracts
     .filter(c => c.symbol && c.symbol.endsWith('USDT'))
     .sort((a, b) => Number(b.volume) - Number(a.volume))
-    .slice(0, 5) // ✅ أعلى 5 عملات حجم
+    .slice(0, 10) // ✅ أعلى 10 عملات حجم
     .map(c => c.symbol);
 
-  console.log(`📊 أعلى 5 عملات حجم: ${usdtPairs.join(', ')}`);
+  console.log(`📊 أعلى 10 عملات حجم: ${usdtPairs.join(', ')}`);
   return usdtPairs;
 }
 
 // ==========================================
-// ✅ PRO MAX SIGNAL ENGINE
+// ✅ إشارات الشراء والبيع المتقدمة
 // ==========================================
 
-function proBuy(prev, curr, candles) {
-  const body = Math.abs(curr.close - curr.open);
-  const range = curr.high - curr.low;
+function isBuySignal(candle, prev, candles) {
+  const body = Math.abs(candle.close - candle.open);
+  const range = candle.high - candle.low;
 
   if (range === 0) return false;
 
-  const wick = curr.close - curr.low;
+  const avgRange = candles.slice(-10).reduce((a, c) => a + (c.high - c.low), 0) / 10;
 
-  const strongReject = wick / range > 0.55;
+  const bullish = candle.close > candle.open;
+  const rejection = candle.low < prev.low; // كسر قاع
+  const recovery = candle.close > (candle.high + candle.low) / 2; // إغلاق قوي فوق المنتصف
+  const volatilityOk = range > avgRange * 0.8;
 
-  const momentum =
-    curr.close > prev.close &&
-    curr.close > curr.open;
-
-  const microTrend =
-    candles[candles.length - 2].close < curr.close;
-
-  return strongReject && momentum && microTrend;
+  return bullish && rejection && recovery && volatilityOk;
 }
 
-function proSell(prev, curr, candles) {
-  const body = Math.abs(curr.close - curr.open);
-  const range = curr.high - curr.low;
+function isSellSignal(candle, prev, candles) {
+  const body = Math.abs(candle.close - candle.open);
+  const range = candle.high - candle.low;
 
   if (range === 0) return false;
 
-  const upperWick = curr.high - curr.close;
+  const avgRange = candles.slice(-10).reduce((a, c) => a + (c.high - c.low), 0) / 10;
 
-  const strongReject = upperWick / range > 0.55;
+  const bearish = candle.close < candle.open;
+  const rejection = candle.high > prev.high; // كسر قمة
+  const rejectionClose = candle.close < (candle.high + candle.low) / 2;
+  const volatilityOk = range > avgRange * 0.8;
 
-  const momentum =
-    curr.close < prev.close &&
-    curr.close < curr.open;
+  return bearish && rejection && rejectionClose && volatilityOk;
+}
 
-  const microTrend =
-    candles[candles.length - 2].close > curr.close;
+// ==========================================
+// ✅ فلترة السوق
+// ==========================================
 
-  return strongReject && momentum && microTrend;
+function marketFilter(candles) {
+  const last = candles.slice(-5);
+
+  const trend = last[4].close - last[0].close;
+
+  const avgRange = last.reduce((a, c) => a + (c.high - c.low), 0) / 5;
+
+  // السوق لازم يتحرك
+  if (avgRange < 0.0001) return false;
+
+  // يمنع السوق الميت
+  return Math.abs(trend) > avgRange * 0.6;
+}
+
+// ==========================================
+// ✅ فحص الإشارة الكامل
+// ==========================================
+
+function checkSignal(candles) {
+  if (candles.length < 20) return null;
+
+  const candle = candles[candles.length - 1];
+  const prev = candles[candles.length - 2];
+
+  if (!marketFilter(candles)) return null;
+
+  if (isBuySignal(candle, prev, candles)) {
+    return "BUY";
+  }
+
+  if (isSellSignal(candle, prev, candles)) {
+    return "SELL";
+  }
+
+  return null;
 }
 
 // ==========================================
@@ -235,11 +265,10 @@ async function getCandles(symbol) {
       data = response.data.data;
     }
 
-    if (!data || !Array.isArray(data) || data.length < 3) {
+    if (!data || !Array.isArray(data) || data.length < 20) {
       return null;
     }
 
-    // ✅ استخراج بيانات الشمعات
     const candles = data.map(candle => ({
       open: Number(candle[1]),
       high: Number(candle[2]),
@@ -248,7 +277,7 @@ async function getCandles(symbol) {
       volume: Number(candle[5])
     })).filter(c => !isNaN(c.open) && !isNaN(c.high) && !isNaN(c.low) && !isNaN(c.close) && c.high > 0 && c.low > 0);
 
-    if (candles.length < 3) return null;
+    if (candles.length < 20) return null;
 
     return candles;
   } catch (error) {
@@ -258,26 +287,13 @@ async function getCandles(symbol) {
 }
 
 // ==========================================
-// ✅ حساب التقلب (Volatility)
+// ✅ حساب كمية العقد مع إدارة المخاطرة
 // ==========================================
 
-function calculateVolatility(candles) {
-  if (candles.length < 2) return 0.01;
-  
-  let sum = 0;
-  for (let i = 1; i < candles.length; i++) {
-    const change = Math.abs((candles[i].close - candles[i-1].close) / candles[i-1].close);
-    sum += change;
-  }
-  return sum / (candles.length - 1);
-}
-
-// ==========================================
-// ✅ حساب كمية العقد
-// ==========================================
-
-function calculateQuantity(price, amount) {
-  const quantity = (amount * LEVERAGE) / price;
+function calculateQuantity(price, balance) {
+  // ✅ المخاطرة 1% من الرصيد
+  const riskAmount = balance * MAX_RISK_PER_TRADE;
+  const quantity = (riskAmount * LEVERAGE) / price;
   const roundedQuantity = parseFloat(quantity.toFixed(6));
   return roundedQuantity;
 }
@@ -324,7 +340,7 @@ async function setLeverage(symbol) {
 // ✅ تنفيذ الأمر (Place Order)
 // ==========================================
 
-async function placeOrder(symbol, side, amount) {
+async function placeOrder(symbol, side, balance) {
   try {
     const price = await getPrice(symbol);
     if (!price) {
@@ -332,15 +348,15 @@ async function placeOrder(symbol, side, amount) {
       return null;
     }
 
-    const roundedQuantity = calculateQuantity(price, amount);
+    const roundedQuantity = calculateQuantity(price, balance);
     
     if (roundedQuantity <= 0) {
       console.log('⚠️ كمية غير صالحة');
       return null;
     }
 
-    const isBuy = side === 'buy';
-    console.log(`📊 ${isBuy ? 'شراء' : 'بيع'} (${side.toUpperCase()}): ${roundedQuantity} ${symbol} بسعر ${price}`);
+    const isBuy = side === 'BUY';
+    console.log(`📊 ${isBuy ? 'شراء' : 'بيع'} (${side}): ${roundedQuantity} ${symbol} بسعر ${price}`);
 
     const params = {
       symbol: symbol,
@@ -474,7 +490,7 @@ async function getFuturesBalance() {
 }
 
 // ==========================================
-// ✅ PRO TRADER - الدورة الرئيسية
+// ✅ الدورة الرئيسية
 // ==========================================
 
 async function tradingCycle() {
@@ -539,7 +555,7 @@ async function tradingCycle() {
       return;
     }
 
-    // ✅ جلب العملات - أعلى 5 حجم
+    // ✅ جلب العملات - أعلى 10 حجم
     const symbols = await getTopVolumeSymbols();
     
     if (!symbols || symbols.length === 0) {
@@ -548,24 +564,18 @@ async function tradingCycle() {
       return;
     }
 
-    console.log(`🔍 جاري مسح ${symbols.length} عملة (PRO TRADER)...`);
+    console.log(`🔍 جاري مسح ${symbols.length} عملة (سكالبينج)...`);
     
     // ✅ Signal Check Loop - تنفيذ أول إشارة تتحقق
     for (const symbol of symbols) {
       const candles = await getCandles(symbol);
-      if (!candles || candles.length < 3) continue;
+      if (!candles || candles.length < 20) continue;
 
-      const prev = candles[candles.length - 2];
-      const curr = candles[candles.length - 1];
-
-      // ✅ حساب التقلب لتحديد سرعة المسح
-      const volatility = calculateVolatility(candles);
-      currentScanInterval = volatility > 0.02 ? 2000 : BASE_SCAN_INTERVAL;
-      console.log(`📊 ${symbol} | volatility=${(volatility*100).toFixed(2)}% | delay=${currentScanInterval/1000}s`);
-
-      // ✅ فحص إشارة شراء
-      if (proBuy(prev, curr, candles)) {
-        console.log(`🟢 إشارة شراء قوية: ${symbol}`);
+      // ✅ فحص الإشارة
+      const signal = checkSignal(candles);
+      
+      if (signal) {
+        console.log(`🚀 إشارة ${signal}: ${symbol}`);
 
         const leverageSet = await setLeverage(symbol);
         if (!leverageSet) {
@@ -573,30 +583,11 @@ async function tradingCycle() {
           continue;
         }
 
-        const position = await placeOrder(symbol, 'buy', tradeAmount);
+        const position = await placeOrder(symbol, signal, balance);
         if (position) {
           currentPosition = position;
           lastTradeTime = Date.now();
-          console.log(`✅ تم الدخول: ${symbol} (BUY)`);
-          break; // ✅ أول إشارة تتحقق → نوقف البحث
-        }
-      }
-
-      // ✅ فحص إشارة بيع
-      if (proSell(prev, curr, candles)) {
-        console.log(`🔴 إشارة بيع قوية: ${symbol}`);
-
-        const leverageSet = await setLeverage(symbol);
-        if (!leverageSet) {
-          console.log(`❌ فشل تعيين الرافعة`);
-          continue;
-        }
-
-        const position = await placeOrder(symbol, 'sell', tradeAmount);
-        if (position) {
-          currentPosition = position;
-          lastTradeTime = Date.now();
-          console.log(`✅ تم الدخول: ${symbol} (SELL)`);
+          console.log(`✅ تم الدخول: ${symbol} (${signal})`);
           break; // ✅ أول إشارة تتحقق → نوقف البحث
         }
       }
@@ -626,7 +617,7 @@ app.get('/dashboard', (req, res) => {
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>لوحة تحكم البوت - PRO TRADER</title>
+      <title>لوحة تحكم البوت - سكالبينج</title>
       <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -733,8 +724,8 @@ app.get('/dashboard', (req, res) => {
     </head>
     <body>
       <div class="container">
-        <h1>⚡ PRO TRADER</h1>
-        <p class="subtitle">📡 شموع 1 دقيقة - Signal Engine + تنفيذ فوري</p>
+        <h1>⚡ بوت سكالبينج</h1>
+        <p class="subtitle">📡 شموع 1 دقيقة - إشارات متقدمة + مخاطرة 1%</p>
         
         <div class="status-grid" id="statusGrid">
           <div class="card">
@@ -747,7 +738,7 @@ app.get('/dashboard', (req, res) => {
           </div>
           <div class="card">
             <div class="label">⚡ الرافعة</div>
-            <div class="value gold" id="leverage">10x</div>
+            <div class="value gold" id="leverage">5x</div>
           </div>
           <div class="card" style="grid-column: span 3;">
             <div class="label">📈 الصفقة الحالية</div>
@@ -761,13 +752,14 @@ app.get('/dashboard', (req, res) => {
         </div>
 
         <div class="settings-box">
-          <div class="label">⚙️ إعدادات PRO TRADER</div>
+          <div class="label">⚙️ إعدادات سكالبينج</div>
           <div class="value">
-            💰 <span class="highlight-green">0.80 USDT</span> &nbsp;|&nbsp;
+            💰 <span class="highlight-green">1% مخاطرة</span> &nbsp;|&nbsp;
             🎯 هدف: <span class="highlight-gold">0.05 USDT</span> &nbsp;|&nbsp;
             🕐 شمعة: <span class="highlight-purple">1 دقيقة</span> &nbsp;|&nbsp;
-            📊 عملات: <span class="highlight-purple">أعلى 5 حجم</span> &nbsp;|&nbsp;
-            🔄 مسح: <span class="highlight-purple">ديناميكي</span>
+            📊 عملات: <span class="highlight-purple">أعلى 10 حجم</span> &nbsp;|&nbsp;
+            ⚡ رافعة: <span class="highlight-purple">5x</span> &nbsp;|&nbsp;
+            🔄 مسح: <span class="highlight-purple">3 ثواني</span>
           </div>
         </div>
 
@@ -837,7 +829,7 @@ app.get('/', async (req, res) => {
     }
     
     res.json({
-      status: '⚡ PRO TRADER - Signal Engine',
+      status: '⚡ بوت سكالبينج - إشارات متقدمة',
       timestamp: new Date().toISOString(),
       balance: `${usdtBalance.toFixed(4)} USDT`,
       leverage: `${LEVERAGE}x`,
@@ -849,10 +841,11 @@ app.get('/', async (req, res) => {
       settings: {
         tradeAmount: `${TRADE_AMOUNT} USDT`,
         profitTarget: `${PROFIT_USDT_TARGET} USDT`,
+        riskPerTrade: `${MAX_RISK_PER_TRADE * 100}%`,
         candleInterval: '1 دقيقة',
-        scanInterval: 'ديناميكي',
+        scanInterval: `${SCAN_INTERVAL/1000} ثانية`,
         leverage: `${LEVERAGE}x`,
-        symbolsCount: 5
+        symbolsCount: 10
       }
     });
   } catch (error) {
@@ -866,14 +859,15 @@ app.get('/', async (req, res) => {
 
 async function startBot() {
   try {
-    console.log('⚡⚡ بدء تشغيل PRO TRADER - Signal Engine');
-    console.log('📊 ===== إعدادات PRO TRADER =====');
-    console.log(`💰 مبلغ التداول الثابت: ${TRADE_AMOUNT} USDT`);
+    console.log('⚡⚡ بدء تشغيل بوت سكالبينج - إشارات متقدمة');
+    console.log('📊 ===== إعدادات سكالبينج =====');
+    console.log(`💰 مبلغ التداول: ${TRADE_AMOUNT} USDT`);
     console.log(`⚡ الرافعة المالية: ${LEVERAGE}x`);
     console.log(`🎯 هدف الربح: ${PROFIT_USDT_TARGET} USDT`);
+    console.log(`📊 المخاطرة: ${MAX_RISK_PER_TRADE * 100}% من الرصيد`);
     console.log(`🕐 فترة الشمعة: ${CANDLE_INTERVAL}`);
-    console.log(`📊 عدد العملات: أعلى 5 حجم`);
-    console.log(`🔄 سرعة المسح: ديناميكية حسب التقلب`);
+    console.log(`📊 عدد العملات: أعلى 10 حجم`);
+    console.log(`🔄 سرعة المسح: كل ${SCAN_INTERVAL/1000} ثانية`);
     console.log('================================');
 
     const balance = await getFuturesBalance();
@@ -895,9 +889,9 @@ async function startBot() {
       } catch (error) {
         console.error('❌ خطأ في الدورة المتكررة:', error);
       }
-    }, currentScanInterval);
+    }, SCAN_INTERVAL);
 
-    console.log(`✅ PRO TRADER يعمل بنجاح!`);
+    console.log(`✅ البوت يعمل بنجاح! يتم التحديث كل ${SCAN_INTERVAL/1000} ثانية`);
 
   } catch (error) {
     console.error(`❌ فشل بدء البوت: ${error.message}`);
@@ -912,13 +906,13 @@ async function startBot() {
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`
   ╔═══════════════════════════════════════════════════════════════╗
-  ║   ⚡ PRO TRADER - Signal Engine                             ║
+  ║   ⚡ بوت سكالبينج - إشارات متقدمة                          ║
   ║   📡 http://localhost:${PORT}                                  ║
   ║   📊 لوحة التحكم: http://localhost:${PORT}/dashboard          ║
-  ║   🚀 رافعة: ${LEVERAGE}x | 💰 مبلغ: ${TRADE_AMOUNT} USDT      ║
+  ║   🚀 رافعة: ${LEVERAGE}x | 💰 مخاطرة: ${MAX_RISK_PER_TRADE * 100}%  ║
   ║   🎯 هدف: ${PROFIT_USDT_TARGET} USDT                          ║
-  ║   🕐 شمعة: ${CANDLE_INTERVAL} | 📊 أعلى 5 عملات حجم           ║
-  ║   ⚡ Signal Engine + تنفيذ فوري                              ║
+  ║   🕐 شمعة: ${CANDLE_INTERVAL} | 📊 أعلى 10 عملات حجم          ║
+  ║   🔄 مسح: ${SCAN_INTERVAL/1000} ثانية | ⚡ إشارات متقدمة     ║
   ║   ⚠️ تداول حقيقي - استخدم بحذر!                              ║
   ╚═══════════════════════════════════════════════════════════════╝
   `);
@@ -948,4 +942,4 @@ process.on('unhandledRejection', (reason) => {
   console.error('❌ رفض غير معالج:', reason);
 });
 
-console.log('🚀 جاري تشغيل PRO TRADER...');
+console.log('🚀 جاري تشغيل البوت...');
