@@ -17,7 +17,7 @@ if (!process.env.BINGX_API_KEY || !process.env.BINGX_API_SECRET) {
 }
 
 // ==========================================
-// إعدادات البوت (BingX Futures) - سكالبينج سريع
+// إعدادات البوت (BingX Futures) - PRO TRADER
 // ==========================================
 
 const API_KEY = process.env.BINGX_API_KEY;
@@ -34,15 +34,9 @@ const LEVERAGE = 10;
 const PROFIT_USDT_TARGET = 0.05;
 const MIN_PROFIT_USDT = 0.05;
 
-// ✅ إعدادات الإشارات - سكالبينج سريع
-const PRICE_CHANGE_THRESHOLD = 0.002; // 0.2%
-
-const CHECK_INTERVAL = 5000;
-const STOP_LOSS_PERCENT = null;
-
 // ✅ إعدادات الشمعة (1 دقيقة - سكالبينج)
 const CANDLE_INTERVAL = '1m';
-const CANDLE_LIMIT = 30; // 30 شمعة كافية
+const CANDLE_LIMIT = 30;
 
 // ✅ المتغيرات
 let lastPrices = {};
@@ -52,8 +46,9 @@ let isRunning = false;
 let lastTradeTime = 0;
 const cooldown = 3000; // 3 ثواني
 
-// ✅ سرعة المسح - سريع جداً
-const SCAN_INTERVAL = 5000; // 5 ثواني
+// ✅ سرعة المسح - ديناميكية
+const BASE_SCAN_INTERVAL = 5000;
+let currentScanInterval = BASE_SCAN_INTERVAL;
 
 // ✅ تخزين العملات مؤقتاً
 let cachedSymbols = [];
@@ -144,7 +139,7 @@ async function bingxRequest(method, endpoint, params = {}, signed = true) {
 }
 
 // ==========================================
-// ✅ جلب العملات - أعلى حجم تداول
+// ✅ جلب العملات - أعلى 5 حجم
 // ==========================================
 
 async function getTopVolumeSymbols() {
@@ -165,53 +160,62 @@ async function getTopVolumeSymbols() {
   const usdtPairs = contracts
     .filter(c => c.symbol && c.symbol.endsWith('USDT'))
     .sort((a, b) => Number(b.volume) - Number(a.volume))
-    .slice(0, 10) // ✅ أعلى 10 عملات حجم
+    .slice(0, 5) // ✅ أعلى 5 عملات حجم
     .map(c => c.symbol);
 
-  console.log(`📊 أعلى 10 عملات حجم: ${usdtPairs.join(', ')}`);
+  console.log(`📊 أعلى 5 عملات حجم: ${usdtPairs.join(', ')}`);
   return usdtPairs;
 }
 
 // ==========================================
-// ✅ إشارات سكالبينج سريعة
+// ✅ PRO MAX SIGNAL ENGINE
 // ==========================================
 
-function scalpBuy(prev, curr) {
-  const swept = curr.low < prev.low;
-  const rejection = curr.close > curr.open;
-  const fastRecovery = curr.close > prev.low;
+function proBuy(prev, curr, candles) {
+  const body = Math.abs(curr.close - curr.open);
+  const range = curr.high - curr.low;
 
-  const smallBody =
-    Math.abs(curr.close - curr.open) < (curr.high - curr.low) * 0.4;
+  if (range === 0) return false;
 
-  return swept && fastRecovery && rejection && smallBody;
+  const wick = curr.close - curr.low;
+
+  const strongReject = wick / range > 0.55;
+
+  const momentum =
+    curr.close > prev.close &&
+    curr.close > curr.open;
+
+  const microTrend =
+    candles[candles.length - 2].close < curr.close;
+
+  return strongReject && momentum && microTrend;
 }
 
-function scalpSell(prev, curr) {
-  const swept = curr.high > prev.high;
-  const rejection = curr.close < curr.open;
-  const fastDrop = curr.close < prev.high;
+function proSell(prev, curr, candles) {
+  const body = Math.abs(curr.close - curr.open);
+  const range = curr.high - curr.low;
 
-  const smallBody =
-    Math.abs(curr.close - curr.open) < (curr.high - curr.low) * 0.4;
+  if (range === 0) return false;
 
-  return swept && fastDrop && rejection && smallBody;
+  const upperWick = curr.high - curr.close;
+
+  const strongReject = upperWick / range > 0.55;
+
+  const momentum =
+    curr.close < prev.close &&
+    curr.close < curr.open;
+
+  const microTrend =
+    candles[candles.length - 2].close > curr.close;
+
+  return strongReject && momentum && microTrend;
 }
 
 // ==========================================
-// ✅ اتجاه لحظي (Micro Trend)
+// ✅ جلب بيانات الشمعة
 // ==========================================
 
-function microTrend(candles) {
-  if (candles.length < 2) return null;
-  return candles[0].close > candles[1].close ? 'UP' : 'DOWN';
-}
-
-// ==========================================
-// ✅ جلب بيانات الشمعة وتحليل الإشارة
-// ==========================================
-
-async function getCandleData(symbol) {
+async function getCandles(symbol) {
   try {
     const response = await bingxRequest('GET', ENDPOINTS.FUTURES_CANDLE, {
       symbol,
@@ -246,29 +250,26 @@ async function getCandleData(symbol) {
 
     if (candles.length < 3) return null;
 
-    const current = candles[candles.length - 1];
-    const previous = candles[candles.length - 2];
-
-    // ✅ اتجاه لحظي
-    const trend = microTrend(candles);
-
-    // ✅ إشارات سكالبينج
-    const buySignal = scalpBuy(previous, current);
-    const sellSignal = scalpSell(previous, current);
-
-    return {
-      symbol,
-      current,
-      previous,
-      trend,
-      buySignal,
-      sellSignal,
-      changePercent: ((current.close - previous.close) / previous.close) * 100
-    };
+    return candles;
   } catch (error) {
     console.error(`❌ فشل جلب شمعة ${symbol}:`, error);
     return null;
   }
+}
+
+// ==========================================
+// ✅ حساب التقلب (Volatility)
+// ==========================================
+
+function calculateVolatility(candles) {
+  if (candles.length < 2) return 0.01;
+  
+  let sum = 0;
+  for (let i = 1; i < candles.length; i++) {
+    const change = Math.abs((candles[i].close - candles[i-1].close) / candles[i-1].close);
+    sum += change;
+  }
+  return sum / (candles.length - 1);
 }
 
 // ==========================================
@@ -320,14 +321,14 @@ async function setLeverage(symbol) {
 }
 
 // ==========================================
-// فتح صفقة شراء
+// ✅ تنفيذ الأمر (Place Order)
 // ==========================================
 
-async function openLongPosition(symbol, amount) {
+async function placeOrder(symbol, side, amount) {
   try {
     const price = await getPrice(symbol);
     if (!price) {
-      console.log(`⚠️ لا يمكن فتح صفقة شراء: سعر ${symbol} غير متوفر`);
+      console.log(`⚠️ لا يمكن تنفيذ الأمر: سعر ${symbol} غير متوفر`);
       return null;
     }
 
@@ -338,83 +339,34 @@ async function openLongPosition(symbol, amount) {
       return null;
     }
 
-    console.log(`📊 فتح صفقة شراء (Long): ${roundedQuantity} ${symbol} بسعر ${price}`);
+    const isBuy = side === 'buy';
+    console.log(`📊 ${isBuy ? 'شراء' : 'بيع'} (${side.toUpperCase()}): ${roundedQuantity} ${symbol} بسعر ${price}`);
 
     const params = {
       symbol: symbol,
-      side: 'BUY',
+      side: isBuy ? 'BUY' : 'SELL',
       type: 'MARKET',
       quantity: roundedQuantity,
-      positionSide: 'LONG'
+      positionSide: isBuy ? 'LONG' : 'SHORT'
     };
 
     const response = await bingxRequest('POST', ENDPOINTS.FUTURES_ORDER, params);
 
     if (response && response.code === 0) {
-      console.log(`✅ تم فتح صفقة شراء: ${roundedQuantity} ${symbol}`);
+      console.log(`✅ تم ${isBuy ? 'شراء' : 'بيع'}: ${roundedQuantity} ${symbol}`);
       return {
         symbol,
         entryPrice: price,
         quantity: roundedQuantity,
-        type: 'LONG',
+        type: isBuy ? 'LONG' : 'SHORT',
         orderId: response.data?.orderId || Date.now(),
         timestamp: Date.now()
       };
     }
-    console.log(`⚠️ فشل فتح صفقة شراء:`, JSON.stringify(response, null, 2));
+    console.log(`⚠️ فشل تنفيذ الأمر:`, JSON.stringify(response, null, 2));
     return null;
   } catch (error) {
-    console.error(`❌ فشل فتح صفقة شراء:`, error);
-    return null;
-  }
-}
-
-// ==========================================
-// فتح صفقة بيع
-// ==========================================
-
-async function openShortPosition(symbol, amount) {
-  try {
-    const price = await getPrice(symbol);
-    if (!price) {
-      console.log(`⚠️ لا يمكن فتح صفقة بيع: سعر ${symbol} غير متوفر`);
-      return null;
-    }
-
-    const roundedQuantity = calculateQuantity(price, amount);
-    
-    if (roundedQuantity <= 0) {
-      console.log('⚠️ كمية غير صالحة');
-      return null;
-    }
-
-    console.log(`📊 فتح صفقة بيع (Short): ${roundedQuantity} ${symbol} بسعر ${price}`);
-
-    const params = {
-      symbol: symbol,
-      side: 'SELL',
-      type: 'MARKET',
-      quantity: roundedQuantity,
-      positionSide: 'SHORT'
-    };
-
-    const response = await bingxRequest('POST', ENDPOINTS.FUTURES_ORDER, params);
-
-    if (response && response.code === 0) {
-      console.log(`✅ تم فتح صفقة بيع: ${roundedQuantity} ${symbol}`);
-      return {
-        symbol,
-        entryPrice: price,
-        quantity: roundedQuantity,
-        type: 'SHORT',
-        orderId: response.data?.orderId || Date.now(),
-        timestamp: Date.now()
-      };
-    }
-    console.log(`⚠️ فشل فتح صفقة بيع:`, JSON.stringify(response, null, 2));
-    return null;
-  } catch (error) {
-    console.error(`❌ فشل فتح صفقة بيع:`, error);
+    console.error(`❌ فشل تنفيذ الأمر:`, error);
     return null;
   }
 }
@@ -522,7 +474,7 @@ async function getFuturesBalance() {
 }
 
 // ==========================================
-// ✅ الدورة الرئيسية - دخول فوري
+// ✅ PRO TRADER - الدورة الرئيسية
 // ==========================================
 
 async function tradingCycle() {
@@ -587,7 +539,7 @@ async function tradingCycle() {
       return;
     }
 
-    // ✅ جلب العملات - أعلى 10 حجم
+    // ✅ جلب العملات - أعلى 5 حجم
     const symbols = await getTopVolumeSymbols();
     
     if (!symbols || symbols.length === 0) {
@@ -596,31 +548,24 @@ async function tradingCycle() {
       return;
     }
 
-    console.log(`🔍 جاري مسح ${symbols.length} عملة (سكالبينج سريع)...`);
+    console.log(`🔍 جاري مسح ${symbols.length} عملة (PRO TRADER)...`);
     
-    // ✅ البحث عن أول إشارة تتحقق - دخول فوري
+    // ✅ Signal Check Loop - تنفيذ أول إشارة تتحقق
     for (const symbol of symbols) {
-      const data = await getCandleData(symbol);
-      if (!data) continue;
+      const candles = await getCandles(symbol);
+      if (!candles || candles.length < 3) continue;
 
-      const { current, previous, trend, buySignal, sellSignal, changePercent } = data;
+      const prev = candles[candles.length - 2];
+      const curr = candles[candles.length - 1];
 
-      console.log(`📊 ${symbol} | trend=${trend} | change=${changePercent.toFixed(2)}% | buy=${buySignal} | sell=${sellSignal}`);
+      // ✅ حساب التقلب لتحديد سرعة المسح
+      const volatility = calculateVolatility(candles);
+      currentScanInterval = volatility > 0.02 ? 2000 : BASE_SCAN_INTERVAL;
+      console.log(`📊 ${symbol} | volatility=${(volatility*100).toFixed(2)}% | delay=${currentScanInterval/1000}s`);
 
-      // ✅ فلتر الاتجاه اللحظي
-      if (buySignal && trend === 'DOWN') {
-        console.log(`📊 ${symbol}: ⛔ اتجاه هابط - تم تجاهل إشارة الشراء`);
-        continue;
-      }
-
-      if (sellSignal && trend === 'UP') {
-        console.log(`📊 ${symbol}: ⛔ اتجاه صاعد - تم تجاهل إشارة البيع`);
-        continue;
-      }
-
-      // ✅ تنفيذ أول إشارة تتحقق - دخول فوري
-      if (buySignal) {
-        console.log(`🚀 إشارة شراء سريعة: ${symbol}`);
+      // ✅ فحص إشارة شراء
+      if (proBuy(prev, curr, candles)) {
+        console.log(`🟢 إشارة شراء قوية: ${symbol}`);
 
         const leverageSet = await setLeverage(symbol);
         if (!leverageSet) {
@@ -628,7 +573,7 @@ async function tradingCycle() {
           continue;
         }
 
-        const position = await openLongPosition(symbol, tradeAmount);
+        const position = await placeOrder(symbol, 'buy', tradeAmount);
         if (position) {
           currentPosition = position;
           lastTradeTime = Date.now();
@@ -637,8 +582,9 @@ async function tradingCycle() {
         }
       }
 
-      if (sellSignal) {
-        console.log(`🚀 إشارة بيع سريعة: ${symbol}`);
+      // ✅ فحص إشارة بيع
+      if (proSell(prev, curr, candles)) {
+        console.log(`🔴 إشارة بيع قوية: ${symbol}`);
 
         const leverageSet = await setLeverage(symbol);
         if (!leverageSet) {
@@ -646,7 +592,7 @@ async function tradingCycle() {
           continue;
         }
 
-        const position = await openShortPosition(symbol, tradeAmount);
+        const position = await placeOrder(symbol, 'sell', tradeAmount);
         if (position) {
           currentPosition = position;
           lastTradeTime = Date.now();
@@ -680,7 +626,7 @@ app.get('/dashboard', (req, res) => {
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>لوحة تحكم البوت - سكالبينج</title>
+      <title>لوحة تحكم البوت - PRO TRADER</title>
       <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -787,8 +733,8 @@ app.get('/dashboard', (req, res) => {
     </head>
     <body>
       <div class="container">
-        <h1>⚡ بوت سكالبينج</h1>
-        <p class="subtitle">📡 شموع 1 دقيقة - دخول فوري</p>
+        <h1>⚡ PRO TRADER</h1>
+        <p class="subtitle">📡 شموع 1 دقيقة - Signal Engine + تنفيذ فوري</p>
         
         <div class="status-grid" id="statusGrid">
           <div class="card">
@@ -815,13 +761,13 @@ app.get('/dashboard', (req, res) => {
         </div>
 
         <div class="settings-box">
-          <div class="label">⚙️ إعدادات سكالبينج</div>
+          <div class="label">⚙️ إعدادات PRO TRADER</div>
           <div class="value">
             💰 <span class="highlight-green">0.80 USDT</span> &nbsp;|&nbsp;
             🎯 هدف: <span class="highlight-gold">0.05 USDT</span> &nbsp;|&nbsp;
             🕐 شمعة: <span class="highlight-purple">1 دقيقة</span> &nbsp;|&nbsp;
-            📊 عملات: <span class="highlight-purple">أعلى 10 حجم</span> &nbsp;|&nbsp;
-            🔄 مسح: <span class="highlight-purple">5 ثواني</span>
+            📊 عملات: <span class="highlight-purple">أعلى 5 حجم</span> &nbsp;|&nbsp;
+            🔄 مسح: <span class="highlight-purple">ديناميكي</span>
           </div>
         </div>
 
@@ -891,7 +837,7 @@ app.get('/', async (req, res) => {
     }
     
     res.json({
-      status: '⚡ بوت سكالبينج - شموع 1 دقيقة',
+      status: '⚡ PRO TRADER - Signal Engine',
       timestamp: new Date().toISOString(),
       balance: `${usdtBalance.toFixed(4)} USDT`,
       leverage: `${LEVERAGE}x`,
@@ -904,9 +850,9 @@ app.get('/', async (req, res) => {
         tradeAmount: `${TRADE_AMOUNT} USDT`,
         profitTarget: `${PROFIT_USDT_TARGET} USDT`,
         candleInterval: '1 دقيقة',
-        scanInterval: `${SCAN_INTERVAL/1000} ثانية`,
+        scanInterval: 'ديناميكي',
         leverage: `${LEVERAGE}x`,
-        symbolsCount: 10
+        symbolsCount: 5
       }
     });
   } catch (error) {
@@ -920,14 +866,14 @@ app.get('/', async (req, res) => {
 
 async function startBot() {
   try {
-    console.log('⚡⚡ بدء تشغيل بوت سكالبينج - شموع 1 دقيقة');
-    console.log('📊 ===== إعدادات سكالبينج =====');
+    console.log('⚡⚡ بدء تشغيل PRO TRADER - Signal Engine');
+    console.log('📊 ===== إعدادات PRO TRADER =====');
     console.log(`💰 مبلغ التداول الثابت: ${TRADE_AMOUNT} USDT`);
     console.log(`⚡ الرافعة المالية: ${LEVERAGE}x`);
     console.log(`🎯 هدف الربح: ${PROFIT_USDT_TARGET} USDT`);
     console.log(`🕐 فترة الشمعة: ${CANDLE_INTERVAL}`);
-    console.log(`📊 عدد العملات: أعلى 10 حجم`);
-    console.log(`🔄 سرعة المسح: كل ${SCAN_INTERVAL/1000} ثانية`);
+    console.log(`📊 عدد العملات: أعلى 5 حجم`);
+    console.log(`🔄 سرعة المسح: ديناميكية حسب التقلب`);
     console.log('================================');
 
     const balance = await getFuturesBalance();
@@ -949,9 +895,9 @@ async function startBot() {
       } catch (error) {
         console.error('❌ خطأ في الدورة المتكررة:', error);
       }
-    }, SCAN_INTERVAL);
+    }, currentScanInterval);
 
-    console.log(`✅ البوت يعمل بنجاح! يتم التحديث كل ${SCAN_INTERVAL/1000} ثانية`);
+    console.log(`✅ PRO TRADER يعمل بنجاح!`);
 
   } catch (error) {
     console.error(`❌ فشل بدء البوت: ${error.message}`);
@@ -966,13 +912,13 @@ async function startBot() {
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`
   ╔═══════════════════════════════════════════════════════════════╗
-  ║   ⚡ بوت سكالبينج - شموع 1 دقيقة                            ║
+  ║   ⚡ PRO TRADER - Signal Engine                             ║
   ║   📡 http://localhost:${PORT}                                  ║
   ║   📊 لوحة التحكم: http://localhost:${PORT}/dashboard          ║
   ║   🚀 رافعة: ${LEVERAGE}x | 💰 مبلغ: ${TRADE_AMOUNT} USDT      ║
   ║   🎯 هدف: ${PROFIT_USDT_TARGET} USDT                          ║
-  ║   🕐 شمعة: ${CANDLE_INTERVAL} | 🔄 مسح: ${SCAN_INTERVAL/1000}ثانية ║
-  ║   📊 أعلى 10 عملات حجم | ⚡ دخول فوري                        ║
+  ║   🕐 شمعة: ${CANDLE_INTERVAL} | 📊 أعلى 5 عملات حجم           ║
+  ║   ⚡ Signal Engine + تنفيذ فوري                              ║
   ║   ⚠️ تداول حقيقي - استخدم بحذر!                              ║
   ╚═══════════════════════════════════════════════════════════════╝
   `);
@@ -1002,4 +948,4 @@ process.on('unhandledRejection', (reason) => {
   console.error('❌ رفض غير معالج:', reason);
 });
 
-console.log('🚀 جاري تشغيل البوت...');
+console.log('🚀 جاري تشغيل PRO TRADER...');
