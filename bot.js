@@ -29,11 +29,11 @@ const PRICE_CHANGE_THRESHOLD = 0.1;
 const CHECK_INTERVAL = parseInt(process.env.CHECK_INTERVAL) || 5000;
 const STOP_LOSS_PERCENT = 4;
 
-// ✅ قائمة العملات للمراقبة (تم إضافة eSports و SPCX)
+// ✅ قائمة العملات (تم إزالة SPCX-USDT لأنها غير موجودة)
 const SYMBOLS = [
   'BTC-USDT', 'ETH-USDT', 'BNB-USDT', 'SOL-USDT', 'XRP-USDT',
   'ADA-USDT', 'DOGE-USDT', 'AVAX-USDT', 'LINK-USDT',
-  'ESPORTS-USDT', 'SPCX-USDT'  // ✅ العملات الجديدة
+  'ESPORTS-USDT'
 ];
 
 // ==========================================
@@ -120,7 +120,6 @@ async function getPrice(symbol) {
     if (response && response.code === 0 && response.data) {
       return parseFloat(response.data.price);
     }
-    // ✅ تجاهل العملات غير المدعومة بصمت
     if (response?.code === 100400) {
       console.log(`ℹ️ العملة ${symbol} غير مدعومة حالياً، سيتم تجاهلها`);
       return null;
@@ -187,13 +186,14 @@ async function getFuturesBalance() {
 }
 
 // ==========================================
-// تعيين الرافعة
+// ✅ تعيين الرافعة (تم التعديل)
 // ==========================================
 
 async function setLeverage(symbol) {
   try {
     const response = await bingxRequest('POST', ENDPOINTS.FUTURES_LEVERAGE, {
       symbol: symbol,
+      side: "LONG",  // ✅ إضافة side كما هو مطلوب في BingX V2
       leverage: LEVERAGE
     });
     if (response && response.code === 0) {
@@ -209,7 +209,7 @@ async function setLeverage(symbol) {
 }
 
 // ==========================================
-// فتح صفقة شراء (Long)
+// ✅ فتح صفقة شراء (تم التعديل)
 // ==========================================
 
 async function openLongPosition(symbol, amount) {
@@ -221,7 +221,8 @@ async function openLongPosition(symbol, amount) {
     }
 
     const quantity = (amount * LEVERAGE) / price;
-    const roundedQuantity = Math.floor(quantity * 1000) / 1000;
+    // ✅ تعديل دقة الكمية إلى رقم واحد بعد العلامة العشرية
+    const roundedQuantity = Number(quantity.toFixed(1));
 
     if (roundedQuantity <= 0) {
       console.log(`⚠️ الكمية صغيرة جداً: ${roundedQuantity}`);
@@ -235,8 +236,7 @@ async function openLongPosition(symbol, amount) {
       symbol: symbol,
       side: 'BUY',
       type: 'MARKET',
-      quantity: roundedQuantity,
-      positionSide: 'LONG'
+      quantity: roundedQuantity
     });
 
     if (response && response.code === 0) {
@@ -249,7 +249,8 @@ async function openLongPosition(symbol, amount) {
         timestamp: Date.now()
       };
     }
-    console.log(`⚠️ فشل فتح الصفقة:`, response?.msg || response);
+    // ✅ طباعة الاستجابة كاملة لتشخيص الخطأ
+    console.log(`⚠️ فشل فتح الصفقة:`, JSON.stringify(response, null, 2));
     return null;
   } catch (error) {
     console.error(`❌ فشل فتح الصفقة:`, error);
@@ -275,8 +276,7 @@ async function closePosition(position) {
       symbol: position.symbol,
       side: 'SELL',
       type: 'MARKET',
-      quantity: position.quantity,
-      positionSide: 'LONG'
+      quantity: position.quantity
     });
 
     if (response && response.code === 0) {
@@ -298,7 +298,7 @@ async function closePosition(position) {
 let priceHistory = {};
 let currentPosition = null;
 let isRunning = false;
-let activeSymbols = []; // ✅ قائمة العملات النشطة
+let activeSymbols = [];
 
 function findRisingTokens(currentPrices) {
   const rising = [];
@@ -318,14 +318,12 @@ function findRisingTokens(currentPrices) {
 
 async function updatePriceHistory() {
   const currentPrices = await getAllPrices();
-  // ✅ تحديث قائمة العملات النشطة
   activeSymbols = Object.keys(currentPrices);
   
   for (const [symbol, data] of Object.entries(currentPrices)) {
     priceHistory[symbol] = data.price;
   }
   
-  // ✅ عرض العملات النشطة
   console.log(`📊 العملات النشطة: ${activeSymbols.length} من ${SYMBOLS.length}`);
 }
 
@@ -403,7 +401,6 @@ async function tradingCycle() {
         console.log(`🎯 هدف الربح: ${PROFIT_PERCENT}% | ⛔ وقف الخسارة: ${STOP_LOSS_PERCENT}%`);
       }
     } else {
-      // عرض أكبر تغير بالسعر للمتابعة
       let maxChange = 0;
       let maxSymbol = '';
       for (const [symbol, data] of Object.entries(currentPrices)) {
@@ -614,13 +611,11 @@ app.get('/dashboard', (req, res) => {
             <div class="label">👀 العملات المراقبة</div>
             <div class="value" id="watching" style="font-size: 14px; color: #aabbdd;">
               BTC, ETH, BNB, SOL, XRP, ADA, DOGE, AVAX, LINK, 
-              <span class="token-tag new">✨ ESPORTS</span>, 
-              <span class="token-tag new">✨ SPCX</span>
+              <span class="token-tag new">✨ ESPORTS</span>
             </div>
           </div>
         </div>
 
-        <!-- ✅ إعدادات التداول -->
         <div class="settings-box">
           <div class="label">⚙️ إعدادات التداول</div>
           <div class="value">
@@ -651,7 +646,6 @@ app.get('/dashboard', (req, res) => {
           }
         }
         
-        // تحديث تلقائي كل 10 ثواني
         fetchStatus();
         setInterval(fetchStatus, 10000);
       </script>
@@ -759,7 +753,7 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   ║   📊 لوحة التحكم: http://localhost:${PORT}/dashboard          ║
   ║   🚀 رافعة: ${LEVERAGE}x | 💰 مبلغ: ${TRADE_AMOUNT} USDT      ║
   ║   🎯 جني ربح: ${PROFIT_PERCENT}% | ⛔ وقف خسارة: ${STOP_LOSS_PERCENT}%  ║
-  ║   📈 العملات: ${SYMBOLS.length} عملة (بما فيها ESPORTS, SPCX) ║
+  ║   📈 العملات: ${SYMBOLS.length} عملة                           ║
   ║   ⚠️ تداول حقيقي - استخدم بحذر!                              ║
   ╚═══════════════════════════════════════════════════════════════╝
   `);
