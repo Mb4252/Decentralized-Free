@@ -25,11 +25,12 @@ const API_SECRET = process.env.BINGX_API_SECRET;
 
 // ✅ إعدادات رأس المال الثابت
 const TRADE_AMOUNT = 1.3;
-const LEVERAGE = 5;
+const LEVERAGE = 10;
 
 // ✅ أهداف سكالبينج سريعة
 const PROFIT_PERCENT = 0.08;
-const MIN_PROFIT_USDT = 0.05; // أقل ربح مسموح
+const PROFIT_USDT_TARGET = 0.05;
+const MIN_PROFIT_USDT = 0.05;
 
 const PRICE_CHANGE_THRESHOLD = 0.1;
 const CHECK_INTERVAL = 5000;
@@ -45,15 +46,19 @@ let currentPosition = null;
 let isRunning = false;
 
 let lastTradeTime = 0;
-const cooldown = 15000; // 15 ثانية بين الصفقات
+const cooldown = 5000; // 5 ثواني فقط بين الصفقات
 
 // ✅ تم تعديل الحساسية
-const SCAN_INTERVAL = 1500; // 1.5 ثانية (أسرع)
-const CHANGE_THRESHOLD = 0.03;
+const SCAN_INTERVAL = 1000; // مسح كل ثانية
+const CHANGE_THRESHOLD = 0.015; // دخول أسرع
+const MIN_SCORE = 0.08; // قبول فرص أكثر
 
 // ✅ إعدادات الفلاتر الجديدة
 const MIN_CANDLE_RANGE = 0.08;
-const MIN_SCORE = 0.1;
+const MAX_SYMBOLS_TO_SCAN = 50;
+
+// ✅ إعدادات وقف الخسارة
+const STOP_LOSS_ENABLED = false;
 
 // ==========================================
 // نقاط النهاية
@@ -135,7 +140,7 @@ async function bingxRequest(method, endpoint, params = {}, signed = true) {
 }
 
 // ==========================================
-// ✅ جلب جميع الرموز من السوق
+// ✅ جلب جميع الرموز من السوق (مع حد أقصى)
 // ==========================================
 
 async function getAllSymbols() {
@@ -148,8 +153,16 @@ async function getAllSymbols() {
     );
 
     if (res && res.code === 0 && res.data) {
-      const symbols = res.data.map(c => c.symbol);
-      console.log(`📊 تم جلب ${symbols.length} رمز من السوق`);
+      let symbols = res.data.map(c => c.symbol);
+      
+      // ✅ تطبيق الحد الأقصى للرموز
+      if (symbols.length > MAX_SYMBOLS_TO_SCAN) {
+        symbols = symbols.slice(0, MAX_SYMBOLS_TO_SCAN);
+        console.log(`📊 تم تقليص الرموز إلى ${MAX_SYMBOLS_TO_SCAN} رمز (من ${res.data.length})`);
+      } else {
+        console.log(`📊 تم جلب ${symbols.length} رمز من السوق`);
+      }
+      
       return symbols;
     }
     return [];
@@ -246,7 +259,7 @@ async function scanMarket() {
     if (!price) continue;
 
     const change = await getPriceChange(symbol);
-    if (Math.abs(change) < 0.02) continue;
+    if (Math.abs(change) < CHANGE_THRESHOLD) continue;
 
     const trend = await getTrend(symbol);
     if (!trend) continue;
@@ -534,15 +547,15 @@ async function tradingCycle() {
       console.log(`⚡ الربح الحالي: ${profitUSDT.toFixed(4)} USDT (${profitPercent.toFixed(2)}%)`);
 
       // ✅ إغلاق الصفقة عند تحقيق أقل ربح مسموح
-      if (profitUSDT >= MIN_PROFIT_USDT) {
+      if (profitUSDT >= PROFIT_USDT_TARGET) {
         console.log(`🎯 إغلاق الصفقة: ربح كافي ${profitUSDT.toFixed(4)} USDT`);
         await closePosition(currentPosition);
         currentPosition = null;
         lastTradeTime = Date.now();
       }
       
-      // ✅ وقف خسارة سريع
-      if (profitUSDT < -0.03) {
+      // ✅ وقف خسارة سريع (إذا كان مفعلاً)
+      if (STOP_LOSS_ENABLED && profitUSDT < -0.03) {
         console.log(`⛔ وقف خسارة سريع: ${profitUSDT.toFixed(4)} USDT`);
         await closePosition(currentPosition);
         currentPosition = null;
@@ -570,7 +583,7 @@ async function tradingCycle() {
     console.log('🔍 جاري مسح السوق بالكامل...');
     const result = await scanMarket();
 
-    if (result.best && result.bestScore > 0.3) {
+    if (result.best && result.bestScore > MIN_SCORE) {
       console.log(`🚀 أفضل فرصة: ${result.best} | ${result.bestDirection} | score=${result.bestScore.toFixed(2)}`);
 
       await setLeverage(result.best);
@@ -743,7 +756,7 @@ app.get('/dashboard', (req, res) => {
           </div>
           <div class="card">
             <div class="label">⚡ الرافعة</div>
-            <div class="value gold" id="leverage">5x</div>
+            <div class="value gold" id="leverage">10x</div>
           </div>
           <div class="card" style="grid-column: span 3;">
             <div class="label">📈 الصفقة الحالية</div>
@@ -762,10 +775,11 @@ app.get('/dashboard', (req, res) => {
           <div class="value">
             💰 <span class="highlight-green">1.30 USDT</span> &nbsp;|&nbsp;
             🎯 هدف: <span class="highlight-gold">0.05 USDT</span> &nbsp;|&nbsp;
-            ⛔ وقف: <span class="highlight-red">-0.03 USDT</span> &nbsp;|&nbsp;
-            📈 عتبة: <span class="highlight-gold">0.02%</span> &nbsp;|&nbsp;
-            ⚡ رافعة: <span class="highlight-gold">5x</span> &nbsp;|&nbsp;
-            🔄 مسح: <span class="highlight-purple">1.5 ثانية</span>
+            ⛔ وقف: <span class="highlight-gray">معطل</span> &nbsp;|&nbsp;
+            📈 عتبة: <span class="highlight-gold">0.015%</span> &nbsp;|&nbsp;
+            ⚡ رافعة: <span class="highlight-gold">10x</span> &nbsp;|&nbsp;
+            🔄 مسح: <span class="highlight-purple">1 ثانية</span> &nbsp;|&nbsp;
+            ⏱️ كولداون: <span class="highlight-purple">5 ثواني</span>
           </div>
         </div>
 
@@ -850,12 +864,13 @@ app.get('/', async (req, res) => {
       profitPercent: profitPercent,
       settings: {
         tradeAmount: `${TRADE_AMOUNT} USDT`,
-        profitTarget: `${MIN_PROFIT_USDT} USDT`,
-        stopLoss: `-0.03 USDT`,
-        changeThreshold: `0.02%`,
+        profitTarget: `${PROFIT_USDT_TARGET} USDT`,
+        stopLoss: STOP_LOSS_ENABLED ? '-0.03 USDT' : 'معطل',
+        changeThreshold: `${CHANGE_THRESHOLD}%`,
         scanInterval: `${SCAN_INTERVAL/1000} ثانية`,
         leverage: `${LEVERAGE}x`,
-        cooldown: `${cooldown/1000} ثانية`
+        cooldown: `${cooldown/1000} ثانية`,
+        maxSymbols: MAX_SYMBOLS_TO_SCAN
       }
     });
   } catch (error) {
@@ -873,10 +888,12 @@ async function startBot() {
     console.log('📊 ===== إعدادات V7 Pro =====');
     console.log(`💰 مبلغ التداول الثابت: ${TRADE_AMOUNT} USDT`);
     console.log(`⚡ الرافعة المالية: ${LEVERAGE}x`);
-    console.log(`🎯 هدف الربح: ${MIN_PROFIT_USDT} USDT`);
-    console.log(`⛔ وقف الخسارة: -0.03 USDT`);
-    console.log(`📈 عتبة الدخول: 0.02%`);
+    console.log(`🎯 هدف الربح: ${PROFIT_USDT_TARGET} USDT`);
+    console.log(`⛔ وقف الخسارة: ${STOP_LOSS_ENABLED ? 'مفعل (-0.03 USDT)' : 'معطل'}`);
+    console.log(`📈 عتبة الدخول: ${CHANGE_THRESHOLD}%`);
     console.log(`🔄 سرعة المسح: كل ${SCAN_INTERVAL/1000} ثانية`);
+    console.log(`⏱️ كولداون: ${cooldown/1000} ثانية`);
+    console.log(`📊 الحد الأقصى للرموز: ${MAX_SYMBOLS_TO_SCAN}`);
     console.log('================================');
 
     const balance = await getFuturesBalance();
@@ -920,7 +937,8 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   ║   📡 http://localhost:${PORT}                                  ║
   ║   📊 لوحة التحكم: http://localhost:${PORT}/dashboard          ║
   ║   🚀 رافعة: ${LEVERAGE}x | 💰 مبلغ: ${TRADE_AMOUNT} USDT      ║
-  ║   🎯 هدف: ${MIN_PROFIT_USDT} USDT | ⛔ وقف: -0.03 USDT        ║
+  ║   🎯 هدف: ${PROFIT_USDT_TARGET} USDT | ⛔ وقف: ${STOP_LOSS_ENABLED ? 'مفعل' : 'معطل'}  ║
+  ║   📈 عتبة: ${CHANGE_THRESHOLD}% | 🔄 مسح: ${SCAN_INTERVAL/1000}ثانية ║
   ║   📡 مسح السوق بالكامل + سكالبينج ذكي                       ║
   ║   ⚠️ تداول حقيقي - استخدم بحذر!                              ║
   ╚═══════════════════════════════════════════════════════════════╝
