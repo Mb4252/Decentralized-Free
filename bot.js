@@ -34,9 +34,8 @@ const LEVERAGE = 10;
 const PROFIT_USDT_TARGET = 0.05;
 const MIN_PROFIT_USDT = 0.05;
 
-// ✅ إعدادات الإشارات (RSI)
-const RSI_OVERSOLD = 45;
-const RSI_OVERBOUGHT = 55;
+// ✅ إعدادات الإشارات
+const PRICE_CHANGE_THRESHOLD = 0.002; // 0.2% تغير السعر
 
 const CHECK_INTERVAL = 5000;
 const STOP_LOSS_PERCENT = null;
@@ -253,66 +252,19 @@ async function getVolume24h(symbol) {
 }
 
 // ==========================================
-// ✅ حساب EMA
+// ✅ حساب المتوسط الحسابي للحجم
 // ==========================================
 
-function calculateEMA(data, period) {
-  if (data.length < period) return null;
-  
-  const k = 2 / (period + 1);
-  let ema = data[0];
-  
-  for (let i = 1; i < data.length; i++) {
-    ema = data[i] * k + ema * (1 - k);
-  }
-  
-  return ema;
+function calculateAverageVolume(data) {
+  if (!data || data.length === 0) return 0;
+  const volumes = data.map(candle => Number(candle[5])).filter(v => !isNaN(v) && v > 0);
+  if (volumes.length === 0) return 0;
+  const sum = volumes.reduce((a, b) => a + b, 0);
+  return sum / volumes.length;
 }
 
 // ==========================================
-// ✅ حساب RSI
-// ==========================================
-
-function calculateRSI(data, period = 14) {
-  if (data.length < period + 1) return null;
-  
-  let gains = 0;
-  let losses = 0;
-  
-  for (let i = 1; i <= period; i++) {
-    const change = data[i] - data[i - 1];
-    if (change >= 0) {
-      gains += change;
-    } else {
-      losses += Math.abs(change);
-    }
-  }
-  
-  let avgGain = gains / period;
-  let avgLoss = losses / period;
-  
-  for (let i = period + 1; i < data.length; i++) {
-    const change = data[i] - data[i - 1];
-    
-    if (change >= 0) {
-      avgGain = (avgGain * (period - 1) + change) / period;
-      avgLoss = (avgLoss * (period - 1) + 0) / period;
-    } else {
-      avgGain = (avgGain * (period - 1) + 0) / period;
-      avgLoss = (avgLoss * (period - 1) + Math.abs(change)) / period;
-    }
-  }
-  
-  if (avgLoss === 0) return 100;
-  
-  const rs = avgGain / avgLoss;
-  const rsi = 100 - (100 / (1 + rs));
-  
-  return rsi;
-}
-
-// ==========================================
-// ✅ جلب بيانات الشمعة وتحليل المؤشرات
+// ✅ جلب بيانات الشمعة وتحليل الإشارة
 // ==========================================
 
 async function getCandleData(symbol) {
@@ -350,45 +302,38 @@ async function getCandleData(symbol) {
       return null;
     }
     
-    // ✅ تم التعديل: 50 شمعة كافية
+    // ✅ 50 شمعة كافية
     if (data.length < 50) {
       console.log(`📊 ${symbol}: بيانات غير كافية (${data.length} < 50)`);
       return null;
     }
 
     const closes = data.map(candle => Number(candle[4])).filter(price => !isNaN(price) && price > 0);
+    const volumes = data.map(candle => Number(candle[5])).filter(v => !isNaN(v) && v > 0);
     
-    if (closes.length < 20) return null;
+    if (closes.length < 2 || volumes.length < 2) return null;
 
     const currentClose = closes[closes.length - 1];
     const previousClose = closes[closes.length - 2];
+    const currentVolume = volumes[volumes.length - 1];
+    const averageVolume = calculateAverageVolume(data);
 
-    const ema9 = calculateEMA(closes, 9);
-    const ema21 = calculateEMA(closes, 21);
-    const rsi = calculateRSI(closes, 14);
+    // ✅ حساب نسبة التغير
+    const changePercent = ((currentClose - previousClose) / previousClose) * 100;
 
-    const ticker = await bingxRequest('GET', ENDPOINTS.FUTURES_TICKER, {
-      symbol
-    }, false);
-
-    const changePercent24h = parseFloat(ticker?.data?.priceChangePercent || 0);
-    const volume24h = parseFloat(ticker?.data?.volume || 0);
-
-    // ✅ طباعة المؤشرات
+    // ✅ طباعة المعلومات
     console.log(
-      `${symbol} | EMA9=${ema9?.toFixed(4)} | EMA21=${ema21?.toFixed(4)} | RSI=${rsi?.toFixed(2)}`
+      `${symbol} | close=${currentClose} | prev=${previousClose} | change=${changePercent.toFixed(3)}% | volume=${currentVolume} | avgVolume=${averageVolume.toFixed(0)}`
     );
 
     return {
       symbol,
       currentClose,
       previousClose,
-      ema9,
-      ema21,
-      rsi,
-      changePercent24h,
-      volume24h,
-      changePercent: ((currentClose - previousClose) / previousClose) * 100
+      currentVolume,
+      averageVolume,
+      changePercent,
+      change: (currentClose - previousClose) / previousClose // النسبة المئوية العشرية
     };
   } catch (error) {
     console.error(`❌ فشل جلب شمعة ${symbol}:`, error);
@@ -712,47 +657,35 @@ async function tradingCycle() {
     let bestScore = 0;
 
     for (const symbol of symbols) {
-      // ✅ طباعة اسم العملة قبل جلب البيانات
       console.log(`🔍 فحص ${symbol}`);
       
       const data = await getCandleData(symbol);
       if (!data) continue;
 
-      const { ema9, ema21, rsi, volume24h, currentClose, previousClose, changePercent, changePercent24h } = data;
+      const { currentClose, previousClose, currentVolume, averageVolume, change, changePercent } = data;
 
-      if (ema9 === null || ema21 === null || rsi === null) {
-        console.log(`📊 ${symbol}: بيانات غير كافية للمؤشرات`);
+      // ✅ فلتر الحجم: الحجم الحالي > متوسط الحجم
+      if (currentVolume <= averageVolume) {
+        console.log(`📊 ${symbol}: حجم منخفض (${currentVolume} <= ${averageVolume.toFixed(0)}) - تم التخطي`);
         continue;
       }
 
-      // ✅ منطق الإشارة مع سكور الاتجاه
+      // ✅ منطق الإشارة الجديد
       let signal = null;
       let score = 0;
 
-      // ✅ اتجاه صاعد: EMA9 > EMA21
-      if (ema9 > ema21) {
+      // ✅ شراء: السعر هبط بأكثر من 0.2% والحجم أعلى من المتوسط
+      if (currentClose < previousClose && (previousClose - currentClose) / previousClose > PRICE_CHANGE_THRESHOLD) {
         signal = 'BUY';
-        score = ((ema9 - ema21) / ema21) * 100;
-        console.log(`📊 ${symbol}: 📈 اتجاه صاعد | سكور=${score.toFixed(2)}`);
+        score = ((previousClose - currentClose) / previousClose) * 100;
+        console.log(`📊 ${symbol}: 📉 هبوط ${changePercent.toFixed(2)}% → إشارة شراء | سكور=${score.toFixed(2)}`);
       }
 
-      // ✅ اتجاه هابط: EMA9 < EMA21
-      if (ema9 < ema21) {
+      // ✅ بيع: السعر صعد بأكثر من 0.2% والحجم أعلى من المتوسط
+      if (currentClose > previousClose && (currentClose - previousClose) / previousClose > PRICE_CHANGE_THRESHOLD) {
         signal = 'SELL';
-        score = ((ema21 - ema9) / ema21) * 100;
-        console.log(`📊 ${symbol}: 📉 اتجاه هابط | سكور=${score.toFixed(2)}`);
-      }
-
-      // ✅ إذا كانت الإشارة شراء و RSI في منطقة التشبع البيعي (RSI < 45)
-      if (signal === 'BUY' && rsi < RSI_OVERSOLD) {
-        score *= 1.5;
-        console.log(`📊 ${symbol}: ✅ RSI=${rsi.toFixed(2)} < ${RSI_OVERSOLD} (تشبع بيع) - تعزيز الشراء`);
-      }
-
-      // ✅ إذا كانت الإشارة بيع و RSI في منطقة التشبع الشرائي (RSI > 55)
-      if (signal === 'SELL' && rsi > RSI_OVERBOUGHT) {
-        score *= 1.5;
-        console.log(`📊 ${symbol}: ✅ RSI=${rsi.toFixed(2)} > ${RSI_OVERBOUGHT} (تشبع شراء) - تعزيز البيع`);
+        score = ((currentClose - previousClose) / previousClose) * 100;
+        console.log(`📊 ${symbol}: 📈 صعود ${changePercent.toFixed(2)}% → إشارة بيع | سكور=${score.toFixed(2)}`);
       }
 
       if (!signal) continue;
@@ -926,7 +859,7 @@ app.get('/dashboard', (req, res) => {
     <body>
       <div class="container">
         <h1>🤖 بوت BingX - V7 Pro</h1>
-        <p class="subtitle">📡 شموع 15 دقيقة - EMA + RSI</p>
+        <p class="subtitle">📡 تغير السعر + حجم التداول</p>
         
         <div class="status-grid" id="statusGrid">
           <div class="card">
@@ -953,14 +886,13 @@ app.get('/dashboard', (req, res) => {
         </div>
 
         <div class="settings-box">
-          <div class="label">⚙️ إعدادات V7 Pro - 15 دقيقة</div>
+          <div class="label">⚙️ إعدادات V7 Pro</div>
           <div class="value">
             💰 <span class="highlight-green">0.80 USDT</span> &nbsp;|&nbsp;
             🎯 هدف: <span class="highlight-gold">0.05 USDT</span> &nbsp;|&nbsp;
-            📈 شراء: <span class="highlight-green">EMA9>EMA21 + RSI&lt;45</span> &nbsp;|&nbsp;
-            📉 بيع: <span class="highlight-red">EMA9&lt;EMA21 + RSI&gt;55</span> &nbsp;|&nbsp;
+            📈 شراء: <span class="highlight-green">هبوط 0.2% + حجم مرتفع</span> &nbsp;|&nbsp;
+            📉 بيع: <span class="highlight-red">صعود 0.2% + حجم مرتفع</span> &nbsp;|&nbsp;
             🕐 شمعة: <span class="highlight-purple">15 دقيقة</span> &nbsp;|&nbsp;
-            📊 شموع: <span class="highlight-purple">≥50</span> &nbsp;|&nbsp;
             🔄 مسح: <span class="highlight-purple">60 ثانية</span>
           </div>
         </div>
@@ -1031,7 +963,7 @@ app.get('/', async (req, res) => {
     }
     
     res.json({
-      status: '⚡ بوت BingX - V7 Pro (شموع 15 دقيقة)',
+      status: '⚡ بوت BingX - V7 Pro (تغير السعر + حجم)',
       timestamp: new Date().toISOString(),
       balance: `${usdtBalance.toFixed(4)} USDT`,
       leverage: `${LEVERAGE}x`,
@@ -1043,10 +975,8 @@ app.get('/', async (req, res) => {
       settings: {
         tradeAmount: `${TRADE_AMOUNT} USDT`,
         profitTarget: `${PROFIT_USDT_TARGET} USDT`,
-        rsiOversold: RSI_OVERSOLD,
-        rsiOverbought: RSI_OVERBOUGHT,
+        priceChangeThreshold: `${PRICE_CHANGE_THRESHOLD * 100}%`,
         candleInterval: '15 دقيقة',
-        candleLimit: CANDLE_LIMIT,
         scanInterval: `${SCAN_INTERVAL/1000} ثانية`,
         leverage: `${LEVERAGE}x`,
         symbolsCount: cachedSymbols.length
@@ -1063,15 +993,14 @@ app.get('/', async (req, res) => {
 
 async function startBot() {
   try {
-    console.log('⚡⚡ بدء تشغيل بوت V7 Pro - شموع 15 دقيقة');
+    console.log('⚡⚡ بدء تشغيل بوت V7 Pro - تغير السعر + حجم');
     console.log('📊 ===== إعدادات V7 Pro =====');
     console.log(`💰 مبلغ التداول الثابت: ${TRADE_AMOUNT} USDT`);
     console.log(`⚡ الرافعة المالية: ${LEVERAGE}x`);
     console.log(`🎯 هدف الربح: ${PROFIT_USDT_TARGET} USDT`);
-    console.log(`📈 شراء: EMA9 > EMA21 (RSI < ${RSI_OVERSOLD} تعزيز)`);
-    console.log(`📉 بيع: EMA9 < EMA21 (RSI > ${RSI_OVERBOUGHT} تعزيز)`);
+    console.log(`📈 شراء: هبوط ${PRICE_CHANGE_THRESHOLD * 100}% + حجم أعلى من المتوسط`);
+    console.log(`📉 بيع: صعود ${PRICE_CHANGE_THRESHOLD * 100}% + حجم أعلى من المتوسط`);
     console.log(`🕐 فترة الشمعة: ${CANDLE_INTERVAL}`);
-    console.log(`📊 عدد الشموع: ≥50`);
     console.log(`🔄 سرعة المسح: كل ${SCAN_INTERVAL/1000} ثانية`);
     console.log('================================');
 
@@ -1113,15 +1042,14 @@ async function startBot() {
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`
   ╔═══════════════════════════════════════════════════════════════╗
-  ║   ⚡ بوت V7 Pro - شموع 15 دقيقة                            ║
+  ║   ⚡ بوت V7 Pro - تغير السعر + حجم                         ║
   ║   📡 http://localhost:${PORT}                                  ║
   ║   📊 لوحة التحكم: http://localhost:${PORT}/dashboard          ║
   ║   🚀 رافعة: ${LEVERAGE}x | 💰 مبلغ: ${TRADE_AMOUNT} USDT      ║
   ║   🎯 هدف: ${PROFIT_USDT_TARGET} USDT                          ║
-  ║   📈 شراء: EMA9>EMA21 + RSI<${RSI_OVERSOLD}                   ║
-  ║   📉 بيع: EMA9<EMA21 + RSI>${RSI_OVERBOUGHT}                  ║
-  ║   🕐 شمعة: ${CANDLE_INTERVAL} | 📊 شموع: ≥50                  ║
-  ║   🔄 مسح: ${SCAN_INTERVAL/1000} ثانية                         ║
+  ║   📈 شراء: هبوط ${PRICE_CHANGE_THRESHOLD * 100}% + حجم عالي   ║
+  ║   📉 بيع: صعود ${PRICE_CHANGE_THRESHOLD * 100}% + حجم عالي    ║
+  ║   🕐 شمعة: ${CANDLE_INTERVAL} | 🔄 مسح: ${SCAN_INTERVAL/1000}ثانية ║
   ║   ⚠️ تداول حقيقي - استخدم بحذر!                              ║
   ╚═══════════════════════════════════════════════════════════════╝
   `);
