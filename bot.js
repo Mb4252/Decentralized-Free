@@ -61,9 +61,8 @@ function generateSignature(params, secret) {
 }
 
 async function bingxRequest(method, endpoint, params = {}, signed = true) {
-  // تجربة النطاقين المحتملين
-  const baseURL = 'https://api.bingx.com'; // جرب هذا النطاق أولاً
-  // const baseURL = 'https://open-api.bingx.com'; // جرب هذا إذا لم يعمل الأول
+  // ✅ تم التعديل هنا: استخدام النطاق open-api.bingx.com
+  const baseURL = 'https://open-api.bingx.com';
   
   const timestamp = Date.now();
   
