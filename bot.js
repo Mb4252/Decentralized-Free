@@ -63,6 +63,14 @@ const STOP_LOSS_ENABLED = false;
 const SIGNAL_PERCENT = 0.1; // 0.1%
 
 // ==========================================
+// تخزين معلومات العقود
+// ==========================================
+
+let contractInfoCache = {};
+let lastContractFetch = 0;
+const CONTRACT_CACHE_TTL = 60000; // 60 ثانية
+
+// ==========================================
 // نقاط النهاية
 // ==========================================
 
@@ -143,7 +151,72 @@ async function bingxRequest(method, endpoint, params = {}, signed = true) {
 }
 
 // ==========================================
-// ✅ فلترة السيولة - معدلة
+// ✅ جلب معلومات العقود
+// ==========================================
+
+async function getContractInfo(symbol) {
+  const now = Date.now();
+  
+  // استخدام الكاش إذا كان محدثاً
+  if (contractInfoCache[symbol] && (now - lastContractFetch) < CONTRACT_CACHE_TTL) {
+    return contractInfoCache[symbol];
+  }
+
+  try {
+    const response = await bingxRequest(
+      'GET',
+      ENDPOINTS.FUTURES_CONTRACTS,
+      {},
+      false
+    );
+
+    if (response && response.code === 0 && response.data) {
+      const contracts = response.data;
+      const contract = contracts.find(c => c.symbol === symbol);
+      
+      if (contract) {
+        contractInfoCache[symbol] = {
+          minQty: Number(contract.minQty) || 0,
+          stepSize: Number(contract.stepSize) || 0.000001,
+          tickSize: Number(contract.tickSize) || 0.01,
+          pricePrecision: contract.pricePrecision || 2,
+          quantityPrecision: contract.quantityPrecision || 6
+        };
+        lastContractFetch = now;
+        console.log(`✅ تم جلب معلومات العقد لـ ${symbol}:`, contractInfoCache[symbol]);
+        return contractInfoCache[symbol];
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error(`❌ فشل جلب معلومات العقد ${symbol}:`, error);
+    return null;
+  }
+}
+
+// ==========================================
+// ✅ تعديل الكمية حسب متطلبات المنصة
+// ==========================================
+
+function adjustQuantity(quantity, contractInfo) {
+  if (!contractInfo) return quantity;
+  
+  const { minQty, stepSize } = contractInfo;
+  
+  // التأكد من أن الكمية >= minQty
+  let adjusted = Math.max(quantity, minQty);
+  
+  // تقريب الكمية حسب stepSize
+  if (stepSize > 0) {
+    adjusted = Math.floor(adjusted / stepSize) * stepSize;
+  }
+  
+  // تقريب إلى 6 منازل عشرية
+  return Number(adjusted.toFixed(6));
+}
+
+// ==========================================
+// ✅ فلترة السيولة المحسنة (حجم التداول بالدولار)
 // ==========================================
 
 function strongMarket(candles) {
@@ -151,16 +224,21 @@ function strongMarket(candles) {
 
   const avgVolume =
     candles.slice(-10)
-      .reduce((sum, c) => sum + c.volume, 0) / 10;
+      .reduce((sum, c) => sum + Number(c.volume), 0) / 10;
 
   const last = candles[candles.length - 1];
 
   const volatility =
     (last.high - last.low) / last.close;
 
+  // حجم التداول بالدولار
+  const dollarVolume = last.close * avgVolume;
+
+  console.log(`📊 متوسط الحجم: ${avgVolume.toFixed(2)} | التذبذب: ${(volatility * 100).toFixed(3)}% | قيمة التداول: $${dollarVolume.toFixed(2)}`);
+
   return (
-    avgVolume > 50000 &&
-    volatility > 0.001
+    dollarVolume > 100000 && // قيمة التداول > 100,000 دولار
+    volatility > 0.001       // التذبذب > 0.1%
   );
 }
 
@@ -183,6 +261,8 @@ async function hasGoodSpread(symbol) {
 
   const spread = ((ask - bid) / bid) * 100;
 
+  console.log(`📊 السبريد: ${spread.toFixed(3)}%`);
+  
   return spread < 0.05;
 }
 
@@ -266,7 +346,15 @@ async function executeRandomTrade() {
       return null;
     }
 
-    const roundedQuantity = calculateQuantity(price);
+    // جلب معلومات العقد
+    const contractInfo = await getContractInfo(symbol);
+    let roundedQuantity = calculateQuantity(price);
+    
+    // تعديل الكمية حسب متطلبات المنصة
+    if (contractInfo) {
+      roundedQuantity = adjustQuantity(roundedQuantity, contractInfo);
+      console.log(`📊 الكمية بعد التعديل: ${roundedQuantity}`);
+    }
     
     if (roundedQuantity <= 0) {
       console.log('⚠️ كمية غير صالحة');
@@ -317,9 +405,9 @@ async function getCandles(symbol) {
       limit: CANDLE_LIMIT
     }, false);
 
-    // ✅ طباعة الرد كامل
-    console.log('📡 الرد الكامل من API:');
-    console.log(JSON.stringify(response, null, 2));
+    // ✅ طباعة الرد كامل (تم تقليلها للقراءة)
+    // console.log('📡 الرد الكامل من API:');
+    // console.log(JSON.stringify(response, null, 2));
 
     // ✅ التحقق من وجود الرد
     if (!response) {
@@ -434,10 +522,22 @@ async function placeOrder(symbol, side, balance) {
       return null;
     }
 
-    const roundedQuantity = calculateQuantity(price);
+    // جلب معلومات العقد
+    const contractInfo = await getContractInfo(symbol);
+    let roundedQuantity = calculateQuantity(price);
+    
+    // تعديل الكمية حسب متطلبات المنصة
+    if (contractInfo) {
+      roundedQuantity = adjustQuantity(roundedQuantity, contractInfo);
+    }
     
     // ✅ عرض الكمية قبل الإرسال
     console.log("📊 الكمية المحسوبة:", roundedQuantity);
+    console.log("💰 Balance:", balance);
+    console.log("💰 Trade Amount:", TRADE_AMOUNT);
+    console.log("⚡ Leverage:", LEVERAGE);
+    console.log("💵 Price:", price);
+    console.log("📊 Contract Info:", contractInfo);
     
     if (roundedQuantity <= 0) {
       console.log('⚠️ كمية غير صالحة');
@@ -456,6 +556,10 @@ async function placeOrder(symbol, side, balance) {
     };
 
     const response = await bingxRequest('POST', ENDPOINTS.FUTURES_ORDER, params);
+
+    // ✅ طباعة الرد كامل بعد التنفيذ
+    console.log('📡 رد المنصة:');
+    console.log(JSON.stringify(response, null, 2));
 
     if (response && response.code === 0) {
       console.log(`🚀 OPEN ${side} ${symbol}`);
@@ -974,6 +1078,12 @@ async function startBot() {
     console.log(`🔄 سرعة المسح: كل ${SCAN_INTERVAL/1000} ثانية`);
     console.log(`⛔ وقف الخسارة: ${STOP_LOSS_ENABLED ? 'مفعل' : 'معطل'}`);
     console.log('================================');
+
+    // ✅ جلب معلومات العقود مسبقاً
+    console.log('📡 جاري جلب معلومات العقود...');
+    for (const symbol of SYMBOLS) {
+      await getContractInfo(symbol);
+    }
 
     const balance = await getFuturesBalance();
     console.log(`💰 رصيد USDT في Futures: ${balance.toFixed(4)}`);
