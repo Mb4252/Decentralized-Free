@@ -24,12 +24,12 @@ const API_KEY = process.env.BINGX_API_KEY;
 const API_SECRET = process.env.BINGX_API_SECRET;
 
 // ✅ إعدادات رأس المال والمخاطرة
-const TRADE_AMOUNT = 0.4; // ✅ تم التعديل إلى 0.4 دولار
+const TRADE_AMOUNT = 0.4; // ✅ 0.4 دولار
 const USE_FULL_BALANCE = false;
 const MAX_RISK_PER_TRADE = 0.01; // 1% من الرصيد
 
 // ✅ الرافعة المالية
-const LEVERAGE = 20; // ✅ تم التعديل إلى 20x
+const LEVERAGE = 20; // ✅ 20x
 
 // ✅ أهداف سكالبينج سريعة
 const PROFIT_USDT_TARGET = 0.05;
@@ -144,25 +144,18 @@ async function bingxRequest(method, endpoint, params = {}, signed = true) {
 }
 
 // ==========================================
-// ✅ فلترة العملات القوية
+// ✅ فلترة العملات القوية - دائماً true
 // ==========================================
 
 function strongMarket(candles) {
-  if (!candles || candles.length === 0) return false;
-  
-  const last = candles[candles.length - 1];
-
-  return (
-    last.volume > 1000 &&
-    (last.high - last.low) / last.close > 0.001
-  );
+  return true; // ✅ دائماً نعم
 }
 
 // ==========================================
 // ✅ فحص الإشارة الجديد (نسبة التغير)
 // ==========================================
 
-function checkSignal(candles) {
+function checkSignal(candles, symbol) {
   if (!candles || candles.length < 2) return null;
 
   const current = candles[candles.length - 1];
@@ -172,9 +165,14 @@ function checkSignal(candles) {
 
   const change = ((current.close - previous.close) / previous.close) * 100;
 
-  // ✅ عرض نسبة التغير والأسعار
+  // ✅ عرض نسبة التغير للعملة
   console.log(
-    `📊 التغير: ${change.toFixed(3)}% | السعر الحالي: ${current.close} | السعر السابق: ${previous.close}`
+    `${symbol} change = ${change.toFixed(3)}%`
+  );
+
+  // عرض الأسعار أيضاً
+  console.log(
+    `📊 السعر الحالي: ${current.close} | السعر السابق: ${previous.close}`
   );
 
   // هبوط 0.1% => شراء
@@ -318,14 +316,15 @@ async function getCandles(symbol) {
 }
 
 // ==========================================
-// ✅ حساب كمية العقد مع إدارة المخاطرة
+// ✅ حساب كمية العقد - الدالة الجديدة
 // ==========================================
 
 function calculateQuantity(price, balance) {
-  const riskAmount = balance * MAX_RISK_PER_TRADE;
-  const quantity = (riskAmount * LEVERAGE) / price;
-  const roundedQuantity = parseFloat(quantity.toFixed(6));
-  return roundedQuantity;
+  const usdtToUse = Math.min(balance * 0.95, TRADE_AMOUNT);
+
+  const quantity = (usdtToUse * LEVERAGE) / price;
+
+  return Number(quantity.toFixed(5));
 }
 
 // ==========================================
@@ -603,10 +602,14 @@ async function tradingCycle() {
     // ✅ Signal Check Loop - تنفيذ أول إشارة تتحقق
     for (const symbol of symbols) {
       const candles = await getCandles(symbol);
+      
+      // ✅ عرض حالة الشموع
+      console.log(symbol, candles ? candles.length : "NO_DATA");
+      
       if (!candles || candles.length < 20) continue;
 
-      // ✅ فحص الإشارة الجديد
-      const signal = checkSignal(candles);
+      // ✅ فحص الإشارة الجديد مع تمرير symbol
+      const signal = checkSignal(candles, symbol);
       
       // ✅ عرض العملة والإشارة
       console.log(`${symbol} => ${signal}`);
