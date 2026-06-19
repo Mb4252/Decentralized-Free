@@ -24,16 +24,16 @@ const API_KEY = process.env.BINGX_API_KEY;
 const API_SECRET = process.env.BINGX_API_SECRET;
 
 // ✅ إعدادات رأس المال والمخاطرة
-const TRADE_AMOUNT = 0.4; // ✅ 0.4 دولار
+const TRADE_AMOUNT = 5; // ✅ تم التعديل إلى 5 دولار
 const USE_FULL_BALANCE = false;
 const MAX_RISK_PER_TRADE = 0.01; // 1% من الرصيد
 
 // ✅ الرافعة المالية
-const LEVERAGE = 20; // ✅ 20x
+const LEVERAGE = 10; // ✅ تم التعديل إلى 10x
 
 // ✅ أهداف سكالبينج سريعة
-const PROFIT_USDT_TARGET = 0.05;
-const MIN_PROFIT_USDT = 0.05;
+const PROFIT_USDT_TARGET = 0.2; // ✅ تم التعديل إلى 0.2 دولار
+const MIN_PROFIT_USDT = 0.2;
 
 // ✅ إعدادات الشمعة (1 دقيقة)
 const CANDLE_INTERVAL = '1m';
@@ -60,7 +60,7 @@ const STOP_LOSS_ENABLED = false;
 // نسبة التغير المطلوبة للإشارة - مخفضة للتداول السريع
 // ==========================================
 
-const SIGNAL_PERCENT = 0.03; // ✅ 0.03% (بدلاً من 0.1%)
+const SIGNAL_PERCENT = 0.03; // 0.03%
 
 // ==========================================
 // تخزين معلومات العقود
@@ -236,10 +236,9 @@ function strongMarket(candles) {
 
   console.log(`📊 متوسط الحجم: ${avgVolume.toFixed(2)} | التذبذب: ${(volatility * 100).toFixed(3)}% | قيمة التداول: $${dollarVolume.toFixed(2)}`);
 
-  // ✅ تخفيض شرط التذبذب من 0.001 (0.1%) إلى 0.00015 (0.015%)
   return (
-    dollarVolume > 10000 && // ✅ تخفيض قيمة التداول إلى 10,000 دولار
-    volatility > 0.00015    // ✅ 0.015% تذبذب
+    dollarVolume > 10000 &&
+    volatility > 0.00015
   );
 }
 
@@ -281,23 +280,18 @@ function checkSignal(candles, symbol) {
 
   const change = ((current.close - previous.close) / previous.close) * 100;
 
-  // ✅ عرض نسبة التغير مقابل المطلوب
   console.log(
     `${symbol} change=${change.toFixed(3)}% required=${SIGNAL_PERCENT}%`
   );
 
-  // عرض الأسعار أيضاً
   console.log(
     `📊 السعر الحالي: ${current.close} | السعر السابق: ${previous.close}`
   );
 
-  // ✅ تخفيض شرط الإشارة من 0.1% إلى 0.03%
-  // هبوط 0.03% => شراء
   if (change <= -SIGNAL_PERCENT) {
     return "BUY";
   }
 
-  // صعود 0.03% => بيع
   if (change >= SIGNAL_PERCENT) {
     return "SELL";
   }
@@ -310,7 +304,6 @@ function checkSignal(candles, symbol) {
 // ==========================================
 
 async function getTopVolumeSymbols() {
-  // ✅ دائماً نرجع القائمة الثابتة
   return SYMBOLS;
 }
 
@@ -348,11 +341,9 @@ async function executeRandomTrade() {
       return null;
     }
 
-    // جلب معلومات العقد
     const contractInfo = await getContractInfo(symbol);
     let roundedQuantity = calculateQuantity(price);
     
-    // تعديل الكمية حسب متطلبات المنصة
     if (contractInfo) {
       roundedQuantity = adjustQuantity(roundedQuantity, contractInfo);
       console.log(`📊 الكمية بعد التعديل: ${roundedQuantity}`);
@@ -396,7 +387,7 @@ async function executeRandomTrade() {
 }
 
 // ==========================================
-// ✅ جلب بيانات الشمعة - مع طباعة الرد الكامل
+// ✅ جلب بيانات الشمعة
 // ==========================================
 
 async function getCandles(symbol) {
@@ -407,16 +398,13 @@ async function getCandles(symbol) {
       limit: CANDLE_LIMIT
     }, false);
 
-    // ✅ التحقق من وجود الرد
     if (!response) {
       console.log(symbol, "API_FAILED");
       return null;
     }
 
-    // ✅ طباعة الكود والرسالة
     console.log(symbol, "code:", response.code, "msg:", response.msg);
 
-    // ✅ إذا كان الكود 100400 (symbol not found)
     if (response.code === 100400) {
       console.log(`⚠️ الرمز ${symbol} غير موجود، جرب صيغة مختلفة (مثل: ${symbol.replace('-', '')})`);
       return null;
@@ -439,7 +427,6 @@ async function getCandles(symbol) {
       return null;
     }
 
-    // ✅ استبدال جزء معالجة الشموع لاستخدام المفاتيح بدلاً من الأرقام
     const candles = data.map(candle => ({
       open: Number(candle.open),
       high: Number(candle.high),
@@ -520,16 +507,13 @@ async function placeOrder(symbol, side, balance) {
       return null;
     }
 
-    // جلب معلومات العقد
     const contractInfo = await getContractInfo(symbol);
     let roundedQuantity = calculateQuantity(price);
     
-    // تعديل الكمية حسب متطلبات المنصة
     if (contractInfo) {
       roundedQuantity = adjustQuantity(roundedQuantity, contractInfo);
     }
     
-    // ✅ عرض الكمية قبل الإرسال
     console.log("📊 الكمية المحسوبة:", roundedQuantity);
     console.log("💰 Balance:", balance);
     console.log("💰 Trade Amount:", TRADE_AMOUNT);
@@ -555,7 +539,6 @@ async function placeOrder(symbol, side, balance) {
 
     const response = await bingxRequest('POST', ENDPOINTS.FUTURES_ORDER, params);
 
-    // ✅ طباعة الرد كامل بعد التنفيذ
     console.log('📡 رد المنصة:');
     console.log(JSON.stringify(response, null, 2));
 
@@ -692,7 +675,7 @@ async function tradingCycle() {
     const balance = await getFuturesBalance();
     console.log(`💰 الرصيد: ${balance.toFixed(4)} USDT`);
 
-    let tradeAmount = TRADE_AMOUNT; // ✅ ثابت 0.4 دولار
+    let tradeAmount = TRADE_AMOUNT;
     if (USE_FULL_BALANCE) {
       tradeAmount = balance * 0.95;
     }
@@ -722,7 +705,6 @@ async function tradingCycle() {
         lastTradeTime = Date.now();
       }
       
-      // ✅ وقف الخسارة معطل
       if (STOP_LOSS_ENABLED && profitUSDT < -0.03) {
         console.log(`⛔ وقف خسارة سريع: ${profitUSDT.toFixed(4)} USDT`);
         await closePosition(currentPosition);
@@ -747,7 +729,6 @@ async function tradingCycle() {
       return;
     }
 
-    // ✅ جلب العملات - القائمة الثابتة
     const symbols = await getTopVolumeSymbols();
     
     if (!symbols || symbols.length === 0) {
@@ -758,22 +739,18 @@ async function tradingCycle() {
 
     console.log(`🔍 جاري مسح ${symbols.length} عملة (سكالبينج)...`);
     
-    // ✅ Signal Check Loop - تنفيذ أول إشارة تتحقق
     for (const symbol of symbols) {
       const candles = await getCandles(symbol);
       
       if (!candles || candles.length < 20) continue;
 
-      // ✅ فحص الإشارة الجديد مع تمرير symbol
       const signal = checkSignal(candles, symbol);
       
-      // ✅ عرض العملة والإشارة
       console.log(`${symbol} => ${signal}`);
       
       if (signal) {
         console.log(`🚀 إشارة ${signal}: ${symbol}`);
 
-        // ✅ فحص السبريد قبل الدخول
         if (!(await hasGoodSpread(symbol))) {
           console.log(`${symbol} سبريد مرتفع ❌`);
           continue;
@@ -791,7 +768,7 @@ async function tradingCycle() {
           currentPosition = position;
           lastTradeTime = Date.now();
           console.log(`✅ تم الدخول: ${symbol} (${signal})`);
-          break; // ✅ أول إشارة تتحقق → نوقف البحث
+          break;
         }
       }
     }
@@ -941,7 +918,7 @@ app.get('/dashboard', (req, res) => {
           </div>
           <div class="card">
             <div class="label">⚡ الرافعة</div>
-            <div class="value gold" id="leverage">20x</div>
+            <div class="value gold" id="leverage">10x</div>
           </div>
           <div class="card" style="grid-column: span 3;">
             <div class="label">📈 الصفقة الحالية</div>
@@ -957,9 +934,9 @@ app.get('/dashboard', (req, res) => {
         <div class="settings-box">
           <div class="label">⚙️ إعدادات سكالبينج</div>
           <div class="value">
-            💰 <span class="highlight-green">0.4 USDT</span> &nbsp;|&nbsp;
-            ⚡ <span class="highlight-gold">20x رافعة</span> &nbsp;|&nbsp;
-            🎯 هدف: <span class="highlight-gold">0.05 USDT</span> &nbsp;|&nbsp;
+            💰 <span class="highlight-green">5 USDT</span> &nbsp;|&nbsp;
+            ⚡ <span class="highlight-gold">10x رافعة</span> &nbsp;|&nbsp;
+            🎯 هدف: <span class="highlight-gold">0.2 USDT</span> &nbsp;|&nbsp;
             🕐 شمعة: <span class="highlight-purple">1 دقيقة</span> &nbsp;|&nbsp;
             📊 عملات: <span class="highlight-purple">AVAX, HYPE, DOGE</span> &nbsp;|&nbsp;
             🔄 مسح: <span class="highlight-purple">3 ثواني</span> &nbsp;|&nbsp;
@@ -1079,7 +1056,6 @@ async function startBot() {
     console.log(`⛔ وقف الخسارة: ${STOP_LOSS_ENABLED ? 'مفعل' : 'معطل'}`);
     console.log('================================');
 
-    // ✅ جلب معلومات العقود مسبقاً
     console.log('📡 جاري جلب معلومات العقود...');
     for (const symbol of SYMBOLS) {
       await getContractInfo(symbol);
@@ -1096,7 +1072,6 @@ async function startBot() {
       console.log(`⚠️ تحذير: الرصيد (${balance.toFixed(4)}) أقل من مبلغ التداول (${TRADE_AMOUNT})`);
     }
 
-    // ✅ تشغيل الدورة الرئيسية
     await tradingCycle();
 
     setInterval(async () => {
