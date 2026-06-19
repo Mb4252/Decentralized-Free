@@ -24,12 +24,12 @@ const API_KEY = process.env.BINGX_API_KEY;
 const API_SECRET = process.env.BINGX_API_SECRET;
 
 // ✅ إعدادات رأس المال والمخاطرة
-const TRADE_AMOUNT = 1; // ✅ تم التعديل إلى 1 دولار
+const TRADE_AMOUNT = 0.4; // ✅ تم التعديل إلى 1 دولار
 const USE_FULL_BALANCE = false;
 const MAX_RISK_PER_TRADE = 0.01; // 1% من الرصيد
 
 // ✅ الرافعة المالية
-const LEVERAGE = 5; // 5x
+const LEVERAGE = 20; // 5x
 
 // ✅ أهداف سكالبينج سريعة
 const PROFIT_USDT_TARGET = 0.05;
