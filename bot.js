@@ -39,10 +39,9 @@ const MIN_PROFIT_USDT = 0.05;
 const CANDLE_INTERVAL = '1m';
 const CANDLE_LIMIT = 30;
 
-// ✅ قائمة العملات الثابتة
+// ✅ قائمة العملات - AVAX, HYPE, DOGE فقط
 const SYMBOLS = [
-  "BTC-USDT","ETH-USDT","LINK-USDT","BCH-USDT","ADA-USDT",
-  "XRP-USDT","LTC-USDT","DOT-USDT","AVAX-USDT","THETA-USDT"
+  "AVAX-USDT", "HYPE-USDT", "DOGE-USDT"
 ];
 
 // ✅ المتغيرات
@@ -824,7 +823,7 @@ app.get('/dashboard', (req, res) => {
             ⚡ <span class="highlight-gold">20x رافعة</span> &nbsp;|&nbsp;
             🎯 هدف: <span class="highlight-gold">0.05 USDT</span> &nbsp;|&nbsp;
             🕐 شمعة: <span class="highlight-purple">1 دقيقة</span> &nbsp;|&nbsp;
-            📊 عملات: <span class="highlight-purple">قائمة ثابتة (10)</span> &nbsp;|&nbsp;
+            📊 عملات: <span class="highlight-purple">AVAX, HYPE, DOGE</span> &nbsp;|&nbsp;
             🔄 مسح: <span class="highlight-purple">3 ثواني</span> &nbsp;|&nbsp;
             📊 إشارة: <span class="highlight-purple">0.1% تغير</span>
           </div>
@@ -935,7 +934,7 @@ async function startBot() {
     console.log(`📊 المخاطرة: ${MAX_RISK_PER_TRADE * 100}% من الرصيد`);
     console.log(`📊 نسبة التغير للإشارة: ${SIGNAL_PERCENT}%`);
     console.log(`🕐 فترة الشمعة: ${CANDLE_INTERVAL}`);
-    console.log(`📊 العملات الثابتة: ${SYMBOLS.join(', ')}`);
+    console.log(`📊 العملات: ${SYMBOLS.join(', ')}`);
     console.log(`🔄 سرعة المسح: كل ${SCAN_INTERVAL/1000} ثانية`);
     console.log(`⛔ وقف الخسارة: ${STOP_LOSS_ENABLED ? 'مفعل' : 'معطل'}`);
     console.log('================================');
@@ -983,7 +982,8 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   ║   🚀 رافعة: ${LEVERAGE}x | 💰 مبلغ: ${TRADE_AMOUNT} USDT    ║
   ║   🎯 هدف: ${PROFIT_USDT_TARGET} USDT                          ║
   ║   📊 إشارة: ${SIGNAL_PERCENT}% تغير                           ║
-  ║   🕐 شمعة: ${CANDLE_INTERVAL} | 📊 ${SYMBOLS.length} عملة ثابتة ║
+  ║   🕐 شمعة: ${CANDLE_INTERVAL} | 📊 ${SYMBOLS.length} عملة     ║
+  ║   📊 العملات: ${SYMBOLS.join(', ')}                          ║
   ║   🔄 مسح: ${SCAN_INTERVAL/1000} ثانية                         ║
   ║   ⛔ وقف الخسارة: معطل                                        ║
   ║   ⚠️ تداول حقيقي - استخدم بحذر!                              ║
