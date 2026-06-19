@@ -143,18 +143,47 @@ async function bingxRequest(method, endpoint, params = {}, signed = true) {
 }
 
 // ==========================================
-// ✅ فلترة العملات القوية - معدلة
+// ✅ فلترة السيولة - معدلة
 // ==========================================
 
 function strongMarket(candles) {
-  if (!candles || candles.length === 0) return false;
-  
+  if (!candles || candles.length < 10) return false;
+
+  const avgVolume =
+    candles.slice(-10)
+      .reduce((sum, c) => sum + c.volume, 0) / 10;
+
   const last = candles[candles.length - 1];
 
+  const volatility =
+    (last.high - last.low) / last.close;
+
   return (
-    last.volume > 0.5 &&
-    ((last.high - last.low) / last.close) > 0.0005
+    avgVolume > 50000 &&
+    volatility > 0.001
   );
+}
+
+// ==========================================
+// ✅ فحص السبريد
+// ==========================================
+
+async function hasGoodSpread(symbol) {
+  const ticker = await bingxRequest(
+    'GET',
+    ENDPOINTS.FUTURES_TICKER,
+    { symbol },
+    false
+  );
+
+  if (!ticker?.data) return false;
+
+  const bid = Number(ticker.data.bidPrice);
+  const ask = Number(ticker.data.askPrice);
+
+  const spread = ((ask - bid) / bid) * 100;
+
+  return spread < 0.05;
 }
 
 // ==========================================
@@ -641,6 +670,13 @@ async function tradingCycle() {
       
       if (signal) {
         console.log(`🚀 إشارة ${signal}: ${symbol}`);
+
+        // ✅ فحص السبريد قبل الدخول
+        if (!(await hasGoodSpread(symbol))) {
+          console.log(`${symbol} سبريد مرتفع ❌`);
+          continue;
+        }
+        console.log(`${symbol} سبريد جيد ✅`);
 
         const leverageSet = await setLeverage(symbol);
         if (!leverageSet) {
