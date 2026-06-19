@@ -24,12 +24,12 @@ const API_KEY = process.env.BINGX_API_KEY;
 const API_SECRET = process.env.BINGX_API_SECRET;
 
 // ✅ إعدادات رأس المال والمخاطرة
-const TRADE_AMOUNT = 0.4; // ✅ تم التعديل إلى 1 دولار
+const TRADE_AMOUNT = 0.4; // ✅ تم التعديل إلى 0.4 دولار
 const USE_FULL_BALANCE = false;
 const MAX_RISK_PER_TRADE = 0.01; // 1% من الرصيد
 
 // ✅ الرافعة المالية
-const LEVERAGE = 20; // 5x
+const LEVERAGE = 20; // ✅ تم التعديل إلى 20x
 
 // ✅ أهداف سكالبينج سريعة
 const PROFIT_USDT_TARGET = 0.05;
@@ -171,6 +171,11 @@ function checkSignal(candles) {
   if (!strongMarket(candles)) return null;
 
   const change = ((current.close - previous.close) / previous.close) * 100;
+
+  // ✅ عرض نسبة التغير والأسعار
+  console.log(
+    `📊 التغير: ${change.toFixed(3)}% | السعر الحالي: ${current.close} | السعر السابق: ${previous.close}`
+  );
 
   // هبوط 0.1% => شراء
   if (change <= -SIGNAL_PERCENT) {
@@ -375,6 +380,9 @@ async function placeOrder(symbol, side, balance) {
 
     const roundedQuantity = calculateQuantity(price, balance);
     
+    // ✅ عرض الكمية قبل الإرسال
+    console.log("📊 الكمية المحسوبة:", roundedQuantity);
+    
     if (roundedQuantity <= 0) {
       console.log('⚠️ كمية غير صالحة');
       return null;
@@ -526,7 +534,7 @@ async function tradingCycle() {
     const balance = await getFuturesBalance();
     console.log(`💰 الرصيد: ${balance.toFixed(4)} USDT`);
 
-    let tradeAmount = TRADE_AMOUNT; // ✅ ثابت 1 دولار
+    let tradeAmount = TRADE_AMOUNT; // ✅ ثابت 0.4 دولار
     if (USE_FULL_BALANCE) {
       tradeAmount = balance * 0.95;
     }
@@ -599,6 +607,9 @@ async function tradingCycle() {
 
       // ✅ فحص الإشارة الجديد
       const signal = checkSignal(candles);
+      
+      // ✅ عرض العملة والإشارة
+      console.log(`${symbol} => ${signal}`);
       
       if (signal) {
         console.log(`🚀 إشارة ${signal}: ${symbol}`);
@@ -764,7 +775,7 @@ app.get('/dashboard', (req, res) => {
           </div>
           <div class="card">
             <div class="label">⚡ الرافعة</div>
-            <div class="value gold" id="leverage">5x</div>
+            <div class="value gold" id="leverage">20x</div>
           </div>
           <div class="card" style="grid-column: span 3;">
             <div class="label">📈 الصفقة الحالية</div>
@@ -780,11 +791,11 @@ app.get('/dashboard', (req, res) => {
         <div class="settings-box">
           <div class="label">⚙️ إعدادات سكالبينج</div>
           <div class="value">
-            💰 <span class="highlight-green">1% مخاطرة</span> &nbsp;|&nbsp;
+            💰 <span class="highlight-green">0.4 USDT</span> &nbsp;|&nbsp;
+            ⚡ <span class="highlight-gold">20x رافعة</span> &nbsp;|&nbsp;
             🎯 هدف: <span class="highlight-gold">0.05 USDT</span> &nbsp;|&nbsp;
             🕐 شمعة: <span class="highlight-purple">1 دقيقة</span> &nbsp;|&nbsp;
             📊 عملات: <span class="highlight-purple">قائمة ثابتة (10)</span> &nbsp;|&nbsp;
-            ⚡ رافعة: <span class="highlight-purple">5x</span> &nbsp;|&nbsp;
             🔄 مسح: <span class="highlight-purple">3 ثواني</span> &nbsp;|&nbsp;
             📊 إشارة: <span class="highlight-purple">0.1% تغير</span>
           </div>
@@ -940,7 +951,7 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   ║   ⚡ بوت سكالبينج - إشارات نسبة التغير 0.1%               ║
   ║   📡 http://localhost:${PORT}                                  ║
   ║   📊 لوحة التحكم: http://localhost:${PORT}/dashboard          ║
-  ║   🚀 رافعة: ${LEVERAGE}x | 💰 مخاطرة: ${MAX_RISK_PER_TRADE * 100}%  ║
+  ║   🚀 رافعة: ${LEVERAGE}x | 💰 مبلغ: ${TRADE_AMOUNT} USDT    ║
   ║   🎯 هدف: ${PROFIT_USDT_TARGET} USDT                          ║
   ║   📊 إشارة: ${SIGNAL_PERCENT}% تغير                           ║
   ║   🕐 شمعة: ${CANDLE_INTERVAL} | 📊 ${SYMBOLS.length} عملة ثابتة ║
