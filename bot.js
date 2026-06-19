@@ -231,7 +231,7 @@ async function executeRandomTrade() {
       return null;
     }
 
-    const roundedQuantity = calculateQuantity(price, amount);
+    const roundedQuantity = calculateQuantity(price);
     
     if (roundedQuantity <= 0) {
       console.log('⚠️ كمية غير صالحة');
@@ -271,7 +271,7 @@ async function executeRandomTrade() {
 }
 
 // ==========================================
-// ✅ جلب بيانات الشمعة
+// ✅ جلب بيانات الشمعة - مع طباعة الرد الكامل
 // ==========================================
 
 async function getCandles(symbol) {
@@ -281,6 +281,25 @@ async function getCandles(symbol) {
       interval: CANDLE_INTERVAL,
       limit: CANDLE_LIMIT
     }, false);
+
+    // ✅ طباعة الرد كامل
+    console.log('📡 الرد الكامل من API:');
+    console.log(JSON.stringify(response, null, 2));
+
+    // ✅ التحقق من وجود الرد
+    if (!response) {
+      console.log(symbol, "API_FAILED");
+      return null;
+    }
+
+    // ✅ طباعة الكود والرسالة
+    console.log(symbol, "code:", response.code, "msg:", response.msg);
+
+    // ✅ إذا كان الكود 100400 (symbol not found)
+    if (response.code === 100400) {
+      console.log(`⚠️ الرمز ${symbol} غير موجود، جرب صيغة مختلفة (مثل: ${symbol.replace('-', '')})`);
+      return null;
+    }
 
     const raw = response?.data;
 
@@ -295,6 +314,7 @@ async function getCandles(symbol) {
     }
 
     if (!data || !Array.isArray(data) || data.length < 20) {
+      console.log(symbol, "بيانات غير كافية:", data ? data.length : 0);
       return null;
     }
 
@@ -306,8 +326,12 @@ async function getCandles(symbol) {
       volume: Number(candle[5])
     })).filter(c => !isNaN(c.open) && !isNaN(c.high) && !isNaN(c.low) && !isNaN(c.close) && c.high > 0 && c.low > 0);
 
-    if (candles.length < 20) return null;
+    if (candles.length < 20) {
+      console.log(symbol, "بيانات غير صالحة بعد التصفية");
+      return null;
+    }
 
+    console.log(symbol, `✅ تم جلب ${candles.length} شمعة`);
     return candles;
   } catch (error) {
     console.error(`❌ فشل جلب شمعة ${symbol}:`, error);
@@ -316,15 +340,11 @@ async function getCandles(symbol) {
 }
 
 // ==========================================
-// ✅ حساب كمية العقد - الدالة الجديدة
+// ✅ حساب كمية العقد - الدالة الجديدة (معامل واحد فقط)
 // ==========================================
 
-function calculateQuantity(price, balance) {
-  const usdtToUse = Math.min(balance * 0.95, TRADE_AMOUNT);
-
-  const quantity = (usdtToUse * LEVERAGE) / price;
-
-  return Number(quantity.toFixed(5));
+function calculateQuantity(price) {
+  return Number((TRADE_AMOUNT * LEVERAGE / price).toFixed(6));
 }
 
 // ==========================================
@@ -377,7 +397,7 @@ async function placeOrder(symbol, side, balance) {
       return null;
     }
 
-    const roundedQuantity = calculateQuantity(price, balance);
+    const roundedQuantity = calculateQuantity(price);
     
     // ✅ عرض الكمية قبل الإرسال
     console.log("📊 الكمية المحسوبة:", roundedQuantity);
@@ -602,9 +622,6 @@ async function tradingCycle() {
     // ✅ Signal Check Loop - تنفيذ أول إشارة تتحقق
     for (const symbol of symbols) {
       const candles = await getCandles(symbol);
-      
-      // ✅ عرض حالة الشموع
-      console.log(symbol, candles ? candles.length : "NO_DATA");
       
       if (!candles || candles.length < 20) continue;
 
