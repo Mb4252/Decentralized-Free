@@ -144,11 +144,18 @@ async function bingxRequest(method, endpoint, params = {}, signed = true) {
 }
 
 // ==========================================
-// ✅ فلترة العملات القوية - دائماً true
+// ✅ فلترة العملات القوية - معدلة
 // ==========================================
 
 function strongMarket(candles) {
-  return true; // ✅ دائماً نعم
+  if (!candles || candles.length === 0) return false;
+  
+  const last = candles[candles.length - 1];
+
+  return (
+    last.volume > 0.5 &&
+    ((last.high - last.low) / last.close) > 0.0005
+  );
 }
 
 // ==========================================
@@ -318,12 +325,14 @@ async function getCandles(symbol) {
       return null;
     }
 
+    // ✅ استبدال جزء معالجة الشموع لاستخدام المفاتيح بدلاً من الأرقام
     const candles = data.map(candle => ({
-      open: Number(candle[1]),
-      high: Number(candle[2]),
-      low: Number(candle[3]),
-      close: Number(candle[4]),
-      volume: Number(candle[5])
+      open: Number(candle.open),
+      high: Number(candle.high),
+      low: Number(candle.low),
+      close: Number(candle.close),
+      volume: Number(candle.volume),
+      time: Number(candle.time)
     })).filter(c => !isNaN(c.open) && !isNaN(c.high) && !isNaN(c.low) && !isNaN(c.close) && c.high > 0 && c.low > 0);
 
     if (candles.length < 20) {
