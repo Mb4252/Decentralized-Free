@@ -35,7 +35,7 @@ const LEVERAGE = 10;
 const PROFIT_USDT_TARGET = 0.12;
 const MIN_PROFIT_USDT = 0.12;
 
-// ✅ وقف الخسارة - ديناميكي (سيتم حسابه عبر ATR)
+// ✅ وقف الخسارة
 const STOP_LOSS_ENABLED = true;
 const STOP_LOSS_ATR_MULTIPLIER = 1.2;
 const TAKE_PROFIT_ATR_MULTIPLIER = 2.5;
@@ -64,8 +64,8 @@ const SYMBOLS = [
 let currentPosition = null;
 let isRunning = false;
 let lastTradeTime = 0;
-const cooldown = 500;
-const SCAN_INTERVAL = 500;
+const cooldown = 2000;
+const SCAN_INTERVAL = 3000;
 
 // ✅ سجل الصفقات
 const TRADES_FILE = path.join(__dirname, 'trades.json');
@@ -467,15 +467,14 @@ function strongMarket(candles) {
   const volatility =
     (last.high - last.low) / last.close;
 
-  // ✅ حساب قيمة التداول بالدولار بشكل صحيح
   const dollarVolume = last.close * avgVolume;
 
   console.log(`   📊 Vol=${avgVolume.toFixed(2)} | DollarVol=$${dollarVolume.toFixed(2)} | تذبذب=${(volatility * 100).toFixed(3)}%`);
 
-  // ✅ تخفيف شروط السيولة لـ BTC والعملات الكبيرة
+  // ✅ تخفيف شرط التذبذب بشكل كبير
   return (
-    dollarVolume > 500 &&      // ✅ تم التخفيف بشكل كبير
-    volatility > 0.00005       // ✅ تم التخفيف
+    dollarVolume > 500 &&
+    volatility > 0.00001   // ✅ 0.001% بدلاً من 0.005%
   );
 }
 
@@ -579,10 +578,10 @@ function detectMarketRegime(candles) {
 }
 
 // ==========================================
-// ✅ نظام النقاط المحسن - 200 نقطة مع عتبة 110
+// ✅ نظام النقاط المحسن - 300 نقطة
 // ==========================================
 
-function checkSignal(candles, symbol, btcTrend) {
+async function checkSignal(candles, symbol, btcTrend) {
   if (!candles || candles.length < 50) return null;
 
   const current = candles[candles.length - 1];
@@ -591,6 +590,7 @@ function checkSignal(candles, symbol, btcTrend) {
   // ✅ المؤشرات الفنية
   const ema20 = calculateEMA(closes, 20);
   const ema50 = calculateEMA(closes, 50);
+  const ema100 = calculateEMA(closes, 100);
   const rsi = calculateRSI(closes, 14);
   const macd = calculateMACD(closes);
   const atr = calculateATR(candles, 14);
@@ -613,9 +613,9 @@ function checkSignal(candles, symbol, btcTrend) {
   const prevClose = candles[candles.length - 2].close;
   const velocity = ((current.close - prevClose) / prevClose) * 100;
 
-  // ✅ كشف الاختراق (قمة/قاع 20 شمعة)
-  const last20High = Math.max(...candles.slice(-20).map(c => c.high));
-  const last20Low = Math.min(...candles.slice(-20).map(c => c.low));
+  // ✅ كشف الاختراق - استبعاد الشمعة الحالية
+  const last20High = Math.max(...candles.slice(-21, -1).map(c => c.high));
+  const last20Low = Math.min(...candles.slice(-21, -1).map(c => c.low));
   const breakoutHigh = current.close > last20High;
   const breakoutLow = current.close < last20Low;
 
@@ -625,112 +625,114 @@ function checkSignal(candles, symbol, btcTrend) {
   const bosHigh = current.high > prevHigh && current.close < prevHigh;
   const bosLow = current.low < prevLow && current.close > prevLow;
 
-  // ✅ كشف الحيتان المحسن
+  // ✅ كشف الحيتان
   const whaleCandle = volumeRatio > 5 && bodyRatio > 2 && current.close > current.open;
   const whaleCandleSell = volumeRatio > 5 && bodyRatio > 2 && current.close < current.open;
+
+  // ✅ Multi Timeframe
+  const mtfSignal = await checkMultiTimeframe(symbol);
 
   let buyScore = 0;
   let sellScore = 0;
 
-  // ✅ 1. EMA Trend (20 نقطة)
+  // ======== 1. TREND SCORE (80 نقطة) ========
+  // EMA Trend
   if (ema20 > ema50) buyScore += 20;
   if (ema20 < ema50) sellScore += 20;
+  
+  if (ema50 > ema100) buyScore += 10;
+  if (ema50 < ema100) sellScore += 10;
+  
+  // ADX with trend direction
+  if (adx > 25 && ema20 > ema50) buyScore += 25;
+  if (adx > 25 && ema20 < ema50) sellScore += 25;
 
-  // ✅ 2. MACD (20 نقطة)
+  // ======== 2. MOMENTUM SCORE (80 نقطة) ========
+  // MACD
   if (macd.histogram > 0 && macd.macd > macd.signal) buyScore += 20;
   if (macd.histogram < 0 && macd.macd < macd.signal) sellScore += 20;
-
-  // ✅ 3. RSI (15 نقطة)
+  
+  // RSI - للارتداد
   if (rsi < 30) buyScore += 15;
   if (rsi > 70) sellScore += 15;
+  
+  // RSI - للترند
+  if (rsi > 55) buyScore += 15;
+  if (rsi < 45) sellScore += 15;
+  
+  // Velocity
+  if (velocity > 0.15 && volumeRatio > 2) buyScore += 10;
+  if (velocity < -0.15 && volumeRatio > 2) sellScore += 10;
 
-  // ✅ 4. VWAP (15 نقطة)
-  if (current.close > vwap) buyScore += 15;
-  if (current.close < vwap) sellScore += 15;
-
-  // ✅ 5. ADX (20 نقطة) + مكافأة
-  if (adx > 25) {
-    buyScore += 20;
-    sellScore += 20;
+  // ======== 3. VOLUME SCORE (80 نقطة) ========
+  // Volume Spike
+  if (volumeRatio > 2) {
+    buyScore += 15;
+    sellScore += 15;
   }
-  // ✅ مكافأة ADX > 20
-  if (adx > 20) {
-    buyScore += 20;
-    sellScore += 20;
-  }
+  
+  // Volume Delta
+  if (volumeDelta > 30) buyScore += 25;
+  if (volumeDelta < -30) sellScore += 25;
+  
+  // Whale Detection
+  if (whaleCandle) buyScore += 20;
+  if (whaleCandleSell) sellScore += 20;
+  
+  // VWAP
+  if (current.close > vwap) buyScore += 10;
+  if (current.close < vwap) sellScore += 10;
 
-  // ✅ 6. Volume Delta (30 نقطة)
-  if (volumeDelta > 30) buyScore += 30;
-  if (volumeDelta < -30) sellScore += 30;
-
-  // ✅ 7. كشف الحيتان (30 نقطة)
-  if (whaleCandle) buyScore += 30;
-  if (whaleCandleSell) sellScore += 30;
-
-  // ✅ 8. Order Flow - السرعة (10 نقاط)
-  if (velocity > 0.15 && volumeRatio > 3) buyScore += 10;
-  if (velocity < -0.15 && volumeRatio > 3) sellScore += 10;
-
-  // ✅ 9. كشف الاختراق (15 نقطة)
+  // ======== 4. MARKET STRUCTURE (60 نقطة) ========
+  // Breakout
   if (breakoutHigh) buyScore += 15;
   if (breakoutLow) sellScore += 15;
-
-  // ✅ 10. SMC - Break of Structure (15 نقطة)
+  
+  // SMC - BOS
   if (bosHigh) sellScore += 15;
   if (bosLow) buyScore += 15;
+  
+  // Multi Timeframe
+  if (mtfSignal === 'BUY') buyScore += 20;
+  if (mtfSignal === 'SELL') sellScore += 20;
+  
+  // BTC Trend
+  if (btcTrend === 'UP' && buyScore > 0) buyScore += 10;
+  if (btcTrend === 'DOWN' && sellScore > 0) sellScore += 10;
 
-  // ✅ 11. Multi Timeframe (15 نقطة)
-  const mtfSignal = checkMultiTimeframe(symbol);
-  if (mtfSignal === 'BUY') buyScore += 15;
-  if (mtfSignal === 'SELL') sellScore += 15;
+  console.log(`   📊 ${symbol} BUY=${buyScore} SELL=${sellScore} | RSI=${rsi.toFixed(1)} | ADX=${adx.toFixed(1)} | Delta=${volumeDelta.toFixed(1)}`);
 
-  // ✅ 12. اتجاه BTC (15 نقطة)
-  if (btcTrend === 'UP' && buyScore > 0) buyScore += 15;
-  if (btcTrend === 'DOWN' && sellScore > 0) sellScore += 15;
-
-  // ✅ 13. Market Regime (5 نقاط)
-  if (marketRegime === 'BULL_TREND') buyScore += 5;
-  if (marketRegime === 'BEAR_TREND') sellScore += 5;
-
-  // ✅ 14. RSI Extreme (+10 نقاط إضافية)
-  if (rsi < 25) buyScore += 10;
-  if (rsi > 75) sellScore += 10;
-
-  console.log(`   📊 ${symbol} BUY=${buyScore} SELL=${sellScore} | RSI=${rsi.toFixed(1)} | ADX=${adx.toFixed(1)} | Delta=${volumeDelta.toFixed(1)} | Regime=${marketRegime}`);
-
-  // ✅ ======== وضع القنص (الـ 3 شروط السريعة) ========
-  // شراء سريع
+  // ✅ ======== وضع القنص ========
   if (
     volumeDelta > 50 &&
-    volumeRatio > 2 &&
+    volumeRatio > 2.5 &&
     rsi < 25
   ) {
     console.log(`   🎯 وضع القنص BUY (Delta=${volumeDelta.toFixed(1)}, Vol=${volumeRatio.toFixed(1)}x, RSI=${rsi.toFixed(1)})`);
     return { signal: "BUY", atr: atr, entryPrice: current.close, isSnipe: true };
   }
 
-  // بيع سريع
   if (
     volumeDelta < -50 &&
-    volumeRatio > 2 &&
+    volumeRatio > 2.5 &&
     rsi > 75
   ) {
     console.log(`   🎯 وضع القنص SELL (Delta=${volumeDelta.toFixed(1)}, Vol=${volumeRatio.toFixed(1)}x, RSI=${rsi.toFixed(1)})`);
     return { signal: "SELL", atr: atr, entryPrice: current.close, isSnipe: true };
   }
 
-  // ✅ عتبة الدخول 110 من 200 (بدلاً من 150)
-  if (buyScore >= 110) {
-    console.log(`   ✅ إشارة BUY (${buyScore}/200)`);
+  // ✅ عتبة الدخول 180 من 300
+  if (buyScore >= 180) {
+    console.log(`   ✅ إشارة BUY (${buyScore}/300)`);
     return { signal: "BUY", atr: atr, entryPrice: current.close, isSnipe: false };
   }
 
-  if (sellScore >= 110) {
-    console.log(`   ✅ إشارة SELL (${sellScore}/200)`);
+  if (sellScore >= 180) {
+    console.log(`   ✅ إشارة SELL (${sellScore}/300)`);
     return { signal: "SELL", atr: atr, entryPrice: current.close, isSnipe: false };
   }
 
-  console.log(`   ❌ لا إشارة (أعلى نقاط: ${Math.max(buyScore, sellScore)}/110)`);
+  console.log(`   ❌ لا إشارة (أعلى نقاط: ${Math.max(buyScore, sellScore)}/180)`);
   return null;
 }
 
@@ -842,7 +844,7 @@ async function setLeverage(symbol) {
 }
 
 // ==========================================
-// ✅ تنفيذ الأمر مع ATR Dynamic TP/SL
+// ✅ تنفيذ الأمر
 // ==========================================
 
 async function placeOrder(symbol, signalData, balance) {
@@ -1035,7 +1037,7 @@ async function getFuturesBalance() {
 }
 
 // ==========================================
-// ✅ الدورة الرئيسية
+// ✅ الدورة الرئيسية - مع Parallel Processing
 // ==========================================
 
 async function tradingCycle() {
@@ -1063,7 +1065,7 @@ async function tradingCycle() {
       let profitPercent = (profitUSDT / (currentPosition.entryPrice * currentPosition.quantity)) * 100;
       console.log(`⚡ الربح الحالي: ${profitUSDT.toFixed(4)} USDT (${profitPercent.toFixed(2)}%)`);
 
-      // ✅ جني الربح - ATR Dynamic
+      // ✅ جني الربح
       if (currentPosition.takeProfitPrice) {
         const isTakeProfit = currentPosition.type === 'LONG' 
           ? currentPrice >= currentPosition.takeProfitPrice
@@ -1079,7 +1081,7 @@ async function tradingCycle() {
         }
       }
 
-      // ✅ وقف الخسارة - ATR Dynamic
+      // ✅ وقف الخسارة
       if (STOP_LOSS_ENABLED && currentPosition.stopLossPrice) {
         const isStopLoss = currentPosition.type === 'LONG'
           ? currentPrice <= currentPosition.stopLossPrice
@@ -1116,48 +1118,68 @@ async function tradingCycle() {
     const btcTrend = await getBTCTrend();
     console.log(`📊 اتجاه BTC: ${btcTrend}`);
 
-    console.log(`🔍 جاري مسح ${SYMBOLS.length} عملة...`);
+    console.log(`🔍 جاري مسح ${SYMBOLS.length} عملة (معالجة متوازية)...`);
     
-    for (const symbol of SYMBOLS) {
-      // ✅ التحقق من نسبة الربح التاريخية للعملة
-      if (winRateBySymbol[symbol] !== undefined && winRateBySymbol[symbol] < 30) {
-        console.log(`${symbol} ⏭️ نسبة ربح ${winRateBySymbol[symbol].toFixed(1)}% < 30% (تجاهل)`);
-        continue;
-      }
+    // ✅ معالجة متوازية لجميع العملات
+    const results = await Promise.all(
+      SYMBOLS.map(async (symbol) => {
+        try {
+          // ✅ التحقق من نسبة الربح
+          if (winRateBySymbol[symbol] !== undefined && winRateBySymbol[symbol] < 30) {
+            return { symbol, signalData: null, error: 'نسبة ربح منخفضة' };
+          }
 
-      const candles = await getCandles(symbol);
-      if (!candles || candles.length < 50) continue;
+          const candles = await getCandles(symbol);
+          if (!candles || candles.length < 50) {
+            return { symbol, signalData: null, error: 'بيانات غير كافية' };
+          }
 
-      console.log(`\n📊 تحليل ${symbol}:`);
+          console.log(`\n📊 تحليل ${symbol}:`);
 
-      // ✅ فلترة السيولة
-      if (!strongMarket(candles)) {
-        console.log(`   ${symbol} ❌ سيولة منخفضة`);
-        continue;
-      }
+          // ✅ فلترة السيولة
+          if (!strongMarket(candles)) {
+            console.log(`   ${symbol} ❌ سيولة منخفضة`);
+            return { symbol, signalData: null, error: 'سيولة منخفضة' };
+          }
 
-      // ✅ فحص الإشارة
-      const signalData = checkSignal(candles, symbol, btcTrend);
+          // ✅ فحص الإشارة
+          const signalData = await checkSignal(candles, symbol, btcTrend);
+          
+          if (!signalData) {
+            return { symbol, signalData: null, error: 'لا توجد إشارة' };
+          }
+
+          return { symbol, signalData, candles };
+        } catch (error) {
+          console.error(`❌ خطأ في تحليل ${symbol}:`, error.message);
+          return { symbol, signalData: null, error: error.message };
+        }
+      })
+    );
+
+    // ✅ معالجة النتائج - تنفيذ أول إشارة صالحة
+    for (const result of results) {
+      if (!result.signalData) continue;
+
+      const { symbol, signalData, candles } = result;
       
-      if (signalData) {
-        console.log(`🚀 إشارة ${signalData.signal}: ${symbol}${signalData.isSnipe ? ' (وضع القنص)' : ''}`);
+      console.log(`🚀 إشارة ${signalData.signal}: ${symbol}${signalData.isSnipe ? ' (وضع القنص)' : ''}`);
 
-        if (!(await hasGoodSpread(symbol))) {
-          console.log(`   ${symbol} سبريد مرتفع ❌`);
-          continue;
-        }
+      if (!(await hasGoodSpread(symbol))) {
+        console.log(`   ${symbol} سبريد مرتفع ❌`);
+        continue;
+      }
 
-        await setLeverage(symbol);
+      await setLeverage(symbol);
 
-        const position = await placeOrder(symbol, signalData, balance);
-        if (position) {
-          currentPosition = position;
-          lastTradeTime = Date.now();
-          console.log(`✅ تم الدخول: ${symbol} (${signalData.signal})`);
-          console.log(`⛔ وقف الخسارة ATR: ${position.stopLossPrice?.toFixed(4)}`);
-          console.log(`🎯 جني الربح ATR: ${position.takeProfitPrice?.toFixed(4)}`);
-          break;
-        }
+      const position = await placeOrder(symbol, signalData, balance);
+      if (position) {
+        currentPosition = position;
+        lastTradeTime = Date.now();
+        console.log(`✅ تم الدخول: ${symbol} (${signalData.signal})`);
+        console.log(`⛔ وقف الخسارة ATR: ${position.stopLossPrice?.toFixed(4)}`);
+        console.log(`🎯 جني الربح ATR: ${position.takeProfitPrice?.toFixed(4)}`);
+        break;
       }
     }
 
@@ -1224,7 +1246,7 @@ app.get('/dashboard', (req, res) => {
     <body>
       <div class="container">
         <h1>⚡ بوت سكالبينج احترافي</h1>
-        <p class="subtitle">📡 200 نقطة | عتبة 110 | وضع القنص | ATR Dynamic</p>
+        <p class="subtitle">📊 300 نقطة | عتبة 180 | وضع القنص | ATR Dynamic | Parallel</p>
         <div class="status-grid" id="statusGrid">
           <div class="card"><div class="label">📊 الحالة</div><div class="value"><span class="status-badge" id="statusBadge">🟢 يعمل</span></div></div>
           <div class="card"><div class="label">💰 الرصيد</div><div class="value green" id="balance">0.00 USDT</div></div>
@@ -1234,7 +1256,7 @@ app.get('/dashboard', (req, res) => {
         <div class="trade-info" id="tradeInfo"><div class="label">💰 الربح / الخسارة</div><div class="value" id="profitDisplay">0.0000 USDT (0.00%)</div></div>
         <div class="settings-box">
           <div class="label">⚙️ إعدادات متقدمة</div>
-          <div class="value">💰 <span class="highlight-green">5 USDT</span> | ⚡ <span class="highlight-gold">10x</span> | 🎯 <span class="highlight-gold">ATR×2.5</span> | ⛔ <span class="highlight-red">ATR×1.2</span> | 📊 <span class="highlight-purple">عتبة 110/200</span> | 🎯 <span class="highlight-purple">وضع القنص</span></div>
+          <div class="value">💰 <span class="highlight-green">5 USDT</span> | ⚡ <span class="highlight-gold">10x</span> | 🎯 <span class="highlight-gold">ATR×2.5</span> | ⛔ <span class="highlight-red">ATR×1.2</span> | 📊 <span class="highlight-purple">عتبة 180/300</span> | 🎯 <span class="highlight-purple">وضع القنص</span> | ⚡ <span class="highlight-purple">معالجة متوازية</span></div>
         </div>
         <button class="refresh-btn" onclick="fetchStatus()">🔄 تحديث</button>
         <div class="footer" id="lastUpdate">🕐 آخر تحديث: --</div>
@@ -1307,8 +1329,9 @@ app.get('/', async (req, res) => {
         profitTarget: 'ATR × 2.5',
         stopLoss: 'ATR × 1.2',
         leverage: `${LEVERAGE}x`,
-        scoreThreshold: '110/200',
+        scoreThreshold: '180/300',
         snipeMode: 'مفعل',
+        parallelProcessing: 'مفعل',
         symbols: SYMBOLS
       }
     });
@@ -1325,14 +1348,15 @@ async function startBot() {
   try {
     loadTradesHistory();
 
-    console.log('⚡⚡ بدء تشغيل بوت سكالبينج احترافي - 200 نقطة');
+    console.log('⚡⚡ بدء تشغيل بوت سكالبينج احترافي - 300 نقطة');
     console.log('📊 ===== إعدادات متقدمة =====');
     console.log(`💰 مبلغ التداول: ${TRADE_AMOUNT} USDT`);
     console.log(`⚡ الرافعة: ${LEVERAGE}x`);
     console.log(`🎯 الهدف: ATR × ${TAKE_PROFIT_ATR_MULTIPLIER}`);
     console.log(`⛔ الوقف: ATR × ${STOP_LOSS_ATR_MULTIPLIER}`);
-    console.log(`📊 عتبة النقاط: 110/200`);
-    console.log(`🎯 وضع القنص: مفعل (Delta>50 + Vol>2x + RSI Extreme)`);
+    console.log(`📊 عتبة النقاط: 180/300`);
+    console.log(`🎯 وضع القنص: مفعل`);
+    console.log(`⚡ معالجة متوازية: مفعل`);
     console.log(`📊 العملات: ${SYMBOLS.length} عملة`);
     console.log(`🔄 سرعة المسح: ${SCAN_INTERVAL/1000} ثانية`);
     console.log('================================');
@@ -1369,12 +1393,13 @@ async function startBot() {
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`
   ╔═══════════════════════════════════════════════════════════════╗
-  ║   ⚡ بوت سكالبينج احترافي - 200 نقطة                      ║
+  ║   ⚡ بوت سكالبينج احترافي - 300 نقطة                      ║
   ║   📡 http://localhost:${PORT}                                  ║
   ║   📊 لوحة التحكم: http://localhost:${PORT}/dashboard          ║
   ║   🚀 رافعة: ${LEVERAGE}x | 💰 ${TRADE_AMOUNT} USDT            ║
   ║   🎯 TP: ATR×${TAKE_PROFIT_ATR_MULTIPLIER} | ⛔ SL: ATR×${STOP_LOSS_ATR_MULTIPLIER} ║
-  ║   📊 عتبة: 110/200 | 🎯 وضع القنص: مفعل                      ║
+  ║   📊 عتبة: 180/300 | 🎯 وضع القنص: مفعل                      ║
+  ║   ⚡ معالجة متوازية: مفعل                                    ║
   ║   📊 المؤشرات: EMA+RSI+MACD+VWAP+ADX+ATR+Delta+SMC         ║
   ║   📊 العملات: ${SYMBOLS.length} عملة                          ║
   ║   🔄 مسح: ${SCAN_INTERVAL/1000} ثانية                         ║
