@@ -83,7 +83,6 @@ function loadTradesHistory() {
       tradesHistory = JSON.parse(data);
       console.log(`📊 تم تحميل ${tradesHistory.length} صفقة سابقة`);
       
-      // حساب نسبة الربح لكل عملة
       const symbolStats = {};
       for (const trade of tradesHistory) {
         if (!symbolStats[trade.symbol]) {
@@ -285,7 +284,6 @@ function calculateATR(candles, period = 14) {
     trs.push(tr);
   }
 
-  // SMA of TR
   let atr = 0;
   for (let i = 0; i < period && i < trs.length; i++) {
     atr += trs[trs.length - 1 - i];
@@ -355,7 +353,6 @@ function calculateADX(candles, period = 14) {
     }
   }
 
-  // حساب ADX مبسط
   const atr = calculateATR(candles, period);
   if (atr === 0) return 0;
 
@@ -455,7 +452,7 @@ function adjustQuantity(quantity, contractInfo) {
 }
 
 // ==========================================
-// ✅ فلترة السيولة
+// ✅ فلترة السيولة - محسنة
 // ==========================================
 
 function strongMarket(candles) {
@@ -470,11 +467,15 @@ function strongMarket(candles) {
   const volatility =
     (last.high - last.low) / last.close;
 
+  // ✅ حساب قيمة التداول بالدولار بشكل صحيح
   const dollarVolume = last.close * avgVolume;
 
+  console.log(`   📊 Vol=${avgVolume.toFixed(2)} | DollarVol=$${dollarVolume.toFixed(2)} | تذبذب=${(volatility * 100).toFixed(3)}%`);
+
+  // ✅ تخفيف شروط السيولة لـ BTC والعملات الكبيرة
   return (
-    dollarVolume > 3000 &&
-    volatility > 0.00008
+    dollarVolume > 500 &&      // ✅ تم التخفيف بشكل كبير
+    volatility > 0.00005       // ✅ تم التخفيف
   );
 }
 
@@ -562,7 +563,6 @@ function detectMarketRegime(candles) {
   const adx = calculateADX(candles, 14);
   const rsi = calculateRSI(closes, 14);
   
-  // حساب التقلب
   const avgRange = candles.slice(-20).reduce((sum, c) => sum + (c.high - c.low), 0) / 20;
   const avgClose = candles.slice(-20).reduce((sum, c) => sum + c.close, 0) / 20;
   const volatility = avgRange / avgClose;
@@ -579,7 +579,7 @@ function detectMarketRegime(candles) {
 }
 
 // ==========================================
-// ✅ نظام النقاط الاحترافي 200 نقطة
+// ✅ نظام النقاط المحسن - 200 نقطة مع عتبة 110
 // ==========================================
 
 function checkSignal(candles, symbol, btcTrend) {
@@ -648,8 +648,13 @@ function checkSignal(candles, symbol, btcTrend) {
   if (current.close > vwap) buyScore += 15;
   if (current.close < vwap) sellScore += 15;
 
-  // ✅ 5. ADX (20 نقطة)
+  // ✅ 5. ADX (20 نقطة) + مكافأة
   if (adx > 25) {
+    buyScore += 20;
+    sellScore += 20;
+  }
+  // ✅ مكافأة ADX > 20
+  if (adx > 20) {
     buyScore += 20;
     sellScore += 20;
   }
@@ -687,23 +692,45 @@ function checkSignal(candles, symbol, btcTrend) {
   if (marketRegime === 'BULL_TREND') buyScore += 5;
   if (marketRegime === 'BEAR_TREND') sellScore += 5;
 
-  // ✅ حفظ ATR للاستخدام في وقف الخسارة
-  const atrValue = atr;
+  // ✅ 14. RSI Extreme (+10 نقاط إضافية)
+  if (rsi < 25) buyScore += 10;
+  if (rsi > 75) sellScore += 10;
 
-  console.log(`📊 ${symbol} BUY=${buyScore} SELL=${sellScore} | RSI=${rsi.toFixed(1)} | ADX=${adx.toFixed(1)} | Delta=${volumeDelta.toFixed(1)} | Regime=${marketRegime}`);
+  console.log(`   📊 ${symbol} BUY=${buyScore} SELL=${sellScore} | RSI=${rsi.toFixed(1)} | ADX=${adx.toFixed(1)} | Delta=${volumeDelta.toFixed(1)} | Regime=${marketRegime}`);
 
-  // ✅ عتبة الدخول 150 من 200
-  if (buyScore >= 150) {
+  // ✅ ======== وضع القنص (الـ 3 شروط السريعة) ========
+  // شراء سريع
+  if (
+    volumeDelta > 50 &&
+    volumeRatio > 2 &&
+    rsi < 25
+  ) {
+    console.log(`   🎯 وضع القنص BUY (Delta=${volumeDelta.toFixed(1)}, Vol=${volumeRatio.toFixed(1)}x, RSI=${rsi.toFixed(1)})`);
+    return { signal: "BUY", atr: atr, entryPrice: current.close, isSnipe: true };
+  }
+
+  // بيع سريع
+  if (
+    volumeDelta < -50 &&
+    volumeRatio > 2 &&
+    rsi > 75
+  ) {
+    console.log(`   🎯 وضع القنص SELL (Delta=${volumeDelta.toFixed(1)}, Vol=${volumeRatio.toFixed(1)}x, RSI=${rsi.toFixed(1)})`);
+    return { signal: "SELL", atr: atr, entryPrice: current.close, isSnipe: true };
+  }
+
+  // ✅ عتبة الدخول 110 من 200 (بدلاً من 150)
+  if (buyScore >= 110) {
     console.log(`   ✅ إشارة BUY (${buyScore}/200)`);
-    return { signal: "BUY", atr: atrValue, entryPrice: current.close };
+    return { signal: "BUY", atr: atr, entryPrice: current.close, isSnipe: false };
   }
 
-  if (sellScore >= 150) {
+  if (sellScore >= 110) {
     console.log(`   ✅ إشارة SELL (${sellScore}/200)`);
-    return { signal: "SELL", atr: atrValue, entryPrice: current.close };
+    return { signal: "SELL", atr: atr, entryPrice: current.close, isSnipe: false };
   }
 
-  console.log(`   ❌ لا إشارة (أعلى نقاط: ${Math.max(buyScore, sellScore)}/150)`);
+  console.log(`   ❌ لا إشارة (أعلى نقاط: ${Math.max(buyScore, sellScore)}/110)`);
   return null;
 }
 
@@ -725,6 +752,7 @@ async function hasGoodSpread(symbol) {
   const ask = Number(ticker.data.askPrice);
 
   const spread = ((ask - bid) / bid) * 100;
+  console.log(`   📊 السبريد: ${spread.toFixed(3)}%`);
   return spread < 0.05;
 }
 
@@ -803,12 +831,12 @@ async function setLeverage(symbol) {
     );
 
     if (longResponse?.code === 0 && shortResponse?.code === 0) {
-      console.log(`✅ تم تثبيت الرافعة x${LEVERAGE} على ${symbol}`);
+      console.log(`   ✅ تم تثبيت الرافعة x${LEVERAGE} على ${symbol}`);
       return true;
     }
     return false;
   } catch (e) {
-    console.log("❌ leverage error", e.message);
+    console.log("   ❌ leverage error", e.message);
     return false;
   }
 }
@@ -829,10 +857,11 @@ async function placeOrder(symbol, signalData, balance) {
       roundedQuantity = adjustQuantity(roundedQuantity, contractInfo);
     }
     
-    console.log("📊 الكمية:", roundedQuantity);
-    console.log("💰 Balance:", balance);
-    console.log("💵 Price:", price);
-    console.log(`📊 ATR: ${signalData.atr?.toFixed(4) || 'N/A'}`);
+    console.log(`   📊 الكمية: ${roundedQuantity}`);
+    console.log(`   💰 Balance: ${balance}`);
+    console.log(`   💵 Price: ${price}`);
+    console.log(`   📊 ATR: ${signalData.atr?.toFixed(4) || 'N/A'}`);
+    console.log(`   🎯 وضع القنص: ${signalData.isSnipe ? 'نعم' : 'لا'}`);
     
     if (roundedQuantity <= 0) return null;
 
@@ -848,7 +877,6 @@ async function placeOrder(symbol, signalData, balance) {
     const response = await bingxRequest('POST', ENDPOINTS.FUTURES_ORDER, params);
 
     if (response && response.code === 0) {
-      // حساب ATR Dynamic TP/SL
       const atr = signalData.atr || 0.01;
       const entryPrice = price;
       
@@ -874,13 +902,14 @@ async function placeOrder(symbol, signalData, balance) {
         timestamp: Date.now(),
         stopLossPrice,
         takeProfitPrice,
-        atr
+        atr,
+        isSnipe: signalData.isSnipe || false
       };
     }
-    console.log(`❌ فشل الصفقة:`, response?.msg || response);
+    console.log(`   ❌ فشل الصفقة:`, response?.msg || response);
     return null;
   } catch (error) {
-    console.log("❌ فشل الصفقة:", error.message);
+    console.log("   ❌ فشل الصفقة:", error.message);
     return null;
   }
 }
@@ -924,7 +953,7 @@ async function getBTCTrend() {
 }
 
 // ==========================================
-// ✅ إغلاق صفقة مع ATR Dynamic SL
+// ✅ إغلاق صفقة
 // ==========================================
 
 async function closePosition(position, result = 'MANUAL') {
@@ -957,6 +986,7 @@ async function closePosition(position, result = 'MANUAL') {
         quantity: position.quantity,
         profit: finalProfit,
         result: finalProfit > 0 ? 'WIN' : 'LOSS',
+        isSnipe: position.isSnipe || false,
         timestamp: new Date().toISOString()
       });
 
@@ -1090,17 +1120,19 @@ async function tradingCycle() {
     
     for (const symbol of SYMBOLS) {
       // ✅ التحقق من نسبة الربح التاريخية للعملة
-      if (winRateBySymbol[symbol] !== undefined && winRateBySymbol[symbol] < 45) {
-        console.log(`${symbol} ⏭️ نسبة ربح ${winRateBySymbol[symbol].toFixed(1)}% < 45% (تجاهل)`);
+      if (winRateBySymbol[symbol] !== undefined && winRateBySymbol[symbol] < 30) {
+        console.log(`${symbol} ⏭️ نسبة ربح ${winRateBySymbol[symbol].toFixed(1)}% < 30% (تجاهل)`);
         continue;
       }
 
       const candles = await getCandles(symbol);
       if (!candles || candles.length < 50) continue;
 
+      console.log(`\n📊 تحليل ${symbol}:`);
+
       // ✅ فلترة السيولة
       if (!strongMarket(candles)) {
-        console.log(`${symbol} ❌ سيولة منخفضة`);
+        console.log(`   ${symbol} ❌ سيولة منخفضة`);
         continue;
       }
 
@@ -1108,10 +1140,10 @@ async function tradingCycle() {
       const signalData = checkSignal(candles, symbol, btcTrend);
       
       if (signalData) {
-        console.log(`🚀 إشارة ${signalData.signal}: ${symbol}`);
+        console.log(`🚀 إشارة ${signalData.signal}: ${symbol}${signalData.isSnipe ? ' (وضع القنص)' : ''}`);
 
         if (!(await hasGoodSpread(symbol))) {
-          console.log(`${symbol} سبريد مرتفع ❌`);
+          console.log(`   ${symbol} سبريد مرتفع ❌`);
           continue;
         }
 
@@ -1192,7 +1224,7 @@ app.get('/dashboard', (req, res) => {
     <body>
       <div class="container">
         <h1>⚡ بوت سكالبينج احترافي</h1>
-        <p class="subtitle">📡 EMA+RSI+MACD+VWAP+ADX+ATR+Volume Delta+SMC</p>
+        <p class="subtitle">📡 200 نقطة | عتبة 110 | وضع القنص | ATR Dynamic</p>
         <div class="status-grid" id="statusGrid">
           <div class="card"><div class="label">📊 الحالة</div><div class="value"><span class="status-badge" id="statusBadge">🟢 يعمل</span></div></div>
           <div class="card"><div class="label">💰 الرصيد</div><div class="value green" id="balance">0.00 USDT</div></div>
@@ -1202,7 +1234,7 @@ app.get('/dashboard', (req, res) => {
         <div class="trade-info" id="tradeInfo"><div class="label">💰 الربح / الخسارة</div><div class="value" id="profitDisplay">0.0000 USDT (0.00%)</div></div>
         <div class="settings-box">
           <div class="label">⚙️ إعدادات متقدمة</div>
-          <div class="value">💰 <span class="highlight-green">5 USDT</span> | ⚡ <span class="highlight-gold">10x</span> | 🎯 <span class="highlight-gold">ATR×2.5</span> | ⛔ <span class="highlight-red">ATR×1.2</span> | 📊 <span class="highlight-purple">200 نقطة (عتبة 150)</span> | 🕐 <span class="highlight-purple">0.5s</span></div>
+          <div class="value">💰 <span class="highlight-green">5 USDT</span> | ⚡ <span class="highlight-gold">10x</span> | 🎯 <span class="highlight-gold">ATR×2.5</span> | ⛔ <span class="highlight-red">ATR×1.2</span> | 📊 <span class="highlight-purple">عتبة 110/200</span> | 🎯 <span class="highlight-purple">وضع القنص</span></div>
         </div>
         <button class="refresh-btn" onclick="fetchStatus()">🔄 تحديث</button>
         <div class="footer" id="lastUpdate">🕐 آخر تحديث: --</div>
@@ -1266,7 +1298,7 @@ app.get('/', async (req, res) => {
       balance: `${usdtBalance.toFixed(4)} USDT`,
       leverage: `${LEVERAGE}x`,
       tradeAmount: `${TRADE_AMOUNT} USDT`,
-      currentPosition: currentPosition ? `${currentPosition.symbol} (${currentPosition.type})` : 'لا توجد صفقة',
+      currentPosition: currentPosition ? `${currentPosition.symbol} (${currentPosition.type})${currentPosition.isSnipe ? ' [قنص]' : ''}` : 'لا توجد صفقة',
       profit: profit,
       profitPercent: profitPercent,
       tradesCount: tradesHistory.length,
@@ -1275,7 +1307,8 @@ app.get('/', async (req, res) => {
         profitTarget: 'ATR × 2.5',
         stopLoss: 'ATR × 1.2',
         leverage: `${LEVERAGE}x`,
-        scoreThreshold: '150/200',
+        scoreThreshold: '110/200',
+        snipeMode: 'مفعل',
         symbols: SYMBOLS
       }
     });
@@ -1298,8 +1331,8 @@ async function startBot() {
     console.log(`⚡ الرافعة: ${LEVERAGE}x`);
     console.log(`🎯 الهدف: ATR × ${TAKE_PROFIT_ATR_MULTIPLIER}`);
     console.log(`⛔ الوقف: ATR × ${STOP_LOSS_ATR_MULTIPLIER}`);
-    console.log(`📊 المؤشرات: EMA + RSI + MACD + VWAP + ADX + ATR + Volume Delta + SMC`);
-    console.log(`📊 عتبة النقاط: 150/200`);
+    console.log(`📊 عتبة النقاط: 110/200`);
+    console.log(`🎯 وضع القنص: مفعل (Delta>50 + Vol>2x + RSI Extreme)`);
     console.log(`📊 العملات: ${SYMBOLS.length} عملة`);
     console.log(`🔄 سرعة المسح: ${SCAN_INTERVAL/1000} ثانية`);
     console.log('================================');
@@ -1341,9 +1374,10 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   ║   📊 لوحة التحكم: http://localhost:${PORT}/dashboard          ║
   ║   🚀 رافعة: ${LEVERAGE}x | 💰 ${TRADE_AMOUNT} USDT            ║
   ║   🎯 TP: ATR×${TAKE_PROFIT_ATR_MULTIPLIER} | ⛔ SL: ATR×${STOP_LOSS_ATR_MULTIPLIER} ║
+  ║   📊 عتبة: 110/200 | 🎯 وضع القنص: مفعل                      ║
   ║   📊 المؤشرات: EMA+RSI+MACD+VWAP+ADX+ATR+Delta+SMC         ║
-  ║   📊 عتبة: 150/200 | سرعة: ${SCAN_INTERVAL/1000}s            ║
   ║   📊 العملات: ${SYMBOLS.length} عملة                          ║
+  ║   🔄 مسح: ${SCAN_INTERVAL/1000} ثانية                         ║
   ║   ⚠️ تداول حقيقي - استخدم بحذر!                              ║
   ╚═══════════════════════════════════════════════════════════════╝
   `);
