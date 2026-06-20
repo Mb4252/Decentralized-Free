@@ -24,7 +24,7 @@ const API_KEY = process.env.BINGX_API_KEY;
 const API_SECRET = process.env.BINGX_API_SECRET;
 
 // ✅ إعدادات رأس المال والمخاطرة
-const TRADE_AMOUNT = 6; // ✅ تم التعديل إلى 6 دولار
+const TRADE_AMOUNT = 5; // ✅ 5 دولار
 const USE_FULL_BALANCE = false;
 const MAX_RISK_PER_TRADE = 0.01;
 
@@ -32,8 +32,8 @@ const MAX_RISK_PER_TRADE = 0.01;
 const LEVERAGE = 10;
 
 // ✅ أهداف سكالبينج سريعة
-const PROFIT_USDT_TARGET = 0.2;
-const MIN_PROFIT_USDT = 0.2;
+const PROFIT_USDT_TARGET = 0.12; // ✅ 0.12 دولار
+const MIN_PROFIT_USDT = 0.12;
 
 // ✅ إعدادات الشمعة (1 دقيقة)
 const CANDLE_INTERVAL = '1m';
@@ -873,9 +873,9 @@ app.get('/dashboard', (req, res) => {
         <div class="settings-box">
           <div class="label">⚙️ إعدادات سكالبينج</div>
           <div class="value">
-            💰 <span class="highlight-green">6 USDT</span> &nbsp;|&nbsp;
+            💰 <span class="highlight-green">5 USDT</span> &nbsp;|&nbsp;
             ⚡ <span class="highlight-gold">10x رافعة</span> &nbsp;|&nbsp;
-            🎯 هدف: <span class="highlight-gold">0.2 USDT</span> &nbsp;|&nbsp;
+            🎯 هدف: <span class="highlight-gold">0.12 USDT</span> &nbsp;|&nbsp;
             🕐 شمعة: <span class="highlight-purple">1 دقيقة</span> &nbsp;|&nbsp;
             📊 عملات: <span class="highlight-purple">AVAX, HYPE, DOGE</span> &nbsp;|&nbsp;
             🔄 مسح: <span class="highlight-purple">1 ثانية</span> &nbsp;|&nbsp;
