@@ -24,7 +24,7 @@ const API_KEY = process.env.BINGX_API_KEY;
 const API_SECRET = process.env.BINGX_API_SECRET;
 
 // ✅ إعدادات رأس المال والمخاطرة
-const TRADE_AMOUNT = 5;
+const TRADE_AMOUNT = 4.8;
 const USE_FULL_BALANCE = false;
 const MAX_RISK_PER_TRADE = 0.01;
 
@@ -37,6 +37,7 @@ const MIN_PROFIT_USDT = 0.12;
 
 // ✅ وقف الخسارة
 const STOP_LOSS_ENABLED = true;
+const STOP_LOSS_FIXED = 0.2; // وقف خسارة ثابت 0.2 USDT
 const STOP_LOSS_ATR_MULTIPLIER = 1.2;
 const TAKE_PROFIT_ATR_MULTIPLIER = 2.5;
 
@@ -892,7 +893,8 @@ async function placeOrder(symbol, signalData, balance) {
         takeProfitPrice = entryPrice - atr * TAKE_PROFIT_ATR_MULTIPLIER;
       }
       
-      console.log(`   🎯 TP: ${takeProfitPrice.toFixed(4)} | ⛔ SL: ${stopLossPrice.toFixed(4)}`);
+      console.log(`   🎯 TP (ATR): ${takeProfitPrice.toFixed(4)} | ⛔ SL (ATR): ${stopLossPrice.toFixed(4)}`);
+      console.log(`   ⛔ وقف الخسارة الثابت: ${STOP_LOSS_FIXED} USDT`);
       
       console.log(`🚀 OPEN ${signalData.signal} ${symbol} (Confidence: ${signalData.confidence?.toFixed(1) || 'N/A'}%)`);
       return {
@@ -1077,19 +1079,32 @@ async function tradingCycle() {
         return;
       }
 
-      // ✅ وقف الخسارة
-      if (STOP_LOSS_ENABLED && currentPosition.stopLossPrice) {
-        const isStopLoss = currentPosition.type === 'LONG'
-          ? currentPrice <= currentPosition.stopLossPrice
-          : currentPrice >= currentPosition.stopLossPrice;
-        
-        if (isStopLoss) {
-          console.log(`⛔ وقف خسارة ATR: ${profitUSDT.toFixed(4)} USDT`);
-          await closePosition(currentPosition, 'STOP_LOSS_ATR');
+      // ✅ وقف الخسارة الثابت 0.2
+      if (STOP_LOSS_ENABLED) {
+        // التحقق من وقف الخسارة الثابت
+        if (profitUSDT <= -STOP_LOSS_FIXED) {
+          console.log(`⛔ وقف خسارة ثابت: ${profitUSDT.toFixed(4)} USDT (الحد: -${STOP_LOSS_FIXED} USDT)`);
+          await closePosition(currentPosition, 'STOP_LOSS_FIXED');
           currentPosition = null;
           lastTradeTime = Date.now();
           isRunning = false;
           return;
+        }
+
+        // التحقق من وقف الخسارة ATR (احتياطي)
+        if (currentPosition.stopLossPrice) {
+          const isStopLoss = currentPosition.type === 'LONG'
+            ? currentPrice <= currentPosition.stopLossPrice
+            : currentPrice >= currentPosition.stopLossPrice;
+          
+          if (isStopLoss) {
+            console.log(`⛔ وقف خسارة ATR: ${profitUSDT.toFixed(4)} USDT`);
+            await closePosition(currentPosition, 'STOP_LOSS_ATR');
+            currentPosition = null;
+            lastTradeTime = Date.now();
+            isRunning = false;
+            return;
+          }
         }
       }
 
@@ -1170,8 +1185,9 @@ async function tradingCycle() {
         currentPosition = position;
         lastTradeTime = Date.now();
         console.log(`✅ تم الدخول: ${symbol} (${signalData.signal})`);
-        console.log(`⛔ وقف الخسارة ATR: ${position.stopLossPrice?.toFixed(4)}`);
         console.log(`🎯 جني الربح ثابت: 0.12 USDT`);
+        console.log(`⛔ وقف الخسارة ثابت: ${STOP_LOSS_FIXED} USDT`);
+        console.log(`⛔ وقف الخسارة ATR احتياطي: ${position.stopLossPrice?.toFixed(4)}`);
         break;
       }
     }
@@ -1239,7 +1255,7 @@ app.get('/dashboard', (req, res) => {
     <body>
       <div class="container">
         <h1>⚡ بوت سكالبينج احترافي</h1>
-        <p class="subtitle">📊 300 نقطة | نظام فروقات | Confidence | وضع القنص | جني ربح ثابت 0.12</p>
+        <p class="subtitle">📊 300 نقطة | نظام فروقات | Confidence | وضع القنص | TP:0.12 | SL:0.2</p>
         <div class="status-grid" id="statusGrid">
           <div class="card"><div class="label">📊 الحالة</div><div class="value"><span class="status-badge" id="statusBadge">🟢 يعمل</span></div></div>
           <div class="card"><div class="label">💰 الرصيد</div><div class="value green" id="balance">0.00 USDT</div></div>
@@ -1249,7 +1265,7 @@ app.get('/dashboard', (req, res) => {
         <div class="trade-info" id="tradeInfo"><div class="label">💰 الربح / الخسارة</div><div class="value" id="profitDisplay">0.0000 USDT (0.00%)</div></div>
         <div class="settings-box">
           <div class="label">⚙️ إعدادات متقدمة</div>
-          <div class="value">💰 <span class="highlight-green">5 USDT</span> | ⚡ <span class="highlight-gold">10x</span> | 🎯 <span class="highlight-gold">0.12 ثابت</span> | ⛔ <span class="highlight-red">ATR×1.2</span> | 📊 <span class="highlight-purple">عتبة 100 + فرق 40</span> | 🎯 <span class="highlight-purple">وضع القنص</span> | 📊 <span class="highlight-purple">Confidence</span></div>
+          <div class="value">💰 <span class="highlight-green">5 USDT</span> | ⚡ <span class="highlight-gold">10x</span> | 🎯 <span class="highlight-gold">0.12 ثابت</span> | ⛔ <span class="highlight-red">0.2 ثابت + ATR×1.2</span> | 📊 <span class="highlight-purple">عتبة 100 + فرق 40</span> | 🎯 <span class="highlight-purple">وضع القنص</span> | 📊 <span class="highlight-purple">Confidence</span></div>
         </div>
         <button class="refresh-btn" onclick="fetchStatus()">🔄 تحديث</button>
         <div class="footer" id="lastUpdate">🕐 آخر تحديث: --</div>
@@ -1320,7 +1336,7 @@ app.get('/', async (req, res) => {
       settings: {
         tradeAmount: `${TRADE_AMOUNT} USDT`,
         profitTarget: '0.12 ثابت',
-        stopLoss: 'ATR × 1.2',
+        stopLoss: '0.2 ثابت + ATR × 1.2',
         leverage: `${LEVERAGE}x`,
         scoreThreshold: '100 + فرق 40',
         snipeMode: 'مفعل (مخفف)',
@@ -1347,7 +1363,8 @@ async function startBot() {
     console.log(`💰 مبلغ التداول: ${TRADE_AMOUNT} USDT`);
     console.log(`⚡ الرافعة: ${LEVERAGE}x`);
     console.log(`🎯 الهدف: 0.12 ثابت`);
-    console.log(`⛔ الوقف: ATR × ${STOP_LOSS_ATR_MULTIPLIER}`);
+    console.log(`⛔ الوقف الثابت: ${STOP_LOSS_FIXED} USDT`);
+    console.log(`⛔ الوقف ATR: × ${STOP_LOSS_ATR_MULTIPLIER}`);
     console.log(`📊 نظام الدخول: عتبة 100 + فرق 40`);
     console.log(`📊 Confidence: مفعل`);
     console.log(`🎯 وضع القنص: مفعل (Delta>30, Vol>1.5, RSI<35/>65)`);
@@ -1392,7 +1409,7 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   ║   📡 http://localhost:${PORT}                                  ║
   ║   📊 لوحة التحكم: http://localhost:${PORT}/dashboard          ║
   ║   🚀 رافعة: ${LEVERAGE}x | 💰 ${TRADE_AMOUNT} USDT            ║
-  ║   🎯 TP: 0.12 ثابت | ⛔ SL: ATR×${STOP_LOSS_ATR_MULTIPLIER}   ║
+  ║   🎯 TP: 0.12 ثابت | ⛔ SL: ${STOP_LOSS_FIXED} ثابت + ATR×${STOP_LOSS_ATR_MULTIPLIER} ║
   ║   📊 عتبة: 100 + فرق 40 | Confidence: مفعل                   ║
   ║   🎯 القنص: Delta>30 + Vol>1.5 + RSI Extreme                ║
   ║   ⚡ معالجة متوازية: مفعل                                    ║
