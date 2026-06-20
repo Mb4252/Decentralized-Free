@@ -24,22 +24,22 @@ const API_KEY = process.env.BINGX_API_KEY;
 const API_SECRET = process.env.BINGX_API_SECRET;
 
 // ✅ إعدادات رأس المال والمخاطرة
-const TRADE_AMOUNT = 5; // ✅ تم التعديل إلى 5 دولار
+const TRADE_AMOUNT = 6; // ✅ تم التعديل إلى 6 دولار
 const USE_FULL_BALANCE = false;
-const MAX_RISK_PER_TRADE = 0.01; // 1% من الرصيد
+const MAX_RISK_PER_TRADE = 0.01;
 
 // ✅ الرافعة المالية
-const LEVERAGE = 10; // ✅ تم التعديل إلى 10x
+const LEVERAGE = 10;
 
 // ✅ أهداف سكالبينج سريعة
-const PROFIT_USDT_TARGET = 0.2; // ✅ تم التعديل إلى 0.2 دولار
+const PROFIT_USDT_TARGET = 0.2;
 const MIN_PROFIT_USDT = 0.2;
 
 // ✅ إعدادات الشمعة (1 دقيقة)
 const CANDLE_INTERVAL = '1m';
 const CANDLE_LIMIT = 30;
 
-// ✅ قائمة العملات - AVAX, HYPE, DOGE فقط
+// ✅ قائمة العملات
 const SYMBOLS = [
   "AVAX-USDT", "HYPE-USDT", "DOGE-USDT"
 ];
@@ -48,16 +48,16 @@ const SYMBOLS = [
 let currentPosition = null;
 let isRunning = false;
 let lastTradeTime = 0;
-const cooldown = 3000; // 3 ثواني
+const cooldown = 3000;
 
 // ✅ سرعة المسح
-const SCAN_INTERVAL = 3000; // 3 ثواني
+const SCAN_INTERVAL = 1000;
 
-// ✅ إعدادات وقف الخسارة - ✅ معطل
+// ✅ إعدادات وقف الخسارة - معطل
 const STOP_LOSS_ENABLED = false;
 
 // ==========================================
-// نسبة التغير المطلوبة للإشارة - مخفضة للتداول السريع
+// نسبة التغير المطلوبة للإشارة
 // ==========================================
 
 const SIGNAL_PERCENT = 0.03; // 0.03%
@@ -68,7 +68,7 @@ const SIGNAL_PERCENT = 0.03; // 0.03%
 
 let contractInfoCache = {};
 let lastContractFetch = 0;
-const CONTRACT_CACHE_TTL = 60000; // 60 ثانية
+const CONTRACT_CACHE_TTL = 60000;
 
 // ==========================================
 // نقاط النهاية
@@ -157,7 +157,6 @@ async function bingxRequest(method, endpoint, params = {}, signed = true) {
 async function getContractInfo(symbol) {
   const now = Date.now();
   
-  // استخدام الكاش إذا كان محدثاً
   if (contractInfoCache[symbol] && (now - lastContractFetch) < CONTRACT_CACHE_TTL) {
     return contractInfoCache[symbol];
   }
@@ -203,20 +202,17 @@ function adjustQuantity(quantity, contractInfo) {
   
   const { minQty, stepSize } = contractInfo;
   
-  // التأكد من أن الكمية >= minQty
   let adjusted = Math.max(quantity, minQty);
   
-  // تقريب الكمية حسب stepSize
   if (stepSize > 0) {
     adjusted = Math.floor(adjusted / stepSize) * stepSize;
   }
   
-  // تقريب إلى 6 منازل عشرية
   return Number(adjusted.toFixed(6));
 }
 
 // ==========================================
-// ✅ فلترة السيولة المحسنة - مع تخفيض شرط التذبذب
+// ✅ فلترة السيولة الأساسية
 // ==========================================
 
 function strongMarket(candles) {
@@ -231,15 +227,78 @@ function strongMarket(candles) {
   const volatility =
     (last.high - last.low) / last.close;
 
-  // حجم التداول بالدولار
   const dollarVolume = last.close * avgVolume;
-
-  console.log(`📊 متوسط الحجم: ${avgVolume.toFixed(2)} | التذبذب: ${(volatility * 100).toFixed(3)}% | قيمة التداول: $${dollarVolume.toFixed(2)}`);
 
   return (
     dollarVolume > 10000 &&
     volatility > 0.00015
   );
+}
+
+// ==========================================
+// ✅ فحص الإشارة بنظام قوة الشمعة ونسبة التغير
+// ==========================================
+
+function checkSignal(candles, symbol) {
+  if (!candles || candles.length < 4) return null;
+
+  const current = candles[candles.length - 1];
+  const prev1 = candles[candles.length - 2];
+  const prev2 = candles[candles.length - 3];
+  const prev3 = candles[candles.length - 4];
+
+  // ✅ فلترة السيولة
+  if (!strongMarket(candles)) {
+    console.log(`${symbol} ❌ فشل فلترة السيولة`);
+    return null;
+  }
+
+  // ✅ حساب قوة الشمعة الحالية
+  const currentBody = Math.abs(current.close - current.open);
+
+  const avgPrevBody = (
+    Math.abs(prev1.close - prev1.open) +
+    Math.abs(prev2.close - prev2.open) +
+    Math.abs(prev3.close - prev3.open)
+  ) / 3;
+
+  const strengthRatio = currentBody / (avgPrevBody || 0.0000001);
+
+  // ✅ حساب نسبة التغير
+  const change = ((current.close - prev1.close) / prev1.close) * 100;
+
+  console.log(`📊 ${symbol} - قوة الشمعة: ${strengthRatio.toFixed(2)}x | التغير: ${change.toFixed(3)}%`);
+  console.log(`   الشمعة الحالية: ${current.close > current.open ? '🟢 صاعدة' : '🔴 هابطة'}`);
+  console.log(`   متوسط الجسم السابق: ${avgPrevBody.toFixed(4)}`);
+
+  // ✅ إشارة بيع (شمعة صاعدة قوية + تغير إيجابي)
+  if (
+    current.close > current.open &&
+    strengthRatio >= 1.3 &&
+    change >= SIGNAL_PERCENT
+  ) {
+    console.log(`   ✅ إشارة SELL (صعود قوي ${strengthRatio.toFixed(2)}x مع تغير ${change.toFixed(3)}%)`);
+    return "SELL";
+  }
+
+  // ✅ إشارة شراء (شمعة هابطة قوية + تغير سلبي)
+  if (
+    current.close < current.open &&
+    strengthRatio >= 1.3 &&
+    change <= -SIGNAL_PERCENT
+  ) {
+    console.log(`   ✅ إشارة BUY (هبوط قوي ${strengthRatio.toFixed(2)}x مع تغير ${change.toFixed(3)}%)`);
+    return "BUY";
+  }
+
+  // ✅ عرض سبب عدم الإشارة
+  if (strengthRatio < 1.3) {
+    console.log(`   ❌ قوة الشمعة ضعيفة (${strengthRatio.toFixed(2)}x < 1.3x)`);
+  } else if (Math.abs(change) < SIGNAL_PERCENT) {
+    console.log(`   ❌ التغير صغير (${change.toFixed(3)}% < ${SIGNAL_PERCENT}%)`);
+  }
+
+  return null;
 }
 
 // ==========================================
@@ -267,123 +326,11 @@ async function hasGoodSpread(symbol) {
 }
 
 // ==========================================
-// ✅ فحص الإشارة - مع سجل توضيحي
-// ==========================================
-
-function checkSignal(candles, symbol) {
-  if (!candles || candles.length < 2) return null;
-
-  const current = candles[candles.length - 1];
-  const previous = candles[candles.length - 2];
-
-  if (!strongMarket(candles)) return null;
-
-  const change = ((current.close - previous.close) / previous.close) * 100;
-
-  console.log(
-    `${symbol} change=${change.toFixed(3)}% required=${SIGNAL_PERCENT}%`
-  );
-
-  console.log(
-    `📊 السعر الحالي: ${current.close} | السعر السابق: ${previous.close}`
-  );
-
-  if (change <= -SIGNAL_PERCENT) {
-    return "BUY";
-  }
-
-  if (change >= SIGNAL_PERCENT) {
-    return "SELL";
-  }
-
-  return null;
-}
-
-// ==========================================
-// ✅ جلب العملات - القائمة الثابتة دائماً
+// ✅ جلب العملات
 // ==========================================
 
 async function getTopVolumeSymbols() {
   return SYMBOLS;
-}
-
-// ==========================================
-// ✅ الحصول على رمز عشوائي
-// ==========================================
-
-function getRandomSymbol() {
-  return SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
-}
-
-// ==========================================
-// ✅ الحصول على اتجاه عشوائي
-// ==========================================
-
-function getRandomSide() {
-  return Math.random() > 0.5 ? "BUY" : "SELL";
-}
-
-// ==========================================
-// ✅ تنفيذ صفقة عشوائية (للاختبار)
-// ==========================================
-
-async function executeRandomTrade() {
-  const symbol = getRandomSymbol();
-  const side = getRandomSide();
-  const amount = TRADE_AMOUNT;
-
-  console.log(`🔄 محاولة دخول عشوائي: ${side} ${symbol}`);
-
-  try {
-    const price = await getPrice(symbol);
-    if (!price) {
-      console.log(`⚠️ لا يمكن تنفيذ الأمر: سعر ${symbol} غير متوفر`);
-      return null;
-    }
-
-    const contractInfo = await getContractInfo(symbol);
-    let roundedQuantity = calculateQuantity(price);
-    
-    if (contractInfo) {
-      roundedQuantity = adjustQuantity(roundedQuantity, contractInfo);
-      console.log(`📊 الكمية بعد التعديل: ${roundedQuantity}`);
-    }
-    
-    if (roundedQuantity <= 0) {
-      console.log('⚠️ كمية غير صالحة');
-      return null;
-    }
-
-    const isBuy = side === 'BUY';
-    console.log(`📊 ${isBuy ? 'شراء' : 'بيع'} (${side}): ${roundedQuantity} ${symbol} بسعر ${price}`);
-
-    const params = {
-      symbol: symbol,
-      side: isBuy ? 'BUY' : 'SELL',
-      type: 'MARKET',
-      quantity: roundedQuantity,
-      positionSide: isBuy ? 'LONG' : 'SHORT'
-    };
-
-    const response = await bingxRequest('POST', ENDPOINTS.FUTURES_ORDER, params);
-
-    if (response && response.code === 0) {
-      console.log(`🚀 OPEN ${side} ${symbol}`);
-      return {
-        symbol,
-        entryPrice: price,
-        quantity: roundedQuantity,
-        type: isBuy ? 'LONG' : 'SHORT',
-        orderId: response.data?.orderId || Date.now(),
-        timestamp: Date.now()
-      };
-    }
-    console.log(`❌ فشل الصفقة:`, response?.msg || response);
-    return null;
-  } catch (error) {
-    console.log("❌ فشل الصفقة:", error.message);
-    return null;
-  }
 }
 
 // ==========================================
@@ -403,10 +350,8 @@ async function getCandles(symbol) {
       return null;
     }
 
-    console.log(symbol, "code:", response.code, "msg:", response.msg);
-
     if (response.code === 100400) {
-      console.log(`⚠️ الرمز ${symbol} غير موجود، جرب صيغة مختلفة (مثل: ${symbol.replace('-', '')})`);
+      console.log(`⚠️ الرمز ${symbol} غير موجود`);
       return null;
     }
 
@@ -423,7 +368,6 @@ async function getCandles(symbol) {
     }
 
     if (!data || !Array.isArray(data) || data.length < 20) {
-      console.log(symbol, "بيانات غير كافية:", data ? data.length : 0);
       return null;
     }
 
@@ -436,12 +380,8 @@ async function getCandles(symbol) {
       time: Number(candle.time)
     })).filter(c => !isNaN(c.open) && !isNaN(c.high) && !isNaN(c.low) && !isNaN(c.close) && c.high > 0 && c.low > 0);
 
-    if (candles.length < 20) {
-      console.log(symbol, "بيانات غير صالحة بعد التصفية");
-      return null;
-    }
+    if (candles.length < 20) return null;
 
-    console.log(symbol, `✅ تم جلب ${candles.length} شمعة`);
     return candles;
   } catch (error) {
     console.error(`❌ فشل جلب شمعة ${symbol}:`, error);
@@ -496,7 +436,7 @@ async function setLeverage(symbol) {
 }
 
 // ==========================================
-// ✅ تنفيذ الأمر (Place Order)
+// ✅ تنفيذ الأمر
 // ==========================================
 
 async function placeOrder(symbol, side, balance) {
@@ -519,7 +459,6 @@ async function placeOrder(symbol, side, balance) {
     console.log("💰 Trade Amount:", TRADE_AMOUNT);
     console.log("⚡ Leverage:", LEVERAGE);
     console.log("💵 Price:", price);
-    console.log("📊 Contract Info:", contractInfo);
     
     if (roundedQuantity <= 0) {
       console.log('⚠️ كمية غير صالحة');
@@ -664,7 +603,7 @@ async function getFuturesBalance() {
 }
 
 // ==========================================
-// ✅ الدورة الرئيسية - سكالبينج ذكي
+// ✅ الدورة الرئيسية
 // ==========================================
 
 async function tradingCycle() {
@@ -744,13 +683,13 @@ async function tradingCycle() {
       
       if (!candles || candles.length < 20) continue;
 
+      // ✅ فحص الإشارة
       const signal = checkSignal(candles, symbol);
-      
-      console.log(`${symbol} => ${signal}`);
       
       if (signal) {
         console.log(`🚀 إشارة ${signal}: ${symbol}`);
 
+        // ✅ فحص السبريد
         if (!(await hasGoodSpread(symbol))) {
           console.log(`${symbol} سبريد مرتفع ❌`);
           continue;
@@ -905,7 +844,7 @@ app.get('/dashboard', (req, res) => {
     <body>
       <div class="container">
         <h1>⚡ بوت سكالبينج</h1>
-        <p class="subtitle">📡 شموع 1 دقيقة - إشارات نسبة التغير 0.03%</p>
+        <p class="subtitle">📡 شموع 1 دقيقة - قوة الشمعة + نسبة التغير</p>
         
         <div class="status-grid" id="statusGrid">
           <div class="card">
@@ -934,13 +873,13 @@ app.get('/dashboard', (req, res) => {
         <div class="settings-box">
           <div class="label">⚙️ إعدادات سكالبينج</div>
           <div class="value">
-            💰 <span class="highlight-green">5 USDT</span> &nbsp;|&nbsp;
+            💰 <span class="highlight-green">6 USDT</span> &nbsp;|&nbsp;
             ⚡ <span class="highlight-gold">10x رافعة</span> &nbsp;|&nbsp;
             🎯 هدف: <span class="highlight-gold">0.2 USDT</span> &nbsp;|&nbsp;
             🕐 شمعة: <span class="highlight-purple">1 دقيقة</span> &nbsp;|&nbsp;
             📊 عملات: <span class="highlight-purple">AVAX, HYPE, DOGE</span> &nbsp;|&nbsp;
-            🔄 مسح: <span class="highlight-purple">3 ثواني</span> &nbsp;|&nbsp;
-            📊 إشارة: <span class="highlight-purple">0.03% تغير</span>
+            🔄 مسح: <span class="highlight-purple">1 ثانية</span> &nbsp;|&nbsp;
+            📊 إشارة: <span class="highlight-purple">قوة شمعة 1.3x + تغير 0.03%</span>
           </div>
         </div>
 
@@ -1010,7 +949,7 @@ app.get('/', async (req, res) => {
     }
     
     res.json({
-      status: '⚡ بوت سكالبينج - إشارات نسبة التغير 0.03%',
+      status: '⚡ بوت سكالبينج - قوة الشمعة + نسبة التغير',
       timestamp: new Date().toISOString(),
       balance: `${usdtBalance.toFixed(4)} USDT`,
       leverage: `${LEVERAGE}x`,
@@ -1027,6 +966,7 @@ app.get('/', async (req, res) => {
         scanInterval: `${SCAN_INTERVAL/1000} ثانية`,
         leverage: `${LEVERAGE}x`,
         signalPercent: `${SIGNAL_PERCENT}%`,
+        strengthRatio: '1.3x',
         symbols: SYMBOLS
       }
     });
@@ -1041,15 +981,15 @@ app.get('/', async (req, res) => {
 
 async function startBot() {
   try {
-    console.log('⚡⚡ بدء تشغيل بوت سكالبينج - إشارات نسبة التغير');
+    console.log('⚡⚡ بدء تشغيل بوت سكالبينج - قوة الشمعة + نسبة التغير');
     console.log('📊 ===== إعدادات سكالبينج =====');
     console.log(`💰 مبلغ التداول: ${TRADE_AMOUNT} USDT`);
     console.log(`⚡ الرافعة المالية: ${LEVERAGE}x`);
     console.log(`🎯 هدف الربح: ${PROFIT_USDT_TARGET} USDT`);
-    console.log(`📊 المخاطرة: ${MAX_RISK_PER_TRADE * 100}% من الرصيد`);
     console.log(`📊 نسبة التغير للإشارة: ${SIGNAL_PERCENT}%`);
-    console.log(`📊 شرط التذبذب: 0.015% (0.00015)`);
+    console.log(`📊 نسبة قوة الشمعة: 1.3x`);
     console.log(`📊 شرط السيولة: $10,000`);
+    console.log(`📊 شرط التذبذب: 0.015%`);
     console.log(`🕐 فترة الشمعة: ${CANDLE_INTERVAL}`);
     console.log(`📊 العملات: ${SYMBOLS.join(', ')}`);
     console.log(`🔄 سرعة المسح: كل ${SCAN_INTERVAL/1000} ثانية`);
@@ -1097,13 +1037,13 @@ async function startBot() {
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`
   ╔═══════════════════════════════════════════════════════════════╗
-  ║   ⚡ بوت سكالبينج - إشارات نسبة التغير 0.03%              ║
+  ║   ⚡ بوت سكالبينج - قوة الشمعة + نسبة التغير               ║
   ║   📡 http://localhost:${PORT}                                  ║
   ║   📊 لوحة التحكم: http://localhost:${PORT}/dashboard          ║
   ║   🚀 رافعة: ${LEVERAGE}x | 💰 مبلغ: ${TRADE_AMOUNT} USDT    ║
   ║   🎯 هدف: ${PROFIT_USDT_TARGET} USDT                          ║
-  ║   📊 إشارة: ${SIGNAL_PERCENT}% تغير                           ║
-  ║   📊 تذبذب: 0.015% | سيولة: $10,000                          ║
+  ║   📊 إشارة: تغير ${SIGNAL_PERCENT}% + قوة 1.3x               ║
+  ║   📊 سيولة: $10,000 | تذبذب: 0.015%                          ║
   ║   🕐 شمعة: ${CANDLE_INTERVAL} | 📊 ${SYMBOLS.length} عملة     ║
   ║   📊 العملات: ${SYMBOLS.join(', ')}                          ║
   ║   🔄 مسح: ${SCAN_INTERVAL/1000} ثانية                         ║
