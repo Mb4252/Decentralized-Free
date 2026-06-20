@@ -31,8 +31,8 @@ const MAX_RISK_PER_TRADE = 0.01;
 // ✅ الرافعة المالية
 const LEVERAGE = 10;
 
-// ✅ أهداف سكالبينج سريعة - ثابتة
-const PROFIT_USDT_TARGET = 0.12; // ✅ هدف ثابت 0.12 دولار
+// ✅ أهداف سكالبينج سريعة
+const PROFIT_USDT_TARGET = 0.12;
 const MIN_PROFIT_USDT = 0.12;
 
 // ✅ وقف الخسارة
@@ -713,6 +713,7 @@ async function checkSignal(candles, symbol, btcTrend) {
   }
 
   // ✅ ======== نظام الفروقات ========
+  // شراء: buyScore >= 100 والفرق >= 40
   if (
     buyScore >= 100 &&
     (buyScore - sellScore) >= 40
@@ -721,6 +722,7 @@ async function checkSignal(candles, symbol, btcTrend) {
     return { signal: "BUY", atr: atr, entryPrice: current.close, isSnipe: false, confidence: confidence };
   }
 
+  // بيع: sellScore >= 100 والفرق >= 40
   if (
     sellScore >= 100 &&
     (sellScore - buyScore) >= 40
@@ -877,6 +879,21 @@ async function placeOrder(symbol, signalData, balance) {
     const response = await bingxRequest('POST', ENDPOINTS.FUTURES_ORDER, params);
 
     if (response && response.code === 0) {
+      const atr = signalData.atr || 0.01;
+      const entryPrice = price;
+      
+      let stopLossPrice, takeProfitPrice;
+      
+      if (isBuy) {
+        stopLossPrice = entryPrice - atr * STOP_LOSS_ATR_MULTIPLIER;
+        takeProfitPrice = entryPrice + atr * TAKE_PROFIT_ATR_MULTIPLIER;
+      } else {
+        stopLossPrice = entryPrice + atr * STOP_LOSS_ATR_MULTIPLIER;
+        takeProfitPrice = entryPrice - atr * TAKE_PROFIT_ATR_MULTIPLIER;
+      }
+      
+      console.log(`   🎯 TP: ${takeProfitPrice.toFixed(4)} | ⛔ SL: ${stopLossPrice.toFixed(4)}`);
+      
       console.log(`🚀 OPEN ${signalData.signal} ${symbol} (Confidence: ${signalData.confidence?.toFixed(1) || 'N/A'}%)`);
       return {
         symbol,
@@ -885,7 +902,9 @@ async function placeOrder(symbol, signalData, balance) {
         type: isBuy ? 'LONG' : 'SHORT',
         orderId: response.data?.orderId || Date.now(),
         timestamp: Date.now(),
-        atr: signalData.atr || 0.01,
+        stopLossPrice,
+        takeProfitPrice,
+        atr,
         isSnipe: signalData.isSnipe || false,
         confidence: signalData.confidence || 0
       };
@@ -1048,24 +1067,30 @@ async function tradingCycle() {
       let profitPercent = (profitUSDT / (currentPosition.entryPrice * currentPosition.quantity)) * 100;
       console.log(`⚡ الربح الحالي: ${profitUSDT.toFixed(4)} USDT (${profitPercent.toFixed(2)}%)`);
 
-      // ✅ جني الربح - هدف ثابت 0.12 USDT
-      if (profitUSDT >= PROFIT_USDT_TARGET) {
-        console.log(`🎯 جني ربح: ${profitUSDT.toFixed(4)} USDT (الهدف: ${PROFIT_USDT_TARGET} USDT)`);
-        await closePosition(currentPosition, 'TAKE_PROFIT');
+      // ✅ جني الربح - ثابت 0.12
+      if (profitUSDT >= 0.12) {
+        console.log(`🎯 جني ربح ثابت: ${profitUSDT.toFixed(4)} USDT`);
+        await closePosition(currentPosition, 'TAKE_PROFIT_FIXED');
         currentPosition = null;
         lastTradeTime = Date.now();
         isRunning = false;
         return;
       }
 
-      // ✅ وقف الخسارة - ثابت 0.12 USDT
-      if (STOP_LOSS_ENABLED && profitUSDT < -STOP_LOSS_USDT) {
-        console.log(`⛔ وقف خسارة: ${profitUSDT.toFixed(4)} USDT (الحد: -${STOP_LOSS_USDT} USDT)`);
-        await closePosition(currentPosition, 'STOP_LOSS');
-        currentPosition = null;
-        lastTradeTime = Date.now();
-        isRunning = false;
-        return;
+      // ✅ وقف الخسارة
+      if (STOP_LOSS_ENABLED && currentPosition.stopLossPrice) {
+        const isStopLoss = currentPosition.type === 'LONG'
+          ? currentPrice <= currentPosition.stopLossPrice
+          : currentPrice >= currentPosition.stopLossPrice;
+        
+        if (isStopLoss) {
+          console.log(`⛔ وقف خسارة ATR: ${profitUSDT.toFixed(4)} USDT`);
+          await closePosition(currentPosition, 'STOP_LOSS_ATR');
+          currentPosition = null;
+          lastTradeTime = Date.now();
+          isRunning = false;
+          return;
+        }
       }
 
       isRunning = false;
@@ -1145,8 +1170,8 @@ async function tradingCycle() {
         currentPosition = position;
         lastTradeTime = Date.now();
         console.log(`✅ تم الدخول: ${symbol} (${signalData.signal})`);
-        console.log(`🎯 هدف الربح: +${PROFIT_USDT_TARGET} USDT`);
-        console.log(`⛔ وقف الخسارة: -${STOP_LOSS_USDT} USDT`);
+        console.log(`⛔ وقف الخسارة ATR: ${position.stopLossPrice?.toFixed(4)}`);
+        console.log(`🎯 جني الربح ثابت: 0.12 USDT`);
         break;
       }
     }
@@ -1214,7 +1239,7 @@ app.get('/dashboard', (req, res) => {
     <body>
       <div class="container">
         <h1>⚡ بوت سكالبينج احترافي</h1>
-        <p class="subtitle">📊 نظام الفروقات | Confidence | هدف ثابت 0.12 USDT</p>
+        <p class="subtitle">📊 300 نقطة | نظام فروقات | Confidence | وضع القنص | جني ربح ثابت 0.12</p>
         <div class="status-grid" id="statusGrid">
           <div class="card"><div class="label">📊 الحالة</div><div class="value"><span class="status-badge" id="statusBadge">🟢 يعمل</span></div></div>
           <div class="card"><div class="label">💰 الرصيد</div><div class="value green" id="balance">0.00 USDT</div></div>
@@ -1224,7 +1249,7 @@ app.get('/dashboard', (req, res) => {
         <div class="trade-info" id="tradeInfo"><div class="label">💰 الربح / الخسارة</div><div class="value" id="profitDisplay">0.0000 USDT (0.00%)</div></div>
         <div class="settings-box">
           <div class="label">⚙️ إعدادات متقدمة</div>
-          <div class="value">💰 <span class="highlight-green">5 USDT</span> | ⚡ <span class="highlight-gold">10x</span> | 🎯 <span class="highlight-gold">0.12 USDT</span> | ⛔ <span class="highlight-red">0.12 USDT</span> | 📊 <span class="highlight-purple">عتبة 100 + فرق 40</span></div>
+          <div class="value">💰 <span class="highlight-green">5 USDT</span> | ⚡ <span class="highlight-gold">10x</span> | 🎯 <span class="highlight-gold">0.12 ثابت</span> | ⛔ <span class="highlight-red">ATR×1.2</span> | 📊 <span class="highlight-purple">عتبة 100 + فرق 40</span> | 🎯 <span class="highlight-purple">وضع القنص</span> | 📊 <span class="highlight-purple">Confidence</span></div>
         </div>
         <button class="refresh-btn" onclick="fetchStatus()">🔄 تحديث</button>
         <div class="footer" id="lastUpdate">🕐 آخر تحديث: --</div>
@@ -1288,18 +1313,19 @@ app.get('/', async (req, res) => {
       balance: `${usdtBalance.toFixed(4)} USDT`,
       leverage: `${LEVERAGE}x`,
       tradeAmount: `${TRADE_AMOUNT} USDT`,
-      profitTarget: `${PROFIT_USDT_TARGET} USDT`,
-      stopLoss: `${STOP_LOSS_USDT} USDT`,
-      currentPosition: currentPosition ? `${currentPosition.symbol} (${currentPosition.type})${currentPosition.isSnipe ? ' [قنص]' : ''}` : 'لا توجد صفقة',
+      currentPosition: currentPosition ? `${currentPosition.symbol} (${currentPosition.type})${currentPosition.isSnipe ? ' [قنص]' : ''} (ثقة: ${currentPosition.confidence?.toFixed(1) || 'N/A'}%)` : 'لا توجد صفقة',
       profit: profit,
       profitPercent: profitPercent,
       tradesCount: tradesHistory.length,
       settings: {
         tradeAmount: `${TRADE_AMOUNT} USDT`,
-        profitTarget: `${PROFIT_USDT_TARGET} USDT`,
-        stopLoss: `${STOP_LOSS_USDT} USDT`,
+        profitTarget: '0.12 ثابت',
+        stopLoss: 'ATR × 1.2',
         leverage: `${LEVERAGE}x`,
         scoreThreshold: '100 + فرق 40',
+        snipeMode: 'مفعل (مخفف)',
+        confidence: 'مفعل',
+        parallelProcessing: 'مفعل',
         symbols: SYMBOLS
       }
     });
@@ -1320,9 +1346,12 @@ async function startBot() {
     console.log('📊 ===== إعدادات متقدمة =====');
     console.log(`💰 مبلغ التداول: ${TRADE_AMOUNT} USDT`);
     console.log(`⚡ الرافعة: ${LEVERAGE}x`);
-    console.log(`🎯 هدف الربح: ${PROFIT_USDT_TARGET} USDT (ثابت)`);
-    console.log(`⛔ وقف الخسارة: ${STOP_LOSS_USDT} USDT (ثابت)`);
+    console.log(`🎯 الهدف: 0.12 ثابت`);
+    console.log(`⛔ الوقف: ATR × ${STOP_LOSS_ATR_MULTIPLIER}`);
     console.log(`📊 نظام الدخول: عتبة 100 + فرق 40`);
+    console.log(`📊 Confidence: مفعل`);
+    console.log(`🎯 وضع القنص: مفعل (Delta>30, Vol>1.5, RSI<35/>65)`);
+    console.log(`⚡ معالجة متوازية: مفعل`);
     console.log(`📊 العملات: ${SYMBOLS.length} عملة`);
     console.log(`🔄 سرعة المسح: ${SCAN_INTERVAL/1000} ثانية`);
     console.log('================================');
@@ -1359,13 +1388,14 @@ async function startBot() {
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`
   ╔═══════════════════════════════════════════════════════════════╗
-  ║   ⚡ بوت سكالبينج احترافي - هدف ثابت 0.12 USDT            ║
+  ║   ⚡ بوت سكالبينج احترافي - نظام الفروقات                  ║
   ║   📡 http://localhost:${PORT}                                  ║
   ║   📊 لوحة التحكم: http://localhost:${PORT}/dashboard          ║
   ║   🚀 رافعة: ${LEVERAGE}x | 💰 ${TRADE_AMOUNT} USDT            ║
-  ║   🎯 هدف الربح: ${PROFIT_USDT_TARGET} USDT (ثابت)             ║
-  ║   ⛔ وقف الخسارة: ${STOP_LOSS_USDT} USDT (ثابت)              ║
-  ║   📊 عتبة: 100 + فرق 40                                       ║
+  ║   🎯 TP: 0.12 ثابت | ⛔ SL: ATR×${STOP_LOSS_ATR_MULTIPLIER}   ║
+  ║   📊 عتبة: 100 + فرق 40 | Confidence: مفعل                   ║
+  ║   🎯 القنص: Delta>30 + Vol>1.5 + RSI Extreme                ║
+  ║   ⚡ معالجة متوازية: مفعل                                    ║
   ║   📊 العملات: ${SYMBOLS.length} عملة                          ║
   ║   🔄 مسح: ${SCAN_INTERVAL/1000} ثانية                         ║
   ║   ⚠️ تداول حقيقي - استخدم بحذر!                              ║
