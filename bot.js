@@ -23,17 +23,22 @@ if (!process.env.BINGX_API_KEY || !process.env.BINGX_API_SECRET) {
 const API_KEY = process.env.BINGX_API_KEY;
 const API_SECRET = process.env.BINGX_API_SECRET;
 
+// ==========================================
+// HYPE MOMENTUM ENGINE
+// ==========================================
+
+const TRADE_AMOUNT = 4.5; // مبلغ ثابت
+const FIXED_PROFIT_TARGET = 0.15; // هدف ربح ثابت
+const FIXED_STOP_LOSS = -0.10; // وقف خسارة ثابت
+const HYPE_VOLUME_MULTIPLIER = 2; // مضاعف حجم الهيب
+const DUMP_VOLUME_MULTIPLIER = 1.5; // مضاعف حجم الدмп
+
 // ✅ إعدادات رأس المال والمخاطرة
-const TRADE_AMOUNT = 4.8;
 const USE_FULL_BALANCE = false;
 const MAX_RISK_PER_TRADE = 0.01;
 
 // ✅ الرافعة المالية
 const LEVERAGE = 10;
-
-// ✅ أهداف سكالبينج ثابتة (بدون ATR)
-const FIXED_PROFIT_TARGET = 0.12;  // هدف ربح ثابت
-const FIXED_STOP_LOSS = -0.12;     // وقف خسارة ثابت
 
 // ✅ إعدادات الشمعة
 const CANDLE_INTERVAL = '1m';
@@ -259,7 +264,7 @@ function calculateMACD(closes) {
 }
 
 // ==========================================
-// ✅ حساب ATR (للإشارات فقط)
+// ✅ حساب ATR
 // ==========================================
 
 function calculateATR(candles, period = 14) {
@@ -384,6 +389,73 @@ function calculateVolumeDelta(candles) {
   if (total === 0) return 0;
 
   return ((buyVolume - sellVolume) / total) * 100;
+}
+
+// ==========================================
+// ✅ HYPE MOMENTUM ENGINE - تحليل الزخم السريع
+// ==========================================
+
+function analyzeMomentumSignal(candles) {
+  if (!candles || candles.length < 20) {
+    return null;
+  }
+
+  const current = candles[candles.length - 1];
+  const previous = candles[candles.length - 2];
+
+  const currentPrice = current.close;
+  const currentVol = current.volume;
+
+  const avgVolume =
+    candles
+    .slice(-11, -1)
+    .reduce((s, c) => s + c.volume, 0) / 10;
+
+  const priceChange =
+    ((current.close - previous.close) / previous.close) * 100;
+
+  // حساب المؤشرات الإضافية للتصفية
+  const closes = candles.map(c => c.close);
+  const adx = calculateADX(candles, 14);
+  const volumeDelta = calculateVolumeDelta(candles.slice(-20));
+
+  const isFakeout =
+    priceChange > 0 &&
+    currentVol < avgVolume;
+
+  const isHype =
+    currentVol > (avgVolume * HYPE_VOLUME_MULTIPLIER) &&
+    priceChange > 0.25;
+
+  const isDump =
+    currentVol > (avgVolume * DUMP_VOLUME_MULTIPLIER) &&
+    priceChange < -0.25;
+
+  // منع الفيكاوت
+  if (isFakeout) {
+    console.log(`   🚫 فليتر: فايكاوت (حجم منخفض مع ارتفاع)`);
+    return null;
+  }
+
+  // ✅ شرط الهيب المحسن - مع تصفية إضافية
+  if (isHype && volumeDelta > 20 && adx > 20) {
+    console.log(`   🔥 HYPE BUY | ΔVol=${(currentVol/avgVolume).toFixed(1)}x | ΔPrice=${priceChange.toFixed(2)}% | Delta=${volumeDelta.toFixed(1)} | ADX=${adx.toFixed(1)}`);
+    return {
+      signal: 'BUY',
+      strength: 'STRONG'
+    };
+  }
+
+  // ✅ شرط الدمب المحسن - مع تصفية إضافية
+  if (isDump && volumeDelta < -20 && adx > 20) {
+    console.log(`   🔥 DUMP SELL | ΔVol=${(currentVol/avgVolume).toFixed(1)}x | ΔPrice=${priceChange.toFixed(2)}% | Delta=${volumeDelta.toFixed(1)} | ADX=${adx.toFixed(1)}`);
+    return {
+      signal: 'SELL',
+      strength: 'STRONG'
+    };
+  }
+
+  return null;
 }
 
 // ==========================================
@@ -707,6 +779,19 @@ async function checkSignal(candles, symbol, btcTrend) {
     return { signal: "SELL", atr: atr, entryPrice: current.close, isSnipe: true, confidence: confidence };
   }
 
+  // ✅ ======== HYPE MOMENTUM ENGINE ========
+  const momentumSignal = analyzeMomentumSignal(candles);
+  if (momentumSignal) {
+    console.log(`   🔥 Momentum ${momentumSignal.signal} (HYPE/DUMP)`);
+    return {
+      signal: momentumSignal.signal,
+      atr: atr,
+      entryPrice: current.close,
+      isSnipe: true,
+      confidence: 85 // ثقة عالية للزخم
+    };
+  }
+
   // ✅ ======== نظام الفروقات ========
   // شراء: buyScore >= 100 والفرق >= 40
   if (
@@ -838,7 +923,7 @@ async function setLeverage(symbol) {
 }
 
 // ==========================================
-// ✅ تنفيذ الأمر (بدون ATR)
+// ✅ تنفيذ الأمر
 // ==========================================
 
 async function placeOrder(symbol, signalData, balance) {
@@ -1018,7 +1103,7 @@ async function getFuturesBalance() {
 }
 
 // ==========================================
-// ✅ الدورة الرئيسية - مع أهداف ثابتة (بدون ATR)
+// ✅ الدورة الرئيسية - مع HYPE MOMENTUM
 // ==========================================
 
 async function tradingCycle() {
@@ -1048,7 +1133,7 @@ async function tradingCycle() {
 
       // ✅ جني ربح ثابت
       if (profitUSDT >= FIXED_PROFIT_TARGET) {
-        console.log(`🎯 جني ربح ثابت: ${profitUSDT.toFixed(4)} USDT (الهدف: ${FIXED_PROFIT_TARGET} USDT)`);
+        console.log(`🎯 FIXED TP ${profitUSDT.toFixed(4)} USDT (الهدف: ${FIXED_PROFIT_TARGET} USDT)`);
         await closePosition(currentPosition, 'FIXED_TP');
         currentPosition = null;
         lastTradeTime = Date.now();
@@ -1058,7 +1143,7 @@ async function tradingCycle() {
 
       // ✅ وقف خسارة ثابت
       if (profitUSDT <= FIXED_STOP_LOSS) {
-        console.log(`⛔ وقف خسارة ثابت: ${profitUSDT.toFixed(4)} USDT (الحد: ${FIXED_STOP_LOSS} USDT)`);
+        console.log(`⛔ FIXED SL ${profitUSDT.toFixed(4)} USDT (الحد: ${FIXED_STOP_LOSS} USDT)`);
         await closePosition(currentPosition, 'FIXED_SL');
         currentPosition = null;
         lastTradeTime = Date.now();
@@ -1173,7 +1258,7 @@ app.get('/dashboard', (req, res) => {
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>لوحة تحكم البوت - سكالبينج احترافي</title>
+      <title>لوحة تحكم البوت - HYPE MOMENTUM</title>
       <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Arial', sans-serif; background: #0a0e17; color: #fff; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
@@ -1190,6 +1275,7 @@ app.get('/dashboard', (req, res) => {
         .card .value.blue { color: #4a9eff; }
         .card .value.red { color: #ff4444; }
         .card .value.purple { color: #a855f7; }
+        .card .value.orange { color: #ff8c00; }
         .status-badge { display: inline-block; padding: 4px 12px; border-radius: 30px; font-size: 13px; font-weight: bold; background: #00aa55; color: #fff; }
         .footer { text-align: center; margin-top: 25px; font-size: 12px; color: #556688; border-top: 1px solid #1a2335; padding-top: 18px; }
         .refresh-btn { display: block; margin: 18px auto 0; padding: 10px 30px; background: #00aa55; border: none; border-radius: 30px; color: #fff; font-weight: bold; cursor: pointer; transition: 0.3s; }
@@ -1201,6 +1287,7 @@ app.get('/dashboard', (req, res) => {
         .settings-box .value .highlight-gold { color: #f0b90b; }
         .settings-box .value .highlight-red { color: #ff4444; }
         .settings-box .value .highlight-purple { color: #a855f7; }
+        .settings-box .value .highlight-orange { color: #ff8c00; }
         .trade-info { background: #1a2335; border-radius: 14px; padding: 16px 18px; margin-top: 12px; border: 1px solid #2a3a55; text-align: center; }
         .trade-info .label { font-size: 11px; color: #8899bb; text-transform: uppercase; }
         .trade-info .value { font-size: 20px; font-weight: bold; margin-top: 4px; }
@@ -1211,8 +1298,8 @@ app.get('/dashboard', (req, res) => {
     </head>
     <body>
       <div class="container">
-        <h1>⚡ بوت سكالبينج احترافي</h1>
-        <p class="subtitle">🎯 TP: ${FIXED_PROFIT_TARGET} ثابت | ⛔ SL: ${FIXED_STOP_LOSS} ثابت</p>
+        <h1>⚡ HYPE MOMENTUM ENGINE</h1>
+        <p class="subtitle">🔥 زخم سريع | TP: ${FIXED_PROFIT_TARGET} | SL: ${FIXED_STOP_LOSS}</p>
         <div class="status-grid" id="statusGrid">
           <div class="card"><div class="label">📊 الحالة</div><div class="value"><span class="status-badge" id="statusBadge">🟢 يعمل</span></div></div>
           <div class="card"><div class="label">💰 الرصيد</div><div class="value green" id="balance">0.00 USDT</div></div>
@@ -1221,8 +1308,8 @@ app.get('/dashboard', (req, res) => {
         </div>
         <div class="trade-info" id="tradeInfo"><div class="label">💰 الربح / الخسارة</div><div class="value" id="profitDisplay">0.0000 USDT (0.00%)</div></div>
         <div class="settings-box">
-          <div class="label">⚙️ إعدادات متقدمة</div>
-          <div class="value">💰 <span class="highlight-green">${TRADE_AMOUNT} USDT</span> | ⚡ <span class="highlight-gold">${LEVERAGE}x</span> | 🎯 <span class="highlight-gold">${FIXED_PROFIT_TARGET} ثابت</span> | ⛔ <span class="highlight-red">${FIXED_STOP_LOSS} ثابت</span> | 📊 <span class="highlight-purple">عتبة 100 + فرق 40</span> | 🎯 <span class="highlight-purple">وضع القنص</span> | 📊 <span class="highlight-purple">Confidence</span></div>
+          <div class="label">⚙️ إعدادات HYPE MOMENTUM</div>
+          <div class="value">💰 <span class="highlight-green">${TRADE_AMOUNT} USDT</span> | ⚡ <span class="highlight-gold">${LEVERAGE}x</span> | 🎯 <span class="highlight-gold">${FIXED_PROFIT_TARGET} ثابت</span> | ⛔ <span class="highlight-red">${FIXED_STOP_LOSS} ثابت</span> | 📊 <span class="highlight-purple">HYPE: ${HYPE_VOLUME_MULTIPLIER}x</span> | 📊 <span class="highlight-orange">DUMP: ${DUMP_VOLUME_MULTIPLIER}x</span></div>
         </div>
         <button class="refresh-btn" onclick="fetchStatus()">🔄 تحديث</button>
         <div class="footer" id="lastUpdate">🕐 آخر تحديث: --</div>
@@ -1281,7 +1368,7 @@ app.get('/', async (req, res) => {
     }
     
     res.json({
-      status: '⚡ بوت سكالبينج احترافي - أهداف ثابتة',
+      status: '⚡ HYPE MOMENTUM ENGINE',
       timestamp: new Date().toISOString(),
       balance: `${usdtBalance.toFixed(4)} USDT`,
       leverage: `${LEVERAGE}x`,
@@ -1295,8 +1382,11 @@ app.get('/', async (req, res) => {
         profitTarget: `${FIXED_PROFIT_TARGET} ثابت`,
         stopLoss: `${FIXED_STOP_LOSS} ثابت`,
         leverage: `${LEVERAGE}x`,
+        hypeMultiplier: `${HYPE_VOLUME_MULTIPLIER}x`,
+        dumpMultiplier: `${DUMP_VOLUME_MULTIPLIER}x`,
         scoreThreshold: '100 + فرق 40',
-        snipeMode: 'مفعل (مخفف)',
+        snipeMode: 'مفعل',
+        momentumMode: 'مفعل (HYPE/DUMP)',
         confidence: 'مفعل',
         parallelProcessing: 'مفعل',
         symbols: SYMBOLS
@@ -1315,15 +1405,17 @@ async function startBot() {
   try {
     loadTradesHistory();
 
-    console.log('⚡⚡ بدء تشغيل بوت سكالبينج احترافي');
+    console.log('⚡⚡ بدء تشغيل HYPE MOMENTUM ENGINE');
     console.log('📊 ===== إعدادات متقدمة =====');
     console.log(`💰 مبلغ التداول: ${TRADE_AMOUNT} USDT`);
     console.log(`⚡ الرافعة: ${LEVERAGE}x`);
     console.log(`🎯 الهدف الثابت: ${FIXED_PROFIT_TARGET} USDT`);
     console.log(`⛔ وقف الخسارة الثابت: ${FIXED_STOP_LOSS} USDT`);
-    console.log(`📊 نظام الدخول: عتبة 100 + فرق 40`);
+    console.log(`🔥 HYPE مضاعف: ${HYPE_VOLUME_MULTIPLIER}x`);
+    console.log(`📉 DUMP مضاعف: ${DUMP_VOLUME_MULTIPLIER}x`);
+    console.log(`📊 نظام الدخول: عتبة 100 + فرق 40 + HYPE MOMENTUM`);
     console.log(`📊 Confidence: مفعل`);
-    console.log(`🎯 وضع القنص: مفعل (Delta>30, Vol>1.5, RSI<35/>65)`);
+    console.log(`🎯 وضع القنص: مفعل`);
     console.log(`⚡ معالجة متوازية: مفعل`);
     console.log(`📊 العملات: ${SYMBOLS.length} عملة`);
     console.log(`🔄 سرعة المسح: ${SCAN_INTERVAL/1000} ثانية`);
@@ -1361,12 +1453,13 @@ async function startBot() {
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`
   ╔═══════════════════════════════════════════════════════════════╗
-  ║   ⚡ بوت سكالبينج احترافي - أهداف ثابتة                    ║
+  ║   🔥 HYPE MOMENTUM ENGINE - سكالبينج سريع                  ║
   ║   📡 http://localhost:${PORT}                                  ║
   ║   📊 لوحة التحكم: http://localhost:${PORT}/dashboard          ║
   ║   🚀 رافعة: ${LEVERAGE}x | 💰 ${TRADE_AMOUNT} USDT            ║
   ║   🎯 TP: ${FIXED_PROFIT_TARGET} ثابت | ⛔ SL: ${FIXED_STOP_LOSS} ثابت ║
-  ║   📊 عتبة: 100 + فرق 40 | Confidence: مفعل                   ║
+  ║   🔥 HYPE: ${HYPE_VOLUME_MULTIPLIER}x | 📉 DUMP: ${DUMP_VOLUME_MULTIPLIER}x ║
+  ║   📊 عتبة: 100 + فرق 40 | HYPE MOMENTUM: مفعل              ║
   ║   🎯 القنص: Delta>30 + Vol>1.5 + RSI Extreme                ║
   ║   ⚡ معالجة متوازية: مفعل                                    ║
   ║   📊 العملات: ${SYMBOLS.length} عملة                          ║
