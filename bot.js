@@ -24,7 +24,7 @@ const API_KEY = process.env.BINGX_API_KEY;
 const API_SECRET = process.env.BINGX_API_SECRET;
 
 // ✅ إعدادات رأس المال والمخاطرة
-const TRADE_AMOUNT = 5; // ✅ 5 دولار
+const TRADE_AMOUNT = 5;
 const USE_FULL_BALANCE = false;
 const MAX_RISK_PER_TRADE = 0.01;
 
@@ -32,8 +32,12 @@ const MAX_RISK_PER_TRADE = 0.01;
 const LEVERAGE = 10;
 
 // ✅ أهداف سكالبينج سريعة
-const PROFIT_USDT_TARGET = 0.12; // ✅ 0.12 دولار
+const PROFIT_USDT_TARGET = 0.12;
 const MIN_PROFIT_USDT = 0.12;
+
+// ✅ وقف الخسارة - ✅ مفعل
+const STOP_LOSS_ENABLED = true;
+const STOP_LOSS_USDT = 0.12;
 
 // ✅ إعدادات الشمعة (1 دقيقة)
 const CANDLE_INTERVAL = '1m';
@@ -41,26 +45,22 @@ const CANDLE_LIMIT = 30;
 
 // ✅ قائمة العملات
 const SYMBOLS = [
-  "AVAX-USDT", "HYPE-USDT", "DOGE-USDT"
+  "BTC-USDT",
+  "ETH-USDT",
+  "DOGE-USDT",
+  "AVAX-USDT",
+  "XRP-USDT",
+  "SOL-USDT"
 ];
 
 // ✅ المتغيرات
 let currentPosition = null;
 let isRunning = false;
 let lastTradeTime = 0;
-const cooldown = 3000;
+const cooldown = 1000; // ✅ 1 ثانية
 
 // ✅ سرعة المسح
 const SCAN_INTERVAL = 1000;
-
-// ✅ إعدادات وقف الخسارة - معطل
-const STOP_LOSS_ENABLED = false;
-
-// ==========================================
-// نسبة التغير المطلوبة للإشارة
-// ==========================================
-
-const SIGNAL_PERCENT = 0.03; // 0.03%
 
 // ==========================================
 // تخزين معلومات العقود
@@ -212,7 +212,7 @@ function adjustQuantity(quantity, contractInfo) {
 }
 
 // ==========================================
-// ✅ فلترة السيولة الأساسية
+// ✅ فلترة السيولة - مخففة
 // ==========================================
 
 function strongMarket(candles) {
@@ -229,23 +229,23 @@ function strongMarket(candles) {
 
   const dollarVolume = last.close * avgVolume;
 
+  console.log(`📊 السيولة: $${dollarVolume.toFixed(2)} | التذبذب: ${(volatility * 100).toFixed(3)}%`);
+
   return (
-    dollarVolume > 10000 &&
-    volatility > 0.00015
+    dollarVolume > 3000 &&      // ✅ تم التخفيف
+    volatility > 0.00008        // ✅ تم التخفيف
   );
 }
 
 // ==========================================
-// ✅ فحص الإشارة بنظام قوة الشمعة ونسبة التغير
+// ✅ فحص الإشارة - نظام bodyRatio + volumeRatio
 // ==========================================
 
 function checkSignal(candles, symbol) {
-  if (!candles || candles.length < 4) return null;
+  if (!candles || candles.length < 10) return null;
 
   const current = candles[candles.length - 1];
-  const prev1 = candles[candles.length - 2];
-  const prev2 = candles[candles.length - 3];
-  const prev3 = candles[candles.length - 4];
+  const prevCandles = candles.slice(-6, -1);
 
   // ✅ فلترة السيولة
   if (!strongMarket(candles)) {
@@ -253,49 +253,60 @@ function checkSignal(candles, symbol) {
     return null;
   }
 
-  // ✅ حساب قوة الشمعة الحالية
+  // ✅ حساب bodyRatio
   const currentBody = Math.abs(current.close - current.open);
+  const avgBody = prevCandles.reduce(
+    (sum, c) => sum + Math.abs(c.close - c.open), 0
+  ) / prevCandles.length;
 
-  const avgPrevBody = (
-    Math.abs(prev1.close - prev1.open) +
-    Math.abs(prev2.close - prev2.open) +
-    Math.abs(prev3.close - prev3.open)
-  ) / 3;
+  // ✅ حساب volumeRatio
+  const avgVolume = prevCandles.reduce(
+    (sum, c) => sum + c.volume, 0
+  ) / prevCandles.length;
 
-  const strengthRatio = currentBody / (avgPrevBody || 0.0000001);
+  const bodyRatio = currentBody / (avgBody || 0.0000001);
+  const volumeRatio = current.volume / (avgVolume || 0.0000001);
 
-  // ✅ حساب نسبة التغير
-  const change = ((current.close - prev1.close) / prev1.close) * 100;
+  // ✅ حساب الفتائل
+  const upperWick = current.high - Math.max(current.open, current.close);
+  const lowerWick = Math.min(current.open, current.close) - current.low;
 
-  console.log(`📊 ${symbol} - قوة الشمعة: ${strengthRatio.toFixed(2)}x | التغير: ${change.toFixed(3)}%`);
-  console.log(`   الشمعة الحالية: ${current.close > current.open ? '🟢 صاعدة' : '🔴 هابطة'}`);
-  console.log(`   متوسط الجسم السابق: ${avgPrevBody.toFixed(4)}`);
+  console.log(`📊 ${symbol} body=${bodyRatio.toFixed(2)}x volume=${volumeRatio.toFixed(2)}x`);
+  console.log(`   الشمعة: ${current.close > current.open ? '🟢 صاعدة' : '🔴 هابطة'}`);
+  console.log(`   الفتيل العلوي: ${upperWick.toFixed(4)} | الفتيل السفلي: ${lowerWick.toFixed(4)}`);
+  console.log(`   الجسم: ${currentBody.toFixed(4)}`);
 
-  // ✅ إشارة بيع (شمعة صاعدة قوية + تغير إيجابي)
+  // ✅ شراء مع الزخم (شمعة صاعدة + جسم قوي + حجم مرتفع + فتيل علوي صغير)
   if (
     current.close > current.open &&
-    strengthRatio >= 1.3 &&
-    change >= SIGNAL_PERCENT
+    bodyRatio >= 1.2 &&
+    volumeRatio >= 1.3 &&
+    upperWick < currentBody
   ) {
-    console.log(`   ✅ إشارة SELL (صعود قوي ${strengthRatio.toFixed(2)}x مع تغير ${change.toFixed(3)}%)`);
-    return "SELL";
-  }
-
-  // ✅ إشارة شراء (شمعة هابطة قوية + تغير سلبي)
-  if (
-    current.close < current.open &&
-    strengthRatio >= 1.3 &&
-    change <= -SIGNAL_PERCENT
-  ) {
-    console.log(`   ✅ إشارة BUY (هبوط قوي ${strengthRatio.toFixed(2)}x مع تغير ${change.toFixed(3)}%)`);
+    console.log(`   ✅ إشارة BUY (body=${bodyRatio.toFixed(2)}x, volume=${volumeRatio.toFixed(2)}x)`);
     return "BUY";
   }
 
+  // ✅ بيع مع الزخم (شمعة هابطة + جسم قوي + حجم مرتفع + فتيل سفلي صغير)
+  if (
+    current.close < current.open &&
+    bodyRatio >= 1.2 &&
+    volumeRatio >= 1.3 &&
+    lowerWick < currentBody
+  ) {
+    console.log(`   ✅ إشارة SELL (body=${bodyRatio.toFixed(2)}x, volume=${volumeRatio.toFixed(2)}x)`);
+    return "SELL";
+  }
+
   // ✅ عرض سبب عدم الإشارة
-  if (strengthRatio < 1.3) {
-    console.log(`   ❌ قوة الشمعة ضعيفة (${strengthRatio.toFixed(2)}x < 1.3x)`);
-  } else if (Math.abs(change) < SIGNAL_PERCENT) {
-    console.log(`   ❌ التغير صغير (${change.toFixed(3)}% < ${SIGNAL_PERCENT}%)`);
+  if (bodyRatio < 1.2) {
+    console.log(`   ❌ الجسم ضعيف (${bodyRatio.toFixed(2)}x < 1.2x)`);
+  } else if (volumeRatio < 1.3) {
+    console.log(`   ❌ الحجم ضعيف (${volumeRatio.toFixed(2)}x < 1.3x)`);
+  } else if (current.close > current.open && upperWick >= currentBody) {
+    console.log(`   ❌ فتيل علوي طويل (${upperWick.toFixed(4)} >= ${currentBody.toFixed(4)})`);
+  } else if (current.close < current.open && lowerWick >= currentBody) {
+    console.log(`   ❌ فتيل سفلي طويل (${lowerWick.toFixed(4)} >= ${currentBody.toFixed(4)})`);
   }
 
   return null;
@@ -637,6 +648,7 @@ async function tradingCycle() {
 
       console.log(`⚡ الربح الحالي: ${profitUSDT.toFixed(4)} USDT (${profitPercent.toFixed(2)}%)`);
 
+      // ✅ جني الربح
       if (profitUSDT >= PROFIT_USDT_TARGET) {
         console.log(`🎯 إغلاق الصفقة: ربح كافي ${profitUSDT.toFixed(4)} USDT`);
         await closePosition(currentPosition);
@@ -644,8 +656,9 @@ async function tradingCycle() {
         lastTradeTime = Date.now();
       }
       
-      if (STOP_LOSS_ENABLED && profitUSDT < -0.03) {
-        console.log(`⛔ وقف خسارة سريع: ${profitUSDT.toFixed(4)} USDT`);
+      // ✅ وقف الخسارة - مفعل
+      if (STOP_LOSS_ENABLED && profitUSDT < -STOP_LOSS_USDT) {
+        console.log(`⛔ وقف خسارة: ${profitUSDT.toFixed(4)} USDT (الحد: -${STOP_LOSS_USDT} USDT)`);
         await closePosition(currentPosition);
         currentPosition = null;
         lastTradeTime = Date.now();
@@ -655,7 +668,7 @@ async function tradingCycle() {
       return;
     }
 
-    // ✅ كولداون
+    // ✅ كولداون - 1 ثانية
     if (Date.now() - lastTradeTime < cooldown) {
       console.log('⏳ في فترة انتظار بين الصفقات');
       isRunning = false;
@@ -707,6 +720,8 @@ async function tradingCycle() {
           currentPosition = position;
           lastTradeTime = Date.now();
           console.log(`✅ تم الدخول: ${symbol} (${signal})`);
+          console.log(`⛔ وقف الخسارة: -${STOP_LOSS_USDT} USDT`);
+          console.log(`🎯 هدف الربح: +${PROFIT_USDT_TARGET} USDT`);
           break;
         }
       }
@@ -844,7 +859,7 @@ app.get('/dashboard', (req, res) => {
     <body>
       <div class="container">
         <h1>⚡ بوت سكالبينج</h1>
-        <p class="subtitle">📡 شموع 1 دقيقة - قوة الشمعة + نسبة التغير</p>
+        <p class="subtitle">📡 شموع 1 دقيقة - Body + Volume Ratio</p>
         
         <div class="status-grid" id="statusGrid">
           <div class="card">
@@ -876,10 +891,11 @@ app.get('/dashboard', (req, res) => {
             💰 <span class="highlight-green">5 USDT</span> &nbsp;|&nbsp;
             ⚡ <span class="highlight-gold">10x رافعة</span> &nbsp;|&nbsp;
             🎯 هدف: <span class="highlight-gold">0.12 USDT</span> &nbsp;|&nbsp;
+            ⛔ وقف: <span class="highlight-red">0.12 USDT</span> &nbsp;|&nbsp;
             🕐 شمعة: <span class="highlight-purple">1 دقيقة</span> &nbsp;|&nbsp;
-            📊 عملات: <span class="highlight-purple">AVAX, HYPE, DOGE</span> &nbsp;|&nbsp;
+            📊 عملات: <span class="highlight-purple">BTC, ETH, DOGE, AVAX, XRP, SOL</span> &nbsp;|&nbsp;
             🔄 مسح: <span class="highlight-purple">1 ثانية</span> &nbsp;|&nbsp;
-            📊 إشارة: <span class="highlight-purple">قوة شمعة 1.3x + تغير 0.03%</span>
+            📊 إشارة: <span class="highlight-purple">Body 1.2x + Volume 1.3x</span>
           </div>
         </div>
 
@@ -949,7 +965,7 @@ app.get('/', async (req, res) => {
     }
     
     res.json({
-      status: '⚡ بوت سكالبينج - قوة الشمعة + نسبة التغير',
+      status: '⚡ بوت سكالبينج - Body + Volume Ratio',
       timestamp: new Date().toISOString(),
       balance: `${usdtBalance.toFixed(4)} USDT`,
       leverage: `${LEVERAGE}x`,
@@ -961,12 +977,13 @@ app.get('/', async (req, res) => {
       settings: {
         tradeAmount: `${TRADE_AMOUNT} USDT`,
         profitTarget: `${PROFIT_USDT_TARGET} USDT`,
+        stopLoss: `${STOP_LOSS_USDT} USDT`,
         riskPerTrade: `${MAX_RISK_PER_TRADE * 100}%`,
         candleInterval: '1 دقيقة',
         scanInterval: `${SCAN_INTERVAL/1000} ثانية`,
         leverage: `${LEVERAGE}x`,
-        signalPercent: `${SIGNAL_PERCENT}%`,
-        strengthRatio: '1.3x',
+        bodyRatio: '1.2x',
+        volumeRatio: '1.3x',
         symbols: SYMBOLS
       }
     });
@@ -981,15 +998,15 @@ app.get('/', async (req, res) => {
 
 async function startBot() {
   try {
-    console.log('⚡⚡ بدء تشغيل بوت سكالبينج - قوة الشمعة + نسبة التغير');
+    console.log('⚡⚡ بدء تشغيل بوت سكالبينج - Body + Volume Ratio');
     console.log('📊 ===== إعدادات سكالبينج =====');
     console.log(`💰 مبلغ التداول: ${TRADE_AMOUNT} USDT`);
     console.log(`⚡ الرافعة المالية: ${LEVERAGE}x`);
     console.log(`🎯 هدف الربح: ${PROFIT_USDT_TARGET} USDT`);
-    console.log(`📊 نسبة التغير للإشارة: ${SIGNAL_PERCENT}%`);
-    console.log(`📊 نسبة قوة الشمعة: 1.3x`);
-    console.log(`📊 شرط السيولة: $10,000`);
-    console.log(`📊 شرط التذبذب: 0.015%`);
+    console.log(`⛔ وقف الخسارة: ${STOP_LOSS_USDT} USDT`);
+    console.log(`📊 شرط الجسم: 1.2x من المتوسط`);
+    console.log(`📊 شرط الحجم: 1.3x من المتوسط`);
+    console.log(`📊 شرط السيولة: $3,000 | تذبذب: 0.008%`);
     console.log(`🕐 فترة الشمعة: ${CANDLE_INTERVAL}`);
     console.log(`📊 العملات: ${SYMBOLS.join(', ')}`);
     console.log(`🔄 سرعة المسح: كل ${SCAN_INTERVAL/1000} ثانية`);
@@ -1037,17 +1054,16 @@ async function startBot() {
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`
   ╔═══════════════════════════════════════════════════════════════╗
-  ║   ⚡ بوت سكالبينج - قوة الشمعة + نسبة التغير               ║
+  ║   ⚡ بوت سكالبينج - Body + Volume Ratio                    ║
   ║   📡 http://localhost:${PORT}                                  ║
   ║   📊 لوحة التحكم: http://localhost:${PORT}/dashboard          ║
   ║   🚀 رافعة: ${LEVERAGE}x | 💰 مبلغ: ${TRADE_AMOUNT} USDT    ║
-  ║   🎯 هدف: ${PROFIT_USDT_TARGET} USDT                          ║
-  ║   📊 إشارة: تغير ${SIGNAL_PERCENT}% + قوة 1.3x               ║
-  ║   📊 سيولة: $10,000 | تذبذب: 0.015%                          ║
+  ║   🎯 هدف: ${PROFIT_USDT_TARGET} USDT | ⛔ وقف: ${STOP_LOSS_USDT} USDT ║
+  ║   📊 الجسم: 1.2x | الحجم: 1.3x | سيولة: $3,000             ║
   ║   🕐 شمعة: ${CANDLE_INTERVAL} | 📊 ${SYMBOLS.length} عملة     ║
   ║   📊 العملات: ${SYMBOLS.join(', ')}                          ║
   ║   🔄 مسح: ${SCAN_INTERVAL/1000} ثانية                         ║
-  ║   ⛔ وقف الخسارة: معطل                                        ║
+  ║   ⛔ وقف الخسارة: مفعل                                       ║
   ║   ⚠️ تداول حقيقي - استخدم بحذر!                              ║
   ╚═══════════════════════════════════════════════════════════════╝
   `);
