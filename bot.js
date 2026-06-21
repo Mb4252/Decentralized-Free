@@ -17,55 +17,51 @@ if (!process.env.BINGX_API_KEY || !process.env.BINGX_API_SECRET) {
 }
 
 // ==========================================
-// إعدادات البوت (BingX Futures) - سكالبينج احترافي
+// إعدادات البوت - HYPE MOMENTUM
 // ==========================================
 
 const API_KEY = process.env.BINGX_API_KEY;
 const API_SECRET = process.env.BINGX_API_SECRET;
 
 // ==========================================
-// HYPE MOMENTUM ENGINE
+// إعدادات التداول
 // ==========================================
 
-const TRADE_AMOUNT = 4.5; // مبلغ ثابت
-const FIXED_PROFIT_TARGET = 0.15; // هدف ربح ثابت
-const FIXED_STOP_LOSS = -0.10; // وقف خسارة ثابت
-const HYPE_VOLUME_MULTIPLIER = 2; // مضاعف حجم الهيب
-const DUMP_VOLUME_MULTIPLIER = 1.5; // مضاعف حجم الدмп
+const TRADE_AMOUNT = 4.5;        // مبلغ الدخول الثابت
+const LEVERAGE = 10;              // الرافعة المالية
+const FIXED_PROFIT_TARGET = 0.12; // هدف الربح الثابت
+const FIXED_STOP_LOSS = -0.12;    // وقف الخسارة الثابت
 
-// ✅ إعدادات رأس المال والمخاطرة
-const USE_FULL_BALANCE = false;
-const MAX_RISK_PER_TRADE = 0.01;
+// ==========================================
+// إعدادات HYPE MOMENTUM
+// ==========================================
 
-// ✅ الرافعة المالية
-const LEVERAGE = 10;
+const HYPE_VOLUME_MULTIPLIER = 2.0;  // مضاعف حجم الهيب
+const DUMP_VOLUME_MULTIPLIER = 1.5;  // مضاعف حجم الدмп
 
-// ✅ إعدادات الشمعة
-const CANDLE_INTERVAL = '1m';
-const CANDLE_LIMIT = 100;
+// ==========================================
+// إعدادات المسح
+// ==========================================
 
-// ✅ العملات الرئيسية
-const SYMBOLS = [
-  "BTC-USDT",
-  "ETH-USDT",
-  "SOL-USDT",
-  "XRP-USDT",
-  "DOGE-USDT",
-  "AVAX-USDT",
-  "LINK-USDT",
-  "SUI-USDT",
-  "ADA-USDT",
-  "TRX-USDT",
-  "APT-USDT",
-  "ARB-USDT"
-];
+const SCAN_INTERVAL = 3000;    // سرعة المسح (3 ثواني)
+const COOLDOWN = 0;            // بدون كولداون
+
+// ==========================================
+// حساب الحركة المطلوبة للربح
+// ==========================================
+
+const REQUIRED_MOVE = FIXED_PROFIT_TARGET / (TRADE_AMOUNT * LEVERAGE);
+
+// ==========================================
+// العملات المتداولة - HYPE فقط
+// ==========================================
+
+const SYMBOLS = ["HYPE-USDT"];
 
 // ✅ المتغيرات
 let currentPosition = null;
 let isRunning = false;
 let lastTradeTime = 0;
-const cooldown = 2000;
-const SCAN_INTERVAL = 3000;
 
 // ✅ سجل الصفقات
 const TRADES_FILE = path.join(__dirname, 'trades.json');
@@ -203,7 +199,7 @@ async function bingxRequest(method, endpoint, params = {}, signed = true) {
 }
 
 // ==========================================
-// ✅ حساب EMA الحقيقي
+// ✅ حساب المتوسط البسيط (للمؤشرات الأساسية)
 // ==========================================
 
 function calculateEMA(prices, period) {
@@ -240,222 +236,59 @@ function calculateRSI(closes, period = 14) {
 }
 
 // ==========================================
-// ✅ حساب MACD
+// ✅ تحليل السوق - HYPE & DUMP
 // ==========================================
 
-function calculateMACD(closes) {
-  if (closes.length < 26) return { macd: 0, signal: 0, histogram: 0 };
-
-  const ema12 = calculateEMA(closes, 12);
-  const ema26 = calculateEMA(closes, 26);
-  const macd = ema12 - ema26;
-
-  const macdValues = [];
-  for (let i = 0; i < closes.length; i++) {
-    const e12 = calculateEMA(closes.slice(0, i + 1), 12);
-    const e26 = calculateEMA(closes.slice(0, i + 1), 26);
-    macdValues.push(e12 - e26);
-  }
-
-  const signal = calculateEMA(macdValues, 9);
-  const histogram = macd - signal;
-
-  return { macd, signal, histogram };
-}
-
-// ==========================================
-// ✅ حساب ATR
-// ==========================================
-
-function calculateATR(candles, period = 14) {
-  if (candles.length < period + 1) return 0;
-
-  const trs = [];
-  for (let i = 1; i < candles.length; i++) {
-    const high = candles[i].high;
-    const low = candles[i].low;
-    const prevClose = candles[i - 1].close;
-    
-    const tr = Math.max(
-      high - low,
-      Math.abs(high - prevClose),
-      Math.abs(low - prevClose)
-    );
-    trs.push(tr);
-  }
-
-  let atr = 0;
-  for (let i = 0; i < period && i < trs.length; i++) {
-    atr += trs[trs.length - 1 - i];
-  }
-  atr = atr / Math.min(period, trs.length);
-  
-  return atr;
-}
-
-// ==========================================
-// ✅ حساب VWAP
-// ==========================================
-
-function calculateVWAP(candles) {
-  if (candles.length < 20) return 0;
-
-  let cumVolumePrice = 0;
-  let cumVolume = 0;
-
-  for (const candle of candles) {
-    const typicalPrice = (candle.high + candle.low + candle.close) / 3;
-    cumVolumePrice += typicalPrice * candle.volume;
-    cumVolume += candle.volume;
-  }
-
-  return cumVolumePrice / (cumVolume || 1);
-}
-
-// ==========================================
-// ✅ حساب ADX
-// ==========================================
-
-function calculateADX(candles, period = 14) {
-  if (candles.length < period + 1) return 0;
-
-  const trs = [];
-  const plusDM = [];
-  const minusDM = [];
-
-  for (let i = 1; i < candles.length; i++) {
-    const high = candles[i].high;
-    const low = candles[i].low;
-    const prevHigh = candles[i - 1].high;
-    const prevLow = candles[i - 1].low;
-    const prevClose = candles[i - 1].close;
-
-    const tr = Math.max(
-      high - low,
-      Math.abs(high - prevClose),
-      Math.abs(low - prevClose)
-    );
-    trs.push(tr);
-
-    const upMove = high - prevHigh;
-    const downMove = prevLow - low;
-
-    if (upMove > downMove && upMove > 0) {
-      plusDM.push(upMove);
-    } else {
-      plusDM.push(0);
-    }
-
-    if (downMove > upMove && downMove > 0) {
-      minusDM.push(downMove);
-    } else {
-      minusDM.push(0);
-    }
-  }
-
-  const atr = calculateATR(candles, period);
-  if (atr === 0) return 0;
-
-  const plusDI = (plusDM.reduce((a, b) => a + b, 0) / trs.length) / atr * 100;
-  const minusDI = (minusDM.reduce((a, b) => a + b, 0) / trs.length) / atr * 100;
-  const dx = Math.abs(plusDI - minusDI) / (plusDI + minusDI + 0.0001) * 100;
-
-  return dx;
-}
-
-// ==========================================
-// ✅ حساب Volume Delta
-// ==========================================
-
-function calculateVolumeDelta(candles) {
-  if (candles.length < 10) return 0;
-
-  let buyVolume = 0;
-  let sellVolume = 0;
-
-  for (const candle of candles) {
-    const body = Math.abs(candle.close - candle.open);
-    const range = candle.high - candle.low;
-    if (range === 0) continue;
-
-    const buyRatio = (candle.close - candle.low) / range;
-    const sellRatio = (candle.high - candle.close) / range;
-
-    buyVolume += candle.volume * buyRatio;
-    sellVolume += candle.volume * sellRatio;
-  }
-
-  const total = buyVolume + sellVolume;
-  if (total === 0) return 0;
-
-  return ((buyVolume - sellVolume) / total) * 100;
-}
-
-// ==========================================
-// ✅ HYPE MOMENTUM ENGINE - تحليل الزخم السريع
-// ==========================================
-
-function analyzeMomentumSignal(candles) {
-  if (!candles || candles.length < 20) {
+function analyzeMarket(data) {
+  if (!data || data.length < 20) {
     return null;
   }
 
-  const current = candles[candles.length - 1];
-  const previous = candles[candles.length - 2];
+  const prices = data.map(c => Number(c.close));
+  const volumes = data.map(c => Number(c.volume));
 
-  const currentPrice = current.close;
-  const currentVol = current.volume;
+  const currentPrice = prices[prices.length - 1];
+  const prevPrice = prices[prices.length - 2];
+
+  const currentVol = volumes[volumes.length - 1];
 
   const avgVolume =
-    candles
-    .slice(-11, -1)
-    .reduce((s, c) => s + c.volume, 0) / 10;
+    volumes.slice(-11, -1)
+    .reduce((a, b) => a + b, 0) / 10;
 
   const priceChange =
-    ((current.close - previous.close) / previous.close) * 100;
+    ((currentPrice - prevPrice) / prevPrice) * 100;
 
-  // حساب المؤشرات الإضافية للتصفية
-  const closes = candles.map(c => c.close);
-  const adx = calculateADX(candles, 14);
-  const volumeDelta = calculateVolumeDelta(candles.slice(-20));
-
+  // فحص الفيكاوت (حجم منخفض مع ارتفاع)
   const isFakeout =
     priceChange > 0 &&
     currentVol < avgVolume;
 
+  // ✅ شرط الهيب (شراء)
   const isHype =
-    currentVol > (avgVolume * HYPE_VOLUME_MULTIPLIER) &&
-    priceChange > 0.25;
+    currentVol > (avgVolume * 2) &&
+    priceChange > 0;
 
+  // ✅ شرط الدمب (بيع)
   const isDump =
-    currentVol > (avgVolume * DUMP_VOLUME_MULTIPLIER) &&
-    priceChange < -0.25;
+    currentVol > (avgVolume * 1.5) &&
+    priceChange < -1.5;
 
-  // منع الفيكاوت
-  if (isFakeout) {
-    console.log(`   🚫 فليتر: فايكاوت (حجم منخفض مع ارتفاع)`);
-    return null;
-  }
+  // حساب RSI للتحليل فقط
+  const rsi = calculateRSI(prices, 14);
 
-  // ✅ شرط الهيب المحسن - مع تصفية إضافية
-  if (isHype && volumeDelta > 20 && adx > 20) {
-    console.log(`   🔥 HYPE BUY | ΔVol=${(currentVol/avgVolume).toFixed(1)}x | ΔPrice=${priceChange.toFixed(2)}% | Delta=${volumeDelta.toFixed(1)} | ADX=${adx.toFixed(1)}`);
-    return {
-      signal: 'BUY',
-      strength: 'STRONG'
-    };
-  }
+  console.log(`   📊 السعر: ${currentPrice.toFixed(4)} | التغير: ${priceChange.toFixed(2)}% | الحجم: ${(currentVol/avgVolume).toFixed(1)}x | RSI: ${rsi.toFixed(1)}`);
 
-  // ✅ شرط الدمب المحسن - مع تصفية إضافية
-  if (isDump && volumeDelta < -20 && adx > 20) {
-    console.log(`   🔥 DUMP SELL | ΔVol=${(currentVol/avgVolume).toFixed(1)}x | ΔPrice=${priceChange.toFixed(2)}% | Delta=${volumeDelta.toFixed(1)} | ADX=${adx.toFixed(1)}`);
-    return {
-      signal: 'SELL',
-      strength: 'STRONG'
-    };
-  }
-
-  return null;
+  return {
+    currentPrice,
+    currentVol,
+    avgVolume,
+    priceChange,
+    isFakeout,
+    isHype,
+    isDump,
+    rsi
+  };
 }
 
 // ==========================================
@@ -519,7 +352,7 @@ function adjustQuantity(quantity, contractInfo) {
 }
 
 // ==========================================
-// ✅ فلترة السيولة - محسنة
+// ✅ فلترة السيولة
 // ==========================================
 
 function strongMarket(candles) {
@@ -536,8 +369,6 @@ function strongMarket(candles) {
 
   const dollarVolume = last.close * avgVolume;
 
-  console.log(`   📊 Vol=${avgVolume.toFixed(2)} | DollarVol=$${dollarVolume.toFixed(2)} | تذبذب=${(volatility * 100).toFixed(3)}%`);
-
   return (
     dollarVolume > 500 &&
     volatility > 0.00001
@@ -545,18 +376,18 @@ function strongMarket(candles) {
 }
 
 // ==========================================
-// ✅ جلب شموع بأطر زمنية مختلفة
+// ✅ جلب بيانات الشمعة (15m مثل الكود الأصلي)
 // ==========================================
 
-async function getCandlesWithInterval(symbol, interval, limit = 60) {
+async function getCandles(symbol) {
   try {
     const response = await bingxRequest('GET', ENDPOINTS.FUTURES_CANDLE, {
       symbol,
-      interval: interval,
-      limit: limit
+      interval: '15m',
+      limit: 100
     }, false);
 
-    if (!response || response.code !== 0) return null;
+    if (!response || response.code === 100400) return null;
 
     const raw = response?.data;
     let data = null;
@@ -585,234 +416,38 @@ async function getCandlesWithInterval(symbol, interval, limit = 60) {
 }
 
 // ==========================================
-// ✅ التحقق من توافق الأطر الزمنية
+// ✅ حساب كمية العقد
 // ==========================================
 
-async function checkMultiTimeframe(symbol) {
-  const intervals = ['1m', '3m', '5m'];
-  const signals = [];
-
-  for (const interval of intervals) {
-    const candles = await getCandlesWithInterval(symbol, interval, 50);
-    if (!candles || candles.length < 50) return null;
-
-    const closes = candles.map(c => c.close);
-    const ema20 = calculateEMA(closes, 20);
-    const ema50 = calculateEMA(closes, 50);
-    const rsi = calculateRSI(closes, 14);
-    const macd = calculateMACD(closes);
-
-    let signal = null;
-    if (ema20 > ema50 && rsi < 40 && macd.histogram > 0) signal = 'BUY';
-    else if (ema20 < ema50 && rsi > 60 && macd.histogram < 0) signal = 'SELL';
-
-    signals.push({ interval, signal });
-  }
-
-  const buySignals = signals.filter(s => s.signal === 'BUY');
-  const sellSignals = signals.filter(s => s.signal === 'SELL');
-
-  if (buySignals.length >= 2) return 'BUY';
-  if (sellSignals.length >= 2) return 'SELL';
-  return null;
+function calculateQuantity(price) {
+  return Number((TRADE_AMOUNT * LEVERAGE / price).toFixed(6));
 }
 
 // ==========================================
-// ✅ كشف Market Regime
+// ✅ تعيين الرافعة
 // ==========================================
 
-function detectMarketRegime(candles) {
-  if (candles.length < 50) return 'NEUTRAL';
-  
-  const closes = candles.map(c => c.close);
-  const adx = calculateADX(candles, 14);
-  const rsi = calculateRSI(closes, 14);
-  
-  const avgRange = candles.slice(-20).reduce((sum, c) => sum + (c.high - c.low), 0) / 20;
-  const avgClose = candles.slice(-20).reduce((sum, c) => sum + c.close, 0) / 20;
-  const volatility = avgRange / avgClose;
-  
-  if (adx > 25 && volatility > 0.005) {
-    if (rsi > 50) return 'BULL_TREND';
-    return 'BEAR_TREND';
+async function setLeverage(symbol, side) {
+  try {
+    const response = await bingxRequest(
+      'POST',
+      ENDPOINTS.FUTURES_LEVERAGE,
+      {
+        symbol,
+        leverage: LEVERAGE,
+        side: side
+      }
+    );
+
+    if (response?.code === 0) {
+      console.log(`   ✅ تم تثبيت الرافعة x${LEVERAGE} على ${symbol} (${side})`);
+      return true;
+    }
+    return false;
+  } catch (e) {
+    console.log("   ❌ leverage error", e.message);
+    return false;
   }
-  
-  if (adx < 20 && volatility < 0.003) return 'RANGE';
-  if (volatility > 0.01) return 'VOLATILE';
-  
-  return 'NEUTRAL';
-}
-
-// ==========================================
-// ✅ نظام النقاط المحسن - مع Confidence
-// ==========================================
-
-async function checkSignal(candles, symbol, btcTrend) {
-  if (!candles || candles.length < 50) return null;
-
-  const current = candles[candles.length - 1];
-  const closes = candles.map(c => c.close);
-
-  // ✅ المؤشرات الفنية
-  const ema20 = calculateEMA(closes, 20);
-  const ema50 = calculateEMA(closes, 50);
-  const ema100 = calculateEMA(closes, 100);
-  const rsi = calculateRSI(closes, 14);
-  const macd = calculateMACD(closes);
-  const atr = calculateATR(candles, 14);
-  const vwap = calculateVWAP(candles);
-  const adx = calculateADX(candles, 14);
-  const volumeDelta = calculateVolumeDelta(candles.slice(-20));
-  const marketRegime = detectMarketRegime(candles);
-  
-  // ✅ متوسط الحجم والجسم
-  const avgVolume = candles.slice(-11, -1)
-    .reduce((s, c) => s + c.volume, 0) / 10;
-  const avgBody = candles.slice(-11, -1)
-    .reduce((s, c) => s + Math.abs(c.close - c.open), 0) / 10;
-
-  const currentBody = Math.abs(current.close - current.open);
-  const bodyRatio = currentBody / (avgBody || 0.000001);
-  const volumeRatio = current.volume / (avgVolume || 0.000001);
-
-  // ✅ Order Flow - السرعة
-  const prevClose = candles[candles.length - 2].close;
-  const velocity = ((current.close - prevClose) / prevClose) * 100;
-
-  // ✅ كشف الاختراق - استبعاد الشمعة الحالية
-  const last20High = Math.max(...candles.slice(-21, -1).map(c => c.high));
-  const last20Low = Math.min(...candles.slice(-21, -1).map(c => c.low));
-  const breakoutHigh = current.close > last20High;
-  const breakoutLow = current.close < last20Low;
-
-  // ✅ SMC - Break of Structure
-  const prevHigh = candles[candles.length - 2].high;
-  const prevLow = candles[candles.length - 2].low;
-  const bosHigh = current.high > prevHigh && current.close < prevHigh;
-  const bosLow = current.low < prevLow && current.close > prevLow;
-
-  // ✅ كشف الحيتان
-  const whaleCandle = volumeRatio > 5 && bodyRatio > 2 && current.close > current.open;
-  const whaleCandleSell = volumeRatio > 5 && bodyRatio > 2 && current.close < current.open;
-
-  // ✅ Multi Timeframe
-  const mtfSignal = await checkMultiTimeframe(symbol);
-
-  let buyScore = 0;
-  let sellScore = 0;
-
-  // ======== 1. TREND SCORE (80 نقطة) ========
-  if (ema20 > ema50) buyScore += 20;
-  if (ema20 < ema50) sellScore += 20;
-  
-  if (ema50 > ema100) buyScore += 10;
-  if (ema50 < ema100) sellScore += 10;
-  
-  if (adx > 25 && ema20 > ema50) buyScore += 25;
-  if (adx > 25 && ema20 < ema50) sellScore += 25;
-
-  // ======== 2. MOMENTUM SCORE (80 نقطة) ========
-  if (macd.histogram > 0 && macd.macd > macd.signal) buyScore += 20;
-  if (macd.histogram < 0 && macd.macd < macd.signal) sellScore += 20;
-  
-  if (rsi < 30) buyScore += 15;
-  if (rsi > 70) sellScore += 15;
-  
-  if (rsi > 55) buyScore += 15;
-  if (rsi < 45) sellScore += 15;
-  
-  if (velocity > 0.15 && volumeRatio > 2) buyScore += 10;
-  if (velocity < -0.15 && volumeRatio > 2) sellScore += 10;
-
-  // ======== 3. VOLUME SCORE (80 نقطة) ========
-  if (volumeRatio > 2) {
-    buyScore += 15;
-    sellScore += 15;
-  }
-  
-  if (volumeDelta > 30) buyScore += 25;
-  if (volumeDelta < -30) sellScore += 25;
-  
-  if (whaleCandle) buyScore += 20;
-  if (whaleCandleSell) sellScore += 20;
-  
-  if (current.close > vwap) buyScore += 10;
-  if (current.close < vwap) sellScore += 10;
-
-  // ======== 4. MARKET STRUCTURE (60 نقطة) ========
-  if (breakoutHigh) buyScore += 15;
-  if (breakoutLow) sellScore += 15;
-  
-  if (bosHigh) sellScore += 15;
-  if (bosLow) buyScore += 15;
-  
-  if (mtfSignal === 'BUY') buyScore += 20;
-  if (mtfSignal === 'SELL') sellScore += 20;
-  
-  if (btcTrend === 'UP' && buyScore > 0) buyScore += 10;
-  if (btcTrend === 'DOWN' && sellScore > 0) sellScore += 10;
-
-  // ✅ حساب Confidence
-  const maxScore = Math.max(buyScore, sellScore);
-  const minScore = Math.min(buyScore, sellScore);
-  const difference = Math.abs(buyScore - sellScore);
-  const confidence = maxScore > 0 ? (difference / maxScore) * 100 : 0;
-
-  console.log(`   📊 ${symbol} BUY=${buyScore} SELL=${sellScore} | Diff=${difference} | Confidence=${confidence.toFixed(1)}% | RSI=${rsi.toFixed(1)} | Delta=${volumeDelta.toFixed(1)}`);
-
-  // ✅ ======== وضع القنص (مخفف) ========
-  if (
-    volumeDelta > 30 &&
-    volumeRatio > 1.5 &&
-    rsi < 35
-  ) {
-    console.log(`   🎯 وضع القنص BUY (Delta=${volumeDelta.toFixed(1)}, Vol=${volumeRatio.toFixed(1)}x, RSI=${rsi.toFixed(1)})`);
-    return { signal: "BUY", atr: atr, entryPrice: current.close, isSnipe: true, confidence: confidence };
-  }
-
-  if (
-    volumeDelta < -30 &&
-    volumeRatio > 1.5 &&
-    rsi > 65
-  ) {
-    console.log(`   🎯 وضع القنص SELL (Delta=${volumeDelta.toFixed(1)}, Vol=${volumeRatio.toFixed(1)}x, RSI=${rsi.toFixed(1)})`);
-    return { signal: "SELL", atr: atr, entryPrice: current.close, isSnipe: true, confidence: confidence };
-  }
-
-  // ✅ ======== HYPE MOMENTUM ENGINE ========
-  const momentumSignal = analyzeMomentumSignal(candles);
-  if (momentumSignal) {
-    console.log(`   🔥 Momentum ${momentumSignal.signal} (HYPE/DUMP)`);
-    return {
-      signal: momentumSignal.signal,
-      atr: atr,
-      entryPrice: current.close,
-      isSnipe: true,
-      confidence: 85 // ثقة عالية للزخم
-    };
-  }
-
-  // ✅ ======== نظام الفروقات ========
-  // شراء: buyScore >= 100 والفرق >= 40
-  if (
-    buyScore >= 100 &&
-    (buyScore - sellScore) >= 40
-  ) {
-    console.log(`   ✅ إشارة BUY (${buyScore}/${sellScore}) | Confidence: ${confidence.toFixed(1)}%`);
-    return { signal: "BUY", atr: atr, entryPrice: current.close, isSnipe: false, confidence: confidence };
-  }
-
-  // بيع: sellScore >= 100 والفرق >= 40
-  if (
-    sellScore >= 100 &&
-    (sellScore - buyScore) >= 40
-  ) {
-    console.log(`   ✅ إشارة SELL (${buyScore}/${sellScore}) | Confidence: ${confidence.toFixed(1)}%`);
-    return { signal: "SELL", atr: atr, entryPrice: current.close, isSnipe: false, confidence: confidence };
-  }
-
-  console.log(`   ❌ لا إشارة (BUY=${buyScore}, SELL=${sellScore}, Diff=${difference}, Need 100+40)`);
-  return null;
 }
 
 // ==========================================
@@ -838,97 +473,12 @@ async function hasGoodSpread(symbol) {
 }
 
 // ==========================================
-// ✅ جلب بيانات الشمعة
+// ✅ تنفيذ أمر (شراء أو بيع)
 // ==========================================
 
-async function getCandles(symbol) {
+async function placeOrder(symbol, signal, stats) {
   try {
-    const response = await bingxRequest('GET', ENDPOINTS.FUTURES_CANDLE, {
-      symbol,
-      interval: CANDLE_INTERVAL,
-      limit: CANDLE_LIMIT
-    }, false);
-
-    if (!response || response.code === 100400) return null;
-
-    const raw = response?.data;
-    let data = null;
-
-    if (Array.isArray(raw)) {
-      data = raw;
-    } else if (Array.isArray(raw?.data)) {
-      data = raw.data;
-    } else if (Array.isArray(response?.data?.data)) {
-      data = response.data.data;
-    }
-
-    if (!data || !Array.isArray(data) || data.length < 50) return null;
-
-    return data.map(candle => ({
-      open: Number(candle.open),
-      high: Number(candle.high),
-      low: Number(candle.low),
-      close: Number(candle.close),
-      volume: Number(candle.volume),
-      time: Number(candle.time)
-    })).filter(c => !isNaN(c.open) && !isNaN(c.high) && !isNaN(c.low) && !isNaN(c.close) && c.high > 0 && c.low > 0);
-  } catch (error) {
-    return null;
-  }
-}
-
-// ==========================================
-// ✅ حساب كمية العقد
-// ==========================================
-
-function calculateQuantity(price) {
-  return Number((TRADE_AMOUNT * LEVERAGE / price).toFixed(6));
-}
-
-// ==========================================
-// ✅ تعيين الرافعة
-// ==========================================
-
-async function setLeverage(symbol) {
-  try {
-    const longResponse = await bingxRequest(
-      'POST',
-      ENDPOINTS.FUTURES_LEVERAGE,
-      {
-        symbol,
-        leverage: LEVERAGE,
-        side: 'LONG'
-      }
-    );
-
-    const shortResponse = await bingxRequest(
-      'POST',
-      ENDPOINTS.FUTURES_LEVERAGE,
-      {
-        symbol,
-        leverage: LEVERAGE,
-        side: 'SHORT'
-      }
-    );
-
-    if (longResponse?.code === 0 && shortResponse?.code === 0) {
-      console.log(`   ✅ تم تثبيت الرافعة x${LEVERAGE} على ${symbol}`);
-      return true;
-    }
-    return false;
-  } catch (e) {
-    console.log("   ❌ leverage error", e.message);
-    return false;
-  }
-}
-
-// ==========================================
-// ✅ تنفيذ الأمر
-// ==========================================
-
-async function placeOrder(symbol, signalData, balance) {
-  try {
-    const price = await getPrice(symbol);
+    const price = stats.currentPrice;
     if (!price) return null;
 
     const contractInfo = await getContractInfo(symbol);
@@ -939,20 +489,22 @@ async function placeOrder(symbol, signalData, balance) {
     }
     
     console.log(`   📊 الكمية: ${roundedQuantity}`);
-    console.log(`   💰 Balance: ${balance}`);
-    console.log(`   💵 Price: ${price}`);
-    console.log(`   🎯 وضع القنص: ${signalData.isSnipe ? 'نعم' : 'لا'}`);
-    console.log(`   📊 الثقة: ${signalData.confidence?.toFixed(1) || 'N/A'}%`);
+    console.log(`   💵 السعر: ${price}`);
+    console.log(`   📊 التغير: ${stats.priceChange.toFixed(2)}%`);
+    console.log(`   📊 الحجم: ${(stats.currentVol/stats.avgVolume).toFixed(1)}x`);
     
     if (roundedQuantity <= 0) return null;
 
-    const isBuy = signalData.signal === 'BUY';
+    const isBuy = signal === 'BUY';
+    const side = isBuy ? 'BUY' : 'SELL';
+    const positionSide = isBuy ? 'LONG' : 'SHORT';
+    
     const params = {
       symbol: symbol,
-      side: isBuy ? 'BUY' : 'SELL',
+      side: side,
       type: 'MARKET',
       quantity: roundedQuantity,
-      positionSide: isBuy ? 'LONG' : 'SHORT'
+      positionSide: positionSide
     };
 
     const response = await bingxRequest('POST', ENDPOINTS.FUTURES_ORDER, params);
@@ -960,8 +512,9 @@ async function placeOrder(symbol, signalData, balance) {
     if (response && response.code === 0) {
       console.log(`   🎯 TP ثابت: ${FIXED_PROFIT_TARGET} USDT`);
       console.log(`   ⛔ SL ثابت: ${FIXED_STOP_LOSS} USDT`);
+      console.log(`   📊 الحركة المطلوبة: ${(REQUIRED_MOVE * 100).toFixed(3)}%`);
       
-      console.log(`🚀 OPEN ${signalData.signal} ${symbol} (Confidence: ${signalData.confidence?.toFixed(1) || 'N/A'}%)`);
+      console.log(`🚀 OPEN ${signal} ${symbol}`);
       return {
         symbol,
         entryPrice: price,
@@ -969,8 +522,7 @@ async function placeOrder(symbol, signalData, balance) {
         type: isBuy ? 'LONG' : 'SHORT',
         orderId: response.data?.orderId || Date.now(),
         timestamp: Date.now(),
-        isSnipe: signalData.isSnipe || false,
-        confidence: signalData.confidence || 0
+        stats: stats
       };
     }
     console.log(`   ❌ فشل الصفقة:`, response?.msg || response);
@@ -1001,25 +553,6 @@ async function getPrice(symbol) {
 }
 
 // ==========================================
-// ✅ جلب اتجاه BTC
-// ==========================================
-
-async function getBTCTrend() {
-  const candles = await getCandles('BTC-USDT');
-  if (!candles || candles.length < 50) return 'NEUTRAL';
-
-  const closes = candles.map(c => c.close);
-  const ema20 = calculateEMA(closes, 20);
-  const ema50 = calculateEMA(closes, 50);
-  const rsi = calculateRSI(closes, 14);
-  const adx = calculateADX(candles, 14);
-
-  if (ema20 > ema50 * 1.01 && rsi > 50 && adx > 25) return 'UP';
-  if (ema20 < ema50 * 0.99 && rsi < 50 && adx > 25) return 'DOWN';
-  return 'NEUTRAL';
-}
-
-// ==========================================
 // ✅ إغلاق صفقة
 // ==========================================
 
@@ -1028,8 +561,9 @@ async function closePosition(position, result = 'MANUAL') {
     const currentPrice = await getPrice(position.symbol);
     if (!currentPrice) return false;
 
-    const closeSide = position.type === 'LONG' ? 'SELL' : 'BUY';
-    const closePositionSide = position.type === 'LONG' ? 'LONG' : 'SHORT';
+    const isLong = position.type === 'LONG';
+    const closeSide = isLong ? 'SELL' : 'BUY';
+    const closePositionSide = isLong ? 'LONG' : 'SHORT';
 
     const params = {
       symbol: position.symbol,
@@ -1042,8 +576,10 @@ async function closePosition(position, result = 'MANUAL') {
     const response = await bingxRequest('POST', ENDPOINTS.FUTURES_ORDER, params);
 
     if (response && response.code === 0) {
-      const profit = (currentPrice - position.entryPrice) * position.quantity;
-      const finalProfit = position.type === 'SHORT' ? -profit : profit;
+      let profit = (currentPrice - position.entryPrice) * position.quantity;
+      if (position.type === 'SHORT') {
+        profit = (position.entryPrice - currentPrice) * position.quantity;
+      }
       
       saveTrade({
         symbol: position.symbol,
@@ -1051,10 +587,8 @@ async function closePosition(position, result = 'MANUAL') {
         entryPrice: position.entryPrice,
         exitPrice: currentPrice,
         quantity: position.quantity,
-        profit: finalProfit,
-        result: finalProfit > 0 ? 'WIN' : 'LOSS',
-        isSnipe: position.isSnipe || false,
-        confidence: position.confidence || 0,
+        profit: profit,
+        result: profit > 0 ? 'WIN' : 'LOSS',
         timestamp: new Date().toISOString()
       });
 
@@ -1103,7 +637,41 @@ async function getFuturesBalance() {
 }
 
 // ==========================================
-// ✅ الدورة الرئيسية - مع HYPE MOMENTUM
+// ✅ جلب إشارة HYPE أو DUMP (بدون فلاتر)
+// ==========================================
+
+function getMomentumSignal(stats) {
+  if (!stats) return null;
+
+  // فحص الفيكاوت
+  if (stats.isFakeout) {
+    console.log(`   🚫 Fakeout Detected`);
+    return null;
+  }
+
+  // ✅ شراء - HYPE
+  if (stats.isHype) {
+    console.log(`   🚀 HYPE BUY | التغير: ${stats.priceChange.toFixed(2)}% | الحجم: ${(stats.currentVol/stats.avgVolume).toFixed(1)}x`);
+    return {
+      signal: 'BUY',
+      type: 'LONG'
+    };
+  }
+
+  // ✅ بيع - DUMP
+  if (stats.isDump) {
+    console.log(`   📉 DUMP SELL | التغير: ${stats.priceChange.toFixed(2)}% | الحجم: ${(stats.currentVol/stats.avgVolume).toFixed(1)}x`);
+    return {
+      signal: 'SELL',
+      type: 'SHORT'
+    };
+  }
+
+  return null;
+}
+
+// ==========================================
+// ✅ الدورة الرئيسية
 // ==========================================
 
 async function tradingCycle() {
@@ -1123,11 +691,10 @@ async function tradingCycle() {
       }
 
       let profitUSDT = (currentPrice - currentPosition.entryPrice) * currentPosition.quantity;
-      
       if (currentPosition.type === 'SHORT') {
         profitUSDT = (currentPosition.entryPrice - currentPrice) * currentPosition.quantity;
       }
-
+      
       let profitPercent = (profitUSDT / (currentPosition.entryPrice * currentPosition.quantity)) * 100;
       console.log(`⚡ الربح الحالي: ${profitUSDT.toFixed(4)} USDT (${profitPercent.toFixed(2)}%)`);
 
@@ -1155,82 +722,73 @@ async function tradingCycle() {
       return;
     }
 
-    // ✅ كولداون
-    if (Date.now() - lastTradeTime < cooldown) {
-      console.log('⏳ كولداون...');
-      isRunning = false;
-      return;
-    }
-
+    // ✅ بدون كولداون (COOLDOWN = 0)
     if (balance < TRADE_AMOUNT) {
       console.log('⚠️ رصيد غير كافي');
       isRunning = false;
       return;
     }
 
-    // ✅ جلب اتجاه BTC
-    const btcTrend = await getBTCTrend();
-    console.log(`📊 اتجاه BTC: ${btcTrend}`);
-
-    console.log(`🔍 جاري مسح ${SYMBOLS.length} عملة (معالجة متوازية)...`);
+    console.log(`🔍 جاري تحليل HYPE-USDT...`);
     
-    // ✅ معالجة متوازية
-    const results = await Promise.all(
-      SYMBOLS.map(async (symbol) => {
-        try {
-          if (winRateBySymbol[symbol] !== undefined && winRateBySymbol[symbol] < 30) {
-            return { symbol, signalData: null, error: 'نسبة ربح منخفضة' };
-          }
-
-          const candles = await getCandles(symbol);
-          if (!candles || candles.length < 50) {
-            return { symbol, signalData: null, error: 'بيانات غير كافية' };
-          }
-
-          console.log(`\n📊 تحليل ${symbol}:`);
-
-          if (!strongMarket(candles)) {
-            console.log(`   ${symbol} ❌ سيولة منخفضة`);
-            return { symbol, signalData: null, error: 'سيولة منخفضة' };
-          }
-
-          const signalData = await checkSignal(candles, symbol, btcTrend);
-          
-          if (!signalData) {
-            return { symbol, signalData: null, error: 'لا توجد إشارة' };
-          }
-
-          return { symbol, signalData, candles };
-        } catch (error) {
-          console.error(`❌ خطأ في تحليل ${symbol}:`, error.message);
-          return { symbol, signalData: null, error: error.message };
+    // ✅ تحليل العملة الواحدة HYPE-USDT
+    for (const symbol of SYMBOLS) {
+      try {
+        const candles = await getCandles(symbol);
+        if (!candles || candles.length < 20) {
+          console.log(`   ${symbol} ❌ بيانات غير كافية`);
+          continue;
         }
-      })
-    );
 
-    // ✅ معالجة النتائج
-    for (const result of results) {
-      if (!result.signalData) continue;
+        console.log(`\n📊 تحليل ${symbol}:`);
 
-      const { symbol, signalData } = result;
-      
-      console.log(`🚀 إشارة ${signalData.signal}: ${symbol}${signalData.isSnipe ? ' (وضع القنص)' : ''} (ثقة: ${signalData.confidence?.toFixed(1) || 'N/A'}%)`);
+        // فحص السيولة
+        if (!strongMarket(candles)) {
+          console.log(`   ${symbol} ❌ سيولة منخفضة`);
+          continue;
+        }
 
-      if (!(await hasGoodSpread(symbol))) {
-        console.log(`   ${symbol} سبريد مرتفع ❌`);
-        continue;
-      }
+        // تحليل السوق
+        const stats = analyzeMarket(candles);
+        if (!stats) {
+          console.log(`   ${symbol} ❌ لا يمكن تحليل السوق`);
+          continue;
+        }
 
-      await setLeverage(symbol);
+        // جلب الإشارة (HYPE أو DUMP)
+        const result = getMomentumSignal(stats);
+        if (!result) {
+          console.log(`   ${symbol} ❌ لا توجد إشارة HYPE أو DUMP`);
+          continue;
+        }
 
-      const position = await placeOrder(symbol, signalData, balance);
-      if (position) {
-        currentPosition = position;
-        lastTradeTime = Date.now();
-        console.log(`✅ تم الدخول: ${symbol} (${signalData.signal})`);
-        console.log(`🎯 جني الربح الثابت: ${FIXED_PROFIT_TARGET} USDT`);
-        console.log(`⛔ وقف الخسارة الثابت: ${FIXED_STOP_LOSS} USDT`);
-        break;
+        const { signal, type } = result;
+        console.log(`🚀 إشارة ${signal} (${type}): ${symbol}`);
+
+        // فحص السبريد
+        if (!(await hasGoodSpread(symbol))) {
+          console.log(`   ${symbol} سبريد مرتفع ❌`);
+          continue;
+        }
+
+        // تعيين الرافعة حسب نوع الصفقة
+        const leverageSide = type === 'LONG' ? 'LONG' : 'SHORT';
+        await setLeverage(symbol, leverageSide);
+
+        // تنفيذ الصفقة
+        const position = await placeOrder(symbol, signal, stats);
+        if (position) {
+          currentPosition = position;
+          lastTradeTime = Date.now();
+          console.log(`✅ تم الدخول ${type}: ${symbol}`);
+          console.log(`🎯 جني الربح الثابت: ${FIXED_PROFIT_TARGET} USDT`);
+          console.log(`⛔ وقف الخسارة الثابت: ${FIXED_STOP_LOSS} USDT`);
+          console.log(`📊 الحركة المطلوبة للربح: ${(REQUIRED_MOVE * 100).toFixed(3)}%`);
+          break;
+        }
+
+      } catch (error) {
+        console.error(`❌ خطأ في تحليل ${symbol}:`, error.message);
       }
     }
 
@@ -1258,15 +816,15 @@ app.get('/dashboard', (req, res) => {
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>لوحة تحكم البوت - HYPE MOMENTUM</title>
+      <title>HYPE MOMENTUM</title>
       <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Arial', sans-serif; background: #0a0e17; color: #fff; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
-        .container { background: #141b2b; border-radius: 20px; padding: 40px; max-width: 750px; width: 100%; box-shadow: 0 10px 30px rgba(0, 170, 85, 0.2); border: 1px solid #00aa55; }
-        h1 { text-align: center; color: #00aa55; font-size: 28px; margin-bottom: 5px; }
+        .container { background: #141b2b; border-radius: 20px; padding: 40px; max-width: 750px; width: 100%; box-shadow: 0 10px 30px rgba(255, 140, 0, 0.2); border: 1px solid #ff8c00; }
+        h1 { text-align: center; color: #ff8c00; font-size: 28px; margin-bottom: 5px; }
         .subtitle { text-align: center; color: #8899bb; margin-bottom: 25px; font-size: 14px; }
         .status-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
-        .card { background: #1a2335; border-radius: 14px; padding: 16px 18px; border-left: 4px solid #00aa55; transition: 0.3s; }
+        .card { background: #1a2335; border-radius: 14px; padding: 16px 18px; border-left: 4px solid #ff8c00; transition: 0.3s; }
         .card:hover { background: #1f2a40; }
         .card .label { font-size: 11px; color: #8899bb; text-transform: uppercase; letter-spacing: 0.5px; }
         .card .value { font-size: 18px; font-weight: bold; margin-top: 4px; color: #fff; }
@@ -1274,19 +832,17 @@ app.get('/dashboard', (req, res) => {
         .card .value.gold { color: #f0b90b; }
         .card .value.blue { color: #4a9eff; }
         .card .value.red { color: #ff4444; }
-        .card .value.purple { color: #a855f7; }
         .card .value.orange { color: #ff8c00; }
-        .status-badge { display: inline-block; padding: 4px 12px; border-radius: 30px; font-size: 13px; font-weight: bold; background: #00aa55; color: #fff; }
+        .status-badge { display: inline-block; padding: 4px 12px; border-radius: 30px; font-size: 13px; font-weight: bold; background: #ff8c00; color: #fff; }
         .footer { text-align: center; margin-top: 25px; font-size: 12px; color: #556688; border-top: 1px solid #1a2335; padding-top: 18px; }
-        .refresh-btn { display: block; margin: 18px auto 0; padding: 10px 30px; background: #00aa55; border: none; border-radius: 30px; color: #fff; font-weight: bold; cursor: pointer; transition: 0.3s; }
-        .refresh-btn:hover { background: #008844; transform: scale(1.02); }
+        .refresh-btn { display: block; margin: 18px auto 0; padding: 10px 30px; background: #ff8c00; border: none; border-radius: 30px; color: #fff; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        .refresh-btn:hover { background: #e67a00; transform: scale(1.02); }
         .settings-box { background: #1a2335; border-radius: 14px; padding: 14px 18px; margin-top: 16px; border: 1px solid #2a3a55; }
         .settings-box .label { font-size: 11px; color: #8899bb; text-transform: uppercase; }
         .settings-box .value { font-size: 15px; font-weight: bold; color: #aabbdd; margin-top: 4px; }
         .settings-box .value .highlight-green { color: #00aa55; }
         .settings-box .value .highlight-gold { color: #f0b90b; }
         .settings-box .value .highlight-red { color: #ff4444; }
-        .settings-box .value .highlight-purple { color: #a855f7; }
         .settings-box .value .highlight-orange { color: #ff8c00; }
         .trade-info { background: #1a2335; border-radius: 14px; padding: 16px 18px; margin-top: 12px; border: 1px solid #2a3a55; text-align: center; }
         .trade-info .label { font-size: 11px; color: #8899bb; text-transform: uppercase; }
@@ -1298,8 +854,8 @@ app.get('/dashboard', (req, res) => {
     </head>
     <body>
       <div class="container">
-        <h1>⚡ HYPE MOMENTUM ENGINE</h1>
-        <p class="subtitle">🔥 زخم سريع | TP: ${FIXED_PROFIT_TARGET} | SL: ${FIXED_STOP_LOSS}</p>
+        <h1>🔥 HYPE MOMENTUM</h1>
+        <p class="subtitle">⚡ TP: ${FIXED_PROFIT_TARGET} | SL: ${FIXED_STOP_LOSS}</p>
         <div class="status-grid" id="statusGrid">
           <div class="card"><div class="label">📊 الحالة</div><div class="value"><span class="status-badge" id="statusBadge">🟢 يعمل</span></div></div>
           <div class="card"><div class="label">💰 الرصيد</div><div class="value green" id="balance">0.00 USDT</div></div>
@@ -1308,8 +864,8 @@ app.get('/dashboard', (req, res) => {
         </div>
         <div class="trade-info" id="tradeInfo"><div class="label">💰 الربح / الخسارة</div><div class="value" id="profitDisplay">0.0000 USDT (0.00%)</div></div>
         <div class="settings-box">
-          <div class="label">⚙️ إعدادات HYPE MOMENTUM</div>
-          <div class="value">💰 <span class="highlight-green">${TRADE_AMOUNT} USDT</span> | ⚡ <span class="highlight-gold">${LEVERAGE}x</span> | 🎯 <span class="highlight-gold">${FIXED_PROFIT_TARGET} ثابت</span> | ⛔ <span class="highlight-red">${FIXED_STOP_LOSS} ثابت</span> | 📊 <span class="highlight-purple">HYPE: ${HYPE_VOLUME_MULTIPLIER}x</span> | 📊 <span class="highlight-orange">DUMP: ${DUMP_VOLUME_MULTIPLIER}x</span></div>
+          <div class="label">⚙️ إعدادات</div>
+          <div class="value">💰 <span class="highlight-green">${TRADE_AMOUNT} USDT</span> | ⚡ <span class="highlight-gold">${LEVERAGE}x</span> | 🎯 <span class="highlight-gold">${FIXED_PROFIT_TARGET} ثابت</span> | ⛔ <span class="highlight-red">${FIXED_STOP_LOSS} ثابت</span> | 🔄 <span class="highlight-orange">مسح: 3s</span></div>
         </div>
         <button class="refresh-btn" onclick="fetchStatus()">🔄 تحديث</button>
         <div class="footer" id="lastUpdate">🕐 آخر تحديث: --</div>
@@ -1368,28 +924,24 @@ app.get('/', async (req, res) => {
     }
     
     res.json({
-      status: '⚡ HYPE MOMENTUM ENGINE',
+      status: '🔥 HYPE MOMENTUM',
       timestamp: new Date().toISOString(),
       balance: `${usdtBalance.toFixed(4)} USDT`,
       leverage: `${LEVERAGE}x`,
       tradeAmount: `${TRADE_AMOUNT} USDT`,
-      currentPosition: currentPosition ? `${currentPosition.symbol} (${currentPosition.type})${currentPosition.isSnipe ? ' [قنص]' : ''} (ثقة: ${currentPosition.confidence?.toFixed(1) || 'N/A'}%)` : 'لا توجد صفقة',
+      currentPosition: currentPosition ? `${currentPosition.symbol} (${currentPosition.type})` : 'لا توجد صفقة',
       profit: profit,
       profitPercent: profitPercent,
       tradesCount: tradesHistory.length,
+      symbol: 'HYPE-USDT',
       settings: {
         tradeAmount: `${TRADE_AMOUNT} USDT`,
         profitTarget: `${FIXED_PROFIT_TARGET} ثابت`,
         stopLoss: `${FIXED_STOP_LOSS} ثابت`,
         leverage: `${LEVERAGE}x`,
-        hypeMultiplier: `${HYPE_VOLUME_MULTIPLIER}x`,
-        dumpMultiplier: `${DUMP_VOLUME_MULTIPLIER}x`,
-        scoreThreshold: '100 + فرق 40',
-        snipeMode: 'مفعل',
-        momentumMode: 'مفعل (HYPE/DUMP)',
-        confidence: 'مفعل',
-        parallelProcessing: 'مفعل',
-        symbols: SYMBOLS
+        scanInterval: `${SCAN_INTERVAL}ms (3 ثواني)`,
+        cooldown: `${COOLDOWN}ms`,
+        requiredMove: `${(REQUIRED_MOVE * 100).toFixed(3)}%`
       }
     });
   } catch (error) {
@@ -1405,25 +957,21 @@ async function startBot() {
   try {
     loadTradesHistory();
 
-    console.log('⚡⚡ بدء تشغيل HYPE MOMENTUM ENGINE');
+    console.log('🔥🔥 بدء تشغيل HYPE MOMENTUM');
     console.log('📊 ===== إعدادات متقدمة =====');
     console.log(`💰 مبلغ التداول: ${TRADE_AMOUNT} USDT`);
     console.log(`⚡ الرافعة: ${LEVERAGE}x`);
     console.log(`🎯 الهدف الثابت: ${FIXED_PROFIT_TARGET} USDT`);
     console.log(`⛔ وقف الخسارة الثابت: ${FIXED_STOP_LOSS} USDT`);
-    console.log(`🔥 HYPE مضاعف: ${HYPE_VOLUME_MULTIPLIER}x`);
-    console.log(`📉 DUMP مضاعف: ${DUMP_VOLUME_MULTIPLIER}x`);
-    console.log(`📊 نظام الدخول: عتبة 100 + فرق 40 + HYPE MOMENTUM`);
-    console.log(`📊 Confidence: مفعل`);
-    console.log(`🎯 وضع القنص: مفعل`);
-    console.log(`⚡ معالجة متوازية: مفعل`);
-    console.log(`📊 العملات: ${SYMBOLS.length} عملة`);
-    console.log(`🔄 سرعة المسح: ${SCAN_INTERVAL/1000} ثانية`);
+    console.log(`📊 الحركة المطلوبة للربح: ${(REQUIRED_MOVE * 100).toFixed(3)}%`);
+    console.log(`🔄 سرعة المسح: ${SCAN_INTERVAL}ms (3 ثواني)`);
+    console.log(`⏳ كولداون: ${COOLDOWN}ms (بدون كولداون)`);
+    console.log(`📊 العملة: HYPE-USDT فقط`);
+    console.log(`📊 نوع التداول: شراء (HYPE) وبيع (DUMP)`);
+    console.log(`📊 الفاصل الزمني: 15m`);
     console.log('================================');
 
-    for (const symbol of SYMBOLS) {
-      await getContractInfo(symbol);
-    }
+    await getContractInfo('HYPE-USDT');
 
     const balance = await getFuturesBalance();
     console.log(`💰 رصيد USDT: ${balance.toFixed(4)}`);
@@ -1438,7 +986,7 @@ async function startBot() {
       }
     }, SCAN_INTERVAL);
 
-    console.log(`✅ البوت يعمل! مسح كل ${SCAN_INTERVAL/1000} ثانية`);
+    console.log(`✅ البوت يعمل! مسح كل ${SCAN_INTERVAL}ms`);
 
   } catch (error) {
     console.error(`❌ فشل بدء البوت: ${error.message}`);
@@ -1453,17 +1001,17 @@ async function startBot() {
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`
   ╔═══════════════════════════════════════════════════════════════╗
-  ║   🔥 HYPE MOMENTUM ENGINE - سكالبينج سريع                  ║
+  ║   🔥 HYPE MOMENTUM                                          ║
   ║   📡 http://localhost:${PORT}                                  ║
   ║   📊 لوحة التحكم: http://localhost:${PORT}/dashboard          ║
   ║   🚀 رافعة: ${LEVERAGE}x | 💰 ${TRADE_AMOUNT} USDT            ║
   ║   🎯 TP: ${FIXED_PROFIT_TARGET} ثابت | ⛔ SL: ${FIXED_STOP_LOSS} ثابت ║
-  ║   🔥 HYPE: ${HYPE_VOLUME_MULTIPLIER}x | 📉 DUMP: ${DUMP_VOLUME_MULTIPLIER}x ║
-  ║   📊 عتبة: 100 + فرق 40 | HYPE MOMENTUM: مفعل              ║
-  ║   🎯 القنص: Delta>30 + Vol>1.5 + RSI Extreme                ║
-  ║   ⚡ معالجة متوازية: مفعل                                    ║
-  ║   📊 العملات: ${SYMBOLS.length} عملة                          ║
-  ║   🔄 مسح: ${SCAN_INTERVAL/1000} ثانية                         ║
+  ║   📊 الحركة المطلوبة: ${(REQUIRED_MOVE * 100).toFixed(3)}%                    ║
+  ║   🔄 سرعة المسح: ${SCAN_INTERVAL}ms (3 ثواني)                 ║
+  ║   🚫 كولداون: ${COOLDOWN}ms                                   ║
+  ║   📊 العملة: HYPE-USDT فقط                                    ║
+  ║   📊 التداول: شراء (HYPE) + بيع (DUMP)                      ║
+  ║   📊 الفاصل: 15m                                             ║
   ║   ⚠️ تداول حقيقي - استخدم بحذر!                              ║
   ╚═══════════════════════════════════════════════════════════════╝
   `);
