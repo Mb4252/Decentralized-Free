@@ -23,10 +23,10 @@ if (!process.env.BINGX_API_KEY || !process.env.BINGX_API_SECRET) {
 const API_KEY = process.env.BINGX_API_KEY;
 const API_SECRET = process.env.BINGX_API_SECRET;
 
-const TRADE_AMOUNT = 5;
+const TRADE_AMOUNT = 2.6;
 const USE_FULL_BALANCE = false;
 const MAX_RISK_PER_TRADE = 0.01;
-const LEVERAGE = 10;
+const LEVERAGE = 15;
 
 // ✅ أهداف ثابتة
 const PROFIT_USDT_TARGET = 0.12;
