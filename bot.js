@@ -32,8 +32,8 @@ const MAX_RISK_PER_TRADE = 0.01;
 const LEVERAGE = 20;
 
 // ✅ أهداف سكالبينج سريعة
-const PROFIT_USDT_TARGET = 0.12;
-const MIN_PROFIT_USDT = 0.12;
+const PROFIT_USDT_TARGET = 0.2;
+const MIN_PROFIT_USDT = 0.22;
 
 // ✅ وقف الخسارة - ✅ مفعل
 const STOP_LOSS_ENABLED = true;
