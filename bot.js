@@ -24,12 +24,12 @@ const API_KEY = process.env.BINGX_API_KEY;
 const API_SECRET = process.env.BINGX_API_SECRET;
 
 // ✅ إعدادات رأس المال والمخاطرة
-const TRADE_AMOUNT = 5;
+const TRADE_AMOUNT = 2.7;
 const USE_FULL_BALANCE = false;
 const MAX_RISK_PER_TRADE = 0.01;
 
 // ✅ الرافعة المالية
-const LEVERAGE = 10;
+const LEVERAGE = 20;
 
 // ✅ أهداف سكالبينج سريعة
 const PROFIT_USDT_TARGET = 0.12;
@@ -37,7 +37,7 @@ const MIN_PROFIT_USDT = 0.12;
 
 // ✅ وقف الخسارة - ✅ مفعل
 const STOP_LOSS_ENABLED = true;
-const STOP_LOSS_USDT = 0.12;
+const STOP_LOSS_USDT = 0.4;
 
 // ✅ إعدادات الشمعة (1 دقيقة)
 const CANDLE_INTERVAL = '1m';
