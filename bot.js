@@ -23,15 +23,15 @@ if (!process.env.BINGX_API_KEY || !process.env.BINGX_API_SECRET) {
 const API_KEY = process.env.BINGX_API_KEY;
 const API_SECRET = process.env.BINGX_API_SECRET;
 
-const TRADE_AMOUNT = 2.3;
+const TRADE_AMOUNT = 7;
 const USE_FULL_BALANCE = false;
 const MAX_RISK_PER_TRADE = 0.01;
-const LEVERAGE = 15;
+const LEVERAGE = 12;
 
 // ✅ أهداف ثابتة
-const PROFIT_USDT_TARGET = 0.12;
-const MIN_PROFIT_USDT = 0.12;
-const STOP_LOSS_USDT = 0.12;
+const PROFIT_USDT_TARGET = 0.4;
+const MIN_PROFIT_USDT = 0.4;
+const STOP_LOSS_USDT = 0.55;
 const STOP_LOSS_ENABLED = true;
 
 // ✅ إعدادات الشمعة
@@ -324,7 +324,7 @@ function adjustQuantity(quantity, contractInfo) {
 }
 
 // ==========================================
-// ✅ فلترة السيولة
+// ✅ فلترة السيولة - مخففة
 // ==========================================
 
 function strongMarket(candles) {
@@ -343,10 +343,10 @@ function strongMarket(candles) {
 
   console.log(`   📊 Vol=${avgVolume.toFixed(2)} | DollarVol=$${dollarVolume.toFixed(2)} | تذبذب=${(volatility * 100).toFixed(3)}%`);
 
-  // ✅ شرط تذبذب أقوى 0.001 (0.1%)
+  // ✅ تخفيف شرط التذبذب للسماح بدخول أكثر
   return (
     dollarVolume > 500 &&
-    volatility > 0.001
+    volatility > 0.0003
   );
 }
 
@@ -512,7 +512,7 @@ async function getTrendDirection(symbol) {
 }
 
 // ==========================================
-// ✅ نظام النقاط المحسن
+// ✅ نظام النقاط المحسن - عتبة 70 + فرق 20
 // ==========================================
 
 async function checkSignal(symbol) {
@@ -554,10 +554,7 @@ async function checkSignal(symbol) {
     // ✅ 6. دفتر الأوامر
     const orderBook = await getOrderBookAnalysis(symbol);
 
-    // ✅ 7. السعر الفوري (Ticker)
-    const ticker = await getTicker(symbol);
-
-    // ✅ 8. كشف الاختراق
+    // ✅ 7. كشف الاختراق
     const last20High = Math.max(...candles.slice(-21, -1).map(c => c.high));
     const last20Low = Math.min(...candles.slice(-21, -1).map(c => c.low));
     const breakoutHigh = current.close > last20High;
@@ -566,33 +563,33 @@ async function checkSignal(symbol) {
     let buyScore = 0;
     let sellScore = 0;
 
-    // ======== نظام النقاط 100 نقطة ========
+    // ======== نظام النقاط ========
 
-    // ✅ 1. الزخم (25 نقطة)
+    // ✅ الزخم (25 نقطة)
     if (momentum > 0.15) buyScore += 25;
     if (momentum < -0.15) sellScore += 25;
 
-    // ✅ 2. كشف الحيتان (20 نقطة)
+    // ✅ كشف الحيتان (20 نقطة)
     if (volumeSpike) {
       buyScore += 20;
       sellScore += 20;
     }
 
-    // ✅ 3. RSI (15 نقطة)
+    // ✅ RSI (15 نقطة)
     if (rsi > 55) buyScore += 15;
     if (rsi < 45) sellScore += 15;
 
-    // ✅ 4. اتجاه 5 دقائق (15 نقطة)
+    // ✅ اتجاه 5 دقائق (15 نقطة)
     if (trend5m === 'UP') buyScore += 15;
     if (trend5m === 'DOWN') sellScore += 15;
 
-    // ✅ 5. دفتر الأوامر (15 نقطة)
+    // ✅ دفتر الأوامر (15 نقطة)
     if (orderBook) {
       if (orderBook.ratio > 1.5) buyScore += 15;
       if (orderBook.ratio < 0.67) sellScore += 15;
     }
 
-    // ✅ 6. الاختراق (10 نقاط)
+    // ✅ الاختراق (10 نقاط)
     if (breakoutHigh) buyScore += 10;
     if (breakoutLow) sellScore += 10;
 
@@ -601,26 +598,41 @@ async function checkSignal(symbol) {
     const difference = Math.abs(buyScore - sellScore);
     const confidence = maxScore > 0 ? (difference / maxScore) * 100 : 0;
 
-    // ✅ منع الدخول في السوق الميت
-    if (volatility < 0.001) {
-      console.log(`   📊 ${symbol} ❌ سوق ميت (تذبذب ${(volatility * 100).toFixed(3)}% < 0.1%)`);
-      return null;
+    console.log(`   📊 ${symbol} BUY=${buyScore} SELL=${sellScore} | Diff=${difference} | Vol=${volumeRatio.toFixed(1)}x | Momentum=${momentum.toFixed(2)}% | RSI=${rsi.toFixed(1)}`);
+
+    // ======== ✅ الدخول السريع (Momentum Explosion) ========
+    // شراء سريع
+    if (
+      volumeRatio > 2 &&
+      momentum > 0.30 &&
+      rsi > 55
+    ) {
+      console.log(`   🚀 دخول سريع BUY (Vol=${volumeRatio.toFixed(1)}x, Mom=${momentum.toFixed(2)}%, RSI=${rsi.toFixed(1)})`);
+      return { signal: "BUY", atr: atr, entryPrice: current.close, confidence: 95, isFastEntry: true };
     }
 
-    console.log(`   📊 ${symbol} BUY=${buyScore} SELL=${sellScore} | Diff=${difference} | Confidence=${confidence.toFixed(1)}% | RSI=${rsi.toFixed(1)} | Vol=${volumeRatio.toFixed(1)}x | Momentum=${momentum.toFixed(2)}%`);
-
-    // ✅ نظام تأكيد متعدد - عتبة 85
-    if (buyScore >= 85 && buyScore - sellScore >= 30) {
-      console.log(`   ✅ إشارة BUY (${buyScore}/85) | Confidence: ${confidence.toFixed(1)}%`);
-      return { signal: "BUY", atr: atr, entryPrice: current.close, confidence: confidence };
+    // بيع سريع
+    if (
+      volumeRatio > 2 &&
+      momentum < -0.30 &&
+      rsi < 45
+    ) {
+      console.log(`   🚀 دخول سريع SELL (Vol=${volumeRatio.toFixed(1)}x, Mom=${momentum.toFixed(2)}%, RSI=${rsi.toFixed(1)})`);
+      return { signal: "SELL", atr: atr, entryPrice: current.close, confidence: 95, isFastEntry: true };
     }
 
-    if (sellScore >= 85 && sellScore - buyScore >= 30) {
-      console.log(`   ✅ إشارة SELL (${sellScore}/85) | Confidence: ${confidence.toFixed(1)}%`);
-      return { signal: "SELL", atr: atr, entryPrice: current.close, confidence: confidence };
+    // ======== ✅ نظام الفروقات - عتبة 70 + فرق 20 ========
+    if (buyScore >= 70 && (buyScore - sellScore) >= 20) {
+      console.log(`   ✅ إشارة BUY (${buyScore}/${sellScore}) | Confidence: ${confidence.toFixed(1)}%`);
+      return { signal: "BUY", atr: atr, entryPrice: current.close, confidence: confidence, isFastEntry: false };
     }
 
-    console.log(`   ❌ لا إشارة (BUY=${buyScore}, SELL=${sellScore}, Need 85+30)`);
+    if (sellScore >= 70 && (sellScore - buyScore) >= 20) {
+      console.log(`   ✅ إشارة SELL (${buyScore}/${sellScore}) | Confidence: ${confidence.toFixed(1)}%`);
+      return { signal: "SELL", atr: atr, entryPrice: current.close, confidence: confidence, isFastEntry: false };
+    }
+
+    console.log(`   ❌ لا إشارة (Need 70+20)`);
     return null;
 
   } catch (error) {
@@ -695,6 +707,7 @@ async function placeOrder(symbol, signalData, balance) {
     console.log(`   💰 Balance: ${balance}`);
     console.log(`   💵 Price: ${price}`);
     console.log(`   📊 الثقة: ${signalData.confidence?.toFixed(1) || 'N/A'}%`);
+    console.log(`   🚀 دخول سريع: ${signalData.isFastEntry ? 'نعم' : 'لا'}`);
     
     if (roundedQuantity <= 0) return null;
 
@@ -710,7 +723,7 @@ async function placeOrder(symbol, signalData, balance) {
     const response = await bingxRequest('POST', ENDPOINTS.FUTURES_ORDER, params);
 
     if (response && response.code === 0) {
-      console.log(`🚀 OPEN ${signalData.signal} ${symbol} (Confidence: ${signalData.confidence?.toFixed(1) || 'N/A'}%)`);
+      console.log(`🚀 OPEN ${signalData.signal} ${symbol} (Confidence: ${signalData.confidence?.toFixed(1) || 'N/A'}%)${signalData.isFastEntry ? ' [دخول سريع]' : ''}`);
       return {
         symbol,
         entryPrice: price,
@@ -720,8 +733,8 @@ async function placeOrder(symbol, signalData, balance) {
         timestamp: Date.now(),
         atr: signalData.atr || 0.01,
         confidence: signalData.confidence || 0,
-        highestProfit: 0,
-        trailingStopLevel: null
+        isFastEntry: signalData.isFastEntry || false,
+        highestProfit: 0
       };
     }
     console.log(`   ❌ فشل الصفقة:`, response?.msg || response);
@@ -730,6 +743,39 @@ async function placeOrder(symbol, signalData, balance) {
     console.log("   ❌ فشل الصفقة:", error.message);
     return null;
   }
+}
+
+// ==========================================
+// ✅ Trailing Stop
+// ==========================================
+
+function updateTrailingStop(position, currentPrice) {
+  if (!position) return null;
+
+  let profitUSDT = (currentPrice - position.entryPrice) * position.quantity;
+  if (position.type === 'SHORT') {
+    profitUSDT = (position.entryPrice - currentPrice) * position.quantity;
+  }
+
+  if (profitUSDT > position.highestProfit) {
+    position.highestProfit = profitUSDT;
+  }
+
+  let newStopLoss = null;
+
+  if (position.highestProfit >= 0.10) {
+    newStopLoss = position.entryPrice + (position.type === 'LONG' ? -0.03 : 0.03);
+  }
+
+  if (position.highestProfit >= 0.20) {
+    newStopLoss = position.entryPrice + (position.type === 'LONG' ? -0.10 : 0.10);
+  }
+
+  if (position.highestProfit >= 0.30) {
+    newStopLoss = position.entryPrice + (position.type === 'LONG' ? -0.20 : 0.20);
+  }
+
+  return newStopLoss;
 }
 
 // ==========================================
@@ -769,6 +815,7 @@ async function closePosition(position, result = 'MANUAL') {
         profit: finalProfit,
         result: finalProfit > 0 ? 'WIN' : 'LOSS',
         confidence: position.confidence || 0,
+        isFastEntry: position.isFastEntry || false,
         timestamp: new Date().toISOString()
       });
 
@@ -780,41 +827,6 @@ async function closePosition(position, result = 'MANUAL') {
     console.error(`❌ فشل إغلاق الصفقة:`, error);
     return false;
   }
-}
-
-// ==========================================
-// ✅ Trailing Stop
-// ==========================================
-
-function updateTrailingStop(position, currentPrice) {
-  if (!position) return null;
-
-  let profitUSDT = (currentPrice - position.entryPrice) * position.quantity;
-  if (position.type === 'SHORT') {
-    profitUSDT = (position.entryPrice - currentPrice) * position.quantity;
-  }
-
-  // تحديث أعلى ربح
-  if (profitUSDT > position.highestProfit) {
-    position.highestProfit = profitUSDT;
-  }
-
-  let newStopLoss = null;
-
-  // ✅ منطق Trailing Stop
-  if (position.highestProfit >= 0.10) {
-    newStopLoss = position.entryPrice + (position.type === 'LONG' ? -0.03 : 0.03);
-  }
-
-  if (position.highestProfit >= 0.20) {
-    newStopLoss = position.entryPrice + (position.type === 'LONG' ? -0.10 : 0.10);
-  }
-
-  if (position.highestProfit >= 0.30) {
-    newStopLoss = position.entryPrice + (position.type === 'LONG' ? -0.20 : 0.20);
-  }
-
-  return newStopLoss;
 }
 
 // ==========================================
@@ -965,7 +977,7 @@ async function tradingCycle() {
 
       const { symbol, signalData } = result;
       
-      console.log(`🚀 إشارة ${signalData.signal}: ${symbol} (ثقة: ${signalData.confidence?.toFixed(1) || 'N/A'}%)`);
+      console.log(`🚀 إشارة ${signalData.signal}: ${symbol} (ثقة: ${signalData.confidence?.toFixed(1) || 'N/A'}%)${signalData.isFastEntry ? ' [دخول سريع]' : ''}`);
 
       await setLeverage(symbol);
 
@@ -1043,7 +1055,7 @@ app.get('/dashboard', (req, res) => {
     <body>
       <div class="container">
         <h1>⚡ بوت سكالبينج احترافي</h1>
-        <p class="subtitle">📊 50 عملة | Momentum + Volume Spike + RSI + Order Book + Trailing Stop</p>
+        <p class="subtitle">📊 50 عملة | دخول سريع | عتبة 70+20 | Trailing Stop</p>
         <div class="status-grid" id="statusGrid">
           <div class="card"><div class="label">📊 الحالة</div><div class="value"><span class="status-badge" id="statusBadge">🟢 يعمل</span></div></div>
           <div class="card"><div class="label">💰 الرصيد</div><div class="value green" id="balance">0.00 USDT</div></div>
@@ -1053,7 +1065,7 @@ app.get('/dashboard', (req, res) => {
         <div class="trade-info" id="tradeInfo"><div class="label">💰 الربح / الخسارة</div><div class="value" id="profitDisplay">0.0000 USDT (0.00%)</div></div>
         <div class="settings-box">
           <div class="label">⚙️ إعدادات متقدمة</div>
-          <div class="value">💰 <span class="highlight-green">5 USDT</span> | ⚡ <span class="highlight-gold">10x</span> | 🎯 <span class="highlight-gold">0.12 USDT</span> | ⛔ <span class="highlight-red">0.12 USDT</span> | 📊 <span class="highlight-purple">عتبة 85 + فرق 30</span> | 🎯 <span class="highlight-purple">Trailing Stop</span></div>
+          <div class="value">💰 <span class="highlight-green">5 USDT</span> | ⚡ <span class="highlight-gold">10x</span> | 🎯 <span class="highlight-gold">0.12 USDT</span> | ⛔ <span class="highlight-red">0.12 USDT</span> | 📊 <span class="highlight-purple">عتبة 70 + فرق 20</span> | 🚀 <span class="highlight-purple">دخول سريع</span></div>
         </div>
         <button class="refresh-btn" onclick="fetchStatus()">🔄 تحديث</button>
         <div class="footer" id="lastUpdate">🕐 آخر تحديث: --</div>
@@ -1120,7 +1132,7 @@ app.get('/', async (req, res) => {
       tradeAmount: `${TRADE_AMOUNT} USDT`,
       profitTarget: `${PROFIT_USDT_TARGET} USDT`,
       stopLoss: `${STOP_LOSS_USDT} USDT`,
-      currentPosition: currentPosition ? `${currentPosition.symbol} (${currentPosition.type})` : 'لا توجد صفقة',
+      currentPosition: currentPosition ? `${currentPosition.symbol} (${currentPosition.type})${currentPosition.isFastEntry ? ' [دخول سريع]' : ''}` : 'لا توجد صفقة',
       profit: profit,
       profitPercent: profitPercent,
       tradesCount: tradesHistory.length,
@@ -1130,7 +1142,8 @@ app.get('/', async (req, res) => {
         profitTarget: `${PROFIT_USDT_TARGET} USDT`,
         stopLoss: `${STOP_LOSS_USDT} USDT`,
         leverage: `${LEVERAGE}x`,
-        scoreThreshold: '85 + فرق 30',
+        scoreThreshold: '70 + فرق 20',
+        fastEntry: 'مفعل',
         trailingStop: 'مفعل',
         symbols: SYMBOLS
       }
@@ -1154,9 +1167,8 @@ async function startBot() {
     console.log(`⚡ الرافعة: ${LEVERAGE}x`);
     console.log(`🎯 هدف الربح: ${PROFIT_USDT_TARGET} USDT (ثابت)`);
     console.log(`⛔ وقف الخسارة: ${STOP_LOSS_USDT} USDT (ثابت)`);
-    console.log(`📊 نظام الدخول: عتبة 85 + فرق 30`);
-    console.log(`📊 المؤشرات: Momentum + Volume Spike + RSI + Order Book + Trend 5m`);
-    console.log(`📊 Trailing Stop: مفعل`);
+    console.log(`📊 نظام الدخول: عتبة 70 + فرق 20`);
+    console.log(`🚀 دخول سريع: Vol>2x + Mom>0.30% + RSI>55`);
     console.log(`📊 العملات: ${SYMBOLS.length} عملة`);
     console.log(`🔄 سرعة المسح: ${SCAN_INTERVAL/1000} ثانية`);
     console.log('================================');
@@ -1193,14 +1205,14 @@ async function startBot() {
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`
   ╔═══════════════════════════════════════════════════════════════╗
-  ║   ⚡ بوت سكالبينج احترافي - أقوى التعديلات                  ║
+  ║   ⚡ بوت سكالبينج احترافي - دخول سريع + عتبة 70+20        ║
   ║   📡 http://localhost:${PORT}                                  ║
   ║   📊 لوحة التحكم: http://localhost:${PORT}/dashboard          ║
   ║   🚀 رافعة: ${LEVERAGE}x | 💰 ${TRADE_AMOUNT} USDT            ║
   ║   🎯 هدف: ${PROFIT_USDT_TARGET} USDT | ⛔ وقف: ${STOP_LOSS_USDT} USDT ║
-  ║   📊 عتبة: 85 + فرق 30 | 📊 ${SYMBOLS.length} عملة            ║
-  ║   📊 المؤشرات: Momentum + Volume Spike + RSI + Order Book   ║
-  ║   🎯 Trailing Stop: مفعل | 🔄 مسح: ${SCAN_INTERVAL/1000}s     ║
+  ║   📊 عتبة: 70 + فرق 20 | 🚀 دخول سريع: مفعل                  ║
+  ║   📊 العملات: ${SYMBOLS.length} عملة                          ║
+  ║   🔄 مسح: ${SCAN_INTERVAL/1000} ثانية                         ║
   ║   ⚠️ تداول حقيقي - استخدم بحذر!                              ║
   ╚═══════════════════════════════════════════════════════════════╝
   `);
