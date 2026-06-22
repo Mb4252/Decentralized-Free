@@ -23,15 +23,15 @@ if (!process.env.BINGX_API_KEY || !process.env.BINGX_API_SECRET) {
 const API_KEY = process.env.BINGX_API_KEY;
 const API_SECRET = process.env.BINGX_API_SECRET;
 
-const TRADE_AMOUNT = 7;
+const TRADE_AMOUNT = 5;
 const USE_FULL_BALANCE = false;
 const MAX_RISK_PER_TRADE = 0.01;
-const LEVERAGE = 12;
+const LEVERAGE = 10;
 
 // ✅ أهداف ثابتة
-const PROFIT_USDT_TARGET = 0.4;
-const MIN_PROFIT_USDT = 0.4;
-const STOP_LOSS_USDT = 0.55;
+const PROFIT_USDT_TARGET = 0.12;
+const MIN_PROFIT_USDT = 0.12;
+const STOP_LOSS_USDT = 0.12;
 const STOP_LOSS_ENABLED = true;
 
 // ✅ إعدادات الشمعة
@@ -324,7 +324,7 @@ function adjustQuantity(quantity, contractInfo) {
 }
 
 // ==========================================
-// ✅ فلترة السيولة - مخففة
+// ✅ فلترة السيولة
 // ==========================================
 
 function strongMarket(candles) {
@@ -343,7 +343,6 @@ function strongMarket(candles) {
 
   console.log(`   📊 Vol=${avgVolume.toFixed(2)} | DollarVol=$${dollarVolume.toFixed(2)} | تذبذب=${(volatility * 100).toFixed(3)}%`);
 
-  // ✅ تخفيف شرط التذبذب للسماح بدخول أكثر
   return (
     dollarVolume > 500 &&
     volatility > 0.0003
@@ -512,7 +511,7 @@ async function getTrendDirection(symbol) {
 }
 
 // ==========================================
-// ✅ نظام النقاط المحسن - عتبة 70 + فرق 20
+// ✅ نظام النقاط المحسن - عتبة 60 + فرق 15
 // ==========================================
 
 async function checkSignal(symbol) {
@@ -539,8 +538,8 @@ async function checkSignal(symbol) {
     const last5 = candles.slice(-5);
     const momentum = ((last5[4].close - last5[0].open) / last5[0].open) * 100;
 
-    // ✅ 2. كشف الحيتان (Volume Spike)
-    const volumeSpike = current.volume > avgVolume * 2;
+    // ✅ 2. كشف الحيتان (Volume Spike) - مخفف
+    const volumeSpike = current.volume > avgVolume * 1.3;
 
     // ✅ 3. التذبذب
     const volatility = (current.high - current.low) / current.close;
@@ -600,10 +599,10 @@ async function checkSignal(symbol) {
 
     console.log(`   📊 ${symbol} BUY=${buyScore} SELL=${sellScore} | Diff=${difference} | Vol=${volumeRatio.toFixed(1)}x | Momentum=${momentum.toFixed(2)}% | RSI=${rsi.toFixed(1)}`);
 
-    // ======== ✅ الدخول السريع (Momentum Explosion) ========
+    // ======== ✅ الدخول السريع (مخفف) ========
     // شراء سريع
     if (
-      volumeRatio > 2 &&
+      volumeRatio > 1.3 &&
       momentum > 0.30 &&
       rsi > 55
     ) {
@@ -613,7 +612,7 @@ async function checkSignal(symbol) {
 
     // بيع سريع
     if (
-      volumeRatio > 2 &&
+      volumeRatio > 1.3 &&
       momentum < -0.30 &&
       rsi < 45
     ) {
@@ -621,18 +620,18 @@ async function checkSignal(symbol) {
       return { signal: "SELL", atr: atr, entryPrice: current.close, confidence: 95, isFastEntry: true };
     }
 
-    // ======== ✅ نظام الفروقات - عتبة 70 + فرق 20 ========
-    if (buyScore >= 70 && (buyScore - sellScore) >= 20) {
+    // ======== ✅ نظام الفروقات - عتبة 60 + فرق 15 ========
+    if (buyScore >= 60 && (buyScore - sellScore) >= 15) {
       console.log(`   ✅ إشارة BUY (${buyScore}/${sellScore}) | Confidence: ${confidence.toFixed(1)}%`);
       return { signal: "BUY", atr: atr, entryPrice: current.close, confidence: confidence, isFastEntry: false };
     }
 
-    if (sellScore >= 70 && (sellScore - buyScore) >= 20) {
+    if (sellScore >= 60 && (sellScore - buyScore) >= 15) {
       console.log(`   ✅ إشارة SELL (${buyScore}/${sellScore}) | Confidence: ${confidence.toFixed(1)}%`);
       return { signal: "SELL", atr: atr, entryPrice: current.close, confidence: confidence, isFastEntry: false };
     }
 
-    console.log(`   ❌ لا إشارة (Need 70+20)`);
+    console.log(`   ❌ لا إشارة (Need 60+15)`);
     return null;
 
   } catch (error) {
@@ -1055,7 +1054,7 @@ app.get('/dashboard', (req, res) => {
     <body>
       <div class="container">
         <h1>⚡ بوت سكالبينج احترافي</h1>
-        <p class="subtitle">📊 50 عملة | دخول سريع | عتبة 70+20 | Trailing Stop</p>
+        <p class="subtitle">📊 50 عملة | عتبة 60+15 | دخول سريع | Trailing Stop</p>
         <div class="status-grid" id="statusGrid">
           <div class="card"><div class="label">📊 الحالة</div><div class="value"><span class="status-badge" id="statusBadge">🟢 يعمل</span></div></div>
           <div class="card"><div class="label">💰 الرصيد</div><div class="value green" id="balance">0.00 USDT</div></div>
@@ -1065,7 +1064,7 @@ app.get('/dashboard', (req, res) => {
         <div class="trade-info" id="tradeInfo"><div class="label">💰 الربح / الخسارة</div><div class="value" id="profitDisplay">0.0000 USDT (0.00%)</div></div>
         <div class="settings-box">
           <div class="label">⚙️ إعدادات متقدمة</div>
-          <div class="value">💰 <span class="highlight-green">5 USDT</span> | ⚡ <span class="highlight-gold">10x</span> | 🎯 <span class="highlight-gold">0.12 USDT</span> | ⛔ <span class="highlight-red">0.12 USDT</span> | 📊 <span class="highlight-purple">عتبة 70 + فرق 20</span> | 🚀 <span class="highlight-purple">دخول سريع</span></div>
+          <div class="value">💰 <span class="highlight-green">5 USDT</span> | ⚡ <span class="highlight-gold">10x</span> | 🎯 <span class="highlight-gold">0.12 USDT</span> | ⛔ <span class="highlight-red">0.12 USDT</span> | 📊 <span class="highlight-purple">عتبة 60 + فرق 15</span> | 🚀 <span class="highlight-purple">دخول سريع 1.3x</span></div>
         </div>
         <button class="refresh-btn" onclick="fetchStatus()">🔄 تحديث</button>
         <div class="footer" id="lastUpdate">🕐 آخر تحديث: --</div>
@@ -1142,8 +1141,8 @@ app.get('/', async (req, res) => {
         profitTarget: `${PROFIT_USDT_TARGET} USDT`,
         stopLoss: `${STOP_LOSS_USDT} USDT`,
         leverage: `${LEVERAGE}x`,
-        scoreThreshold: '70 + فرق 20',
-        fastEntry: 'مفعل',
+        scoreThreshold: '60 + فرق 15',
+        fastEntry: 'مفعل (1.3x)',
         trailingStop: 'مفعل',
         symbols: SYMBOLS
       }
@@ -1167,8 +1166,8 @@ async function startBot() {
     console.log(`⚡ الرافعة: ${LEVERAGE}x`);
     console.log(`🎯 هدف الربح: ${PROFIT_USDT_TARGET} USDT (ثابت)`);
     console.log(`⛔ وقف الخسارة: ${STOP_LOSS_USDT} USDT (ثابت)`);
-    console.log(`📊 نظام الدخول: عتبة 70 + فرق 20`);
-    console.log(`🚀 دخول سريع: Vol>2x + Mom>0.30% + RSI>55`);
+    console.log(`📊 نظام الدخول: عتبة 60 + فرق 15`);
+    console.log(`🚀 دخول سريع: Vol>1.3x + Mom>0.30% + RSI>55`);
     console.log(`📊 العملات: ${SYMBOLS.length} عملة`);
     console.log(`🔄 سرعة المسح: ${SCAN_INTERVAL/1000} ثانية`);
     console.log('================================');
@@ -1205,12 +1204,12 @@ async function startBot() {
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`
   ╔═══════════════════════════════════════════════════════════════╗
-  ║   ⚡ بوت سكالبينج احترافي - دخول سريع + عتبة 70+20        ║
+  ║   ⚡ بوت سكالبينج احترافي - عتبة 60+15 + دخول سريع 1.3x  ║
   ║   📡 http://localhost:${PORT}                                  ║
   ║   📊 لوحة التحكم: http://localhost:${PORT}/dashboard          ║
   ║   🚀 رافعة: ${LEVERAGE}x | 💰 ${TRADE_AMOUNT} USDT            ║
   ║   🎯 هدف: ${PROFIT_USDT_TARGET} USDT | ⛔ وقف: ${STOP_LOSS_USDT} USDT ║
-  ║   📊 عتبة: 70 + فرق 20 | 🚀 دخول سريع: مفعل                  ║
+  ║   📊 عتبة: 60 + فرق 15 | 🚀 دخول سريع: 1.3x                  ║
   ║   📊 العملات: ${SYMBOLS.length} عملة                          ║
   ║   🔄 مسح: ${SCAN_INTERVAL/1000} ثانية                         ║
   ║   ⚠️ تداول حقيقي - استخدم بحذر!                              ║
