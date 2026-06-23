@@ -30,8 +30,8 @@ const MAX_RISK_PER_TRADE = 0.01;
 const LEVERAGE = 50;
 
 // ✅ أهداف ثابتة
-const PROFIT_USDT_TARGET = 0.4;
-const MIN_PROFIT_USDT = 0.4;
+const PROFIT_USDT_TARGET = 0.38;
+const MIN_PROFIT_USDT = 0.38;
 const STOP_LOSS_USDT = 0.7;
 const STOP_LOSS_ENABLED = true;
 
