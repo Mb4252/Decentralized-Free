@@ -1,40 +1,58 @@
 const { Web3 } = require('web3');
 const express = require('express');
-const path = require('path');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// الاتصال بالشبكة
+// الاتصال بـ BSC
 const web3 = new Web3('https://bsc-dataseed.binance.org/');
 
-// مصفوفة لتخزين النتائج
 let scanResults = [];
 
-// إعداد تقديم الملفات الثابتة (Static Files)
-app.use(express.static('public'));
+// 1. وظيفة توليد عنوان عشوائي
+function generateRandomAddress() {
+    return '0x' + Array.from({length: 40}, () => Math.floor(Math.random() * 16).toString(16)).join('');
+}
 
-// مسار API لجلب البيانات
-app.get('/api/results', (req, res) => {
-    res.json(scanResults);
-});
+// 2. وظيفة الفحص
+async function scan() {
+    console.log("--- بدء دورة فحص جديدة ---");
+    
+    // أ- محاولة بحث عشوائي (احتمالية ضئيلة جداً لكنها عشوائية)
+    const randomAddr = generateRandomAddress();
+    await checkAddress(randomAddr);
 
-// منطق الفحص (تحديث المصفوفة)
-async function scanContracts() {
-    const targetContracts = ["0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d"]; // ضع العناوين هنا
-    for (const address of targetContracts) {
-        try {
+    // ب- البحث في نشاط الشبكة الحقيقي (أخذ عينة من آخر كتلة)
+    try {
+        const latestBlock = await web3.eth.getBlock('latest', true);
+        const randomTx = latestBlock.transactions[Math.floor(Math.random() * latestBlock.transactions.length)];
+        if (randomTx.to) {
+            await checkAddress(randomTx.to);
+        }
+    } catch (err) {
+        console.error("خطأ في أخذ العينة من الشبكة");
+    }
+}
+
+async function checkAddress(address) {
+    try {
+        const code = await web3.eth.getCode(address);
+        // نتأكد أنه عقد (ليس محفظة شخصية)
+        if (code !== '0x') {
             const balance = await web3.eth.getBalance(address);
             const balanceInBnb = web3.utils.fromWei(balance, 'ether');
             
             if (parseFloat(balanceInBnb) > 0) {
-                // إضافة النتيجة للمصفوفة إذا لم تكن موجودة
-                if (!scanResults.find(r => r.address === address)) {
-                    scanResults.push({ address, balance: balanceInBnb, time: new Date().toLocaleTimeString() });
-                }
+                console.log(`[!] تم العثور: ${address} | الرصيد: ${balanceInBnb} BNB`);
+                scanResults.push({ address, balance: balanceInBnb, time: new Date().toLocaleTimeString() });
             }
-        } catch (err) { console.error(err); }
-    }
+        }
+    } catch (e) { /* تجاهل الأخطاء */ }
 }
 
-setInterval(scanContracts, 60000); // فحص كل دقيقة
-app.listen(port, () => console.log(`Dashboard running on port ${port}`));
+// مسارات الويب
+app.use(express.static('public'));
+app.get('/api/results', (req, res) => res.json(scanResults));
+app.listen(port, () => console.log(`Dashboard running on ${port}`));
+
+// تشغيل الفحص كل 10 ثواني (سريع)
+setInterval(scan, 10000);
