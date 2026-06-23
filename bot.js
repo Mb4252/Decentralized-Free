@@ -24,10 +24,10 @@ const API_KEY = process.env.BINGX_API_KEY;
 const API_SECRET = process.env.BINGX_API_SECRET;
 
 // ✅ إعدادات التداول
-const TRADE_AMOUNT = 3.2;
+const TRADE_AMOUNT = 2.2;
 const USE_FULL_BALANCE = false;
 const MAX_RISK_PER_TRADE = 0.01;
-const LEVERAGE = 30;
+const LEVERAGE = 50;
 
 // ✅ أهداف ثابتة
 const PROFIT_USDT_TARGET = 0.4;
