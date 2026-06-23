@@ -230,7 +230,6 @@ function calculateRSI(closes, period = 14) {
   let gains = 0;
   let losses = 0;
 
-  // ✅ حساب RSI على آخر period شمعة فقط
   for (let i = closes.length - period; i < closes.length; i++) {
     const diff = closes[i] - closes[i - 1];
 
@@ -308,6 +307,7 @@ async function getContractInfo(symbol) {
           quantityPrecision: contract.quantityPrecision || 6
         };
         lastContractFetch = now;
+        console.log(`   ✅ Contract Info ${symbol}:`, contractInfoCache[symbol]);
         return contractInfoCache[symbol];
       }
     }
@@ -319,7 +319,7 @@ async function getContractInfo(symbol) {
 }
 
 // ==========================================
-// ✅ تعديل الكمية
+// ✅ تعديل الكمية - مع حماية
 // ==========================================
 
 function adjustQuantity(quantity, contractInfo) {
@@ -327,9 +327,15 @@ function adjustQuantity(quantity, contractInfo) {
   
   const { minQty, stepSize } = contractInfo;
   
-  let adjusted = Math.max(quantity, minQty);
+  // ✅ حماية من NaN
+  if (isNaN(quantity) || quantity <= 0) {
+    console.log(`   ⚠️ كمية غير صالحة: ${quantity}`);
+    return 0;
+  }
   
-  if (stepSize > 0) {
+  let adjusted = Math.max(quantity, minQty || 0);
+  
+  if (stepSize && stepSize > 0) {
     adjusted = Math.floor(adjusted / stepSize) * stepSize;
   }
   
@@ -483,7 +489,7 @@ async function getCandles(symbol) {
 }
 
 // ==========================================
-// ✅ جلب السعر الفوري (Ticker)
+// ✅ جلب السعر الفوري (Ticker) - مع طباعة الرد
 // ==========================================
 
 async function getTicker(symbol) {
@@ -492,16 +498,60 @@ async function getTicker(symbol) {
       symbol: symbol
     }, false);
 
-    if (response && response.code === 0 && response.data) {
-      return {
-        price: parseFloat(response.data.price),
-        bid: parseFloat(response.data.bidPrice),
-        ask: parseFloat(response.data.askPrice),
-        volume: parseFloat(response.data.volume)
-      };
+    // ✅ طباعة الرد كامل لمعرفة الشكل
+    console.log(`   📡 Ticker Response ${symbol}:`, JSON.stringify(response, null, 2));
+
+    if (!response || response.code !== 0) {
+      console.log(`   ❌ Ticker فشل لـ ${symbol}: code=${response?.code}, msg=${response?.msg}`);
+      return null;
     }
-    return null;
+
+    const data = response.data;
+    if (!data) {
+      console.log(`   ❌ لا توجد بيانات لـ ${symbol}`);
+      return null;
+    }
+
+    // ✅ محاولة استخراج السعر من عدة صيغ محتملة
+    let price = null;
+    let bid = null;
+    let ask = null;
+    let volume = null;
+
+    // الصيغة 1: data.price
+    if (data.price !== undefined) {
+      price = parseFloat(data.price);
+    }
+    // الصيغة 2: data.lastPrice
+    if (isNaN(price) && data.lastPrice !== undefined) {
+      price = parseFloat(data.lastPrice);
+    }
+    // الصيغة 3: data.last
+    if (isNaN(price) && data.last !== undefined) {
+      price = parseFloat(data.last);
+    }
+    // الصيغة 4: data.close
+    if (isNaN(price) && data.close !== undefined) {
+      price = parseFloat(data.close);
+    }
+
+    // Bid
+    if (data.bidPrice !== undefined) bid = parseFloat(data.bidPrice);
+    if (isNaN(bid) && data.bid !== undefined) bid = parseFloat(data.bid);
+    
+    // Ask
+    if (data.askPrice !== undefined) ask = parseFloat(data.askPrice);
+    if (isNaN(ask) && data.ask !== undefined) ask = parseFloat(data.ask);
+    
+    // Volume
+    if (data.volume !== undefined) volume = parseFloat(data.volume);
+    if (isNaN(volume) && data.vol !== undefined) volume = parseFloat(data.vol);
+
+    console.log(`   ✅ Ticker ${symbol}: price=${price}, bid=${bid}, ask=${ask}, volume=${volume}`);
+
+    return { price, bid, ask, volume };
   } catch (error) {
+    console.error(`❌ فشل جلب السعر ${symbol}:`, error);
     return null;
   }
 }
@@ -524,12 +574,11 @@ async function getTrendDirection(symbol) {
 }
 
 // ==========================================
-// ✅ نظام النقاط المحسن - النسخة النهائية
+// ✅ نظام النقاط المحسن
 // ==========================================
 
 async function checkSignal(symbol) {
   try {
-    // ✅ جلب الشموع
     const candles = await getCandles(symbol);
     if (!candles || candles.length < 50) return null;
 
@@ -537,7 +586,6 @@ async function checkSignal(symbol) {
     const closes = candles.map(c => c.close);
     const atr = calculateATR(candles, 14);
 
-    // ✅ المتوسطات
     const avgVolume = candles.slice(-11, -1)
       .reduce((s, c) => s + c.volume, 0) / 10;
     const avgBody = candles.slice(-11, -1)
@@ -547,32 +595,20 @@ async function checkSignal(symbol) {
     const bodyRatio = currentBody / (avgBody || 0.000001);
     const volumeRatio = current.volume / (avgVolume || 0.000001);
 
-    // ✅ 1. تحليل الزخم اللحظي (Momentum Explosion)
     const last5 = candles.slice(-5);
     const momentum = ((last5[4].close - last5[0].open) / last5[0].open) * 100;
 
-    // ✅ 2. كشف الحيتان (Volume Spike)
     const volumeSpike = current.volume > avgVolume * FAST_ENTRY_VOLUME;
-
-    // ✅ 3. التذبذب
     const volatility = (current.high - current.low) / current.close;
-
-    // ✅ 4. RSI - محسّن
     const rsi = calculateRSI(closes, 14);
-
-    // ✅ 5. اتجاه 5 دقائق
     const trend5m = await getTrendDirection(symbol);
-
-    // ✅ 6. دفتر الأوامر - مخفف
     const orderBook = await getOrderBookAnalysis(symbol);
 
-    // ✅ 7. كشف الاختراق
     const last20High = Math.max(...candles.slice(-21, -1).map(c => c.high));
     const last20Low = Math.min(...candles.slice(-21, -1).map(c => c.low));
     const breakoutHigh = current.close > last20High;
     const breakoutLow = current.close < last20Low;
 
-    // ✅ 8. EMA Trend للترشيح
     const ema20 = calculateEMA(closes, 20);
     const ema50 = calculateEMA(closes, 50);
     const isUptrend = ema20 > ema50;
@@ -581,49 +617,38 @@ async function checkSignal(symbol) {
     let buyScore = 0;
     let sellScore = 0;
 
-    // ======== نظام النقاط ========
-
-    // ✅ الزخم (25 نقطة)
     if (momentum > 0.15) buyScore += 25;
     if (momentum < -0.15) sellScore += 25;
 
-    // ✅ كشف الحيتان (20 نقطة)
     if (volumeSpike) {
       buyScore += 20;
       sellScore += 20;
     }
 
-    // ✅ RSI (15 نقطة)
     if (rsi > 55) buyScore += 15;
     if (rsi < 45) sellScore += 15;
 
-    // ✅ اتجاه 5 دقائق (15 نقطة)
     if (trend5m === 'UP') buyScore += 15;
     if (trend5m === 'DOWN') sellScore += 15;
 
-    // ✅ دفتر الأوامر - مخفف (15 نقطة)
     if (orderBook) {
       if (orderBook.ratio > 1.2) buyScore += 15;
       if (orderBook.ratio < 0.8) sellScore += 15;
     }
 
-    // ✅ الاختراق (10 نقاط)
     if (breakoutHigh) buyScore += 10;
     if (breakoutLow) sellScore += 10;
 
-    // ✅ فلتر الاتجاه - لا تشتري ضد الاتجاه
     if (!isUptrend && buyScore > 0) buyScore = Math.max(0, buyScore - 20);
     if (!isDowntrend && sellScore > 0) sellScore = Math.max(0, sellScore - 20);
 
-    // ✅ حساب Confidence
     const maxScore = Math.max(buyScore, sellScore);
     const difference = Math.abs(buyScore - sellScore);
     const confidence = maxScore > 0 ? (difference / maxScore) * 100 : 0;
 
-    console.log(`   📊 ${symbol} BUY=${buyScore} SELL=${sellScore} | Diff=${difference} | Vol=${volumeRatio.toFixed(1)}x | Mom=${momentum.toFixed(2)}% | RSI=${rsi.toFixed(1)} | Trend=${isUptrend ? 'UP' : 'DOWN'}`);
+    console.log(`   📊 ${symbol} BUY=${buyScore} SELL=${sellScore} | Diff=${difference} | Vol=${volumeRatio.toFixed(1)}x | Mom=${momentum.toFixed(2)}% | RSI=${rsi.toFixed(1)}`);
 
-    // ======== ✅ الدخول السريع ========
-    // شراء سريع - مخفف
+    // ✅ دخول سريع
     if (
       volumeRatio > FAST_ENTRY_VOLUME &&
       momentum > FAST_ENTRY_MOMENTUM &&
@@ -633,7 +658,6 @@ async function checkSignal(symbol) {
       return { signal: "BUY", atr: atr, entryPrice: current.close, confidence: 95, isFastEntry: true };
     }
 
-    // بيع سريع - مخفف
     if (
       volumeRatio > FAST_ENTRY_VOLUME &&
       momentum < -FAST_ENTRY_MOMENTUM &&
@@ -643,7 +667,6 @@ async function checkSignal(symbol) {
       return { signal: "SELL", atr: atr, entryPrice: current.close, confidence: 95, isFastEntry: true };
     }
 
-    // ======== ✅ نظام الفروقات - عتبة 45 + فرق 10 ========
     if (buyScore >= BUY_SCORE_THRESHOLD && (buyScore - sellScore) >= MIN_SCORE_DIFF) {
       console.log(`   ✅ إشارة BUY (${buyScore}/${sellScore}) | Confidence: ${confidence.toFixed(1)}%`);
       return { signal: "BUY", atr: atr, entryPrice: current.close, confidence: confidence, isFastEntry: false };
@@ -664,11 +687,17 @@ async function checkSignal(symbol) {
 }
 
 // ==========================================
-// ✅ حساب كمية العقد
+// ✅ حساب كمية العقد - مع حماية من NaN
 // ==========================================
 
 function calculateQuantity(price) {
-  return Number((TRADE_AMOUNT * LEVERAGE / price).toFixed(6));
+  if (!price || isNaN(price) || price <= 0) {
+    console.log(`   ⚠️ سعر غير صالح للحساب: ${price}`);
+    return 0;
+  }
+
+  const quantity = (TRADE_AMOUNT * LEVERAGE) / price;
+  return Number(quantity.toFixed(6));
 }
 
 // ==========================================
@@ -709,29 +738,50 @@ async function setLeverage(symbol) {
 }
 
 // ==========================================
-// ✅ تنفيذ الأمر
+// ✅ تنفيذ الأمر - مع حماية السعر والكمية
 // ==========================================
 
 async function placeOrder(symbol, signalData, balance) {
   try {
     const ticker = await getTicker(symbol);
-    if (!ticker) return null;
+    if (!ticker) {
+      console.log(`   ❌ لا يمكن جلب السعر لـ ${symbol}`);
+      return null;
+    }
 
-    const price = ticker.price;
+    // ✅ حماية السعر
+    const price = Number(ticker.price);
+    if (!price || isNaN(price) || price <= 0) {
+      console.log(`   ❌ سعر غير صالح ${symbol}:`, ticker);
+      return null;
+    }
+
     const contractInfo = await getContractInfo(symbol);
+    console.log(`   📊 Contract Info:`, contractInfo);
+
     let roundedQuantity = calculateQuantity(price);
-    
+    console.log(`   📊 الكمية المحسوبة (قبل التعديل): ${roundedQuantity}`);
+
     if (contractInfo) {
       roundedQuantity = adjustQuantity(roundedQuantity, contractInfo);
     }
-    
-    console.log(`   📊 الكمية: ${roundedQuantity}`);
+
+    // ✅ طباعة تفصيلية قبل الإرسال
+    console.log(`   📊 تفاصيل الأمر:`);
+    console.log(`      symbol: ${symbol}`);
+    console.log(`      price: ${price}`);
+    console.log(`      quantity: ${roundedQuantity}`);
+    console.log(`      side: ${signalData.signal}`);
+    console.log(`      contractInfo:`, contractInfo);
+
+    if (roundedQuantity <= 0 || isNaN(roundedQuantity)) {
+      console.log(`   ❌ كمية غير صالحة: ${roundedQuantity}`);
+      return null;
+    }
+
     console.log(`   💰 Balance: ${balance}`);
-    console.log(`   💵 Price: ${price}`);
     console.log(`   📊 الثقة: ${signalData.confidence?.toFixed(1) || 'N/A'}%`);
     console.log(`   🚀 دخول سريع: ${signalData.isFastEntry ? 'نعم' : 'لا'}`);
-    
-    if (roundedQuantity <= 0) return null;
 
     const isBuy = signalData.signal === 'BUY';
     const params = {
@@ -810,6 +860,10 @@ async function closePosition(position, result = 'MANUAL') {
     if (!ticker) return false;
 
     const currentPrice = ticker.price;
+    if (!currentPrice || isNaN(currentPrice) || currentPrice <= 0) {
+      console.log(`   ❌ سعر غير صالح للإغلاق: ${currentPrice}`);
+      return false;
+    }
 
     const closeSide = position.type === 'LONG' ? 'SELL' : 'BUY';
     const closePositionSide = position.type === 'LONG' ? 'LONG' : 'SHORT';
@@ -844,6 +898,7 @@ async function closePosition(position, result = 'MANUAL') {
       console.log(`✅ تم إغلاق صفقة ${position.type}: ${position.symbol} (${result})`);
       return true;
     }
+    console.log(`⚠️ فشل إغلاق الصفقة:`, response?.msg || response);
     return false;
   } catch (error) {
     console.error(`❌ فشل إغلاق الصفقة:`, error);
@@ -897,10 +952,10 @@ async function tradingCycle() {
     const balance = await getFuturesBalance();
     console.log(`💰 الرصيد: ${balance.toFixed(4)} USDT`);
 
-    // ✅ إدارة الصفقة المفتوحة
     if (currentPosition) {
       const ticker = await getTicker(currentPosition.symbol);
-      if (!ticker) {
+      if (!ticker || !ticker.price || isNaN(ticker.price) || ticker.price <= 0) {
+        console.log(`   ❌ سعر غير صالح لـ ${currentPosition.symbol}`);
         isRunning = false;
         return;
       }
@@ -915,7 +970,6 @@ async function tradingCycle() {
       let profitPercent = (profitUSDT / (currentPosition.entryPrice * currentPosition.quantity)) * 100;
       console.log(`⚡ الربح الحالي: ${profitUSDT.toFixed(4)} USDT (${profitPercent.toFixed(2)}%)`);
 
-      // ✅ جني الربح الثابت
       if (profitUSDT >= PROFIT_USDT_TARGET) {
         console.log(`🎯 جني ربح: ${profitUSDT.toFixed(4)} USDT (الهدف: ${PROFIT_USDT_TARGET} USDT)`);
         await closePosition(currentPosition, 'TAKE_PROFIT');
@@ -925,7 +979,6 @@ async function tradingCycle() {
         return;
       }
 
-      // ✅ Trailing Stop
       const newStopLoss = updateTrailingStop(currentPosition, currentPrice);
       if (newStopLoss) {
         const isStopLoss = currentPosition.type === 'LONG'
@@ -942,7 +995,6 @@ async function tradingCycle() {
         }
       }
 
-      // ✅ وقف الخسارة الثابت
       if (STOP_LOSS_ENABLED && profitUSDT < -STOP_LOSS_USDT) {
         console.log(`⛔ وقف خسارة: ${profitUSDT.toFixed(4)} USDT (الحد: -${STOP_LOSS_USDT} USDT)`);
         await closePosition(currentPosition, 'STOP_LOSS');
@@ -956,7 +1008,6 @@ async function tradingCycle() {
       return;
     }
 
-    // ✅ كولداون
     if (Date.now() - lastTradeTime < cooldown) {
       console.log('⏳ كولداون...');
       isRunning = false;
@@ -971,7 +1022,6 @@ async function tradingCycle() {
 
     console.log(`🔍 جاري مسح ${SYMBOLS.length} عملة...`);
     
-    // ✅ معالجة متوازية
     const results = await Promise.all(
       SYMBOLS.map(async (symbol) => {
         try {
@@ -992,7 +1042,6 @@ async function tradingCycle() {
       })
     );
 
-    // ✅ معالجة النتائج
     for (const result of results) {
       if (!result.signalData) continue;
 
@@ -1075,8 +1124,8 @@ app.get('/dashboard', (req, res) => {
     </head>
     <body>
       <div class="container">
-        <h1>⚡ بوت سكالبينج احترافي - النسخة النهائية</h1>
-        <p class="subtitle">📊 23 عملة قوية | عتبة 45+10 | دخول سريع 1.0x</p>
+        <h1>⚡ بوت سكالبينج احترافي</h1>
+        <p class="subtitle">📊 23 عملة | عتبة 45+10 | دخول سريع 1.0x | مع حماية NaN</p>
         <div class="status-grid" id="statusGrid">
           <div class="card"><div class="label">📊 الحالة</div><div class="value"><span class="status-badge" id="statusBadge">🟢 يعمل</span></div></div>
           <div class="card"><div class="label">💰 الرصيد</div><div class="value green" id="balance">0.00 USDT</div></div>
@@ -1134,7 +1183,7 @@ app.get('/', async (req, res) => {
     
     if (currentPosition) {
       const ticker = await getTicker(currentPosition.symbol);
-      if (ticker) {
+      if (ticker && ticker.price && !isNaN(ticker.price) && ticker.price > 0) {
         const currentPrice = ticker.price;
         let rawProfit = (currentPrice - currentPosition.entryPrice) * currentPosition.quantity;
         if (currentPosition.type === 'SHORT') {
@@ -1146,7 +1195,7 @@ app.get('/', async (req, res) => {
     }
     
     res.json({
-      status: '⚡ بوت سكالبينج احترافي - النسخة النهائية',
+      status: '⚡ بوت سكالبينج احترافي',
       timestamp: new Date().toISOString(),
       balance: `${usdtBalance.toFixed(4)} USDT`,
       leverage: `${LEVERAGE}x`,
@@ -1182,7 +1231,7 @@ async function startBot() {
   try {
     loadTradesHistory();
 
-    console.log('⚡⚡ بدء تشغيل بوت سكالبينج احترافي - النسخة النهائية');
+    console.log('⚡⚡ بدء تشغيل بوت سكالبينج احترافي - مع حماية NaN');
     console.log('📊 ===== إعدادات متقدمة =====');
     console.log(`💰 مبلغ التداول: ${TRADE_AMOUNT} USDT`);
     console.log(`⚡ الرافعة: ${LEVERAGE}x`);
@@ -1226,13 +1275,14 @@ async function startBot() {
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`
   ╔═══════════════════════════════════════════════════════════════╗
-  ║   ⚡ بوت سكالبينج احترافي - النسخة النهائية                ║
+  ║   ⚡ بوت سكالبينج احترافي - مع حماية NaN                   ║
   ║   📡 http://localhost:${PORT}                                  ║
   ║   📊 لوحة التحكم: http://localhost:${PORT}/dashboard          ║
   ║   🚀 رافعة: ${LEVERAGE}x | 💰 ${TRADE_AMOUNT} USDT            ║
   ║   🎯 هدف: ${PROFIT_USDT_TARGET} USDT | ⛔ وقف: ${STOP_LOSS_USDT} USDT ║
   ║   📊 عتبة: ${BUY_SCORE_THRESHOLD} + فرق ${MIN_SCORE_DIFF}     ║
   ║   🚀 دخول سريع: ${FAST_ENTRY_VOLUME}x + ${FAST_ENTRY_MOMENTUM}% + RSI${FAST_ENTRY_RSI_BUY} ║
+  ║   🛡️ حماية NaN: مفعل                                         ║
   ║   📊 العملات: ${SYMBOLS.length} عملة قوية                     ║
   ║   🔄 مسح: ${SCAN_INTERVAL/1000} ثانية                         ║
   ║   ⚠️ تداول حقيقي - استخدم بحذر!                              ║
