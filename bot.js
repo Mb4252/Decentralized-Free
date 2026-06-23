@@ -27,7 +27,7 @@ const API_SECRET = process.env.BINGX_API_SECRET;
 const TRADE_AMOUNT = 0.0018;
 const USE_FULL_BALANCE = false;
 const MAX_RISK_PER_TRADE = 0.01;
-const LEVERAGE = 150;
+const LEVERAGE = 300;
 
 // ✅ أهداف ثابتة
 const PROFIT_USDT_TARGET = 0.25;
