@@ -3,56 +3,53 @@ const express = require('express');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// الاتصال بـ BSC
 const web3 = new Web3('https://bsc-dataseed.binance.org/');
 
 let scanResults = [];
 
-// 1. وظيفة توليد عنوان عشوائي
-function generateRandomAddress() {
-    return '0x' + Array.from({length: 40}, () => Math.floor(Math.random() * 16).toString(16)).join('');
-}
+// بصمة وظيفة withdraw()
+const WITHDRAW_SELECTOR = '3ccfd60b';
 
-// 2. وظيفة الفحص
-async function scan() {
-    console.log("--- بدء دورة فحص جديدة ---");
+async function scanContracts() {
+    console.log("🔍 جاري البحث عن عقود بها رصيد ووظيفة سحب...");
     
-    // أ- محاولة بحث عشوائي (احتمالية ضئيلة جداً لكنها عشوائية)
-    const randomAddr = generateRandomAddress();
-    await checkAddress(randomAddr);
+    // هنا نأخذ عينة من الشبكة (آخر معاملات)
+    const latestBlock = await web3.eth.getBlock('latest', true);
+    
+    for (let tx of latestBlock.transactions) {
+        if (!tx.to) continue; // تخطي المعاملات التي لا تتوجه لعقود
 
-    // ب- البحث في نشاط الشبكة الحقيقي (أخذ عينة من آخر كتلة)
-    try {
-        const latestBlock = await web3.eth.getBlock('latest', true);
-        const randomTx = latestBlock.transactions[Math.floor(Math.random() * latestBlock.transactions.length)];
-        if (randomTx.to) {
-            await checkAddress(randomTx.to);
-        }
-    } catch (err) {
-        console.error("خطأ في أخذ العينة من الشبكة");
-    }
-}
-
-async function checkAddress(address) {
-    try {
-        const code = await web3.eth.getCode(address);
-        // نتأكد أنه عقد (ليس محفظة شخصية)
-        if (code !== '0x') {
-            const balance = await web3.eth.getBalance(address);
+        try {
+            // 1. التحقق من الرصيد
+            const balance = await web3.eth.getBalance(tx.to);
             const balanceInBnb = web3.utils.fromWei(balance, 'ether');
             
             if (parseFloat(balanceInBnb) > 0) {
-                console.log(`[!] تم العثور: ${address} | الرصيد: ${balanceInBnb} BNB`);
-                scanResults.push({ address, balance: balanceInBnb, time: new Date().toLocaleTimeString() });
+                // 2. جلب كود العقد للتحقق من وجود وظيفة السحب
+                const code = await web3.eth.getCode(tx.to);
+                
+                // البحث عن البصمة في كود العقد (Bytecode)
+                if (code.includes(WITHDRAW_SELECTOR)) {
+                    if (!scanResults.find(r => r.address === tx.to)) {
+                        scanResults.push({ 
+                            address: tx.to, 
+                            balance: balanceInBnb, 
+                            time: new Date().toLocaleTimeString(),
+                            note: "Withdraw Found"
+                        });
+                        console.log(`[!] وجدنا عقداً مطابقاً: ${tx.to}`);
+                    }
+                }
             }
+        } catch (err) {
+            // تجاهل الأخطاء (مثل عناوين لا تحتوي على كود)
         }
-    } catch (e) { /* تجاهل الأخطاء */ }
+    }
 }
 
-// مسارات الويب
 app.use(express.static('public'));
 app.get('/api/results', (req, res) => res.json(scanResults));
-app.listen(port, () => console.log(`Dashboard running on ${port}`));
+app.listen(port, () => console.log(`Scanner running on port ${port}`));
 
-// تشغيل الفحص كل 10 ثواني (سريع)
-setInterval(scan, 10000);
+// تشغيل الفحص كل 30 ثانية
+setInterval(scanContracts, 30000);
