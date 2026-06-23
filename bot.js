@@ -327,7 +327,6 @@ function adjustQuantity(quantity, contractInfo) {
   
   const { minQty, stepSize } = contractInfo;
   
-  // ✅ حماية من NaN
   if (isNaN(quantity) || quantity <= 0) {
     console.log(`   ⚠️ كمية غير صالحة: ${quantity}`);
     return 0;
@@ -489,67 +488,36 @@ async function getCandles(symbol) {
 }
 
 // ==========================================
-// ✅ جلب السعر الفوري (Ticker) - مع طباعة الرد
+// ✅ جلب السعر الفوري (Ticker) - تم الإصلاح
 // ==========================================
 
 async function getTicker(symbol) {
   try {
-    const response = await bingxRequest('GET', ENDPOINTS.FUTURES_TICKER, {
-      symbol: symbol
-    }, false);
+    const response = await bingxRequest(
+      'GET',
+      ENDPOINTS.FUTURES_TICKER,
+      { symbol },
+      false
+    );
 
-    // ✅ طباعة الرد كامل لمعرفة الشكل
-    console.log(`   📡 Ticker Response ${symbol}:`, JSON.stringify(response, null, 2));
+    if (response && response.code === 0 && response.data) {
+      const data = response.data;
 
-    if (!response || response.code !== 0) {
-      console.log(`   ❌ Ticker فشل لـ ${symbol}: code=${response?.code}, msg=${response?.msg}`);
-      return null;
+      // ✅ قراءة الحقول الصحيحة من API
+      const price = Number(data.lastPrice);
+      const bid = Number(data.bidPrice);
+      const ask = Number(data.askPrice);
+      const volume = Number(data.volume);
+
+      return {
+        price: price,
+        bid: bid,
+        ask: ask,
+        volume: volume
+      };
     }
 
-    const data = response.data;
-    if (!data) {
-      console.log(`   ❌ لا توجد بيانات لـ ${symbol}`);
-      return null;
-    }
-
-    // ✅ محاولة استخراج السعر من عدة صيغ محتملة
-    let price = null;
-    let bid = null;
-    let ask = null;
-    let volume = null;
-
-    // الصيغة 1: data.price
-    if (data.price !== undefined) {
-      price = parseFloat(data.price);
-    }
-    // الصيغة 2: data.lastPrice
-    if (isNaN(price) && data.lastPrice !== undefined) {
-      price = parseFloat(data.lastPrice);
-    }
-    // الصيغة 3: data.last
-    if (isNaN(price) && data.last !== undefined) {
-      price = parseFloat(data.last);
-    }
-    // الصيغة 4: data.close
-    if (isNaN(price) && data.close !== undefined) {
-      price = parseFloat(data.close);
-    }
-
-    // Bid
-    if (data.bidPrice !== undefined) bid = parseFloat(data.bidPrice);
-    if (isNaN(bid) && data.bid !== undefined) bid = parseFloat(data.bid);
-    
-    // Ask
-    if (data.askPrice !== undefined) ask = parseFloat(data.askPrice);
-    if (isNaN(ask) && data.ask !== undefined) ask = parseFloat(data.ask);
-    
-    // Volume
-    if (data.volume !== undefined) volume = parseFloat(data.volume);
-    if (isNaN(volume) && data.vol !== undefined) volume = parseFloat(data.vol);
-
-    console.log(`   ✅ Ticker ${symbol}: price=${price}, bid=${bid}, ask=${ask}, volume=${volume}`);
-
-    return { price, bid, ask, volume };
+    return null;
   } catch (error) {
     console.error(`❌ فشل جلب السعر ${symbol}:`, error);
     return null;
@@ -644,9 +612,15 @@ async function checkSignal(symbol) {
 
     const maxScore = Math.max(buyScore, sellScore);
     const difference = Math.abs(buyScore - sellScore);
-    const confidence = maxScore > 0 ? (difference / maxScore) * 100 : 0;
+    
+    // ✅ حساب Confidence بشكل أكثر دقة
+    let confidence = 0;
+    if (maxScore > 0) {
+      // النسبة المئوية من إجمالي النقاط الممكنة (100)
+      confidence = Math.min(maxScore, 100);
+    }
 
-    console.log(`   📊 ${symbol} BUY=${buyScore} SELL=${sellScore} | Diff=${difference} | Vol=${volumeRatio.toFixed(1)}x | Mom=${momentum.toFixed(2)}% | RSI=${rsi.toFixed(1)}`);
+    console.log(`   📊 ${symbol} BUY=${buyScore} SELL=${sellScore} | Diff=${difference} | Vol=${volumeRatio.toFixed(1)}x | Mom=${momentum.toFixed(2)}% | RSI=${rsi.toFixed(1)} | Conf=${confidence.toFixed(1)}%`);
 
     // ✅ دخول سريع
     if (
@@ -691,7 +665,7 @@ async function checkSignal(symbol) {
 // ==========================================
 
 function calculateQuantity(price) {
-  if (!price || isNaN(price) || price <= 0) {
+  if (!price || isNaN(price) || price <= 0 || !Number.isFinite(price)) {
     console.log(`   ⚠️ سعر غير صالح للحساب: ${price}`);
     return 0;
   }
@@ -749,9 +723,9 @@ async function placeOrder(symbol, signalData, balance) {
       return null;
     }
 
-    // ✅ حماية السعر
+    // ✅ حماية السعر - استخدام Number.isFinite
     const price = Number(ticker.price);
-    if (!price || isNaN(price) || price <= 0) {
+    if (!Number.isFinite(price) || price <= 0) {
       console.log(`   ❌ سعر غير صالح ${symbol}:`, ticker);
       return null;
     }
@@ -774,7 +748,7 @@ async function placeOrder(symbol, signalData, balance) {
     console.log(`      side: ${signalData.signal}`);
     console.log(`      contractInfo:`, contractInfo);
 
-    if (roundedQuantity <= 0 || isNaN(roundedQuantity)) {
+    if (roundedQuantity <= 0 || isNaN(roundedQuantity) || !Number.isFinite(roundedQuantity)) {
       console.log(`   ❌ كمية غير صالحة: ${roundedQuantity}`);
       return null;
     }
@@ -859,8 +833,8 @@ async function closePosition(position, result = 'MANUAL') {
     const ticker = await getTicker(position.symbol);
     if (!ticker) return false;
 
-    const currentPrice = ticker.price;
-    if (!currentPrice || isNaN(currentPrice) || currentPrice <= 0) {
+    const currentPrice = Number(ticker.price);
+    if (!Number.isFinite(currentPrice) || currentPrice <= 0) {
       console.log(`   ❌ سعر غير صالح للإغلاق: ${currentPrice}`);
       return false;
     }
@@ -954,13 +928,18 @@ async function tradingCycle() {
 
     if (currentPosition) {
       const ticker = await getTicker(currentPosition.symbol);
-      if (!ticker || !ticker.price || isNaN(ticker.price) || ticker.price <= 0) {
-        console.log(`   ❌ سعر غير صالح لـ ${currentPosition.symbol}`);
+      if (!ticker) {
+        console.log(`   ❌ لا يمكن جلب السعر لـ ${currentPosition.symbol}`);
         isRunning = false;
         return;
       }
 
-      const currentPrice = ticker.price;
+      const currentPrice = Number(ticker.price);
+      if (!Number.isFinite(currentPrice) || currentPrice <= 0) {
+        console.log(`   ❌ سعر غير صالح لـ ${currentPosition.symbol}`);
+        isRunning = false;
+        return;
+      }
 
       let profitUSDT = (currentPrice - currentPosition.entryPrice) * currentPosition.quantity;
       if (currentPosition.type === 'SHORT') {
@@ -1183,7 +1162,7 @@ app.get('/', async (req, res) => {
     
     if (currentPosition) {
       const ticker = await getTicker(currentPosition.symbol);
-      if (ticker && ticker.price && !isNaN(ticker.price) && ticker.price > 0) {
+      if (ticker && ticker.price && Number.isFinite(ticker.price) && ticker.price > 0) {
         const currentPrice = ticker.price;
         let rawProfit = (currentPrice - currentPosition.entryPrice) * currentPosition.quantity;
         if (currentPosition.type === 'SHORT') {
