@@ -40,9 +40,9 @@ const BUY_SCORE_THRESHOLD = 45;
 const SELL_SCORE_THRESHOLD = 45;
 const MIN_SCORE_DIFF = 10;
 
-// ✅ دخول سريع
-const FAST_ENTRY_VOLUME = 1.0;
-const FAST_ENTRY_MOMENTUM = 0.15;
+// ✅ دخول سريع - مشدد
+const FAST_ENTRY_VOLUME = 2.0;
+const FAST_ENTRY_MOMENTUM = 0.5;
 const FAST_ENTRY_RSI_BUY = 52;
 const FAST_ENTRY_RSI_SELL = 48;
 
@@ -488,7 +488,7 @@ async function getCandles(symbol) {
 }
 
 // ==========================================
-// ✅ جلب السعر الفوري (Ticker) - تم الإصلاح
+// ✅ جلب السعر الفوري (Ticker) - مع دعم صيغ متعددة
 // ==========================================
 
 async function getTicker(symbol) {
@@ -503,11 +503,19 @@ async function getTicker(symbol) {
     if (response && response.code === 0 && response.data) {
       const data = response.data;
 
-      // ✅ قراءة الحقول الصحيحة من API
-      const price = Number(data.lastPrice);
-      const bid = Number(data.bidPrice);
-      const ask = Number(data.askPrice);
-      const volume = Number(data.volume);
+      // ✅ محاولة استخراج السعر من عدة مصادر
+      const price = parseFloat(
+        data.lastPrice ||
+        data.bidPrice ||
+        data.askPrice ||
+        data.price ||
+        data.last ||
+        0
+      );
+
+      const bid = parseFloat(data.bidPrice || data.bid || 0);
+      const ask = parseFloat(data.askPrice || data.ask || 0);
+      const volume = parseFloat(data.volume || data.vol || 0);
 
       return {
         price: price,
@@ -542,7 +550,7 @@ async function getTrendDirection(symbol) {
 }
 
 // ==========================================
-// ✅ نظام النقاط المحسن
+// ✅ نظام النقاط المحسن - مع فلتر RSI والاتجاه
 // ==========================================
 
 async function checkSignal(symbol) {
@@ -607,46 +615,65 @@ async function checkSignal(symbol) {
     if (breakoutHigh) buyScore += 10;
     if (breakoutLow) sellScore += 10;
 
-    if (!isUptrend && buyScore > 0) buyScore = Math.max(0, buyScore - 20);
-    if (!isDowntrend && sellScore > 0) sellScore = Math.max(0, sellScore - 20);
+    // ✅ فلتر الاتجاه - لا تشتري إلا في اتجاه صاعد
+    if (!isUptrend && buyScore > 0) buyScore = Math.max(0, buyScore - 30);
+    // ✅ فلتر الاتجاه - لا تبيع إلا في اتجاه هابط
+    if (!isDowntrend && sellScore > 0) sellScore = Math.max(0, sellScore - 30);
+
+    // ✅ منع الشراء إذا RSI أعلى من 65
+    if (rsi > 65 && buyScore > 0) buyScore = Math.max(0, buyScore - 20);
+    
+    // ✅ منع البيع إذا RSI أقل من 35
+    if (rsi < 35 && sellScore > 0) sellScore = Math.max(0, sellScore - 20);
 
     const maxScore = Math.max(buyScore, sellScore);
     const difference = Math.abs(buyScore - sellScore);
-    
-    // ✅ حساب Confidence بشكل أكثر دقة
-    let confidence = 0;
-    if (maxScore > 0) {
-      // النسبة المئوية من إجمالي النقاط الممكنة (100)
-      confidence = Math.min(maxScore, 100);
-    }
+    let confidence = Math.min(maxScore, 100);
 
-    console.log(`   📊 ${symbol} BUY=${buyScore} SELL=${sellScore} | Diff=${difference} | Vol=${volumeRatio.toFixed(1)}x | Mom=${momentum.toFixed(2)}% | RSI=${rsi.toFixed(1)} | Conf=${confidence.toFixed(1)}%`);
+    console.log(`   📊 ${symbol} BUY=${buyScore} SELL=${sellScore} | Diff=${difference} | Vol=${volumeRatio.toFixed(1)}x | Mom=${momentum.toFixed(2)}% | RSI=${rsi.toFixed(1)} | Trend=${isUptrend ? 'UP' : 'DOWN'} | Conf=${confidence.toFixed(1)}%`);
 
-    // ✅ دخول سريع
+    // ======== ✅ الدخول السريع - مشدد ========
+    // شراء سريع: Vol > 2x, Mom > 0.5%, RSI > 52
     if (
       volumeRatio > FAST_ENTRY_VOLUME &&
       momentum > FAST_ENTRY_MOMENTUM &&
-      rsi > FAST_ENTRY_RSI_BUY
+      rsi > FAST_ENTRY_RSI_BUY &&
+      isUptrend &&
+      rsi < 65
     ) {
       console.log(`   🚀 دخول سريع BUY (Vol=${volumeRatio.toFixed(1)}x, Mom=${momentum.toFixed(2)}%, RSI=${rsi.toFixed(1)})`);
       return { signal: "BUY", atr: atr, entryPrice: current.close, confidence: 95, isFastEntry: true };
     }
 
+    // بيع سريع: Vol > 2x, Mom < -0.5%, RSI < 48
     if (
       volumeRatio > FAST_ENTRY_VOLUME &&
       momentum < -FAST_ENTRY_MOMENTUM &&
-      rsi < FAST_ENTRY_RSI_SELL
+      rsi < FAST_ENTRY_RSI_SELL &&
+      isDowntrend &&
+      rsi > 35
     ) {
       console.log(`   🚀 دخول سريع SELL (Vol=${volumeRatio.toFixed(1)}x, Mom=${momentum.toFixed(2)}%, RSI=${rsi.toFixed(1)})`);
       return { signal: "SELL", atr: atr, entryPrice: current.close, confidence: 95, isFastEntry: true };
     }
 
-    if (buyScore >= BUY_SCORE_THRESHOLD && (buyScore - sellScore) >= MIN_SCORE_DIFF) {
+    // ======== ✅ نظام الفروقات مع فلتر RSI ========
+    if (
+      buyScore >= BUY_SCORE_THRESHOLD &&
+      (buyScore - sellScore) >= MIN_SCORE_DIFF &&
+      rsi < 65 &&
+      isUptrend
+    ) {
       console.log(`   ✅ إشارة BUY (${buyScore}/${sellScore}) | Confidence: ${confidence.toFixed(1)}%`);
       return { signal: "BUY", atr: atr, entryPrice: current.close, confidence: confidence, isFastEntry: false };
     }
 
-    if (sellScore >= SELL_SCORE_THRESHOLD && (sellScore - buyScore) >= MIN_SCORE_DIFF) {
+    if (
+      sellScore >= SELL_SCORE_THRESHOLD &&
+      (sellScore - buyScore) >= MIN_SCORE_DIFF &&
+      rsi > 35 &&
+      isDowntrend
+    ) {
       console.log(`   ✅ إشارة SELL (${buyScore}/${sellScore}) | Confidence: ${confidence.toFixed(1)}%`);
       return { signal: "SELL", atr: atr, entryPrice: current.close, confidence: confidence, isFastEntry: false };
     }
@@ -723,7 +750,7 @@ async function placeOrder(symbol, signalData, balance) {
       return null;
     }
 
-    // ✅ حماية السعر - استخدام Number.isFinite
+    // ✅ حماية السعر
     const price = Number(ticker.price);
     if (!Number.isFinite(price) || price <= 0) {
       console.log(`   ❌ سعر غير صالح ${symbol}:`, ticker);
@@ -740,13 +767,11 @@ async function placeOrder(symbol, signalData, balance) {
       roundedQuantity = adjustQuantity(roundedQuantity, contractInfo);
     }
 
-    // ✅ طباعة تفصيلية قبل الإرسال
     console.log(`   📊 تفاصيل الأمر:`);
     console.log(`      symbol: ${symbol}`);
     console.log(`      price: ${price}`);
     console.log(`      quantity: ${roundedQuantity}`);
     console.log(`      side: ${signalData.signal}`);
-    console.log(`      contractInfo:`, contractInfo);
 
     if (roundedQuantity <= 0 || isNaN(roundedQuantity) || !Number.isFinite(roundedQuantity)) {
       console.log(`   ❌ كمية غير صالحة: ${roundedQuantity}`);
@@ -1104,7 +1129,7 @@ app.get('/dashboard', (req, res) => {
     <body>
       <div class="container">
         <h1>⚡ بوت سكالبينج احترافي</h1>
-        <p class="subtitle">📊 23 عملة | عتبة 45+10 | دخول سريع 1.0x | مع حماية NaN</p>
+        <p class="subtitle">📊 23 عملة | عتبة 45+10 | دخول سريع 2x+0.5% | فلتر RSI+Trend</p>
         <div class="status-grid" id="statusGrid">
           <div class="card"><div class="label">📊 الحالة</div><div class="value"><span class="status-badge" id="statusBadge">🟢 يعمل</span></div></div>
           <div class="card"><div class="label">💰 الرصيد</div><div class="value green" id="balance">0.00 USDT</div></div>
@@ -1114,7 +1139,7 @@ app.get('/dashboard', (req, res) => {
         <div class="trade-info" id="tradeInfo"><div class="label">💰 الربح / الخسارة</div><div class="value" id="profitDisplay">0.0000 USDT (0.00%)</div></div>
         <div class="settings-box">
           <div class="label">⚙️ إعدادات متقدمة</div>
-          <div class="value">💰 <span class="highlight-green">7 USDT</span> | ⚡ <span class="highlight-gold">15x</span> | 🎯 <span class="highlight-gold">0.4 USDT</span> | ⛔ <span class="highlight-red">0.7 USDT</span> | 📊 <span class="highlight-purple">عتبة 45 + فرق 10</span> | 🚀 <span class="highlight-purple">دخول سريع 1.0x</span></div>
+          <div class="value">💰 <span class="highlight-green">7 USDT</span> | ⚡ <span class="highlight-gold">15x</span> | 🎯 <span class="highlight-gold">0.4 USDT</span> | ⛔ <span class="highlight-red">0.7 USDT</span> | 📊 <span class="highlight-purple">عتبة 45 + فرق 10</span> | 🚀 <span class="highlight-purple">دخول سريع 2x+0.5%</span> | 🛡️ <span class="highlight-purple">RSI+Trend</span></div>
         </div>
         <button class="refresh-btn" onclick="fetchStatus()">🔄 تحديث</button>
         <div class="footer" id="lastUpdate">🕐 آخر تحديث: --</div>
@@ -1192,7 +1217,9 @@ app.get('/', async (req, res) => {
         stopLoss: `${STOP_LOSS_USDT} USDT`,
         leverage: `${LEVERAGE}x`,
         scoreThreshold: '45 + فرق 10',
-        fastEntry: 'مفعل (1.0x)',
+        fastEntry: 'مفعل (2x + 0.5%)',
+        rsiFilter: 'مفعل (RSI < 65 للشراء، RSI > 35 للبيع)',
+        trendFilter: 'مفعل (EMA20 > EMA50 للشراء)',
         trailingStop: 'مفعل',
         symbols: SYMBOLS
       }
@@ -1210,7 +1237,7 @@ async function startBot() {
   try {
     loadTradesHistory();
 
-    console.log('⚡⚡ بدء تشغيل بوت سكالبينج احترافي - مع حماية NaN');
+    console.log('⚡⚡ بدء تشغيل بوت سكالبينج احترافي - النسخة النهائية');
     console.log('📊 ===== إعدادات متقدمة =====');
     console.log(`💰 مبلغ التداول: ${TRADE_AMOUNT} USDT`);
     console.log(`⚡ الرافعة: ${LEVERAGE}x`);
@@ -1218,6 +1245,8 @@ async function startBot() {
     console.log(`⛔ وقف الخسارة: ${STOP_LOSS_USDT} USDT (ثابت)`);
     console.log(`📊 نظام الدخول: عتبة ${BUY_SCORE_THRESHOLD} + فرق ${MIN_SCORE_DIFF}`);
     console.log(`🚀 دخول سريع: Vol>${FAST_ENTRY_VOLUME}x + Mom>${FAST_ENTRY_MOMENTUM}% + RSI>${FAST_ENTRY_RSI_BUY}`);
+    console.log(`🛡️ فلتر RSI: شراء RSI<65, بيع RSI>35`);
+    console.log(`🛡️ فلتر الاتجاه: شراء EMA20>EMA50, بيع EMA20<EMA50`);
     console.log(`📊 العملات: ${SYMBOLS.length} عملة قوية`);
     console.log(`🔄 سرعة المسح: ${SCAN_INTERVAL/1000} ثانية`);
     console.log('================================');
@@ -1254,14 +1283,15 @@ async function startBot() {
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`
   ╔═══════════════════════════════════════════════════════════════╗
-  ║   ⚡ بوت سكالبينج احترافي - مع حماية NaN                   ║
+  ║   ⚡ بوت سكالبينج احترافي - النسخة النهائية                ║
   ║   📡 http://localhost:${PORT}                                  ║
   ║   📊 لوحة التحكم: http://localhost:${PORT}/dashboard          ║
   ║   🚀 رافعة: ${LEVERAGE}x | 💰 ${TRADE_AMOUNT} USDT            ║
   ║   🎯 هدف: ${PROFIT_USDT_TARGET} USDT | ⛔ وقف: ${STOP_LOSS_USDT} USDT ║
   ║   📊 عتبة: ${BUY_SCORE_THRESHOLD} + فرق ${MIN_SCORE_DIFF}     ║
   ║   🚀 دخول سريع: ${FAST_ENTRY_VOLUME}x + ${FAST_ENTRY_MOMENTUM}% + RSI${FAST_ENTRY_RSI_BUY} ║
-  ║   🛡️ حماية NaN: مفعل                                         ║
+  ║   🛡️ فلتر RSI: شراء<65, بيع>35                               ║
+  ║   🛡️ فلتر الاتجاه: شراء UP, بيع DOWN                        ║
   ║   📊 العملات: ${SYMBOLS.length} عملة قوية                     ║
   ║   🔄 مسح: ${SCAN_INTERVAL/1000} ثانية                         ║
   ║   ⚠️ تداول حقيقي - استخدم بحذر!                              ║
