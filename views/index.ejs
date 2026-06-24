@@ -252,6 +252,87 @@
             transform: scale(1.05);
             color: white;
         }
+
+        .edu-card {
+            background: linear-gradient(135deg, #007229, #004d1a);
+            color: white;
+            border-radius: 20px;
+            padding: 25px;
+            margin-bottom: 25px;
+            position: relative;
+            overflow: hidden;
+            animation: pulseGlow 3s ease-in-out infinite;
+        }
+        
+        .edu-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            animation: shimmer 6s ease-in-out infinite;
+        }
+        
+        @keyframes shimmer {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(-30%, -30%); }
+        }
+        
+        @keyframes pulseGlow {
+            0%, 100% { box-shadow: 0 5px 25px rgba(0, 114, 41, 0.3); }
+            50% { box-shadow: 0 5px 35px rgba(0, 114, 41, 0.6); }
+        }
+        
+        .edu-card h4 {
+            position: relative;
+            z-index: 1;
+            font-weight: bold;
+        }
+        
+        .edu-card p, .edu-card li {
+            position: relative;
+            z-index: 1;
+        }
+        
+        .edu-card .step-number {
+            display: inline-block;
+            width: 28px;
+            height: 28px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 50%;
+            text-align: center;
+            line-height: 28px;
+            font-weight: bold;
+            margin-left: 8px;
+            font-size: 0.8rem;
+        }
+        
+        .edu-card .tip-box {
+            background: rgba(255,255,255,0.15);
+            border-radius: 15px;
+            padding: 15px;
+            margin-top: 15px;
+            border-right: 4px solid #ffc107;
+        }
+        
+        .edu-card .stat-icon-bg {
+            font-size: 4rem;
+            opacity: 0.15;
+            position: absolute;
+            bottom: -10px;
+            left: -10px;
+            z-index: 0;
+        }
+        
+        .edu-card .content-box {
+            background: rgba(255,255,255,0.12);
+            border-radius: 12px;
+            padding: 12px 18px;
+            margin-bottom: 8px;
+            backdrop-filter: blur(5px);
+        }
         
         @media (max-width: 768px) {
             .stat-card .stat-number {
@@ -259,6 +340,12 @@
             }
             .sudan-header h2 {
                 font-size: 1.5rem;
+            }
+            .edu-card .step-number {
+                width: 22px;
+                height: 22px;
+                line-height: 22px;
+                font-size: 0.7rem;
             }
         }
     </style>
@@ -298,12 +385,70 @@
             </div>
         </div>
 
-        <!-- أزرار الملف الشخصي - النسخة المحدثة مع تسجيل الدخول -->
+        <!-- ======================================== -->
+        <!-- المنشور التعليمي -->
+        <!-- ======================================== -->
+        <div class="edu-card">
+            <div class="stat-icon-bg">
+                <i class="fas fa-hands-helping"></i>
+            </div>
+            
+            <div class="row position-relative" style="z-index: 1;">
+                <div class="col-md-8">
+                    <h4>
+                        <i class="fas fa-graduation-cap"></i> 
+                        كيف تنشر السعر وتساعد مجتمعك؟
+                    </h4>
+                    
+                    <p class="mb-3">
+                        🇸🇩 <strong>منصة التكافل السوداني</strong> هي منصة <strong>تطوعية مجتمعية</strong>.
+                        مشاركتك للأسعار تساعد الجميع في معرفة الأسعار الحقيقية وتجنب الاستغلال.
+                    </p>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="content-box">
+                                <h6><i class="fas fa-edit"></i> خطوات النشر:</h6>
+                                <ul style="padding-right: 20px; margin-bottom: 0;">
+                                    <li><span class="step-number">١</span> اكتب <strong>اسم السلعة</strong></li>
+                                    <li><span class="step-number">٢</span> أدخل <strong>السعر</strong></li>
+                                    <li><span class="step-number">٣</span> حدد <strong>المنطقة</strong></li>
+                                    <li><span class="step-number">٤</span> اضغط <strong>أضف</strong></li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="content-box">
+                                <h6><i class="fas fa-heart" style="color: #ff6b6b;"></i> كيف تساعد؟</h6>
+                                <ul style="padding-right: 20px; margin-bottom: 0;">
+                                    <li>✅ نشر أسعار <strong>حقيقية</strong></li>
+                                    <li>✅ مقارنة الأسعار بين المتاجر</li>
+                                    <li>✅ مشاركة المنصة مع الآخرين</li>
+                                    <li>✅ استخدام زر واتساب للمشاركة</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="tip-box">
+                        <i class="fas fa-star" style="color: #ffc107;"></i>
+                        <strong>نصيحة:</strong> كلما زادت المشاركات، زادت دقة الأسعار واستفاد الجميع!
+                        <span class="badge bg-warning text-dark ms-2">ساعد غيرك كما تحب أن يساعدوك</span>
+                    </div>
+                </div>
+                <div class="col-md-4 d-none d-md-flex align-items-center justify-content-center">
+                    <div style="font-size: 5rem; opacity: 0.3;">
+                        <i class="fas fa-share-alt"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- أزرار الملف الشخصي -->
         <div class="row mb-4">
             <div class="col-12">
                 <div class="d-flex gap-2 flex-wrap justify-content-center align-items-center">
                     <% if (currentUser) { %>
-                        <!-- ✅ مستخدم مسجل -->
                         <span class="user-badge">
                             <i class="fas fa-user-check"></i> مرحباً <%= currentUser.full_name %>
                         </span>
@@ -314,7 +459,6 @@
                             <i class="fas fa-sign-out-alt"></i> تسجيل خروج
                         </a>
                     <% } else { %>
-                        <!-- ❌ غير مسجل -->
                         <button class="btn btn-profile" data-bs-toggle="modal" data-bs-target="#createProfileModal">
                             <i class="fas fa-user-plus"></i> إنشاء ملف شخصي
                         </button>
@@ -467,7 +611,6 @@
                         <i class="fas fa-save"></i> أضف
                     </button>
                 </div>
-                <!-- اسم المستخدم يتم أخذه من الجلسة تلقائياً -->
             </form>
             <div class="mt-2 text-muted small">
                 <i class="fas fa-info-circle"></i> جميع الأسعار بالجنيه السوداني (ج.س)
@@ -771,11 +914,7 @@
             window.open(url, '_blank');
         }
 
-        // تحديث تلقائي كل 30 ثانية
-        setTimeout(() => {
-            location.reload();
-        }, 3000000);
-
+        // تم إزالة التحديث التلقائي لمنع مسح الحقول
         console.log('🇸🇩 منصة التكافل السوداني - نساعد بعضنا البعض');
     </script>
 </body>
