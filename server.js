@@ -1,29 +1,40 @@
 // ============================================================
-// منصة التكافل السوداني - ملف الخادم الرئيسي
+// منصة التكافل السوداني - مع نظام تسجيل الدخول
 // ============================================================
 
-// استيراد المكتبات الأساسية
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
+const session = require('express-session');
 
 const app = express();
 
 // ============================================================
-// إعداد الاتصال بقاعدة بيانات Supabase
+// إعداد Supabase
 // ============================================================
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // ============================================================
+// إعداد Session (تسجيل الدخول)
+// ============================================================
+app.use(session({
+    secret: process.env.SESSION_SECRET || 'sudan_secret_key_2026',
+    resave: false,
+    saveUninitialized: true,
+    cookie: { 
+        secure: false,  // true في الإنتاج مع HTTPS
+        maxAge: 30 * 24 * 60 * 60 * 1000 // 30 يوم
+    }
+}));
+
+// ============================================================
 // إعدادات التطبيق
 // ============================================================
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
-
-// Middleware
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static('public'));
@@ -32,26 +43,21 @@ app.use(express.static('public'));
 // دوال مساعدة
 // ============================================================
 
-// حساب متوسط الأسعار
 function calculateAverage(prices) {
     if (!prices || prices.length === 0) return 0;
     const sum = prices.reduce((acc, p) => acc + parseFloat(p.price), 0);
     return (sum / prices.length).toFixed(2);
 }
 
-// جلب أحدث الإضافات
 function getLatest(prices, count = 10) {
     return prices.slice(0, count);
 }
 
-// منع الإضافات المتكررة
 const rateLimit = new Map();
 
 // ============================================================
-// Routes الرئيسية
-// ============================================================
-
 // الصفحة الرئيسية
+// ============================================================
 app.get('/', async (req, res) => {
     try {
         const { data: prices, error } = await supabase
@@ -97,6 +103,9 @@ app.get('/', async (req, res) => {
         });
 
         const success = req.query.success || null;
+        
+        // ✅ تمرير معلومات المستخدم الحالي إلى الصفحة
+        const currentUser = req.session.user || null;
 
         res.render('index', { 
             prices: prices || [],
@@ -110,7 +119,8 @@ app.get('/', async (req, res) => {
                 locations: locations,
                 itemAverages: itemAverages
             },
-            success: success
+            success: success,
+            currentUser: currentUser  // ✅ المستخدم الحالي
         });
     } catch (err) {
         console.error("General Error:", err);
@@ -122,10 +132,9 @@ app.get('/', async (req, res) => {
 // Routes الأسعار
 // ============================================================
 
-// إضافة سعر جديد
 app.post('/add_price', async (req, res) => {
     try {
-        const { item, price, location, store, category, username } = req.body;
+        const { item, price, location, store, category } = req.body;
         
         if (!item || !price || !location) {
             return res.status(400).send("جميع الحقول مطلوبة.");
@@ -147,7 +156,9 @@ app.post('/add_price', async (req, res) => {
             return res.status(400).send("❌ كلمة غير مسموح بها");
         }
 
-        const finalUsername = username || 'ضيف';
+        // ✅ استخدام اسم المستخدم من الجلسة إذا كان مسجلاً
+        const finalUsername = req.session.user?.username || 'ضيف';
+        
         const { data, error } = await supabase
             .from('prices')
             .insert([{ 
@@ -156,7 +167,7 @@ app.post('/add_price', async (req, res) => {
                 location: location.trim(),
                 store: store?.trim() || 'غير محدد',
                 category: category?.trim() || 'عام',
-                username: finalUsername.trim()
+                username: finalUsername
             }]);
 
         if (error) {
@@ -171,7 +182,6 @@ app.post('/add_price', async (req, res) => {
     }
 });
 
-// حذف سعر
 app.post('/delete_price/:id', async (req, res) => {
     try {
         const { id } = req.params;
@@ -193,7 +203,6 @@ app.post('/delete_price/:id', async (req, res) => {
     }
 });
 
-// تحديث سعر
 app.post('/update_price/:id', async (req, res) => {
     try {
         const { id } = req.params;
@@ -226,58 +235,40 @@ app.post('/update_price/:id', async (req, res) => {
 });
 
 // ============================================================
-// Routes المستخدمين (الملف الشخصي) - النسخة المعدلة
+// Routes المستخدمين مع تسجيل الدخول
 // ============================================================
 
-// صفحة الملف الشخصي
-app.get('/profile/:username', async (req, res) => {
+// صفحة الملف الشخصي - تعرض ملف المستخدم المسجل حالياً
+app.get('/profile', async (req, res) => {
     try {
-        const { username } = req.params;
+        // ✅ التحقق من وجود مستخدم مسجل
+        if (!req.session.user) {
+            return res.redirect('/?error=⚠️ يرجى إنشاء ملف شخصي أولاً');
+        }
+
+        const username = req.session.user.username;
         
         console.log('📖 جلب ملف المستخدم:', username);
-        console.log('🔍 البحث في جدول users عن:', username);
         
-        // جلب بيانات المستخدم
         const { data: user, error } = await supabase
             .from('users')
             .select('*')
             .eq('username', username);
 
-        console.log('📊 نتيجة البحث:', { user, error });
-
-        if (error) {
-            console.error('❌ خطأ في الاستعلام:', error);
-            return res.status(500).send("خطأ في قاعدة البيانات: " + error.message);
-        }
-
-        if (!user || user.length === 0) {
+        if (error || !user || user.length === 0) {
             console.log('❌ المستخدم غير موجود:', username);
-            
-            // عرض جميع المستخدمين للمساعدة في التصحيح
-            const { data: allUsers } = await supabase
-                .from('users')
-                .select('username');
-            console.log('📋 المستخدمين الموجودين:', allUsers);
-            
-            return res.status(404).send(`
-                <h1>❌ المستخدم غير موجود</h1>
-                <p>المستخدم "<strong>${username}</strong>" غير موجود في قاعدة البيانات.</p>
-                <p>🔍 المستخدمين الموجودين: ${allUsers?.map(u => u.username).join(', ') || 'لا يوجد'}</p>
-                <a href="/">العودة إلى الرئيسية</a>
-            `);
+            req.session.user = null; // مسح الجلسة
+            return res.redirect('/?error=❌ المستخدم غير موجود، يرجى إنشاء ملف جديد');
         }
 
-        // استخراج المستخدم الأول
         const userData = user[0];
 
-        // جلب إحصائيات المستخدم
-        const { count: totalAdds, error: countError } = await supabase
+        const { count: totalAdds } = await supabase
             .from('prices')
             .select('*', { count: 'exact', head: true })
             .eq('username', username);
 
-        // جلب آخر 5 إضافات للمستخدم
-        const { data: recentPrices, error: pricesError } = await supabase
+        const { data: recentPrices } = await supabase
             .from('prices')
             .select('*')
             .eq('username', username)
@@ -286,26 +277,71 @@ app.get('/profile/:username', async (req, res) => {
 
         const success = req.query.success || null;
 
-        console.log('✅ تم جلب الملف الشخصي بنجاح:', userData.username);
+        res.render('profile', {
+            user: userData,
+            totalAdds: totalAdds || 0,
+            recentPrices: recentPrices || [],
+            success: success,
+            currentUser: req.session.user
+        });
+        
+    } catch (err) {
+        console.error('❌ خطأ عام في الملف الشخصي:', err);
+        res.status(500).send("حدث خطأ في تحميل الملف الشخصي");
+    }
+});
+
+// عرض ملف شخص معين (للزوار)
+app.get('/profile/:username', async (req, res) => {
+    try {
+        const { username } = req.params;
+        
+        console.log('📖 جلب ملف المستخدم:', username);
+        
+        const { data: user, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('username', username);
+
+        if (error || !user || user.length === 0) {
+            return res.status(404).send(`
+                <h1>❌ المستخدم غير موجود</h1>
+                <p>المستخدم "<strong>${username}</strong>" غير موجود.</p>
+                <a href="/">العودة إلى الرئيسية</a>
+            `);
+        }
+
+        const userData = user[0];
+
+        const { count: totalAdds } = await supabase
+            .from('prices')
+            .select('*', { count: 'exact', head: true })
+            .eq('username', username);
+
+        const { data: recentPrices } = await supabase
+            .from('prices')
+            .select('*')
+            .eq('username', username)
+            .order('created_at', { ascending: false })
+            .limit(5);
+
+        const success = req.query.success || null;
 
         res.render('profile', {
             user: userData,
             totalAdds: totalAdds || 0,
             recentPrices: recentPrices || [],
-            success: success
+            success: success,
+            currentUser: req.session.user || null
         });
         
     } catch (err) {
-        console.error('❌ خطأ عام في الملف الشخصي:', err);
-        res.status(500).send(`
-            <h1>❌ حدث خطأ</h1>
-            <p>${err.message}</p>
-            <a href="/">العودة إلى الرئيسية</a>
-        `);
+        console.error('❌ خطأ:', err);
+        res.status(500).send("حدث خطأ");
     }
 });
 
-// إنشاء مستخدم جديد
+// إنشاء مستخدم جديد + تسجيل الدخول تلقائياً
 app.post('/create_user', async (req, res) => {
     try {
         const { username, full_name, state, phone } = req.body;
@@ -313,11 +349,9 @@ app.post('/create_user', async (req, res) => {
         console.log('📝 محاولة إنشاء مستخدم:', { username, full_name, state, phone });
         
         if (!username || !full_name || !state) {
-            console.log('❌ بيانات ناقصة');
             return res.status(400).send("جميع الحقول مطلوبة");
         }
 
-        // التحقق من أن اسم المستخدم غير مكرر
         const { data: existingUser } = await supabase
             .from('users')
             .select('username')
@@ -329,7 +363,6 @@ app.post('/create_user', async (req, res) => {
             return res.status(400).send("اسم المستخدم موجود بالفعل");
         }
 
-        // إضافة المستخدم
         const { data, error } = await supabase
             .from('users')
             .insert([{ 
@@ -346,7 +379,15 @@ app.post('/create_user', async (req, res) => {
         }
 
         console.log('✅ تم إنشاء المستخدم بنجاح:', data);
-        res.redirect(`/profile/${username}?success=✅ تم إنشاء الملف الشخصي بنجاح`);
+        
+        // ✅ تسجيل الدخول تلقائياً بعد إنشاء المستخدم
+        req.session.user = {
+            username: username.trim(),
+            full_name: full_name.trim(),
+            state: state.trim()
+        };
+        
+        res.redirect(`/profile?success=✅ تم إنشاء الملف الشخصي بنجاح وتم تسجيل الدخول`);
         
     } catch (err) {
         console.error('❌ خطأ عام:', err);
@@ -354,10 +395,58 @@ app.post('/create_user', async (req, res) => {
     }
 });
 
-// تحديث الملف الشخصي
-app.post('/update_profile/:username', async (req, res) => {
+// تسجيل الدخول (Login) - للمستخدمين الموجودين
+app.post('/login', async (req, res) => {
     try {
-        const { username } = req.params;
+        const { username } = req.body;
+        
+        if (!username) {
+            return res.status(400).send("يرجى إدخال اسم المستخدم");
+        }
+
+        const { data: user, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('username', username)
+            .single();
+
+        if (error || !user) {
+            return res.status(404).send("❌ المستخدم غير موجود");
+        }
+
+        // ✅ تسجيل الدخول
+        req.session.user = {
+            username: user.username,
+            full_name: user.full_name,
+            state: user.state
+        };
+
+        res.redirect('/?success=✅ مرحباً ' + user.full_name + '! تم تسجيل الدخول بنجاح');
+        
+    } catch (err) {
+        console.error('Login Error:', err);
+        res.status(500).send("حدث خطأ في تسجيل الدخول");
+    }
+});
+
+// تسجيل الخروج (Logout)
+app.get('/logout', (req, res) => {
+    req.session.destroy((err) => {
+        if (err) {
+            console.error('Logout Error:', err);
+        }
+        res.redirect('/?success=👋 تم تسجيل الخروج بنجاح');
+    });
+});
+
+// تحديث الملف الشخصي
+app.post('/update_profile', async (req, res) => {
+    try {
+        if (!req.session.user) {
+            return res.redirect('/?error=⚠️ يرجى تسجيل الدخول أولاً');
+        }
+
+        const username = req.session.user.username;
         const { full_name, state, phone } = req.body;
 
         const { data, error } = await supabase
@@ -376,8 +465,12 @@ app.post('/update_profile/:username', async (req, res) => {
             return res.status(500).send("خطأ في تحديث البيانات");
         }
 
+        // ✅ تحديث بيانات الجلسة
+        req.session.user.full_name = full_name.trim();
+        req.session.user.state = state.trim();
+
         console.log('✅ تم تحديث الملف الشخصي:', username);
-        res.redirect(`/profile/${username}?success=✅ تم تحديث الملف الشخصي بنجاح`);
+        res.redirect(`/profile?success=✅ تم تحديث الملف الشخصي بنجاح`);
         
     } catch (err) {
         console.error("Update Profile Error:", err);
@@ -389,16 +482,16 @@ app.post('/update_profile/:username', async (req, res) => {
 // Routes اختبارية
 // ============================================================
 
-// اختبار الاتصال
 app.get('/test', (req, res) => {
     res.json({
         status: '✅ السيرفر يعمل',
         time: new Date().toLocaleString('ar-EG'),
-        version: '2.0.0'
+        version: '2.0.0',
+        loggedIn: req.session.user ? true : false,
+        user: req.session.user || null
     });
 });
 
-// عرض جميع المستخدمين (للتطوير)
 app.get('/api/users', async (req, res) => {
     try {
         const { data: users, error } = await supabase
@@ -413,11 +506,6 @@ app.get('/api/users', async (req, res) => {
     }
 });
 
-// ============================================================
-// API Routes
-// ============================================================
-
-// API: جلب إحصائيات عامة
 app.get('/api/stats', async (req, res) => {
     try {
         const { data: prices, error } = await supabase
@@ -446,24 +534,6 @@ app.get('/api/stats', async (req, res) => {
         });
     } catch (err) {
         res.status(500).json({ error: err.message });
-    }
-});
-
-// API: جلب بيانات مستخدم
-app.get('/api/user/:username', async (req, res) => {
-    try {
-        const { username } = req.params;
-        
-        const { data: user, error } = await supabase
-            .from('users')
-            .select('*')
-            .eq('username', username)
-            .single();
-
-        if (error) throw error;
-        res.json(user);
-    } catch (err) {
-        res.status(404).json({ error: "المستخدم غير موجود" });
     }
 });
 
