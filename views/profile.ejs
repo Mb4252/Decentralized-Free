@@ -236,6 +236,23 @@
             border-radius: 20px;
             font-size: 0.9rem;
         }
+        
+        .btn-change-password {
+            background: linear-gradient(135deg, #ffc107, #e0a800);
+            color: #333;
+            border: none;
+            padding: 10px 30px;
+            border-radius: 25px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+        
+        .btn-change-password:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 15px rgba(255, 193, 7, 0.4);
+            color: #333;
+        }
     </style>
 </head>
 <body>
@@ -397,11 +414,17 @@
     </div>
     <% } %>
 
-    <!-- زر تعديل الملف (فقط لصاحب الملف) -->
+    <!-- أزرار التحكم (فقط لصاحب الملف) -->
     <% if (currentUser && currentUser.username === user.username) { %>
-    <button class="btn-edit" data-bs-toggle="modal" data-bs-target="#editProfileModal">
-        <i class="fas fa-edit"></i> تعديل الملف الشخصي
-    </button>
+        <!-- زر تعديل الملف الشخصي -->
+        <button class="btn-edit mb-3" data-bs-toggle="modal" data-bs-target="#editProfileModal">
+            <i class="fas fa-edit"></i> تعديل الملف الشخصي
+        </button>
+        
+        <!-- زر تغيير كلمة المرور -->
+        <button class="btn-change-password" data-bs-toggle="modal" data-bs-target="#changePasswordModal">
+            <i class="fas fa-key"></i> تغيير كلمة المرور
+        </button>
     <% } %>
 </div>
 
@@ -455,6 +478,48 @@
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
                     <button type="submit" class="btn btn-save">
                         <i class="fas fa-save"></i> حفظ التغييرات
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ======================================== -->
+<!-- مودال تغيير كلمة المرور -->
+<!-- ======================================== -->
+<div class="modal fade" id="changePasswordModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header" style="background: linear-gradient(135deg, #ffc107, #e0a800); color: #333;">
+                <h5 class="modal-title">
+                    <i class="fas fa-key"></i> تغيير كلمة المرور
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="/change_password" method="POST">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">كلمة المرور الحالية *</label>
+                        <input type="password" name="current_password" class="form-control" 
+                               placeholder="أدخل كلمة المرور الحالية" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">كلمة المرور الجديدة *</label>
+                        <input type="password" name="new_password" class="form-control" 
+                               placeholder="أدخل كلمة مرور جديدة (6 أحرف على الأقل)" required minlength="6">
+                        <small class="text-muted">يجب أن تكون 6 أحرف على الأقل</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">تأكيد كلمة المرور الجديدة *</label>
+                        <input type="password" name="confirm_new_password" class="form-control" 
+                               placeholder="أعد كتابة كلمة المرور الجديدة" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn" style="background: #ffc107; color: #333; font-weight: bold;">
+                        <i class="fas fa-save"></i> تغيير كلمة المرور
                     </button>
                 </div>
             </form>
