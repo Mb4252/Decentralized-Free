@@ -214,6 +214,28 @@
             background: #00531e;
             color: white;
         }
+        
+        .btn-logout {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 20px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-logout:hover {
+            transform: scale(1.05);
+            color: white;
+        }
+        
+        .user-badge {
+            background: var(--sudan-green);
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+        }
     </style>
 </head>
 <body>
@@ -230,11 +252,34 @@
     </div>
     <% } %>
 
-    <!-- زر العودة -->
-    <div class="mb-3">
+    <!-- رسائل الخطأ -->
+    <% if (typeof error !== 'undefined' && error) { %>
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="fas fa-exclamation-circle"></i> <%= error %>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    <% } %>
+
+    <!-- شريط العلوي -->
+    <div class="mb-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
         <a href="/" class="btn btn-back">
             <i class="fas fa-arrow-right"></i> العودة للرئيسية
         </a>
+        
+        <div class="d-flex gap-2 align-items-center flex-wrap">
+            <% if (currentUser && currentUser.username === user.username) { %>
+                <span class="user-badge">
+                    <i class="fas fa-user-check"></i> أنت
+                </span>
+                <a href="/logout" class="btn btn-logout btn-sm">
+                    <i class="fas fa-sign-out-alt"></i> خروج
+                </a>
+            <% } else { %>
+                <span class="badge bg-secondary">
+                    <i class="fas fa-eye"></i> زيارة
+                </span>
+            <% } %>
+        </div>
     </div>
 
     <!-- الصورة الرمزية -->
@@ -346,17 +391,24 @@
             <% }) %>
         </div>
     </div>
+    <% } else { %>
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle"></i> لم تقم بإضافة أي أسعار حتى الآن
+    </div>
     <% } %>
 
-    <!-- زر تعديل الملف -->
+    <!-- زر تعديل الملف (فقط لصاحب الملف) -->
+    <% if (currentUser && currentUser.username === user.username) { %>
     <button class="btn-edit" data-bs-toggle="modal" data-bs-target="#editProfileModal">
         <i class="fas fa-edit"></i> تعديل الملف الشخصي
     </button>
+    <% } %>
 </div>
 
 <!-- ======================================== -->
-<!-- مودال تعديل الملف الشخصي -->
+<!-- مودال تعديل الملف الشخصي (فقط لصاحب الملف) -->
 <!-- ======================================== -->
+<% if (currentUser && currentUser.username === user.username) { %>
 <div class="modal fade" id="editProfileModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -366,7 +418,7 @@
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form action="/update_profile/<%= user.username %>" method="POST">
+            <form action="/update_profile" method="POST">
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label fw-bold">الاسم الكامل *</label>
@@ -394,6 +446,10 @@
                                value="<%= user.phone || '' %>" 
                                placeholder="مثال: 0912345678">
                     </div>
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> 
+                        <strong>ملاحظة:</strong> اسم المستخدم لا يمكن تغييره
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
@@ -405,6 +461,7 @@
         </div>
     </div>
 </div>
+<% } %>
 
 <!-- ======================================== -->
 <!-- JavaScript -->
