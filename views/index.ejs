@@ -204,16 +204,6 @@
             box-shadow: 0 4px 15px rgba(0, 114, 41, 0.4);
         }
         
-        .modal-header-sudan {
-            background: linear-gradient(135deg, var(--sudan-green), #00531e);
-            color: white;
-            border-radius: 15px 15px 0 0;
-        }
-        
-        .modal-header-sudan .btn-close {
-            filter: brightness(0) invert(1);
-        }
-        
         .btn-login {
             background: linear-gradient(135deg, #C8102E, #8B0000);
             color: white;
@@ -459,12 +449,12 @@
                             <i class="fas fa-sign-out-alt"></i> تسجيل خروج
                         </a>
                     <% } else { %>
-                        <button class="btn btn-profile" data-bs-toggle="modal" data-bs-target="#createProfileModal">
-                            <i class="fas fa-user-plus"></i> إنشاء ملف شخصي
-                        </button>
-                        <button class="btn btn-login" data-bs-toggle="modal" data-bs-target="#loginModal">
+                        <a href="/register" class="btn btn-profile">
+                            <i class="fas fa-user-plus"></i> إنشاء حساب
+                        </a>
+                        <a href="/login" class="btn btn-login">
                             <i class="fas fa-sign-in-alt"></i> تسجيل دخول
-                        </button>
+                        </a>
                     <% } %>
                     <button class="btn btn-outline-info" onclick="window.location.reload()">
                         <i class="fas fa-sync"></i> تحديث
@@ -719,96 +709,6 @@
     </div>
 
     <!-- ======================================== -->
-    <!-- مودال إنشاء ملف شخصي -->
-    <!-- ======================================== -->
-    <div class="modal fade" id="createProfileModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header modal-header-sudan">
-                    <h5 class="modal-title">
-                        <i class="fas fa-user-plus"></i> إنشاء ملف شخصي
-                    </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <form action="/create_user" method="POST">
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">اسم المستخدم *</label>
-                            <input type="text" name="username" class="form-control" 
-                                   placeholder="أدخل اسم مستخدم فريد" required>
-                            <small class="text-muted">سيظهر في رابط ملفك الشخصي</small>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">الاسم الكامل *</label>
-                            <input type="text" name="full_name" class="form-control" 
-                                   placeholder="أدخل اسمك الكامل" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">الولاية *</label>
-                            <select name="state" class="form-select" required>
-                                <option value="">اختر ولايتك</option>
-                                <option value="الخرطوم">الخرطوم</option>
-                                <option value="أم درمان">أم درمان</option>
-                                <option value="الخرطوم بحري">الخرطوم بحري</option>
-                                <option value="جزيرة">جزيرة</option>
-                                <option value="كردفان">كردفان</option>
-                                <option value="دارفور">دارفور</option>
-                                <option value="النيل الأزرق">النيل الأزرق</option>
-                                <option value="نهر النيل">نهر النيل</option>
-                                <option value="البحر الأحمر">البحر الأحمر</option>
-                                <option value="أخرى">أخرى</option>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">رقم الهاتف (اختياري)</label>
-                            <input type="tel" name="phone" class="form-control" 
-                                   placeholder="مثال: 0912345678">
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
-                        <button type="submit" class="btn btn-green">
-                            <i class="fas fa-check"></i> إنشاء الملف
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- ======================================== -->
-    <!-- مودال تسجيل الدخول -->
-    <!-- ======================================== -->
-    <div class="modal fade" id="loginModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header" style="background: linear-gradient(135deg, #C8102E, #8B0000); color: white;">
-                    <h5 class="modal-title">
-                        <i class="fas fa-sign-in-alt"></i> تسجيل الدخول
-                    </h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <form action="/login" method="POST">
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">اسم المستخدم *</label>
-                            <input type="text" name="username" class="form-control" 
-                                   placeholder="أدخل اسم المستخدم" required>
-                            <small class="text-muted">أدخل اسم المستخدم الذي سجلت به</small>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
-                        <button type="submit" class="btn" style="background: #C8102E; color: white;">
-                            <i class="fas fa-sign-in-alt"></i> تسجيل دخول
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- ======================================== -->
     <!-- مودال تعديل السعر -->
     <!-- ======================================== -->
     <div class="modal fade" id="editModal" tabindex="-1">
@@ -914,7 +814,6 @@
             window.open(url, '_blank');
         }
 
-        // تم إزالة التحديث التلقائي لمنع مسح الحقول
         console.log('🇸🇩 منصة التكافل السوداني - نساعد بعضنا البعض');
     </script>
 </body>
