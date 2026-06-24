@@ -117,14 +117,6 @@
             font-weight: bold;
         }
         
-        .alert-price {
-            background-color: #fff3cd;
-            border-right: 4px solid #ffc107;
-            padding: 10px;
-            border-radius: 8px;
-            margin: 5px 0;
-        }
-        
         .btn-sudan {
             background: linear-gradient(135deg, var(--sudan-red), #a00d22);
             color: white;
@@ -150,11 +142,17 @@
             font-weight: bold;
         }
         
+        .btn-green:hover {
+            transform: scale(1.05);
+            color: white;
+        }
+        
         .card-sudan {
             border: none;
             border-radius: 15px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.08);
             transition: all 0.3s ease;
+            background: white;
         }
         
         .card-sudan:hover {
@@ -185,13 +183,6 @@
             color: white;
         }
         
-        .toast-container {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 9999;
-        }
-        
         .category-badge {
             padding: 4px 12px;
             border-radius: 20px;
@@ -219,6 +210,42 @@
             cursor: help;
         }
         
+        .btn-profile {
+            background: linear-gradient(135deg, #007229, #004d1a);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            padding: 8px 20px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-profile:hover {
+            transform: scale(1.05);
+            color: white;
+            box-shadow: 0 4px 15px rgba(0, 114, 41, 0.4);
+        }
+        
+        .btn-create-profile {
+            background: linear-gradient(135deg, #6c757d, #495057);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            padding: 8px 20px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-create-profile:hover {
+            transform: scale(1.05);
+            color: white;
+        }
+        
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+        }
+        
         @media (max-width: 768px) {
             .stat-card .stat-number {
                 font-size: 1.2rem;
@@ -227,12 +254,23 @@
                 font-size: 1.5rem;
             }
         }
+        
+        /* تنسيق المودال */
+        .modal-header-sudan {
+            background: linear-gradient(135deg, var(--sudan-green), #00531e);
+            color: white;
+            border-radius: 15px 15px 0 0;
+        }
+        
+        .modal-header-sudan .btn-close {
+            filter: brightness(0) invert(1);
+        }
     </style>
 </head>
 <body>
     <div class="container mt-4">
         <!-- رسالة نجاح -->
-        <% if (typeof success !== 'undefined' && success) { %>
+        <% if (success) { %>
         <div class="alert alert-success alert-dismissible fade show" role="alert">
             <i class="fas fa-check-circle"></i> <%= success %>
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
@@ -253,6 +291,23 @@
                 <span class="badge bg-light text-dark">
                     <i class="fas fa-clock"></i> آخر تحديث: <%= new Date().toLocaleTimeString('ar-EG') %>
                 </span>
+            </div>
+        </div>
+
+        <!-- أزرار الملف الشخصي -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="d-flex gap-2 flex-wrap justify-content-center">
+                    <button class="btn btn-profile" data-bs-toggle="modal" data-bs-target="#createProfileModal">
+                        <i class="fas fa-user-plus"></i> إنشاء ملف شخصي
+                    </button>
+                    <a href="/profile/ضيف" class="btn btn-outline-success">
+                        <i class="fas fa-user"></i> عرض ملفي الشخصي
+                    </a>
+                    <button class="btn btn-outline-info" onclick="window.location.reload()">
+                        <i class="fas fa-sync"></i> تحديث
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -327,6 +382,11 @@
                         <small class="text-muted d-block">
                             <%= p.created_at ? new Date(p.created_at).toLocaleString('ar-EG') : '' %>
                         </small>
+                        <% if (p.username) { %>
+                        <small class="text-muted">
+                            <i class="fas fa-user"></i> <%= p.username %>
+                        </small>
+                        <% } %>
                     </div>
                 </div>
                 <% }) %>
@@ -380,13 +440,15 @@
                     <input name="location" class="form-control" placeholder="المنطقة/الحي *" required>
                 </div>
                 <div class="col-md-2">
-                    <input name="store" class="form-control" placeholder="اسم المتجر (اختياري)">
+                    <input name="store" class="form-control" placeholder="المتجر (اختياري)">
                 </div>
                 <div class="col-md-2">
                     <button type="submit" class="btn btn-sudan w-100">
                         <i class="fas fa-save"></i> أضف
                     </button>
                 </div>
+                <!-- حقل مخفي لاسم المستخدم -->
+                <input type="hidden" name="username" value="ضيف">
             </form>
             <div class="mt-2 text-muted small">
                 <i class="fas fa-info-circle"></i> 
@@ -425,6 +487,7 @@
                             <th>السعر (ج.س)</th>
                             <th>المنطقة</th>
                             <th>المتجر</th>
+                            <th>المستخدم</th>
                             <th>التاريخ</th>
                             <th>الإجراءات</th>
                         </tr>
@@ -436,6 +499,15 @@
                             <td class="price-high"><%= p.price %></td>
                             <td><span class="badge bg-info"><%= p.location %></span></td>
                             <td><%= p.store || 'غير محدد' %></td>
+                            <td>
+                                <% if (p.username && p.username !== 'ضيف') { %>
+                                <a href="/profile/<%= p.username %>" class="text-decoration-none">
+                                    <i class="fas fa-user"></i> <%= p.username %>
+                                </a>
+                                <% } else { %>
+                                <span class="text-muted">ضيف</span>
+                                <% } %>
+                            </td>
                             <td>
                                 <small class="text-muted">
                                     <%= p.created_at ? new Date(p.created_at).toLocaleString('ar-EG') : 'غير متوفر' %>
@@ -489,43 +561,110 @@
         </footer>
     </div>
 
-    <!-- نموذج تعديل مخفي -->
-    <div class="modal fade" id="editModal" tabindex="-1">
+    <!-- ======================================== -->
+    <!-- مودال إنشاء ملف شخصي -->
+    <!-- ======================================== -->
+    <div class="modal fade" id="createProfileModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">تعديل السعر</h5>
+                <div class="modal-header modal-header-sudan">
+                    <h5 class="modal-title">
+                        <i class="fas fa-user-plus"></i> إنشاء ملف شخصي
+                    </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <form id="editForm" method="POST">
+                <form action="/create_user" method="POST">
                     <div class="modal-body">
-                        <input type="hidden" name="_method" value="PUT">
                         <div class="mb-3">
-                            <label>السعر الجديد</label>
-                            <input name="price" class="form-control" type="number" step="0.01" required>
+                            <label class="form-label fw-bold">اسم المستخدم *</label>
+                            <input type="text" name="username" class="form-control" 
+                                   placeholder="أدخل اسم مستخدم فريد" required>
+                            <small class="text-muted">سيظهر في رابط ملفك الشخصي</small>
                         </div>
                         <div class="mb-3">
-                            <label>المنطقة</label>
-                            <input name="location" class="form-control">
+                            <label class="form-label fw-bold">الاسم الكامل *</label>
+                            <input type="text" name="full_name" class="form-control" 
+                                   placeholder="أدخل اسمك الكامل" required>
                         </div>
                         <div class="mb-3">
-                            <label>المتجر</label>
-                            <input name="store" class="form-control">
+                            <label class="form-label fw-bold">الولاية *</label>
+                            <select name="state" class="form-select" required>
+                                <option value="">اختر ولايتك</option>
+                                <option value="الخرطوم">الخرطوم</option>
+                                <option value="أم درمان">أم درمان</option>
+                                <option value="الخرطوم بحري">الخرطوم بحري</option>
+                                <option value="جزيرة">جزيرة</option>
+                                <option value="كردفان">كردفان</option>
+                                <option value="دارفور">دارفور</option>
+                                <option value="النيل الأزرق">النيل الأزرق</option>
+                                <option value="نهر النيل">نهر النيل</option>
+                                <option value="البحر الأحمر">البحر الأحمر</option>
+                                <option value="أخرى">أخرى</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">رقم الهاتف (اختياري)</label>
+                            <input type="tel" name="phone" class="form-control" 
+                                   placeholder="مثال: 0912345678">
                         </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
-                        <button type="submit" class="btn btn-primary">تحديث</button>
+                        <button type="submit" class="btn btn-green">
+                            <i class="fas fa-check"></i> إنشاء الملف
+                        </button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
 
-    <!-- JavaScript -->
+    <!-- ======================================== -->
+    <!-- مودال تعديل السعر -->
+    <!-- ======================================== -->
+    <div class="modal fade" id="editModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header" style="background: linear-gradient(135deg, #C8102E, #8B0000); color: white;">
+                    <h5 class="modal-title">
+                        <i class="fas fa-edit"></i> تعديل السعر
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="editForm" method="POST">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">السعر الجديد *</label>
+                            <input name="price" class="form-control" type="number" step="0.01" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">المنطقة</label>
+                            <input name="location" class="form-control" placeholder="المنطقة/الحي">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">المتجر</label>
+                            <input name="store" class="form-control" placeholder="اسم المتجر">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                        <button type="submit" class="btn btn-sudan">
+                            <i class="fas fa-save"></i> تحديث
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ======================================== -->
+    <!-- Bootstrap & JavaScript -->
+    <!-- ======================================== -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // ============================================
         // البحث
+        // ============================================
         document.getElementById('searchInput').addEventListener('keyup', function() {
             const filter = this.value.toLowerCase();
             const rows = document.querySelectorAll('#priceTable tbody tr');
@@ -535,17 +674,19 @@
             });
         });
 
+        // ============================================
         // الترتيب
+        // ============================================
         document.getElementById('sortSelect').addEventListener('change', function() {
             const tbody = document.querySelector('#priceTable tbody');
             const rows = Array.from(tbody.querySelectorAll('tr'));
             
             const sortType = this.value;
             rows.sort((a, b) => {
-                const dateA = new Date(a.cells[4].innerText || 0);
-                const dateB = new Date(b.cells[4].innerText || 0);
-                const priceA = parseFloat(a.cells[1].innerText) || 0;
-                const priceB = parseFloat(b.cells[1].innerText) || 0;
+                const dateA = new Date(a.cells[5]?.innerText || 0);
+                const dateB = new Date(b.cells[5]?.innerText || 0);
+                const priceA = parseFloat(a.cells[1]?.innerText) || 0;
+                const priceB = parseFloat(b.cells[1]?.innerText) || 0;
                 
                 switch(sortType) {
                     case 'newest': return dateB - dateA;
@@ -559,9 +700,11 @@
             rows.forEach(row => tbody.appendChild(row));
         });
 
+        // ============================================
         // حذف
+        // ============================================
         function deletePrice(id) {
-            if (confirm('هل أنت متأكد من حذف هذا السعر؟')) {
+            if (confirm('⚠️ هل أنت متأكد من حذف هذا السعر؟')) {
                 const form = document.createElement('form');
                 form.method = 'POST';
                 form.action = `/delete_price/${id}`;
@@ -570,7 +713,9 @@
             }
         }
 
+        // ============================================
         // تعديل
+        // ============================================
         function editPrice(id, price, location, store) {
             const modal = new bootstrap.Modal(document.getElementById('editModal'));
             const form = document.getElementById('editForm');
@@ -581,20 +726,27 @@
             modal.show();
         }
 
+        // ============================================
         // مشاركة واتساب
+        // ============================================
         function sharePrice(item, price, location) {
             const text = `🇸🇩 سعر ${item} في ${location} = ${price} ج.س`;
             const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
             window.open(url, '_blank');
         }
 
+        // ============================================
         // تحديث تلقائي كل 30 ثانية
+        // ============================================
         setTimeout(() => {
             location.reload();
         }, 30000);
 
-        // عرض رسالة ترحيب
+        // ============================================
+        // رسالة ترحيب في الكونسول
+        // ============================================
         console.log('🇸🇩 منصة التكافل السوداني - نساعد بعضنا البعض');
+        console.log('❤️ تم إنشاء هذه المنصة لخدمة الشعب السوداني');
     </script>
 </body>
 </html>
