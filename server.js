@@ -56,6 +56,45 @@ function getLatest(prices, count = 10) {
 const rateLimit = new Map();
 
 // ============================================================
+// حذف المنشورات المنتهية (أقدم من 3 أيام)
+// ============================================================
+
+async function deleteExpiredPrices() {
+    try {
+        const threeDaysAgo = new Date();
+        threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+        
+        const { data, error } = await supabase
+            .from('prices')
+            .delete()
+            .lt('created_at', threeDaysAgo.toISOString());
+
+        if (error) {
+            console.error('❌ خطأ في حذف المنشورات المنتهية:', error);
+            return;
+        }
+
+        if (data && data.length > 0) {
+            console.log(`✅ تم حذف ${data.length} منشور منتهي (أقدم من 3 أيام)`);
+        } else {
+            console.log('ℹ️ لا توجد منشورات منتهية للحذف');
+        }
+    } catch (err) {
+        console.error('❌ خطأ في deleteExpiredPrices:', err);
+    }
+}
+
+// تشغيل الحذف عند بدء السيرفر (بعد 5 ثوان)
+setTimeout(() => {
+    deleteExpiredPrices();
+}, 5000);
+
+// جدولة الحذف كل 3 أيام (259200000 ملي ثانية)
+setInterval(() => {
+    deleteExpiredPrices();
+}, 259200000);
+
+// ============================================================
 // الصفحة الرئيسية
 // ============================================================
 app.get('/', async (req, res) => {
@@ -235,12 +274,11 @@ app.post('/update_price/:id', async (req, res) => {
 });
 
 // ============================================================
-// Routes المستخدمين مع كلمة المرور
+// Routes المستخدمين
 // ============================================================
 
-// صفحة تسجيل الدخول المنفصلة
+// صفحة تسجيل الدخول
 app.get('/login', (req, res) => {
-    // إذا كان المستخدم مسجلاً بالفعل، حوله للرئيسية
     if (req.session.user) {
         return res.redirect('/');
     }
@@ -249,7 +287,7 @@ app.get('/login', (req, res) => {
     res.render('login', { error: error });
 });
 
-// صفحة إنشاء حساب جديد (منفصلة)
+// صفحة إنشاء حساب جديد
 app.get('/register', (req, res) => {
     if (req.session.user) {
         return res.redirect('/');
@@ -259,7 +297,7 @@ app.get('/register', (req, res) => {
     res.render('register', { error: error });
 });
 
-// تسجيل الدخول مع كلمة المرور
+// تسجيل الدخول
 app.post('/login', async (req, res) => {
     try {
         const { username, password } = req.body;
@@ -288,7 +326,6 @@ app.post('/login', async (req, res) => {
             return res.redirect('/login?error=❌ كلمة المرور غير صحيحة');
         }
 
-        // ✅ تسجيل الدخول بنجاح
         req.session.user = {
             username: user.username,
             full_name: user.full_name,
@@ -305,14 +342,13 @@ app.post('/login', async (req, res) => {
     }
 });
 
-// إنشاء مستخدم جديد مع كلمة مرور
+// إنشاء مستخدم جديد
 app.post('/register', async (req, res) => {
     try {
         const { username, full_name, state, phone, password, confirm_password } = req.body;
         
         console.log('📝 محاولة إنشاء مستخدم جديد:', { username, full_name, state });
         
-        // التحقق من صحة البيانات
         if (!username || !full_name || !state || !password) {
             return res.redirect('/register?error=⚠️ جميع الحقول مطلوبة');
         }
@@ -325,7 +361,6 @@ app.post('/register', async (req, res) => {
             return res.redirect('/register?error=⚠️ كلمة المرور غير متطابقة');
         }
 
-        // التحقق من أن اسم المستخدم غير مكرر
         const { data: existingUser } = await supabase
             .from('users')
             .select('username')
@@ -337,7 +372,6 @@ app.post('/register', async (req, res) => {
             return res.redirect('/register?error=⚠️ اسم المستخدم موجود بالفعل');
         }
 
-        // إضافة المستخدم مع كلمة المرور
         const { data, error } = await supabase
             .from('users')
             .insert([{ 
@@ -345,7 +379,7 @@ app.post('/register', async (req, res) => {
                 full_name: full_name.trim(),
                 state: state.trim(),
                 phone: phone?.trim() || null,
-                password: password // نص عادي (يمكن تشفيره لاحقاً)
+                password: password
             }])
             .select();
 
@@ -356,7 +390,6 @@ app.post('/register', async (req, res) => {
 
         console.log('✅ تم إنشاء المستخدم بنجاح:', data);
         
-        // تسجيل الدخول تلقائياً بعد الإنشاء
         req.session.user = {
             username: username.trim(),
             full_name: full_name.trim(),
@@ -409,12 +442,14 @@ app.get('/profile', async (req, res) => {
             .limit(5);
 
         const success = req.query.success || null;
+        const errorMsg = req.query.error || null;
 
         res.render('profile', {
             user: userData,
             totalAdds: totalAdds || 0,
             recentPrices: recentPrices || [],
             success: success,
+            error: errorMsg,
             currentUser: req.session.user
         });
         
@@ -424,7 +459,7 @@ app.get('/profile', async (req, res) => {
     }
 });
 
-// عرض ملف شخص معين (للزوار)
+// عرض ملف شخص معين
 app.get('/profile/:username', async (req, res) => {
     try {
         const { username } = req.params;
@@ -522,7 +557,6 @@ app.post('/change_password', async (req, res) => {
         const username = req.session.user.username;
         const { current_password, new_password, confirm_new_password } = req.body;
 
-        // التحقق من البيانات
         if (!current_password || !new_password || !confirm_new_password) {
             return res.redirect('/profile?error=⚠️ جميع الحقول مطلوبة');
         }
@@ -535,7 +569,6 @@ app.post('/change_password', async (req, res) => {
             return res.redirect('/profile?error=⚠️ كلمة المرور الجديدة غير متطابقة');
         }
 
-        // جلب المستخدم للتحقق من كلمة المرور الحالية
         const { data: user, error } = await supabase
             .from('users')
             .select('password')
@@ -546,12 +579,10 @@ app.post('/change_password', async (req, res) => {
             return res.redirect('/profile?error=❌ المستخدم غير موجود');
         }
 
-        // التحقق من كلمة المرور الحالية
         if (user.password !== current_password) {
             return res.redirect('/profile?error=❌ كلمة المرور الحالية غير صحيحة');
         }
 
-        // تحديث كلمة المرور
         const { error: updateError } = await supabase
             .from('users')
             .update({ password: new_password })
@@ -579,6 +610,37 @@ app.get('/logout', (req, res) => {
         }
         res.redirect('/?success=👋 تم تسجيل الخروج بنجاح');
     });
+});
+
+// ============================================================
+// Route: مسح المنشورات القديمة يدوياً (للمشرفين)
+// ============================================================
+
+app.post('/admin/cleanup', async (req, res) => {
+    try {
+        if (!req.session.user || req.session.user.username !== 'admin') {
+            return res.status(403).send('❌ غير مصرح به');
+        }
+
+        const threeDaysAgo = new Date();
+        threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+        
+        const { data, error } = await supabase
+            .from('prices')
+            .delete()
+            .lt('created_at', threeDaysAgo.toISOString())
+            .select();
+
+        if (error) {
+            console.error('Cleanup Error:', error);
+            return res.status(500).send('خطأ في مسح المنشورات');
+        }
+
+        res.redirect(`/?success=🗑️ تم حذف ${data?.length || 0} منشور منتهي`);
+    } catch (err) {
+        console.error('Cleanup Error:', err);
+        res.status(500).send('حدث خطأ');
+    }
 });
 
 // ============================================================
@@ -660,4 +722,5 @@ app.listen(PORT, () => {
     console.log(`🟢 Server is running on port ${PORT}`);
     console.log(`🔗 http://localhost:${PORT}`);
     console.log(`🇸🇩 منصة التكافل السوداني جاهزة للعمل`);
+    console.log(`🗑️ سيتم حذف المنشورات الأقدم من 3 أيام تلقائياً`);
 });
