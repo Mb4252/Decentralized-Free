@@ -1,25 +1,69 @@
+// استيراد المكتبات الأساسية
 require('dotenv').config();
 const express = require('express');
+const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
+// إعداد الاتصال بقاعدة بيانات Supabase
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_KEY;
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+// إعدادات محرك العرض (EJS) وتحديد مسار مجلد views بدقة
 app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
+
+// Middleware لمعالجة بيانات النماذج (Forms)
 app.use(express.urlencoded({ extended: true }));
 
-// الصفحة الرئيسية - عرض البيانات
+// Route: الصفحة الرئيسية (عرض البيانات)
 app.get('/', async (req, res) => {
-    const { data: prices, error } = await supabase.from('prices').select('*');
-    res.render('index', { prices: prices || [] });
+    try {
+        // جلب البيانات مع ترتيبها من الأحدث للأقدم
+        const { data: prices, error } = await supabase
+            .from('prices')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error("Supabase Error:", error);
+            return res.status(500).send("خطأ في الاتصال بقاعدة البيانات.");
+        }
+
+        res.render('index', { prices: prices || [] });
+    } catch (err) {
+        console.error("General Error:", err);
+        res.status(500).send("حدث خطأ غير متوقع.");
+    }
 });
 
-// إضافة سعر جديد
+// Route: إضافة سعر جديد
 app.post('/add_price', async (req, res) => {
-    const { item, price, location } = req.body;
-    await supabase.from('prices').insert([{ item, price, location }]);
-    res.redirect('/');
+    try {
+        const { item, price, location } = req.body;
+        
+        // إدخال البيانات في الجدول
+        const { error } = await supabase
+            .from('prices')
+            .insert([{ item, price, location }]);
+
+        if (error) {
+            console.error("Insert Error:", error);
+            return res.status(500).send("خطأ أثناء إضافة البيانات.");
+        }
+
+        // إعادة التوجيه للصفحة الرئيسية بعد الإضافة
+        res.redirect('/');
+    } catch (err) {
+        console.error("General Error:", err);
+        res.status(500).send("حدث خطأ أثناء تنفيذ الطلب.");
+    }
 });
 
+// تشغيل السيرفر
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+});
