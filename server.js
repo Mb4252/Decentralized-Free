@@ -1,6 +1,6 @@
-// ============================================
+// ============================================================
 // منصة التكافل السوداني - ملف الخادم الرئيسي
-// ============================================
+// ============================================================
 
 // استيراد المكتبات الأساسية
 require('dotenv').config();
@@ -10,16 +10,16 @@ const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 
-// ============================================
+// ============================================================
 // إعداد الاتصال بقاعدة بيانات Supabase
-// ============================================
+// ============================================================
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// ============================================
+// ============================================================
 // إعدادات التطبيق
-// ============================================
+// ============================================================
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
@@ -28,9 +28,9 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static('public'));
 
-// ============================================
+// ============================================================
 // دوال مساعدة
-// ============================================
+// ============================================================
 
 // حساب متوسط الأسعار
 function calculateAverage(prices) {
@@ -44,17 +44,16 @@ function getLatest(prices, count = 10) {
     return prices.slice(0, count);
 }
 
-// منع الإضافات المتكررة (حماية بسيطة)
+// منع الإضافات المتكررة
 const rateLimit = new Map();
 
-// ============================================
+// ============================================================
 // Routes الرئيسية
-// ============================================
+// ============================================================
 
 // الصفحة الرئيسية
 app.get('/', async (req, res) => {
     try {
-        // جلب جميع البيانات مرتبة من الأحدث
         const { data: prices, error } = await supabase
             .from('prices')
             .select('*')
@@ -65,12 +64,10 @@ app.get('/', async (req, res) => {
             return res.status(500).send("خطأ في الاتصال بقاعدة البيانات.");
         }
 
-        // حساب الإحصائيات
         const totalItems = prices.length;
         const uniqueItems = [...new Set(prices.map(p => p.item))];
         const avgPrice = calculateAverage(prices);
         
-        // أعلى وأقل سعر
         let highestPrice = null;
         let lowestPrice = null;
         if (prices.length > 0) {
@@ -79,13 +76,9 @@ app.get('/', async (req, res) => {
             lowestPrice = sortedByPrice[sortedByPrice.length - 1];
         }
 
-        // أحدث الإضافات
         const latestPrices = getLatest(prices, 10);
-
-        // تجميع البيانات حسب المنطقة
         const locations = [...new Set(prices.map(p => p.location))];
 
-        // حساب متوسط الأسعار لكل سلعة
         const itemAverages = {};
         prices.forEach(p => {
             if (!itemAverages[p.item]) {
@@ -103,7 +96,6 @@ app.get('/', async (req, res) => {
             data.max = Math.max(...data.prices);
         });
 
-        // رسالة النجاح من الـ Query String
         const success = req.query.success || null;
 
         res.render('index', { 
@@ -126,16 +118,15 @@ app.get('/', async (req, res) => {
     }
 });
 
-// ============================================
+// ============================================================
 // Routes الأسعار
-// ============================================
+// ============================================================
 
 // إضافة سعر جديد
 app.post('/add_price', async (req, res) => {
     try {
         const { item, price, location, store, category, username } = req.body;
         
-        // التحقق من صحة البيانات
         if (!item || !price || !location) {
             return res.status(400).send("جميع الحقول مطلوبة.");
         }
@@ -144,7 +135,6 @@ app.post('/add_price', async (req, res) => {
             return res.status(400).send("السعر يجب أن يكون رقماً موجباً.");
         }
 
-        // حماية من الإضافات المتكررة
         const ip = req.ip || req.connection.remoteAddress;
         const now = Date.now();
         if (rateLimit.has(ip) && (now - rateLimit.get(ip) < 30000)) {
@@ -152,13 +142,11 @@ app.post('/add_price', async (req, res) => {
         }
         rateLimit.set(ip, now);
 
-        // الكلمات الممنوعة
         const blacklist = ['سبام', 'test', 'اختبار', 'spam', 'حرام', 'ممنوع'];
         if (blacklist.some(word => item.toLowerCase().includes(word))) {
             return res.status(400).send("❌ كلمة غير مسموح بها");
         }
 
-        // إدخال البيانات
         const finalUsername = username || 'ضيف';
         const { data, error } = await supabase
             .from('prices')
@@ -237,9 +225,9 @@ app.post('/update_price/:id', async (req, res) => {
     }
 });
 
-// ============================================
-// Routes المستخدمين (الملف الشخصي)
-// ============================================
+// ============================================================
+// Routes المستخدمين (الملف الشخصي) - النسخة المعدلة
+// ============================================================
 
 // صفحة الملف الشخصي
 app.get('/profile/:username', async (req, res) => {
@@ -247,20 +235,42 @@ app.get('/profile/:username', async (req, res) => {
         const { username } = req.params;
         
         console.log('📖 جلب ملف المستخدم:', username);
+        console.log('🔍 البحث في جدول users عن:', username);
         
         // جلب بيانات المستخدم
         const { data: user, error } = await supabase
             .from('users')
             .select('*')
-            .eq('username', username)
-            .single();
+            .eq('username', username);
 
-        if (error || !user) {
-            console.log('❌ المستخدم غير موجود:', username);
-            return res.status(404).send("❌ المستخدم غير موجود");
+        console.log('📊 نتيجة البحث:', { user, error });
+
+        if (error) {
+            console.error('❌ خطأ في الاستعلام:', error);
+            return res.status(500).send("خطأ في قاعدة البيانات: " + error.message);
         }
 
-        // جلب إحصائيات المستخدم (عدد الإضافات)
+        if (!user || user.length === 0) {
+            console.log('❌ المستخدم غير موجود:', username);
+            
+            // عرض جميع المستخدمين للمساعدة في التصحيح
+            const { data: allUsers } = await supabase
+                .from('users')
+                .select('username');
+            console.log('📋 المستخدمين الموجودين:', allUsers);
+            
+            return res.status(404).send(`
+                <h1>❌ المستخدم غير موجود</h1>
+                <p>المستخدم "<strong>${username}</strong>" غير موجود في قاعدة البيانات.</p>
+                <p>🔍 المستخدمين الموجودين: ${allUsers?.map(u => u.username).join(', ') || 'لا يوجد'}</p>
+                <a href="/">العودة إلى الرئيسية</a>
+            `);
+        }
+
+        // استخراج المستخدم الأول
+        const userData = user[0];
+
+        // جلب إحصائيات المستخدم
         const { count: totalAdds, error: countError } = await supabase
             .from('prices')
             .select('*', { count: 'exact', head: true })
@@ -276,15 +286,22 @@ app.get('/profile/:username', async (req, res) => {
 
         const success = req.query.success || null;
 
+        console.log('✅ تم جلب الملف الشخصي بنجاح:', userData.username);
+
         res.render('profile', {
-            user: user,
+            user: userData,
             totalAdds: totalAdds || 0,
             recentPrices: recentPrices || [],
             success: success
         });
+        
     } catch (err) {
-        console.error("Profile Error:", err);
-        res.status(500).send("حدث خطأ في تحميل الملف الشخصي");
+        console.error('❌ خطأ عام في الملف الشخصي:', err);
+        res.status(500).send(`
+            <h1>❌ حدث خطأ</h1>
+            <p>${err.message}</p>
+            <a href="/">العودة إلى الرئيسية</a>
+        `);
     }
 });
 
@@ -295,7 +312,6 @@ app.post('/create_user', async (req, res) => {
         
         console.log('📝 محاولة إنشاء مستخدم:', { username, full_name, state, phone });
         
-        // التحقق من صحة البيانات
         if (!username || !full_name || !state) {
             console.log('❌ بيانات ناقصة');
             return res.status(400).send("جميع الحقول مطلوبة");
@@ -369,9 +385,9 @@ app.post('/update_profile/:username', async (req, res) => {
     }
 });
 
-// ============================================
+// ============================================================
 // Routes اختبارية
-// ============================================
+// ============================================================
 
 // اختبار الاتصال
 app.get('/test', (req, res) => {
@@ -397,9 +413,9 @@ app.get('/api/users', async (req, res) => {
     }
 });
 
-// ============================================
+// ============================================================
 // API Routes
-// ============================================
+// ============================================================
 
 // API: جلب إحصائيات عامة
 app.get('/api/stats', async (req, res) => {
@@ -451,9 +467,9 @@ app.get('/api/user/:username', async (req, res) => {
     }
 });
 
-// ============================================
-// معالجة الأخطاء (404 - صفحة غير موجودة)
-// ============================================
+// ============================================================
+// معالجة الأخطاء (404)
+// ============================================================
 app.use((req, res) => {
     res.status(404).send(`
         <h1>❌ 404 - صفحة غير موجودة</h1>
@@ -462,9 +478,9 @@ app.use((req, res) => {
     `);
 });
 
-// ============================================
+// ============================================================
 // تشغيل السيرفر
-// ============================================
+// ============================================================
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
