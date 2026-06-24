@@ -2,76 +2,599 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>منصة التكافل السوداني</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🇸🇩 منصة التكافل السوداني</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --sudan-red: #C8102E;
+            --sudan-white: #FFFFFF;
+            --sudan-black: #000000;
+            --sudan-green: #007229;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            font-family: 'Tahoma', 'Segoe UI', sans-serif;
+            min-height: 100vh;
+        }
+        
+        .sudan-header {
+            background: linear-gradient(135deg, var(--sudan-red), var(--sudan-black));
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .sudan-header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, 
+                var(--sudan-red) 0%, 
+                var(--sudan-red) 33%,
+                var(--sudan-white) 33%,
+                var(--sudan-white) 66%,
+                var(--sudan-black) 66%,
+                var(--sudan-black) 100%
+            );
+            opacity: 0.1;
+        }
+        
+        .sudan-header h2 {
+            position: relative;
+            z-index: 1;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .sudan-header .subtitle {
+            position: relative;
+            z-index: 1;
+            color: rgba(255,255,255,0.9);
+        }
+        
+        .flag-stripes {
+            height: 4px;
+            background: linear-gradient(90deg, 
+                var(--sudan-red) 0%, 
+                var(--sudan-red) 33%,
+                var(--sudan-white) 33%,
+                var(--sudan-white) 66%,
+                var(--sudan-black) 66%,
+                var(--sudan-black) 100%
+            );
+            margin: 10px 0;
+            border-radius: 2px;
+        }
+        
+        .stat-card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+            border-right: 4px solid var(--sudan-green);
+            margin-bottom: 15px;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+        }
+        
+        .stat-card .stat-icon {
+            font-size: 2rem;
+            color: var(--sudan-green);
+        }
+        
+        .stat-card .stat-number {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: var(--sudan-black);
+        }
+        
+        .stat-card .stat-label {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .price-high {
+            color: var(--sudan-red);
+            font-weight: bold;
+        }
+        
+        .price-low {
+            color: var(--sudan-green);
+            font-weight: bold;
+        }
+        
+        .alert-price {
+            background-color: #fff3cd;
+            border-right: 4px solid #ffc107;
+            padding: 10px;
+            border-radius: 8px;
+            margin: 5px 0;
+        }
+        
+        .btn-sudan {
+            background: linear-gradient(135deg, var(--sudan-red), #a00d22);
+            color: white;
+            border: none;
+            padding: 10px 25px;
+            border-radius: 25px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-sudan:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 15px rgba(200, 16, 46, 0.4);
+            color: white;
+        }
+        
+        .btn-green {
+            background: linear-gradient(135deg, var(--sudan-green), #00531e);
+            color: white;
+            border: none;
+            padding: 10px 25px;
+            border-radius: 25px;
+            font-weight: bold;
+        }
+        
+        .card-sudan {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            transition: all 0.3s ease;
+        }
+        
+        .card-sudan:hover {
+            box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+        }
+        
+        .latest-item {
+            background: #f8f9fa;
+            padding: 8px 15px;
+            border-radius: 20px;
+            margin: 4px 0;
+            font-size: 0.9rem;
+            border-right: 3px solid var(--sudan-green);
+        }
+        
+        .share-btn {
+            background: #25D366;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 35px;
+            height: 35px;
+            transition: all 0.3s ease;
+        }
+        
+        .share-btn:hover {
+            transform: scale(1.1);
+            color: white;
+        }
+        
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+        }
+        
+        .category-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            background: #e9ecef;
+        }
+        
+        .table-hover tbody tr:hover {
+            background-color: rgba(0, 114, 41, 0.05);
+        }
+        
+        footer {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-top: 30px;
+        }
+        
+        .help-tip {
+            background: var(--sudan-green);
+            color: white;
+            padding: 3px 10px;
+            border-radius: 50%;
+            font-size: 0.7rem;
+            cursor: help;
+        }
+        
+        @media (max-width: 768px) {
+            .stat-card .stat-number {
+                font-size: 1.2rem;
+            }
+            .sudan-header h2 {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
 </head>
-<body class="container mt-4">
-    <h2 class="text-center mb-4">سوق التكافل السوداني</h2>
-    
-    <!-- قسم إضافة سعر جديد -->
-    <div class="card p-4 mb-4 shadow-sm">
-        <h4>أضف سعر سلعة</h4>
-        <form action="/add_price" method="POST" class="row g-3">
-            <div class="col-md-4">
-                <input name="item" class="form-control" placeholder="اسم السلعة (مثال: دقيق)" required>
+<body>
+    <div class="container mt-4">
+        <!-- رسالة نجاح -->
+        <% if (typeof success !== 'undefined' && success) { %>
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="fas fa-check-circle"></i> <%= success %>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        <% } %>
+
+        <!-- الهيدر -->
+        <div class="sudan-header text-center">
+            <h2>
+                <i class="fas fa-hand-holding-heart"></i> 
+                سوق التكافل السوداني
+            </h2>
+            <div class="flag-stripes"></div>
+            <p class="subtitle mt-2">
+                <i class="fas fa-users"></i> منصة مجتمعية لتتبع الأسعار ومكافحة الغلاء
+            </p>
+            <div class="mt-2">
+                <span class="badge bg-light text-dark">
+                    <i class="fas fa-clock"></i> آخر تحديث: <%= new Date().toLocaleTimeString('ar-EG') %>
+                </span>
             </div>
-            <div class="col-md-3">
-                <input name="price" class="form-control" placeholder="السعر" required>
+        </div>
+
+        <!-- الإحصائيات السريعة -->
+        <div class="row mb-4">
+            <div class="col-md-3 col-6">
+                <div class="stat-card text-center">
+                    <div class="stat-icon"><i class="fas fa-shopping-basket"></i></div>
+                    <div class="stat-number"><%= stats.total %></div>
+                    <div class="stat-label">إجمالي الأسعار</div>
+                </div>
             </div>
-            <div class="col-md-3">
-                <input name="location" class="form-control" placeholder="المنطقة/الحي" required>
+            <div class="col-md-3 col-6">
+                <div class="stat-card text-center">
+                    <div class="stat-icon"><i class="fas fa-tags"></i></div>
+                    <div class="stat-number"><%= stats.uniqueItems %></div>
+                    <div class="stat-label">سلع مختلفة</div>
+                </div>
             </div>
-            <div class="col-md-2">
-                <button type="submit" class="btn btn-primary w-100">إضافة</button>
+            <div class="col-md-3 col-6">
+                <div class="stat-card text-center">
+                    <div class="stat-icon"><i class="fas fa-map-marker-alt"></i></div>
+                    <div class="stat-number"><%= stats.locations.length %></div>
+                    <div class="stat-label">مناطق</div>
+                </div>
             </div>
-        </form>
+            <div class="col-md-3 col-6">
+                <div class="stat-card text-center">
+                    <div class="stat-icon"><i class="fas fa-money-bill-wave"></i></div>
+                    <div class="stat-number"><%= stats.avgPrice %></div>
+                    <div class="stat-label">متوسط السعر</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- تنبيهات الأسعار -->
+        <% if (stats.highest && stats.lowest) { %>
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="alert alert-danger">
+                    <i class="fas fa-arrow-up"></i> 
+                    <strong>أعلى سعر:</strong> 
+                    <%= stats.highest.item %> - <%= stats.highest.price %> ج.س 
+                    <small>(<%= stats.highest.location %>)</small>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="alert alert-success">
+                    <i class="fas fa-arrow-down"></i> 
+                    <strong>أقل سعر:</strong> 
+                    <%= stats.lowest.item %> - <%= stats.lowest.price %> ج.س 
+                    <small>(<%= stats.lowest.location %>)</small>
+                </div>
+            </div>
+        </div>
+        <% } %>
+
+        <!-- أحدث الإضافات -->
+        <div class="card card-sudan p-3 mb-4">
+            <h5>
+                <i class="fas fa-clock text-success"></i> 
+                أحدث الإضافات
+                <span class="badge bg-success"><%= stats.latest.length %></span>
+            </h5>
+            <div class="row">
+                <% stats.latest.forEach(p => { %>
+                <div class="col-md-4">
+                    <div class="latest-item">
+                        <strong><%= p.item %></strong> 
+                        <span class="price-high"><%= p.price %> ج.س</span>
+                        <span class="text-muted"> - <%= p.location %></span>
+                        <small class="text-muted d-block">
+                            <%= p.created_at ? new Date(p.created_at).toLocaleString('ar-EG') : '' %>
+                        </small>
+                    </div>
+                </div>
+                <% }) %>
+            </div>
+        </div>
+
+        <!-- متوسط الأسعار لكل سلعة -->
+        <div class="card card-sudan p-3 mb-4">
+            <h5><i class="fas fa-chart-line text-primary"></i> متوسط الأسعار لكل سلعة</h5>
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>السلعة</th>
+                            <th>المتوسط</th>
+                            <th>الأقل</th>
+                            <th>الأعلى</th>
+                            <th>عدد العروض</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% Object.keys(stats.itemAverages).slice(0, 10).forEach(item => { %>
+                        <tr>
+                            <td><strong><%= item %></strong></td>
+                            <td><%= stats.itemAverages[item].average %> ج.س</td>
+                            <td><%= stats.itemAverages[item].min %> ج.س</td>
+                            <td><%= stats.itemAverages[item].max %> ج.س</td>
+                            <td><%= stats.itemAverages[item].count %></td>
+                        </tr>
+                        <% }) %>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- نموذج الإضافة -->
+        <div class="card card-sudan p-4 mb-4">
+            <h4>
+                <i class="fas fa-plus-circle text-success"></i> 
+                أضف سعر سلعة
+                <span class="help-tip" title="ساعد مجتمعك بمشاركة الأسعار الحقيقية">?</span>
+            </h4>
+            <form action="/add_price" method="POST" class="row g-3">
+                <div class="col-md-3">
+                    <input name="item" class="form-control" placeholder="اسم السلعة *" required>
+                </div>
+                <div class="col-md-2">
+                    <input name="price" class="form-control" placeholder="السعر *" type="number" step="0.01" required>
+                </div>
+                <div class="col-md-3">
+                    <input name="location" class="form-control" placeholder="المنطقة/الحي *" required>
+                </div>
+                <div class="col-md-2">
+                    <input name="store" class="form-control" placeholder="اسم المتجر (اختياري)">
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-sudan w-100">
+                        <i class="fas fa-save"></i> أضف
+                    </button>
+                </div>
+            </form>
+            <div class="mt-2 text-muted small">
+                <i class="fas fa-info-circle"></i> 
+                جميع الأسعار بالجنيه السوداني (ج.س)
+            </div>
+        </div>
+
+        <!-- جدول الأسعار -->
+        <div class="card card-sudan p-3 mb-4">
+            <h5>
+                <i class="fas fa-table"></i> 
+                قائمة الأسعار 
+                <span class="badge bg-secondary"><%= prices.length %></span>
+            </h5>
+            
+            <!-- البحث والفلترة -->
+            <div class="row mb-3">
+                <div class="col-md-8">
+                    <input type="text" id="searchInput" class="form-control" placeholder="🔍 ابحث عن سلعة، منطقة، أو متجر...">
+                </div>
+                <div class="col-md-4">
+                    <select id="sortSelect" class="form-select">
+                        <option value="newest">الأحدث أولاً</option>
+                        <option value="oldest">الأقدم أولاً</option>
+                        <option value="price-high">السعر: الأعلى</option>
+                        <option value="price-low">السعر: الأقل</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover border" id="priceTable">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>السلعة</th>
+                            <th>السعر (ج.س)</th>
+                            <th>المنطقة</th>
+                            <th>المتجر</th>
+                            <th>التاريخ</th>
+                            <th>الإجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% prices.forEach(p => { %>
+                        <tr>
+                            <td><strong><%= p.item %></strong></td>
+                            <td class="price-high"><%= p.price %></td>
+                            <td><span class="badge bg-info"><%= p.location %></span></td>
+                            <td><%= p.store || 'غير محدد' %></td>
+                            <td>
+                                <small class="text-muted">
+                                    <%= p.created_at ? new Date(p.created_at).toLocaleString('ar-EG') : 'غير متوفر' %>
+                                </small>
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-danger" onclick="deletePrice('<%= p.id %>')">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-primary" onclick="editPrice('<%= p.id %>', '<%= p.price %>', '<%= p.location %>', '<%= p.store %>')">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-sm share-btn" onclick="sharePrice('<%= p.item %>', '<%= p.price %>', '<%= p.location %>')">
+                                    <i class="fab fa-whatsapp"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        <% }) %>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- نصائح -->
+        <div class="card card-sudan p-3 mb-4 bg-light">
+            <h5><i class="fas fa-lightbulb text-warning"></i> نصائح لترشيد الاستهلاك</h5>
+            <ul class="list-unstyled">
+                <li>✓ قارن الأسعار بين أكثر من متجر قبل الشراء</li>
+                <li>✓ اشترِ السلع الأساسية بكميات مناسبة عند انخفاض الأسعار</li>
+                <li>✓ شارك الأسعار في منطقتك لمساعدة الجيران</li>
+                <li>✓ تجنب الشراء من البائعين الذين يرفعون الأسعار بشكل مبالغ فيه</li>
+            </ul>
+        </div>
+
+        <!-- الفوتر -->
+        <footer class="text-center">
+            <p class="text-muted small">
+                <i class="fas fa-heart text-danger"></i> 
+                منصة تطوعية لخدمة الشعب السوداني 🇸🇩
+                <br>
+                الأسعار استرشادية وتعتمد على مساهمات المستخدمين
+            </p>
+            <div>
+                <a href="#" class="btn btn-sm btn-outline-success">
+                    <i class="fas fa-donate"></i> دعم المنصة
+                </a>
+                <a href="#" class="btn btn-sm btn-outline-primary">
+                    <i class="fas fa-info-circle"></i> عن المنصة
+                </a>
+            </div>
+        </footer>
     </div>
 
-    <!-- قسم البحث والفلترة -->
-    <div class="mb-3">
-        <input type="text" id="searchInput" class="form-control" placeholder="🔍 ابحث عن سلعة أو منطقة هنا...">
+    <!-- نموذج تعديل مخفي -->
+    <div class="modal fade" id="editModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">تعديل السعر</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="editForm" method="POST">
+                    <div class="modal-body">
+                        <input type="hidden" name="_method" value="PUT">
+                        <div class="mb-3">
+                            <label>السعر الجديد</label>
+                            <input name="price" class="form-control" type="number" step="0.01" required>
+                        </div>
+                        <div class="mb-3">
+                            <label>المنطقة</label>
+                            <input name="location" class="form-control">
+                        </div>
+                        <div class="mb-3">
+                            <label>المتجر</label>
+                            <input name="store" class="form-control">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                        <button type="submit" class="btn btn-primary">تحديث</button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 
-    <!-- جدول الأسعار -->
-    <table class="table table-hover border" id="priceTable">
-        <thead class="table-dark">
-            <tr>
-                <th>السلعة</th>
-                <th>السعر</th>
-                <th>المنطقة</th>
-                <th>التاريخ</th>
-            </tr>
-        </thead>
-        <tbody>
-            <% prices.forEach(p => { %>
-            <tr>
-                <td><%= p.item %></td>
-                <td><%= p.price %></td>
-                <td><%= p.location %></td>
-                <td>
-                    <small class="text-muted">
-                        <%= p.created_at ? new Date(p.created_at).toLocaleDateString('ar-EG') : 'غير متوفر' %>
-                    </small>
-                </td>
-            </tr>
-            <% }) %>
-        </tbody>
-    </table>
-
-    <!-- إخلاء المسؤولية -->
-    <footer class="mt-5 p-3 text-center border-top">
-        <p class="text-muted small">هذه منصة تطوعية. الأسعار استرشادية وتعتمد على مساهمات المستخدمين.</p>
-    </footer>
-
-    <!-- كود البحث -->
+    <!-- JavaScript -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // البحث
         document.getElementById('searchInput').addEventListener('keyup', function() {
-            let filter = this.value.toLowerCase();
-            let rows = document.querySelectorAll('#priceTable tbody tr');
+            const filter = this.value.toLowerCase();
+            const rows = document.querySelectorAll('#priceTable tbody tr');
             rows.forEach(row => {
-                row.style.display = row.innerText.toLowerCase().includes(filter) ? '' : 'none';
+                const text = row.innerText.toLowerCase();
+                row.style.display = text.includes(filter) ? '' : 'none';
             });
         });
+
+        // الترتيب
+        document.getElementById('sortSelect').addEventListener('change', function() {
+            const tbody = document.querySelector('#priceTable tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            
+            const sortType = this.value;
+            rows.sort((a, b) => {
+                const dateA = new Date(a.cells[4].innerText || 0);
+                const dateB = new Date(b.cells[4].innerText || 0);
+                const priceA = parseFloat(a.cells[1].innerText) || 0;
+                const priceB = parseFloat(b.cells[1].innerText) || 0;
+                
+                switch(sortType) {
+                    case 'newest': return dateB - dateA;
+                    case 'oldest': return dateA - dateB;
+                    case 'price-high': return priceB - priceA;
+                    case 'price-low': return priceA - priceB;
+                    default: return 0;
+                }
+            });
+            
+            rows.forEach(row => tbody.appendChild(row));
+        });
+
+        // حذف
+        function deletePrice(id) {
+            if (confirm('هل أنت متأكد من حذف هذا السعر؟')) {
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = `/delete_price/${id}`;
+                document.body.appendChild(form);
+                form.submit();
+            }
+        }
+
+        // تعديل
+        function editPrice(id, price, location, store) {
+            const modal = new bootstrap.Modal(document.getElementById('editModal'));
+            const form = document.getElementById('editForm');
+            form.action = `/update_price/${id}`;
+            form.querySelector('[name="price"]').value = price;
+            form.querySelector('[name="location"]').value = location || '';
+            form.querySelector('[name="store"]').value = store || '';
+            modal.show();
+        }
+
+        // مشاركة واتساب
+        function sharePrice(item, price, location) {
+            const text = `🇸🇩 سعر ${item} في ${location} = ${price} ج.س`;
+            const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
+            window.open(url, '_blank');
+        }
+
+        // تحديث تلقائي كل 30 ثانية
+        setTimeout(() => {
+            location.reload();
+        }, 30000);
+
+        // عرض رسالة ترحيب
+        console.log('🇸🇩 منصة التكافل السوداني - نساعد بعضنا البعض');
     </script>
 </body>
 </html>
