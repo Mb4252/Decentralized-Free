@@ -1,3 +1,7 @@
+// ============================================
+// منصة التكافل السوداني - ملف الخادم الرئيسي
+// ============================================
+
 // استيراد المكتبات الأساسية
 require('dotenv').config();
 const express = require('express');
@@ -6,12 +10,16 @@ const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 
+// ============================================
 // إعداد الاتصال بقاعدة بيانات Supabase
+// ============================================
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// إعدادات محرك العرض (EJS)
+// ============================================
+// إعدادات التطبيق
+// ============================================
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
@@ -20,7 +28,9 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static('public'));
 
-// ============= دوال مساعدة =============
+// ============================================
+// دوال مساعدة
+// ============================================
 
 // حساب متوسط الأسعار
 function calculateAverage(prices) {
@@ -29,12 +39,17 @@ function calculateAverage(prices) {
     return (sum / prices.length).toFixed(2);
 }
 
-// جلب أحدث 10 إضافات
+// جلب أحدث الإضافات
 function getLatest(prices, count = 10) {
     return prices.slice(0, count);
 }
 
-// ============= Routes =============
+// منع الإضافات المتكررة (حماية بسيطة)
+const rateLimit = new Map();
+
+// ============================================
+// Routes الرئيسية
+// ============================================
 
 // الصفحة الرئيسية
 app.get('/', async (req, res) => {
@@ -53,8 +68,6 @@ app.get('/', async (req, res) => {
         // حساب الإحصائيات
         const totalItems = prices.length;
         const uniqueItems = [...new Set(prices.map(p => p.item))];
-        
-        // حساب متوسط السعر الإجمالي
         const avgPrice = calculateAverage(prices);
         
         // أعلى وأقل سعر
@@ -66,7 +79,7 @@ app.get('/', async (req, res) => {
             lowestPrice = sortedByPrice[sortedByPrice.length - 1];
         }
 
-        // أحدث 10 إضافات
+        // أحدث الإضافات
         const latestPrices = getLatest(prices, 10);
 
         // تجميع البيانات حسب المنطقة
@@ -83,13 +96,15 @@ app.get('/', async (req, res) => {
             itemAverages[p.item].prices.push(parseFloat(p.price));
         });
 
-        // حساب المتوسطات
         Object.keys(itemAverages).forEach(item => {
             const data = itemAverages[item];
             data.average = (data.total / data.count).toFixed(2);
             data.min = Math.min(...data.prices);
             data.max = Math.max(...data.prices);
         });
+
+        // رسالة النجاح من الـ Query String
+        const success = req.query.success || null;
 
         res.render('index', { 
             prices: prices || [],
@@ -102,7 +117,8 @@ app.get('/', async (req, res) => {
                 latest: latestPrices,
                 locations: locations,
                 itemAverages: itemAverages
-            }
+            },
+            success: success
         });
     } catch (err) {
         console.error("General Error:", err);
@@ -110,10 +126,14 @@ app.get('/', async (req, res) => {
     }
 });
 
+// ============================================
+// Routes الأسعار
+// ============================================
+
 // إضافة سعر جديد
 app.post('/add_price', async (req, res) => {
     try {
-        const { item, price, location, category, store } = req.body;
+        const { item, price, location, store, category, username } = req.body;
         
         // التحقق من صحة البيانات
         if (!item || !price || !location) {
@@ -124,15 +144,31 @@ app.post('/add_price', async (req, res) => {
             return res.status(400).send("السعر يجب أن يكون رقماً موجباً.");
         }
 
+        // حماية من الإضافات المتكررة
+        const ip = req.ip || req.connection.remoteAddress;
+        const now = Date.now();
+        if (rateLimit.has(ip) && (now - rateLimit.get(ip) < 30000)) {
+            return res.status(429).send("⏳ يرجى الانتظار 30 ثانية بين كل إضافة");
+        }
+        rateLimit.set(ip, now);
+
+        // الكلمات الممنوعة
+        const blacklist = ['سبام', 'test', 'اختبار', 'spam', 'حرام', 'ممنوع'];
+        if (blacklist.some(word => item.toLowerCase().includes(word))) {
+            return res.status(400).send("❌ كلمة غير مسموح بها");
+        }
+
         // إدخال البيانات
+        const finalUsername = username || 'ضيف';
         const { data, error } = await supabase
             .from('prices')
             .insert([{ 
-                item, 
-                price: parseFloat(price), 
-                location,
-                category: category || 'عام',
-                store: store || 'غير محدد'
+                item: item.trim(),
+                price: parseFloat(price),
+                location: location.trim(),
+                store: store?.trim() || 'غير محدد',
+                category: category?.trim() || 'عام',
+                username: finalUsername.trim()
             }]);
 
         if (error) {
@@ -140,8 +176,7 @@ app.post('/add_price', async (req, res) => {
             return res.status(500).send("خطأ أثناء إضافة البيانات.");
         }
 
-        // إعادة التوجيه مع رسالة نجاح
-        res.redirect('/?success=تم إضافة السعر بنجاح');
+        res.redirect('/?success=✅ تم إضافة السعر بنجاح');
     } catch (err) {
         console.error("General Error:", err);
         res.status(500).send("حدث خطأ أثناء تنفيذ الطلب.");
@@ -163,7 +198,7 @@ app.post('/delete_price/:id', async (req, res) => {
             return res.status(500).send("خطأ أثناء حذف البيانات.");
         }
 
-        res.redirect('/?success=تم حذف السعر بنجاح');
+        res.redirect('/?success=🗑️ تم حذف السعر بنجاح');
     } catch (err) {
         console.error("General Error:", err);
         res.status(500).send("حدث خطأ أثناء تنفيذ الطلب.");
@@ -184,8 +219,9 @@ app.post('/update_price/:id', async (req, res) => {
             .from('prices')
             .update({ 
                 price: parseFloat(price),
-                location: location || undefined,
-                store: store || undefined
+                location: location?.trim() || undefined,
+                store: store?.trim() || undefined,
+                updated_at: new Date()
             })
             .eq('id', id);
 
@@ -194,14 +230,137 @@ app.post('/update_price/:id', async (req, res) => {
             return res.status(500).send("خطأ أثناء تحديث البيانات.");
         }
 
-        res.redirect('/?success=تم تحديث السعر بنجاح');
+        res.redirect('/?success=✏️ تم تحديث السعر بنجاح');
     } catch (err) {
         console.error("General Error:", err);
         res.status(500).send("حدث خطأ أثناء تنفيذ الطلب.");
     }
 });
 
-// الحصول على إحصائيات (API)
+// ============================================
+// Routes المستخدمين (الملف الشخصي)
+// ============================================
+
+// صفحة الملف الشخصي
+app.get('/profile/:username', async (req, res) => {
+    try {
+        const { username } = req.params;
+        
+        // جلب بيانات المستخدم
+        const { data: user, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('username', username)
+            .single();
+
+        if (error || !user) {
+            return res.status(404).send("❌ المستخدم غير موجود");
+        }
+
+        // جلب إحصائيات المستخدم (عدد الإضافات)
+        const { count: totalAdds, error: countError } = await supabase
+            .from('prices')
+            .select('*', { count: 'exact', head: true })
+            .eq('username', username);
+
+        // جلب آخر 5 إضافات للمستخدم
+        const { data: recentPrices, error: pricesError } = await supabase
+            .from('prices')
+            .select('*')
+            .eq('username', username)
+            .order('created_at', { ascending: false })
+            .limit(5);
+
+        const success = req.query.success || null;
+
+        res.render('profile', {
+            user: user,
+            totalAdds: totalAdds || 0,
+            recentPrices: recentPrices || [],
+            success: success
+        });
+    } catch (err) {
+        console.error("Profile Error:", err);
+        res.status(500).send("حدث خطأ في تحميل الملف الشخصي");
+    }
+});
+
+// إنشاء مستخدم جديد
+app.post('/create_user', async (req, res) => {
+    try {
+        const { username, full_name, state, phone } = req.body;
+        
+        // التحقق من صحة البيانات
+        if (!username || !full_name || !state) {
+            return res.status(400).send("جميع الحقول مطلوبة");
+        }
+
+        // التحقق من أن اسم المستخدم غير مكرر
+        const { data: existingUser } = await supabase
+            .from('users')
+            .select('username')
+            .eq('username', username)
+            .single();
+
+        if (existingUser) {
+            return res.status(400).send("اسم المستخدم موجود بالفعل");
+        }
+
+        // إضافة المستخدم
+        const { data, error } = await supabase
+            .from('users')
+            .insert([{ 
+                username: username.trim(),
+                full_name: full_name.trim(),
+                state: state.trim(),
+                phone: phone?.trim() || null
+            }]);
+
+        if (error) {
+            console.error("Create User Error:", error);
+            return res.status(500).send("خطأ في إنشاء المستخدم");
+        }
+
+        res.redirect(`/profile/${username}?success=✅ تم إنشاء الملف الشخصي بنجاح`);
+    } catch (err) {
+        console.error("Create User Error:", err);
+        res.status(500).send("حدث خطأ في إنشاء المستخدم");
+    }
+});
+
+// تحديث الملف الشخصي
+app.post('/update_profile/:username', async (req, res) => {
+    try {
+        const { username } = req.params;
+        const { full_name, state, phone } = req.body;
+
+        const { data, error } = await supabase
+            .from('users')
+            .update({ 
+                full_name: full_name.trim(),
+                state: state.trim(),
+                phone: phone?.trim() || null,
+                last_active: new Date()
+            })
+            .eq('username', username);
+
+        if (error) {
+            console.error("Update Profile Error:", error);
+            return res.status(500).send("خطأ في تحديث البيانات");
+        }
+
+        res.redirect(`/profile/${username}?success=✅ تم تحديث الملف الشخصي بنجاح`);
+    } catch (err) {
+        console.error("Update Profile Error:", err);
+        res.status(500).send("حدث خطأ في تحديث الملف الشخصي");
+    }
+});
+
+// ============================================
+// API Routes
+// ============================================
+
+// API: جلب إحصائيات عامة
 app.get('/api/stats', async (req, res) => {
     try {
         const { data: prices, error } = await supabase
@@ -233,9 +392,31 @@ app.get('/api/stats', async (req, res) => {
     }
 });
 
+// API: جلب بيانات مستخدم
+app.get('/api/user/:username', async (req, res) => {
+    try {
+        const { username } = req.params;
+        
+        const { data: user, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('username', username)
+            .single();
+
+        if (error) throw error;
+        res.json(user);
+    } catch (err) {
+        res.status(404).json({ error: "المستخدم غير موجود" });
+    }
+});
+
+// ============================================
 // تشغيل السيرفر
+// ============================================
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`🟢 Server is running on port ${PORT}`);
     console.log(`🔗 http://localhost:${PORT}`);
+    console.log(`🇸🇩 منصة التكافل السوداني جاهزة للعمل`);
 });
