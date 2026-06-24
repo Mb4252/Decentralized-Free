@@ -214,6 +214,45 @@
             filter: brightness(0) invert(1);
         }
         
+        .btn-login {
+            background: linear-gradient(135deg, #C8102E, #8B0000);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            padding: 8px 20px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-login:hover {
+            transform: scale(1.05);
+            color: white;
+        }
+        
+        .user-badge {
+            background: var(--sudan-green);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 25px;
+            font-size: 0.9rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .btn-logout {
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            padding: 8px 20px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-logout:hover {
+            transform: scale(1.05);
+            color: white;
+        }
+        
         @media (max-width: 768px) {
             .stat-card .stat-number {
                 font-size: 1.2rem;
@@ -230,6 +269,14 @@
         <% if (success) { %>
         <div class="alert alert-success alert-dismissible fade show" role="alert">
             <i class="fas fa-check-circle"></i> <%= success %>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        <% } %>
+
+        <!-- رسالة خطأ -->
+        <% if (typeof error !== 'undefined' && error) { %>
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="fas fa-exclamation-circle"></i> <%= error %>
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
         <% } %>
@@ -251,16 +298,30 @@
             </div>
         </div>
 
-        <!-- أزرار الملف الشخصي -->
+        <!-- أزرار الملف الشخصي - النسخة المحدثة مع تسجيل الدخول -->
         <div class="row mb-4">
             <div class="col-12">
-                <div class="d-flex gap-2 flex-wrap justify-content-center">
-                    <button class="btn btn-profile" data-bs-toggle="modal" data-bs-target="#createProfileModal">
-                        <i class="fas fa-user-plus"></i> إنشاء ملف شخصي
-                    </button>
-                    <button class="btn btn-outline-success" onclick="window.location.href='/profile/ضيف'">
-                        <i class="fas fa-user"></i> عرض ملفي الشخصي
-                    </button>
+                <div class="d-flex gap-2 flex-wrap justify-content-center align-items-center">
+                    <% if (currentUser) { %>
+                        <!-- ✅ مستخدم مسجل -->
+                        <span class="user-badge">
+                            <i class="fas fa-user-check"></i> مرحباً <%= currentUser.full_name %>
+                        </span>
+                        <a href="/profile" class="btn btn-profile">
+                            <i class="fas fa-user"></i> ملفي الشخصي
+                        </a>
+                        <a href="/logout" class="btn btn-logout">
+                            <i class="fas fa-sign-out-alt"></i> تسجيل خروج
+                        </a>
+                    <% } else { %>
+                        <!-- ❌ غير مسجل -->
+                        <button class="btn btn-profile" data-bs-toggle="modal" data-bs-target="#createProfileModal">
+                            <i class="fas fa-user-plus"></i> إنشاء ملف شخصي
+                        </button>
+                        <button class="btn btn-login" data-bs-toggle="modal" data-bs-target="#loginModal">
+                            <i class="fas fa-sign-in-alt"></i> تسجيل دخول
+                        </button>
+                    <% } %>
                     <button class="btn btn-outline-info" onclick="window.location.reload()">
                         <i class="fas fa-sync"></i> تحديث
                     </button>
@@ -339,9 +400,12 @@
                         <small class="text-muted d-block">
                             <%= p.created_at ? new Date(p.created_at).toLocaleString('ar-EG') : '' %>
                         </small>
-                        <% if (p.username) { %>
+                        <% if (p.username && p.username !== 'ضيف') { %>
                         <small class="text-muted">
-                            <i class="fas fa-user"></i> <%= p.username %>
+                            <i class="fas fa-user"></i> 
+                            <a href="/profile/<%= p.username %>" class="text-decoration-none">
+                                <%= p.username %>
+                            </a>
                         </small>
                         <% } %>
                     </div>
@@ -403,10 +467,15 @@
                         <i class="fas fa-save"></i> أضف
                     </button>
                 </div>
-                <input type="hidden" name="username" value="ضيف">
+                <!-- اسم المستخدم يتم أخذه من الجلسة تلقائياً -->
             </form>
             <div class="mt-2 text-muted small">
                 <i class="fas fa-info-circle"></i> جميع الأسعار بالجنيه السوداني (ج.س)
+                <% if (currentUser) { %>
+                <span class="badge bg-success ms-2">سيتم إضافتك باسم: <%= currentUser.username %></span>
+                <% } else { %>
+                <span class="badge bg-secondary ms-2">سيتم إضافتك كـ: ضيف</span>
+                <% } %>
             </div>
         </div>
 
@@ -557,6 +626,38 @@
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
                         <button type="submit" class="btn btn-green">
                             <i class="fas fa-check"></i> إنشاء الملف
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ======================================== -->
+    <!-- مودال تسجيل الدخول -->
+    <!-- ======================================== -->
+    <div class="modal fade" id="loginModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header" style="background: linear-gradient(135deg, #C8102E, #8B0000); color: white;">
+                    <h5 class="modal-title">
+                        <i class="fas fa-sign-in-alt"></i> تسجيل الدخول
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form action="/login" method="POST">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">اسم المستخدم *</label>
+                            <input type="text" name="username" class="form-control" 
+                                   placeholder="أدخل اسم المستخدم" required>
+                            <small class="text-muted">أدخل اسم المستخدم الذي سجلت به</small>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                        <button type="submit" class="btn" style="background: #C8102E; color: white;">
+                            <i class="fas fa-sign-in-alt"></i> تسجيل دخول
                         </button>
                     </div>
                 </form>
