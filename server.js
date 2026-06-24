@@ -246,6 +246,8 @@ app.get('/profile/:username', async (req, res) => {
     try {
         const { username } = req.params;
         
+        console.log('📖 جلب ملف المستخدم:', username);
+        
         // جلب بيانات المستخدم
         const { data: user, error } = await supabase
             .from('users')
@@ -254,6 +256,7 @@ app.get('/profile/:username', async (req, res) => {
             .single();
 
         if (error || !user) {
+            console.log('❌ المستخدم غير موجود:', username);
             return res.status(404).send("❌ المستخدم غير موجود");
         }
 
@@ -290,8 +293,11 @@ app.post('/create_user', async (req, res) => {
     try {
         const { username, full_name, state, phone } = req.body;
         
+        console.log('📝 محاولة إنشاء مستخدم:', { username, full_name, state, phone });
+        
         // التحقق من صحة البيانات
         if (!username || !full_name || !state) {
+            console.log('❌ بيانات ناقصة');
             return res.status(400).send("جميع الحقول مطلوبة");
         }
 
@@ -303,6 +309,7 @@ app.post('/create_user', async (req, res) => {
             .single();
 
         if (existingUser) {
+            console.log('⚠️ المستخدم موجود بالفعل:', username);
             return res.status(400).send("اسم المستخدم موجود بالفعل");
         }
 
@@ -314,16 +321,19 @@ app.post('/create_user', async (req, res) => {
                 full_name: full_name.trim(),
                 state: state.trim(),
                 phone: phone?.trim() || null
-            }]);
+            }])
+            .select();
 
         if (error) {
-            console.error("Create User Error:", error);
-            return res.status(500).send("خطأ في إنشاء المستخدم");
+            console.error('❌ خطأ في الإضافة:', error);
+            return res.status(500).send("خطأ في إنشاء المستخدم: " + error.message);
         }
 
+        console.log('✅ تم إنشاء المستخدم بنجاح:', data);
         res.redirect(`/profile/${username}?success=✅ تم إنشاء الملف الشخصي بنجاح`);
+        
     } catch (err) {
-        console.error("Create User Error:", err);
+        console.error('❌ خطأ عام:', err);
         res.status(500).send("حدث خطأ في إنشاء المستخدم");
     }
 });
@@ -342,17 +352,48 @@ app.post('/update_profile/:username', async (req, res) => {
                 phone: phone?.trim() || null,
                 last_active: new Date()
             })
-            .eq('username', username);
+            .eq('username', username)
+            .select();
 
         if (error) {
             console.error("Update Profile Error:", error);
             return res.status(500).send("خطأ في تحديث البيانات");
         }
 
+        console.log('✅ تم تحديث الملف الشخصي:', username);
         res.redirect(`/profile/${username}?success=✅ تم تحديث الملف الشخصي بنجاح`);
+        
     } catch (err) {
         console.error("Update Profile Error:", err);
         res.status(500).send("حدث خطأ في تحديث الملف الشخصي");
+    }
+});
+
+// ============================================
+// Routes اختبارية
+// ============================================
+
+// اختبار الاتصال
+app.get('/test', (req, res) => {
+    res.json({
+        status: '✅ السيرفر يعمل',
+        time: new Date().toLocaleString('ar-EG'),
+        version: '2.0.0'
+    });
+});
+
+// عرض جميع المستخدمين (للتطوير)
+app.get('/api/users', async (req, res) => {
+    try {
+        const { data: users, error } = await supabase
+            .from('users')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        res.json(users);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
 });
 
@@ -408,6 +449,17 @@ app.get('/api/user/:username', async (req, res) => {
     } catch (err) {
         res.status(404).json({ error: "المستخدم غير موجود" });
     }
+});
+
+// ============================================
+// معالجة الأخطاء (404 - صفحة غير موجودة)
+// ============================================
+app.use((req, res) => {
+    res.status(404).send(`
+        <h1>❌ 404 - صفحة غير موجودة</h1>
+        <p>الصفحة التي تبحث عنها غير موجودة.</p>
+        <a href="/">العودة إلى الرئيسية</a>
+    `);
 });
 
 // ============================================
