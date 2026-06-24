@@ -1,5 +1,5 @@
 // ============================================================
-// منصة التكافل السوداني - مع نظام تسجيل الدخول
+// منصة التكافل السوداني - ملف الخادم الرئيسي
 // ============================================================
 
 require('dotenv').config();
@@ -18,15 +18,15 @@ const supabaseKey = process.env.SUPABASE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // ============================================================
-// إعداد Session (تسجيل الدخول)
+// إعداد Session
 // ============================================================
 app.use(session({
     secret: process.env.SESSION_SECRET || 'sudan_secret_key_2026',
     resave: false,
     saveUninitialized: true,
     cookie: { 
-        secure: false,  // true في الإنتاج مع HTTPS
-        maxAge: 30 * 24 * 60 * 60 * 1000 // 30 يوم
+        secure: false,
+        maxAge: 30 * 24 * 60 * 60 * 1000
     }
 }));
 
@@ -103,8 +103,8 @@ app.get('/', async (req, res) => {
         });
 
         const success = req.query.success || null;
+        const errorMsg = req.query.error || null;
         
-        // ✅ تمرير معلومات المستخدم الحالي إلى الصفحة
         const currentUser = req.session.user || null;
 
         res.render('index', { 
@@ -120,7 +120,8 @@ app.get('/', async (req, res) => {
                 itemAverages: itemAverages
             },
             success: success,
-            currentUser: currentUser  // ✅ المستخدم الحالي
+            error: errorMsg,
+            currentUser: currentUser
         });
     } catch (err) {
         console.error("General Error:", err);
@@ -156,7 +157,6 @@ app.post('/add_price', async (req, res) => {
             return res.status(400).send("❌ كلمة غير مسموح بها");
         }
 
-        // ✅ استخدام اسم المستخدم من الجلسة إذا كان مسجلاً
         const finalUsername = req.session.user?.username || 'ضيف';
         
         const { data, error } = await supabase
@@ -235,15 +235,148 @@ app.post('/update_price/:id', async (req, res) => {
 });
 
 // ============================================================
-// Routes المستخدمين مع تسجيل الدخول
+// Routes المستخدمين مع كلمة المرور
 // ============================================================
 
-// صفحة الملف الشخصي - تعرض ملف المستخدم المسجل حالياً
+// صفحة تسجيل الدخول المنفصلة
+app.get('/login', (req, res) => {
+    // إذا كان المستخدم مسجلاً بالفعل، حوله للرئيسية
+    if (req.session.user) {
+        return res.redirect('/');
+    }
+    
+    const error = req.query.error || null;
+    res.render('login', { error: error });
+});
+
+// صفحة إنشاء حساب جديد (منفصلة)
+app.get('/register', (req, res) => {
+    if (req.session.user) {
+        return res.redirect('/');
+    }
+    
+    const error = req.query.error || null;
+    res.render('register', { error: error });
+});
+
+// تسجيل الدخول مع كلمة المرور
+app.post('/login', async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        
+        console.log('📝 محاولة تسجيل دخول:', username);
+        
+        if (!username || !password) {
+            return res.redirect('/login?error=⚠️ يرجى إدخال اسم المستخدم وكلمة المرور');
+        }
+
+        // البحث عن المستخدم
+        const { data: user, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('username', username)
+            .single();
+
+        if (error || !user) {
+            console.log('❌ المستخدم غير موجود:', username);
+            return res.redirect('/login?error=❌ اسم المستخدم غير صحيح');
+        }
+
+        // التحقق من كلمة المرور
+        if (user.password !== password) {
+            console.log('❌ كلمة مرور خاطئة للمستخدم:', username);
+            return res.redirect('/login?error=❌ كلمة المرور غير صحيحة');
+        }
+
+        // ✅ تسجيل الدخول بنجاح
+        req.session.user = {
+            username: user.username,
+            full_name: user.full_name,
+            state: user.state,
+            id: user.id
+        };
+
+        console.log('✅ تم تسجيل الدخول بنجاح:', username);
+        res.redirect('/?success=✅ مرحباً ' + user.full_name + '! تم تسجيل الدخول بنجاح');
+        
+    } catch (err) {
+        console.error('Login Error:', err);
+        res.redirect('/login?error=❌ حدث خطأ في تسجيل الدخول');
+    }
+});
+
+// إنشاء مستخدم جديد مع كلمة مرور
+app.post('/register', async (req, res) => {
+    try {
+        const { username, full_name, state, phone, password, confirm_password } = req.body;
+        
+        console.log('📝 محاولة إنشاء مستخدم جديد:', { username, full_name, state });
+        
+        // التحقق من صحة البيانات
+        if (!username || !full_name || !state || !password) {
+            return res.redirect('/register?error=⚠️ جميع الحقول مطلوبة');
+        }
+
+        if (password.length < 6) {
+            return res.redirect('/register?error=⚠️ كلمة المرور يجب أن تكون 6 أحرف على الأقل');
+        }
+
+        if (password !== confirm_password) {
+            return res.redirect('/register?error=⚠️ كلمة المرور غير متطابقة');
+        }
+
+        // التحقق من أن اسم المستخدم غير مكرر
+        const { data: existingUser } = await supabase
+            .from('users')
+            .select('username')
+            .eq('username', username)
+            .single();
+
+        if (existingUser) {
+            console.log('⚠️ المستخدم موجود بالفعل:', username);
+            return res.redirect('/register?error=⚠️ اسم المستخدم موجود بالفعل');
+        }
+
+        // إضافة المستخدم مع كلمة المرور
+        const { data, error } = await supabase
+            .from('users')
+            .insert([{ 
+                username: username.trim(),
+                full_name: full_name.trim(),
+                state: state.trim(),
+                phone: phone?.trim() || null,
+                password: password // نص عادي (يمكن تشفيره لاحقاً)
+            }])
+            .select();
+
+        if (error) {
+            console.error('❌ خطأ في الإضافة:', error);
+            return res.redirect('/register?error=❌ خطأ في إنشاء الحساب: ' + error.message);
+        }
+
+        console.log('✅ تم إنشاء المستخدم بنجاح:', data);
+        
+        // تسجيل الدخول تلقائياً بعد الإنشاء
+        req.session.user = {
+            username: username.trim(),
+            full_name: full_name.trim(),
+            state: state.trim(),
+            id: data[0].id
+        };
+        
+        res.redirect('/?success=✅ تم إنشاء الحساب وتسجيل الدخول بنجاح');
+        
+    } catch (err) {
+        console.error('❌ خطأ عام:', err);
+        res.redirect('/register?error=❌ حدث خطأ في إنشاء الحساب');
+    }
+});
+
+// صفحة الملف الشخصي
 app.get('/profile', async (req, res) => {
     try {
-        // ✅ التحقق من وجود مستخدم مسجل
         if (!req.session.user) {
-            return res.redirect('/?error=⚠️ يرجى إنشاء ملف شخصي أولاً');
+            return res.redirect('/login?error=⚠️ يرجى تسجيل الدخول أولاً');
         }
 
         const username = req.session.user.username;
@@ -257,8 +390,8 @@ app.get('/profile', async (req, res) => {
 
         if (error || !user || user.length === 0) {
             console.log('❌ المستخدم غير موجود:', username);
-            req.session.user = null; // مسح الجلسة
-            return res.redirect('/?error=❌ المستخدم غير موجود، يرجى إنشاء ملف جديد');
+            req.session.user = null;
+            return res.redirect('/login?error=❌ المستخدم غير موجود');
         }
 
         const userData = user[0];
@@ -286,7 +419,7 @@ app.get('/profile', async (req, res) => {
         });
         
     } catch (err) {
-        console.error('❌ خطأ عام في الملف الشخصي:', err);
+        console.error('❌ خطأ:', err);
         res.status(500).send("حدث خطأ في تحميل الملف الشخصي");
     }
 });
@@ -341,109 +474,11 @@ app.get('/profile/:username', async (req, res) => {
     }
 });
 
-// إنشاء مستخدم جديد + تسجيل الدخول تلقائياً
-app.post('/create_user', async (req, res) => {
-    try {
-        const { username, full_name, state, phone } = req.body;
-        
-        console.log('📝 محاولة إنشاء مستخدم:', { username, full_name, state, phone });
-        
-        if (!username || !full_name || !state) {
-            return res.status(400).send("جميع الحقول مطلوبة");
-        }
-
-        const { data: existingUser } = await supabase
-            .from('users')
-            .select('username')
-            .eq('username', username)
-            .single();
-
-        if (existingUser) {
-            console.log('⚠️ المستخدم موجود بالفعل:', username);
-            return res.status(400).send("اسم المستخدم موجود بالفعل");
-        }
-
-        const { data, error } = await supabase
-            .from('users')
-            .insert([{ 
-                username: username.trim(),
-                full_name: full_name.trim(),
-                state: state.trim(),
-                phone: phone?.trim() || null
-            }])
-            .select();
-
-        if (error) {
-            console.error('❌ خطأ في الإضافة:', error);
-            return res.status(500).send("خطأ في إنشاء المستخدم: " + error.message);
-        }
-
-        console.log('✅ تم إنشاء المستخدم بنجاح:', data);
-        
-        // ✅ تسجيل الدخول تلقائياً بعد إنشاء المستخدم
-        req.session.user = {
-            username: username.trim(),
-            full_name: full_name.trim(),
-            state: state.trim()
-        };
-        
-        res.redirect(`/profile?success=✅ تم إنشاء الملف الشخصي بنجاح وتم تسجيل الدخول`);
-        
-    } catch (err) {
-        console.error('❌ خطأ عام:', err);
-        res.status(500).send("حدث خطأ في إنشاء المستخدم");
-    }
-});
-
-// تسجيل الدخول (Login) - للمستخدمين الموجودين
-app.post('/login', async (req, res) => {
-    try {
-        const { username } = req.body;
-        
-        if (!username) {
-            return res.status(400).send("يرجى إدخال اسم المستخدم");
-        }
-
-        const { data: user, error } = await supabase
-            .from('users')
-            .select('*')
-            .eq('username', username)
-            .single();
-
-        if (error || !user) {
-            return res.status(404).send("❌ المستخدم غير موجود");
-        }
-
-        // ✅ تسجيل الدخول
-        req.session.user = {
-            username: user.username,
-            full_name: user.full_name,
-            state: user.state
-        };
-
-        res.redirect('/?success=✅ مرحباً ' + user.full_name + '! تم تسجيل الدخول بنجاح');
-        
-    } catch (err) {
-        console.error('Login Error:', err);
-        res.status(500).send("حدث خطأ في تسجيل الدخول");
-    }
-});
-
-// تسجيل الخروج (Logout)
-app.get('/logout', (req, res) => {
-    req.session.destroy((err) => {
-        if (err) {
-            console.error('Logout Error:', err);
-        }
-        res.redirect('/?success=👋 تم تسجيل الخروج بنجاح');
-    });
-});
-
 // تحديث الملف الشخصي
 app.post('/update_profile', async (req, res) => {
     try {
         if (!req.session.user) {
-            return res.redirect('/?error=⚠️ يرجى تسجيل الدخول أولاً');
+            return res.redirect('/login?error=⚠️ يرجى تسجيل الدخول أولاً');
         }
 
         const username = req.session.user.username;
@@ -465,7 +500,6 @@ app.post('/update_profile', async (req, res) => {
             return res.status(500).send("خطأ في تحديث البيانات");
         }
 
-        // ✅ تحديث بيانات الجلسة
         req.session.user.full_name = full_name.trim();
         req.session.user.state = state.trim();
 
@@ -476,6 +510,75 @@ app.post('/update_profile', async (req, res) => {
         console.error("Update Profile Error:", err);
         res.status(500).send("حدث خطأ في تحديث الملف الشخصي");
     }
+});
+
+// تغيير كلمة المرور
+app.post('/change_password', async (req, res) => {
+    try {
+        if (!req.session.user) {
+            return res.redirect('/login?error=⚠️ يرجى تسجيل الدخول أولاً');
+        }
+
+        const username = req.session.user.username;
+        const { current_password, new_password, confirm_new_password } = req.body;
+
+        // التحقق من البيانات
+        if (!current_password || !new_password || !confirm_new_password) {
+            return res.redirect('/profile?error=⚠️ جميع الحقول مطلوبة');
+        }
+
+        if (new_password.length < 6) {
+            return res.redirect('/profile?error=⚠️ كلمة المرور الجديدة يجب أن تكون 6 أحرف على الأقل');
+        }
+
+        if (new_password !== confirm_new_password) {
+            return res.redirect('/profile?error=⚠️ كلمة المرور الجديدة غير متطابقة');
+        }
+
+        // جلب المستخدم للتحقق من كلمة المرور الحالية
+        const { data: user, error } = await supabase
+            .from('users')
+            .select('password')
+            .eq('username', username)
+            .single();
+
+        if (error || !user) {
+            return res.redirect('/profile?error=❌ المستخدم غير موجود');
+        }
+
+        // التحقق من كلمة المرور الحالية
+        if (user.password !== current_password) {
+            return res.redirect('/profile?error=❌ كلمة المرور الحالية غير صحيحة');
+        }
+
+        // تحديث كلمة المرور
+        const { error: updateError } = await supabase
+            .from('users')
+            .update({ password: new_password })
+            .eq('username', username);
+
+        if (updateError) {
+            console.error("Change Password Error:", updateError);
+            return res.redirect('/profile?error=❌ خطأ في تغيير كلمة المرور');
+        }
+
+        console.log('✅ تم تغيير كلمة المرور للمستخدم:', username);
+        res.redirect('/profile?success=✅ تم تغيير كلمة المرور بنجاح');
+        
+    } catch (err) {
+        console.error("Change Password Error:", err);
+        res.redirect('/profile?error=❌ حدث خطأ في تغيير كلمة المرور');
+    }
+});
+
+// تسجيل الخروج
+app.get('/logout', (req, res) => {
+    req.session.destroy((err) => {
+        if (err) {
+            console.error('Logout Error:', err);
+        }
+        res.redirect('/?success=👋 تم تسجيل الخروج بنجاح');
+    });
 });
 
 // ============================================================
@@ -496,7 +599,7 @@ app.get('/api/users', async (req, res) => {
     try {
         const { data: users, error } = await supabase
             .from('users')
-            .select('*')
+            .select('id, username, full_name, state, phone, created_at, last_active')
             .order('created_at', { ascending: false });
 
         if (error) throw error;
