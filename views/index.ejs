@@ -112,11 +112,6 @@
             font-weight: bold;
         }
         
-        .price-low {
-            color: var(--sudan-green);
-            font-weight: bold;
-        }
-        
         .btn-sudan {
             background: linear-gradient(135deg, var(--sudan-red), #a00d22);
             color: white;
@@ -183,13 +178,6 @@
             color: white;
         }
         
-        .category-badge {
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            background: #e9ecef;
-        }
-        
         .table-hover tbody tr:hover {
             background-color: rgba(0, 114, 41, 0.05);
         }
@@ -199,15 +187,6 @@
             border-radius: 15px;
             padding: 20px;
             margin-top: 30px;
-        }
-        
-        .help-tip {
-            background: var(--sudan-green);
-            color: white;
-            padding: 3px 10px;
-            border-radius: 50%;
-            font-size: 0.7rem;
-            cursor: help;
         }
         
         .btn-profile {
@@ -225,25 +204,14 @@
             box-shadow: 0 4px 15px rgba(0, 114, 41, 0.4);
         }
         
-        .btn-create-profile {
-            background: linear-gradient(135deg, #6c757d, #495057);
+        .modal-header-sudan {
+            background: linear-gradient(135deg, var(--sudan-green), #00531e);
             color: white;
-            border: none;
-            border-radius: 25px;
-            padding: 8px 20px;
-            transition: all 0.3s ease;
+            border-radius: 15px 15px 0 0;
         }
         
-        .btn-create-profile:hover {
-            transform: scale(1.05);
-            color: white;
-        }
-        
-        .toast-container {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 9999;
+        .modal-header-sudan .btn-close {
+            filter: brightness(0) invert(1);
         }
         
         @media (max-width: 768px) {
@@ -253,17 +221,6 @@
             .sudan-header h2 {
                 font-size: 1.5rem;
             }
-        }
-        
-        /* تنسيق المودال */
-        .modal-header-sudan {
-            background: linear-gradient(135deg, var(--sudan-green), #00531e);
-            color: white;
-            border-radius: 15px 15px 0 0;
-        }
-        
-        .modal-header-sudan .btn-close {
-            filter: brightness(0) invert(1);
         }
     </style>
 </head>
@@ -301,9 +258,9 @@
                     <button class="btn btn-profile" data-bs-toggle="modal" data-bs-target="#createProfileModal">
                         <i class="fas fa-user-plus"></i> إنشاء ملف شخصي
                     </button>
-                    <a href="/profile/ضيف" class="btn btn-outline-success">
+                    <button class="btn btn-outline-success" onclick="window.location.href='/profile/ضيف'">
                         <i class="fas fa-user"></i> عرض ملفي الشخصي
-                    </a>
+                    </button>
                     <button class="btn btn-outline-info" onclick="window.location.reload()">
                         <i class="fas fa-sync"></i> تحديث
                     </button>
@@ -311,7 +268,7 @@
             </div>
         </div>
 
-        <!-- الإحصائيات السريعة -->
+        <!-- الإحصائيات -->
         <div class="row mb-4">
             <div class="col-md-3 col-6">
                 <div class="stat-card text-center">
@@ -393,7 +350,7 @@
             </div>
         </div>
 
-        <!-- متوسط الأسعار لكل سلعة -->
+        <!-- متوسط الأسعار -->
         <div class="card card-sudan p-3 mb-4">
             <h5><i class="fas fa-chart-line text-primary"></i> متوسط الأسعار لكل سلعة</h5>
             <div class="table-responsive">
@@ -427,7 +384,6 @@
             <h4>
                 <i class="fas fa-plus-circle text-success"></i> 
                 أضف سعر سلعة
-                <span class="help-tip" title="ساعد مجتمعك بمشاركة الأسعار الحقيقية">?</span>
             </h4>
             <form action="/add_price" method="POST" class="row g-3">
                 <div class="col-md-3">
@@ -447,12 +403,10 @@
                         <i class="fas fa-save"></i> أضف
                     </button>
                 </div>
-                <!-- حقل مخفي لاسم المستخدم -->
                 <input type="hidden" name="username" value="ضيف">
             </form>
             <div class="mt-2 text-muted small">
-                <i class="fas fa-info-circle"></i> 
-                جميع الأسعار بالجنيه السوداني (ج.س)
+                <i class="fas fa-info-circle"></i> جميع الأسعار بالجنيه السوداني (ج.س)
             </div>
         </div>
 
@@ -464,7 +418,6 @@
                 <span class="badge bg-secondary"><%= prices.length %></span>
             </h5>
             
-            <!-- البحث والفلترة -->
             <div class="row mb-3">
                 <div class="col-md-8">
                     <input type="text" id="searchInput" class="form-control" placeholder="🔍 ابحث عن سلعة، منطقة، أو متجر...">
@@ -550,14 +503,6 @@
                 <br>
                 الأسعار استرشادية وتعتمد على مساهمات المستخدمين
             </p>
-            <div>
-                <a href="#" class="btn btn-sm btn-outline-success">
-                    <i class="fas fa-donate"></i> دعم المنصة
-                </a>
-                <a href="#" class="btn btn-sm btn-outline-primary">
-                    <i class="fas fa-info-circle"></i> عن المنصة
-                </a>
-            </div>
         </footer>
     </div>
 
@@ -658,13 +603,11 @@
     </div>
 
     <!-- ======================================== -->
-    <!-- Bootstrap & JavaScript -->
+    <!-- JavaScript -->
     <!-- ======================================== -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // ============================================
         // البحث
-        // ============================================
         document.getElementById('searchInput').addEventListener('keyup', function() {
             const filter = this.value.toLowerCase();
             const rows = document.querySelectorAll('#priceTable tbody tr');
@@ -674,9 +617,7 @@
             });
         });
 
-        // ============================================
         // الترتيب
-        // ============================================
         document.getElementById('sortSelect').addEventListener('change', function() {
             const tbody = document.querySelector('#priceTable tbody');
             const rows = Array.from(tbody.querySelectorAll('tr'));
@@ -700,9 +641,7 @@
             rows.forEach(row => tbody.appendChild(row));
         });
 
-        // ============================================
         // حذف
-        // ============================================
         function deletePrice(id) {
             if (confirm('⚠️ هل أنت متأكد من حذف هذا السعر؟')) {
                 const form = document.createElement('form');
@@ -713,9 +652,7 @@
             }
         }
 
-        // ============================================
         // تعديل
-        // ============================================
         function editPrice(id, price, location, store) {
             const modal = new bootstrap.Modal(document.getElementById('editModal'));
             const form = document.getElementById('editForm');
@@ -726,27 +663,19 @@
             modal.show();
         }
 
-        // ============================================
         // مشاركة واتساب
-        // ============================================
         function sharePrice(item, price, location) {
             const text = `🇸🇩 سعر ${item} في ${location} = ${price} ج.س`;
             const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
             window.open(url, '_blank');
         }
 
-        // ============================================
         // تحديث تلقائي كل 30 ثانية
-        // ============================================
         setTimeout(() => {
             location.reload();
         }, 30000);
 
-        // ============================================
-        // رسالة ترحيب في الكونسول
-        // ============================================
         console.log('🇸🇩 منصة التكافل السوداني - نساعد بعضنا البعض');
-        console.log('❤️ تم إنشاء هذه المنصة لخدمة الشعب السوداني');
     </script>
 </body>
 </html>
