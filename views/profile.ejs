@@ -177,33 +177,14 @@
             background: #e9ecef;
         }
         
-        .modal-content {
-            border-radius: 20px;
-        }
-        
-        .modal-header {
-            background: linear-gradient(135deg, var(--sudan-red), #8B0000);
+        .modal-header-sudan {
+            background: linear-gradient(135deg, var(--sudan-green), #00531e);
             color: white;
-            border-radius: 20px 20px 0 0;
+            border-radius: 15px 15px 0 0;
         }
         
-        .form-control:focus {
-            border-color: var(--sudan-green);
-            box-shadow: 0 0 0 0.2rem rgba(0, 114, 41, 0.25);
-        }
-        
-        .btn-save {
-            background: var(--sudan-green);
-            color: white;
-            border: none;
-            padding: 10px 30px;
-            border-radius: 25px;
-            font-weight: bold;
-        }
-        
-        .btn-save:hover {
-            background: #00531e;
-            color: white;
+        .modal-header-sudan .btn-close {
+            filter: brightness(0) invert(1);
         }
         
         .flag-stripes {
@@ -218,6 +199,20 @@
             );
             margin: 10px 0;
             border-radius: 2px;
+        }
+        
+        .btn-save {
+            background: var(--sudan-green);
+            color: white;
+            border: none;
+            padding: 10px 30px;
+            border-radius: 25px;
+            font-weight: bold;
+        }
+        
+        .btn-save:hover {
+            background: #00531e;
+            color: white;
         }
     </style>
 </head>
@@ -354,30 +349,32 @@
     <% } %>
 
     <!-- زر تعديل الملف -->
-    <button class="btn-edit" data-bs-toggle="modal" data-bs-target="#editModal">
+    <button class="btn-edit" data-bs-toggle="modal" data-bs-target="#editProfileModal">
         <i class="fas fa-edit"></i> تعديل الملف الشخصي
     </button>
 </div>
 
-<!-- نموذج تعديل الملف الشخصي -->
-<div class="modal fade" id="editModal" tabindex="-1">
+<!-- ======================================== -->
+<!-- مودال تعديل الملف الشخصي -->
+<!-- ======================================== -->
+<div class="modal fade" id="editProfileModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header">
+            <div class="modal-header modal-header-sudan">
                 <h5 class="modal-title">
                     <i class="fas fa-user-edit"></i> تعديل الملف الشخصي
                 </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form action="/update_profile/<%= user.username %>" method="POST">
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label fw-bold">الاسم الكامل</label>
+                        <label class="form-label fw-bold">الاسم الكامل *</label>
                         <input type="text" name="full_name" class="form-control" 
                                value="<%= user.full_name %>" required>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-bold">الولاية</label>
+                        <label class="form-label fw-bold">الولاية *</label>
                         <select name="state" class="form-select" required>
                             <option value="الخرطوم" <%= user.state === 'الخرطوم' ? 'selected' : '' %>>الخرطوم</option>
                             <option value="أم درمان" <%= user.state === 'أم درمان' ? 'selected' : '' %>>أم درمان</option>
@@ -387,6 +384,7 @@
                             <option value="دارفور" <%= user.state === 'دارفور' ? 'selected' : '' %>>دارفور</option>
                             <option value="النيل الأزرق" <%= user.state === 'النيل الأزرق' ? 'selected' : '' %>>النيل الأزرق</option>
                             <option value="نهر النيل" <%= user.state === 'نهر النيل' ? 'selected' : '' %>>نهر النيل</option>
+                            <option value="البحر الأحمر" <%= user.state === 'البحر الأحمر' ? 'selected' : '' %>>البحر الأحمر</option>
                             <option value="أخرى" <%= user.state === 'أخرى' ? 'selected' : '' %>>أخرى</option>
                         </select>
                     </div>
@@ -399,7 +397,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
-                    <button type="submit" class="btn-save">
+                    <button type="submit" class="btn btn-save">
                         <i class="fas fa-save"></i> حفظ التغييرات
                     </button>
                 </div>
@@ -408,7 +406,9 @@
     </div>
 </div>
 
-<!-- Bootstrap JS -->
+<!-- ======================================== -->
+<!-- JavaScript -->
+<!-- ======================================== -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
