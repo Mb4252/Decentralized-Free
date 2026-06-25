@@ -324,6 +324,38 @@
             backdrop-filter: blur(5px);
         }
         
+        .btn-edit-row {
+            background: #ffc107;
+            color: #333;
+            border: none;
+            border-radius: 50%;
+            width: 35px;
+            height: 35px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-edit-row:hover {
+            transform: scale(1.1);
+            background: #e0a800;
+            color: #333;
+        }
+        
+        .btn-delete-row {
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 35px;
+            height: 35px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-delete-row:hover {
+            transform: scale(1.1);
+            background: #c82333;
+            color: white;
+        }
+        
         @media (max-width: 768px) {
             .stat-card .stat-number {
                 font-size: 1.2rem;
@@ -669,13 +701,18 @@
                                 </small>
                             </td>
                             <td>
-                                <button class="btn btn-sm btn-outline-danger" onclick="deletePrice('<%= p.id %>')">
+                                <!-- ✅ زر الحذف -->
+                                <button class="btn btn-delete-row btn-sm" onclick="deletePrice('<%= p.id %>')" title="حذف">
                                     <i class="fas fa-trash"></i>
                                 </button>
-                                <button class="btn btn-sm btn-outline-primary" onclick="editPrice('<%= p.id %>', '<%= p.price %>', '<%= p.location %>', '<%= p.store %>')">
+                                
+                                <!-- ✅ زر التعديل -->
+                                <button class="btn btn-edit-row btn-sm" onclick="editPrice('<%= p.id %>', '<%= p.price %>', '<%= p.location %>', '<%= p.store %>')" title="تعديل">
                                     <i class="fas fa-edit"></i>
                                 </button>
-                                <button class="btn btn-sm share-btn" onclick="sharePrice('<%= p.item %>', '<%= p.price %>', '<%= p.location %>')">
+                                
+                                <!-- ✅ زر مشاركة واتساب -->
+                                <button class="btn btn-sm share-btn" onclick="sharePrice('<%= p.item %>', '<%= p.price %>', '<%= p.location %>')" title="مشاركة">
                                     <i class="fab fa-whatsapp"></i>
                                 </button>
                             </td>
@@ -785,7 +822,7 @@
             rows.forEach(row => tbody.appendChild(row));
         });
 
-        // حذف
+        // ✅ دالة حذف
         function deletePrice(id) {
             if (confirm('⚠️ هل أنت متأكد من حذف هذا السعر؟')) {
                 const form = document.createElement('form');
@@ -796,7 +833,7 @@
             }
         }
 
-        // تعديل
+        // ✅ دالة تعديل (تفتح المودال)
         function editPrice(id, price, location, store) {
             const modal = new bootstrap.Modal(document.getElementById('editModal'));
             const form = document.getElementById('editForm');
@@ -807,7 +844,7 @@
             modal.show();
         }
 
-        // مشاركة واتساب
+        // ✅ دالة مشاركة واتساب
         function sharePrice(item, price, location) {
             const text = `🇸🇩 سعر ${item} في ${location} = ${price} ج.س`;
             const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
