@@ -123,10 +123,6 @@
             color: white;
         }
         
-        .btn-register i {
-            margin-left: 8px;
-        }
-        
         .input-group-text {
             background: #f8f9fa;
             border: 2px solid #e9ecef;
@@ -183,28 +179,30 @@
             margin-top: 4px;
         }
         
-        .instructions-box {
-            background: #f8f9fa;
+        .gift-info {
+            background: linear-gradient(135deg, #fff3cd, #ffeaa7);
             border-radius: 12px;
             padding: 15px;
-            margin-top: 20px;
-            border-right: 4px solid var(--sudan-red);
+            margin-bottom: 20px;
+            border-right: 4px solid #ffc107;
         }
         
-        .instructions-box h6 {
-            color: var(--sudan-red);
+        .gift-info h6 {
+            color: #856404;
             font-weight: bold;
         }
         
-        .instructions-box ul {
+        .gift-info ul {
             padding-right: 20px;
             margin-bottom: 0;
-            font-size: 0.85rem;
+            font-size: 0.9rem;
             color: #555;
         }
         
-        .instructions-box ul li {
-            margin-bottom: 4px;
+        .gift-info .gift-amount {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #28a745;
         }
         
         .strength-meter {
@@ -244,6 +242,27 @@
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     </div>
     <% } %>
+
+    <!-- ============================================================ -->
+    <!-- معلومات الرصيد الترحيبي -->
+    <!-- ============================================================ -->
+    <div class="gift-info">
+        <h6><i class="fas fa-gift"></i> 🎁 هدية الترحيب</h6>
+        <p class="mb-1">
+            عند إنشاء حسابك، ستحصل على 
+            <span class="gift-amount">💰 5000 نقطة ترحيبية</span>
+        </p>
+        <ul>
+            <li>✅ رصيد وهمي يعكس نشاطك في المنصة</li>
+            <li>✅ يظهر في ملفك الشخصي</li>
+            <li>✅ يزيد من مكانتك في المجتمع</li>
+            <li>✅ يشجعك على المشاركة أكثر</li>
+        </ul>
+        <small class="text-muted">
+            <i class="fas fa-info-circle"></i> 
+            هذا الرصيد ترويجي وليس له قيمة مالية حقيقية
+        </small>
+    </div>
 
     <!-- نموذج إنشاء حساب -->
     <form action="/register" method="POST">
@@ -359,25 +378,13 @@
             <i class="fas fa-arrow-right"></i> العودة للرئيسية
         </a>
     </div>
-
-    <!-- تعليمات التسجيل -->
-    <div class="instructions-box">
-        <h6><i class="fas fa-info-circle"></i> تعليمات التسجيل:</h6>
-        <ul>
-            <li>🔹 اختر <strong>اسم مستخدم</strong> فريد وسهل التذكر</li>
-            <li>🔹 أدخل <strong>كلمة مرور</strong> قوية (6 أحرف على الأقل)</li>
-            <li>🔹 احفظ بياناتك في مكان آمن</li>
-            <li>🔹 بعد التسجيل، ستسجل الدخول تلقائياً</li>
-            <li>🔹 يمكنك تغيير كلمة المرور لاحقاً من الملف الشخصي</li>
-        </ul>
-    </div>
 </div>
 
 <!-- Bootstrap JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
-// قياس قوة كلمة المرور (بسيط)
+// قياس قوة كلمة المرور
 document.querySelector('input[name="password"]').addEventListener('input', function() {
     const password = this.value;
     const bar = document.getElementById('strengthBar');
