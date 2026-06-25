@@ -56,6 +56,59 @@ function getLatest(prices, count = 10) {
 const rateLimit = new Map();
 
 // ============================================================
+// دوال الهدية
+// ============================================================
+
+// دالة منح الهدية للمستخدم الجديد
+async function giveWelcomeGift(userId, username) {
+    try {
+        const giftAmount = 5000;
+        
+        const { data, error } = await supabase
+            .from('users')
+            .update({ 
+                gift_received: true,
+                gift_date: new Date(),
+                gift_balance: giftAmount
+            })
+            .eq('id', userId)
+            .select();
+
+        if (error) {
+            console.error('❌ خطأ في منح الهدية:', error);
+            return false;
+        }
+
+        console.log(`🎁 تم منح هدية ${giftAmount} ج للمستخدم: ${username}`);
+        return true;
+    } catch (err) {
+        console.error('❌ خطأ في giveWelcomeGift:', err);
+        return false;
+    }
+}
+
+// دالة التحقق من حالة الهدية
+async function checkGiftStatus(username) {
+    try {
+        const { data: user, error } = await supabase
+            .from('users')
+            .select('gift_received, gift_balance, gift_date')
+            .eq('username', username)
+            .single();
+
+        if (error) {
+            console.error('❌ خطأ في التحقق من الهدية:', error);
+            return null;
+        }
+
+        return user;
+    } catch (err) {
+        console.error('❌ خطأ:', err);
+        return null;
+    }
+}
+
+// ============================================================
 // حذف المنشورات المنتهية (أقدم من 3 أيام)
 // ============================================================
 
@@ -84,12 +137,12 @@ async function deleteExpiredPrices() {
     }
 }
 
-// تشغيل الحذف عند بدء السيرفر (بعد 5 ثوان)
+// تشغيل الحذف عند بدء السيرفر
 setTimeout(() => {
     deleteExpiredPrices();
 }, 5000);
 
-// جدولة الحذف كل 3 أيام (259200000 ملي ثانية)
+// جدولة الحذف كل 3 أيام
 setInterval(() => {
     deleteExpiredPrices();
 }, 259200000);
@@ -297,6 +350,38 @@ app.get('/register', (req, res) => {
     res.render('register', { error: error });
 });
 
+// صفحة عرض الهدية
+app.get('/gift', async (req, res) => {
+    try {
+        if (!req.session.user) {
+            return res.redirect('/login?error=⚠️ يرجى تسجيل الدخول أولاً');
+        }
+
+        const username = req.session.user.username;
+        
+        const { data: user, error } = await supabase
+            .from('users')
+            .select('gift_received, gift_balance, gift_date')
+            .eq('username', username)
+            .single();
+
+        if (error) {
+            console.error('Gift Error:', error);
+            return res.redirect('/profile?error=❌ خطأ في عرض الهدية');
+        }
+
+        req.session.user.gift_received = user.gift_received;
+        req.session.user.gift_balance = user.gift_balance;
+        req.session.user.gift_date = user.gift_date;
+
+        res.render('gift', { currentUser: req.session.user });
+        
+    } catch (err) {
+        console.error('Gift Error:', err);
+        res.redirect('/profile?error=❌ حدث خطأ');
+    }
+});
+
 // تسجيل الدخول
 app.post('/login', async (req, res) => {
     try {
@@ -308,7 +393,6 @@ app.post('/login', async (req, res) => {
             return res.redirect('/login?error=⚠️ يرجى إدخال اسم المستخدم وكلمة المرور');
         }
 
-        // البحث عن المستخدم
         const { data: user, error } = await supabase
             .from('users')
             .select('*')
@@ -320,21 +404,37 @@ app.post('/login', async (req, res) => {
             return res.redirect('/login?error=❌ اسم المستخدم غير صحيح');
         }
 
-        // التحقق من كلمة المرور
         if (user.password !== password) {
             console.log('❌ كلمة مرور خاطئة للمستخدم:', username);
             return res.redirect('/login?error=❌ كلمة المرور غير صحيحة');
         }
 
+        // التحقق من حالة الهدية
+        const giftStatus = await checkGiftStatus(username);
+        
         req.session.user = {
             username: user.username,
             full_name: user.full_name,
             state: user.state,
-            id: user.id
+            id: user.id,
+            gift_received: user.gift_received || false,
+            gift_balance: user.gift_balance || 0
         };
 
+        let successMessage = `✅ مرحباً ${user.full_name}! تم تسجيل الدخول بنجاح`;
+        
+        // إذا لم يستلم الهدية بعد (للمستخدمين القدامى)
+        if (!user.gift_received) {
+            const giftGiven = await giveWelcomeGift(user.id, user.username);
+            if (giftGiven) {
+                successMessage = `🎁 مرحباً ${user.full_name}! تم منحك 5000 جنيه كهدية ترحيبية!`;
+                req.session.user.gift_received = true;
+                req.session.user.gift_balance = 5000;
+            }
+        }
+
         console.log('✅ تم تسجيل الدخول بنجاح:', username);
-        res.redirect('/?success=✅ مرحباً ' + user.full_name + '! تم تسجيل الدخول بنجاح');
+        res.redirect(`/?success=${encodeURIComponent(successMessage)}`);
         
     } catch (err) {
         console.error('Login Error:', err);
@@ -342,7 +442,7 @@ app.post('/login', async (req, res) => {
     }
 });
 
-// إنشاء مستخدم جديد
+// إنشاء مستخدم جديد مع هدية
 app.post('/register', async (req, res) => {
     try {
         const { username, full_name, state, phone, password, confirm_password } = req.body;
@@ -379,7 +479,9 @@ app.post('/register', async (req, res) => {
                 full_name: full_name.trim(),
                 state: state.trim(),
                 phone: phone?.trim() || null,
-                password: password
+                password: password,
+                gift_received: false,
+                gift_balance: 0
             }])
             .select();
 
@@ -390,14 +492,24 @@ app.post('/register', async (req, res) => {
 
         console.log('✅ تم إنشاء المستخدم بنجاح:', data);
         
+        const newUser = data[0];
+        
+        const giftGiven = await giveWelcomeGift(newUser.id, newUser.username);
+        
+        if (giftGiven) {
+            console.log(`🎁 تم منح 5000 ج للمستخدم: ${newUser.username}`);
+        }
+        
         req.session.user = {
-            username: username.trim(),
-            full_name: full_name.trim(),
-            state: state.trim(),
-            id: data[0].id
+            username: newUser.username,
+            full_name: newUser.full_name,
+            state: newUser.state,
+            id: newUser.id,
+            gift_received: true,
+            gift_balance: 5000
         };
         
-        res.redirect('/?success=✅ تم إنشاء الحساب وتسجيل الدخول بنجاح');
+        res.redirect('/?success=🎁 مرحباً! تم إنشاء حسابك ومنحك 5000 جنيه كهدية ترحيبية!');
         
     } catch (err) {
         console.error('❌ خطأ عام:', err);
@@ -661,7 +773,7 @@ app.get('/api/users', async (req, res) => {
     try {
         const { data: users, error } = await supabase
             .from('users')
-            .select('id, username, full_name, state, phone, created_at, last_active')
+            .select('id, username, full_name, state, phone, created_at, last_active, gift_received, gift_balance, gift_date')
             .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -723,4 +835,5 @@ app.listen(PORT, () => {
     console.log(`🔗 http://localhost:${PORT}`);
     console.log(`🇸🇩 منصة التكافل السوداني جاهزة للعمل`);
     console.log(`🗑️ سيتم حذف المنشورات الأقدم من 3 أيام تلقائياً`);
+    console.log(`🎁 سيتم منح 5000 ج هدية لكل مستخدم جديد`);
 });
