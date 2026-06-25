@@ -56,10 +56,10 @@ function getLatest(prices, count = 10) {
 const rateLimit = new Map();
 
 // ============================================================
-// دوال الهدية
+// دوال الهدية (رصيد ترحيبي وهمي)
 // ============================================================
 
-// دالة منح الهدية للمستخدم الجديد
+// دالة منح الرصيد الترحيبي للمستخدم الجديد
 async function giveWelcomeGift(userId, username) {
     try {
         const giftAmount = 5000;
@@ -75,11 +75,11 @@ async function giveWelcomeGift(userId, username) {
             .select();
 
         if (error) {
-            console.error('❌ خطأ في منح الهدية:', error);
+            console.error('❌ خطأ في منح الرصيد الترحيبي:', error);
             return false;
         }
 
-        console.log(`🎁 تم منح هدية ${giftAmount} ج للمستخدم: ${username}`);
+        console.log(`🎁 تم منح ${giftAmount} نقطة ترحيبية للمستخدم: ${username}`);
         return true;
     } catch (err) {
         console.error('❌ خطأ في giveWelcomeGift:', err);
@@ -87,7 +87,7 @@ async function giveWelcomeGift(userId, username) {
     }
 }
 
-// دالة التحقق من حالة الهدية
+// دالة التحقق من حالة الرصيد
 async function checkGiftStatus(username) {
     try {
         const { data: user, error } = await supabase
@@ -97,7 +97,7 @@ async function checkGiftStatus(username) {
             .single();
 
         if (error) {
-            console.error('❌ خطأ في التحقق من الهدية:', error);
+            console.error('❌ خطأ في التحقق من الرصيد:', error);
             return null;
         }
 
@@ -350,7 +350,7 @@ app.get('/register', (req, res) => {
     res.render('register', { error: error });
 });
 
-// صفحة عرض الهدية
+// صفحة عرض الرصيد الترحيبي
 app.get('/gift', async (req, res) => {
     try {
         if (!req.session.user) {
@@ -367,7 +367,7 @@ app.get('/gift', async (req, res) => {
 
         if (error) {
             console.error('Gift Error:', error);
-            return res.redirect('/profile?error=❌ خطأ في عرض الهدية');
+            return res.redirect('/profile?error=❌ خطأ في عرض الرصيد');
         }
 
         req.session.user.gift_received = user.gift_received;
@@ -380,6 +380,11 @@ app.get('/gift', async (req, res) => {
         console.error('Gift Error:', err);
         res.redirect('/profile?error=❌ حدث خطأ');
     }
+});
+
+// صفحة شرح استخدام الرصيد
+app.get('/how-to-use-gift', (req, res) => {
+    res.render('how-to-use-gift');
 });
 
 // تسجيل الدخول
@@ -409,7 +414,7 @@ app.post('/login', async (req, res) => {
             return res.redirect('/login?error=❌ كلمة المرور غير صحيحة');
         }
 
-        // التحقق من حالة الهدية
+        // التحقق من حالة الرصيد الترحيبي
         const giftStatus = await checkGiftStatus(username);
         
         req.session.user = {
@@ -423,11 +428,11 @@ app.post('/login', async (req, res) => {
 
         let successMessage = `✅ مرحباً ${user.full_name}! تم تسجيل الدخول بنجاح`;
         
-        // إذا لم يستلم الهدية بعد (للمستخدمين القدامى)
+        // إذا لم يستلم الرصيد بعد (للمستخدمين القدامى)
         if (!user.gift_received) {
             const giftGiven = await giveWelcomeGift(user.id, user.username);
             if (giftGiven) {
-                successMessage = `🎁 مرحباً ${user.full_name}! تم منحك 5000 جنيه كهدية ترحيبية!`;
+                successMessage = `🎁 مرحباً ${user.full_name}! تم منحك 5000 نقطة ترحيبية!`;
                 req.session.user.gift_received = true;
                 req.session.user.gift_balance = 5000;
             }
@@ -442,7 +447,7 @@ app.post('/login', async (req, res) => {
     }
 });
 
-// إنشاء مستخدم جديد مع هدية
+// إنشاء مستخدم جديد مع رصيد ترحيبي
 app.post('/register', async (req, res) => {
     try {
         const { username, full_name, state, phone, password, confirm_password } = req.body;
@@ -497,7 +502,7 @@ app.post('/register', async (req, res) => {
         const giftGiven = await giveWelcomeGift(newUser.id, newUser.username);
         
         if (giftGiven) {
-            console.log(`🎁 تم منح 5000 ج للمستخدم: ${newUser.username}`);
+            console.log(`🎁 تم منح 5000 نقطة ترحيبية للمستخدم: ${newUser.username}`);
         }
         
         req.session.user = {
@@ -509,7 +514,7 @@ app.post('/register', async (req, res) => {
             gift_balance: 5000
         };
         
-        res.redirect('/?success=🎁 مرحباً! تم إنشاء حسابك ومنحك 5000 جنيه كهدية ترحيبية!');
+        res.redirect('/?success=🎁 مرحباً! تم إنشاء حسابك ومنحك 5000 نقطة ترحيبية!');
         
     } catch (err) {
         console.error('❌ خطأ عام:', err);
@@ -835,5 +840,5 @@ app.listen(PORT, () => {
     console.log(`🔗 http://localhost:${PORT}`);
     console.log(`🇸🇩 منصة التكافل السوداني جاهزة للعمل`);
     console.log(`🗑️ سيتم حذف المنشورات الأقدم من 3 أيام تلقائياً`);
-    console.log(`🎁 سيتم منح 5000 ج هدية لكل مستخدم جديد`);
+    console.log(`🎁 سيتم منح 5000 نقطة ترحيبية لكل مستخدم جديد (رصيد وهمي ترويجي)`);
 });
