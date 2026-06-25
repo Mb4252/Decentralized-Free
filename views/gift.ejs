@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🎁 هديتي - منصة التكافل السوداني</title>
+    <title>🎁 رصيدي الترحيبي - منصة التكافل السوداني</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -100,6 +100,21 @@
             position: relative;
             z-index: 1;
         }
+        .info-box {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 15px;
+            margin-top: 15px;
+            position: relative;
+            z-index: 1;
+            text-align: right;
+        }
+        .info-box ul {
+            padding-right: 20px;
+            margin-bottom: 0;
+            font-size: 0.9rem;
+            color: #555;
+        }
     </style>
 </head>
 <body>
@@ -108,28 +123,45 @@
         <div class="gift-icon">
             <i class="fas fa-gift"></i>
         </div>
-        <h3>🎁 هدية الترحيب</h3>
+        <h3>🎁 رصيدي الترحيبي</h3>
         <p>شكراً لانضمامك إلى منصة التكافل السوداني</p>
         
         <% if (currentUser && currentUser.gift_received) { %>
             <div class="gift-amount">
-                💰 <%= currentUser.gift_balance || 0 %> ج
+                💰 <%= currentUser.gift_balance || 0 %> نقطة
             </div>
             <div class="gift-status text-success">
-                <i class="fas fa-check-circle"></i> تم استلام الهدية
+                <i class="fas fa-check-circle"></i> تم استلام الرصيد
             </div>
-            <p class="text-muted">تم منحك هذه الهدية كترحيب من المنصة</p>
+            <p class="text-muted">هذا الرصيد الترويجي يعكس نشاطك في المنصة</p>
             <small class="text-muted">
                 تم الاستلام في: <%= currentUser.gift_date ? new Date(currentUser.gift_date).toLocaleString('ar-EG') : 'اليوم' %>
             </small>
         <% } else { %>
             <div class="gift-status text-warning">
-                <i class="fas fa-clock"></i> في انتظار الهدية
+                <i class="fas fa-clock"></i> في انتظار الرصيد
             </div>
-            <p class="text-muted">سيتم منحك 5000 ج عند تفعيل حسابك</p>
+            <p class="text-muted">سيتم منحك 5000 نقطة ترحيبية عند تفعيل حسابك</p>
         <% } %>
+
+        <div class="info-box">
+            <h6><i class="fas fa-info-circle"></i> ما هي النقاط الترحيبية؟</h6>
+            <ul>
+                <li>✅ رصيد وهمي يعكس نشاطك في المنصة</li>
+                <li>✅ يظهر في ملفك الشخصي</li>
+                <li>✅ يزيد من مكانتك في المجتمع</li>
+                <li>✅ يشجعك على المشاركة أكثر</li>
+            </ul>
+            <small class="text-muted">
+                <i class="fas fa-info-circle"></i> 
+                هذا الرصيد ترويجي وليس له قيمة مالية حقيقية
+            </small>
+        </div>
         
         <div class="mt-3">
+            <a href="/how-to-use-gift" class="btn btn-outline-warning btn-sm">
+                <i class="fas fa-question-circle"></i> كيف تستخدم رصيدك؟
+            </a>
             <a href="/" class="btn btn-gift">
                 <i class="fas fa-home"></i> العودة للرئيسية
             </a>
