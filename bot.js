@@ -24,10 +24,10 @@ const API_KEY = process.env.BINGX_API_KEY;
 const API_SECRET = process.env.BINGX_API_SECRET;
 
 // ✅ إعدادات ثابتة
-const TRADE_AMOUNT = 0.50;
+const TRADE_AMOUNT = 0.42; // ✅ تم التعديل من 0.50 إلى 0.42
 const LEVERAGE = 10;
-const PROFIT_USDT_TARGET = 0.06;
-const STOP_LOSS_USDT = 0.20;
+const PROFIT_USDT_TARGET = 0.10; // ✅ تم التعديل من 0.06 إلى 0.10
+const STOP_LOSS_USDT = 0.20; // ✅ يبقى كما هو
 const STOP_LOSS_ENABLED = true;
 
 // ✅ إعدادات الدخول
@@ -969,7 +969,7 @@ async function tradingCycle() {
       let profitPercent = (profitUSDT / (currentPosition.entryPrice * currentPosition.quantity)) * 100;
       console.log(`⚡ ${currentPosition.symbol} الربح الحالي: ${profitUSDT.toFixed(4)} USDT (${profitPercent.toFixed(2)}%)`);
 
-      // ✅ جني الربح (0.06 USDT)
+      // ✅ جني الربح (0.10 USDT)
       if (profitUSDT >= PROFIT_USDT_TARGET) {
         console.log(`🎯 جني ربح: ${profitUSDT.toFixed(4)} USDT (هدف ${PROFIT_USDT_TARGET} USDT)`);
         await closePosition(currentPosition, 'TAKE_PROFIT');
@@ -1112,7 +1112,7 @@ app.get('/dashboard', (req, res) => {
     <body>
       <div class="container">
         <h1>⚡ بوت سكالبينج احترافي</h1>
-        <p class="subtitle">📊 50 عملة | عتبة 90/140 | TP 0.06 | SL 0.20</p>
+        <p class="subtitle">📊 50 عملة | عتبة 90/140 | TP 0.10 | SL 0.20</p>
         <div class="status-grid" id="statusGrid">
           <div class="card"><div class="label">📊 الحالة</div><div class="value"><span class="status-badge" id="statusBadge">🟢 يعمل</span></div></div>
           <div class="card"><div class="label">💰 الرصيد</div><div class="value green" id="balance">0.00 USDT</div></div>
@@ -1122,7 +1122,7 @@ app.get('/dashboard', (req, res) => {
         <div class="trade-info" id="tradeInfo"><div class="label">💰 الربح / الخسارة</div><div class="value" id="profitDisplay">0.0000 USDT (0.00%)</div></div>
         <div class="settings-box">
           <div class="label">⚙️ إعدادات البوت النهائية</div>
-          <div class="value">💰 <span class="highlight-green">0.49 USDT</span> | ⚡ <span class="highlight-gold">10x</span> | 🎯 <span class="highlight-gold">+0.06 USDT</span> | ⛔ <span class="highlight-red">-0.20 USDT</span> | 📊 <span class="highlight-purple">عتبة 90/140</span> | ⚡ <span class="highlight-purple">500ms</span></div>
+          <div class="value">💰 <span class="highlight-green">0.42 USDT</span> | ⚡ <span class="highlight-gold">10x</span> | 🎯 <span class="highlight-gold">+0.10 USDT</span> | ⛔ <span class="highlight-red">-0.20 USDT</span> | 📊 <span class="highlight-purple">عتبة 90/140</span> | ⚡ <span class="highlight-purple">500ms</span></div>
         </div>
         <button class="refresh-btn" onclick="fetchStatus()">🔄 تحديث</button>
         <div class="footer" id="lastUpdate">🕐 آخر تحديث: --</div>
