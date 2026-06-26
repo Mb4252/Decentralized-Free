@@ -24,7 +24,7 @@ const API_KEY = process.env.BINGX_API_KEY;
 const API_SECRET = process.env.BINGX_API_SECRET;
 
 // ✅ إعدادات ثابتة
-const TRADE_AMOUNT = 0.42; // ✅ تم التعديل من 0.50 إلى 0.42
+const TRADE_AMOUNT = 0.41; // ✅ تم التعديل من 0.50 إلى 0.42
 const LEVERAGE = 50;
 const PROFIT_USDT_TARGET = 0.10; // ✅ تم التعديل من 0.06 إلى 0.10
 const STOP_LOSS_USDT = 0.20; // ✅ يبقى كما هو
