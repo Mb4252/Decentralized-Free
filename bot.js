@@ -17,33 +17,28 @@ if (!process.env.BINGX_API_KEY || !process.env.BINGX_API_SECRET) {
 }
 
 // ==========================================
-// إعدادات البوت النهائية
+// إعدادات البوت
 // ==========================================
 
 const API_KEY = process.env.BINGX_API_KEY;
 const API_SECRET = process.env.BINGX_API_SECRET;
 
 // ✅ إعدادات ثابتة
-const TRADE_AMOUNT = 0.41; // ✅ تم التعديل من 0.50 إلى 0.42
+const TRADE_AMOUNT = 0.42;
 const LEVERAGE = 50;
-const PROFIT_USDT_TARGET = 0.10; // ✅ تم التعديل من 0.06 إلى 0.10
-const STOP_LOSS_USDT = 0.20; // ✅ يبقى كما هو
+const PROFIT_USDT_TARGET = 0.10;
+const STOP_LOSS_USDT = 0.20;
 const STOP_LOSS_ENABLED = true;
-
-// ✅ إعدادات الدخول
-const SCORE_THRESHOLD = 90;
-const TOTAL_SCORE = 140;
 
 // ✅ إعدادات الشمعة
 const CANDLE_INTERVAL = '1m';
-const TREND_INTERVAL = '5m';
-const CANDLE_LIMIT = 200;
+const CANDLE_LIMIT = 30;
 
 // ✅ سرعة المسح
 const SCAN_INTERVAL = 500;
 const cooldown = 1000;
 
-// ✅ العملات (أفضل 50-80 عملة)
+// ✅ العملات
 const SYMBOLS = [
   "BTC-USDT", "ETH-USDT", "SOL-USDT", "BNB-USDT", "XRP-USDT",
   "DOGE-USDT", "ADA-USDT", "LINK-USDT", "AVAX-USDT", "DOT-USDT",
@@ -129,7 +124,6 @@ const ENDPOINTS = {
   FUTURES_CANDLE: '/openApi/swap/v2/quote/klines',
   FUTURES_TICKER: '/openApi/swap/v2/quote/ticker',
   FUTURES_CONTRACTS: '/openApi/swap/v2/quote/contracts',
-  FUTURES_DEPTH: '/openApi/swap/v2/quote/depth',
 };
 
 // ==========================================
@@ -196,102 +190,6 @@ async function bingxRequest(method, endpoint, params = {}, signed = true) {
     console.error('❌ BingX error:', error.response?.data || error.message);
     return null;
   }
-}
-
-// ==========================================
-// ✅ حساب EMA
-// ==========================================
-
-function calculateEMA(prices, period) {
-  if (prices.length < period) return prices[prices.length - 1] || 0;
-
-  const multiplier = 2 / (period + 1);
-  let ema = prices[0];
-
-  for (let i = 1; i < prices.length; i++) {
-    ema = ((prices[i] - ema) * multiplier) + ema;
-  }
-
-  return ema;
-}
-
-// ==========================================
-// ✅ حساب RSI
-// ==========================================
-
-function calculateRSI(closes, period = 14) {
-  if (closes.length < period + 1) return 50;
-
-  let gains = 0;
-  let losses = 0;
-
-  for (let i = closes.length - period; i < closes.length; i++) {
-    const diff = closes[i] - closes[i - 1];
-
-    if (diff > 0) gains += diff;
-    else losses += Math.abs(diff);
-  }
-
-  const avgGain = gains / period;
-  const avgLoss = losses / period;
-
-  if (avgLoss === 0) return 100;
-  const rs = avgGain / avgLoss;
-  return 100 - (100 / (1 + rs));
-}
-
-// ==========================================
-// ✅ حساب MACD
-// ==========================================
-
-function calculateMACD(closes) {
-  if (closes.length < 26) return { macd: 0, signal: 0, histogram: 0 };
-
-  const ema12 = calculateEMA(closes, 12);
-  const ema26 = calculateEMA(closes, 26);
-  const macd = ema12 - ema26;
-
-  const macdValues = [];
-  for (let i = 0; i < closes.length; i++) {
-    const e12 = calculateEMA(closes.slice(0, i + 1), 12);
-    const e26 = calculateEMA(closes.slice(0, i + 1), 26);
-    macdValues.push(e12 - e26);
-  }
-
-  const signal = calculateEMA(macdValues, 9);
-  const histogram = macd - signal;
-
-  return { macd, signal, histogram };
-}
-
-// ==========================================
-// ✅ حساب ATR
-// ==========================================
-
-function calculateATR(candles, period = 14) {
-  if (candles.length < period + 1) return 0;
-
-  const trs = [];
-  for (let i = 1; i < candles.length; i++) {
-    const high = candles[i].high;
-    const low = candles[i].low;
-    const prevClose = candles[i - 1].close;
-    
-    const tr = Math.max(
-      high - low,
-      Math.abs(high - prevClose),
-      Math.abs(low - prevClose)
-    );
-    trs.push(tr);
-  }
-
-  let atr = 0;
-  for (let i = 0; i < period && i < trs.length; i++) {
-    atr += trs[trs.length - 1 - i];
-  }
-  atr = atr / Math.min(period, trs.length);
-  
-  return atr;
 }
 
 // ==========================================
@@ -383,47 +281,7 @@ async function getCandles(symbol) {
       data = response.data.data;
     }
 
-    if (!data || !Array.isArray(data) || data.length < 100) return null;
-
-    return data.map(candle => ({
-      open: Number(candle.open),
-      high: Number(candle.high),
-      low: Number(candle.low),
-      close: Number(candle.close),
-      volume: Number(candle.volume),
-      time: Number(candle.time)
-    })).filter(c => !isNaN(c.open) && !isNaN(c.high) && !isNaN(c.low) && !isNaN(c.close) && c.high > 0 && c.low > 0);
-  } catch (error) {
-    return null;
-  }
-}
-
-// ==========================================
-// ✅ جلب شموع 5 دقائق
-// ==========================================
-
-async function getCandles5m(symbol) {
-  try {
-    const response = await bingxRequest('GET', ENDPOINTS.FUTURES_CANDLE, {
-      symbol,
-      interval: TREND_INTERVAL,
-      limit: 60
-    }, false);
-
-    if (!response || response.code !== 0) return null;
-
-    const raw = response?.data;
-    let data = null;
-
-    if (Array.isArray(raw)) {
-      data = raw;
-    } else if (Array.isArray(raw?.data)) {
-      data = raw.data;
-    } else if (Array.isArray(response?.data?.data)) {
-      data = response.data.data;
-    }
-
-    if (!data || !Array.isArray(data) || data.length < 50) return null;
+    if (!data || !Array.isArray(data) || data.length < 10) return null;
 
     return data.map(candle => ({
       open: Number(candle.open),
@@ -463,11 +321,7 @@ async function getTicker(symbol) {
         0
       );
 
-      const bid = parseFloat(data.bidPrice || data.bid || 0);
-      const ask = parseFloat(data.askPrice || data.ask || 0);
-      const volume = parseFloat(data.volume || data.vol || 0);
-
-      return { price, bid, ask, volume };
+      return { price };
     }
 
     return null;
@@ -477,252 +331,33 @@ async function getTicker(symbol) {
 }
 
 // ==========================================
-// ✅ جلب Order Book
+// ✅ دالة الإشارة - المنطق البسيط
 // ==========================================
 
-async function getOrderBook(symbol) {
-  try {
-    const response = await bingxRequest(
-      'GET',
-      ENDPOINTS.FUTURES_DEPTH,
-      { symbol, limit: 20 },
-      false
-    );
+function checkSignal(candles) {
+  if (!candles || candles.length < 4) return null;
 
-    if (!response || response.code !== 0) return null;
+  const current = candles[candles.length - 1];
+  const last3 = candles.slice(-3);
+  
+  // حساب نسبة التغير خلال آخر 3 شموع
+  const change = ((last3[2].close - last3[0].open) / last3[0].open) * 100;
 
-    const data = response.data;
-    if (!data || !data.bids || !data.asks) return null;
+  console.log(`   📊 التغير خلال 3 شموع: ${change.toFixed(2)}%`);
 
-    let bidVolume = 0;
-    let askVolume = 0;
-
-    for (const bid of data.bids) {
-      bidVolume += parseFloat(bid[1]);
-    }
-
-    for (const ask of data.asks) {
-      askVolume += parseFloat(ask[1]);
-    }
-
-    const total = bidVolume + askVolume;
-    if (total === 0) return null;
-
-    const bidPercent = (bidVolume / total) * 100;
-    const askPercent = (askVolume / total) * 100;
-
-    return { bidVolume, askVolume, bidPercent, askPercent };
-  } catch (error) {
-    return null;
+  // ✅ شراء بعد هبوط حاد جداً (≥ 2%)
+  if (change <= -2.0) {
+    console.log(`   ✅ إشارة BUY (هبوط ${change.toFixed(2)}%)`);
+    return { signal: "BUY", entryPrice: current.close };
   }
-}
 
-// ==========================================
-// ✅ حساب الدعم والمقاومة
-// ==========================================
-
-function findSupportResistance(candles) {
-  if (candles.length < 50) return { support: 0, resistance: 0 };
-
-  const highs = candles.slice(-50).map(c => c.high);
-  const lows = candles.slice(-50).map(c => c.low);
-
-  const resistance = Math.max(...highs);
-  const support = Math.min(...lows);
-
-  return { support, resistance };
-}
-
-// ==========================================
-// ✅ نظام النقاط - النسخة النهائية
-// ==========================================
-
-async function checkSignal(symbol) {
-  try {
-    const candles = await getCandles(symbol);
-    if (!candles || candles.length < 100) {
-      console.log(`   ${symbol} ❌ بيانات غير كافية`);
-      return null;
-    }
-
-    const candles5m = await getCandles5m(symbol);
-    if (!candles5m || candles5m.length < 50) {
-      console.log(`   ${symbol} ❌ بيانات 5m غير كافية`);
-      return null;
-    }
-
-    const current = candles[candles.length - 1];
-    const closes = candles.map(c => c.close);
-    const closes5m = candles5m.map(c => c.close);
-
-    // ======== المتوسطات ========
-    const avgVolume = candles.slice(-20, -1)
-      .reduce((s, c) => s + c.volume, 0) / 20;
-    const avgBody = candles.slice(-20, -1)
-      .reduce((s, c) => s + Math.abs(c.close - c.open), 0) / 20;
-
-    const currentBody = Math.abs(current.close - current.open);
-    const bodyRatio = currentBody / (avgBody || 0.000001);
-    const volumeRatio = current.volume / (avgVolume || 0.000001);
-
-    // ======== المؤشرات ========
-    const ema20 = calculateEMA(closes, 20);
-    const ema50 = calculateEMA(closes, 50);
-    const ema20_5m = calculateEMA(closes5m, 20);
-    const ema50_5m = calculateEMA(closes5m, 50);
-    const rsi = calculateRSI(closes, 14);
-    const macd = calculateMACD(closes);
-    const atr = calculateATR(candles, 14);
-    const supportResistance = findSupportResistance(candles);
-
-    // ======== آخر 3 شموع ========
-    const last3 = candles.slice(-3);
-    const last3Change = ((last3[2].close - last3[0].open) / last3[0].open) * 100;
-
-    // ======== أول شمعة خضراء/حمراء بعد الاتجاه ========
-    const prevCandle = candles[candles.length - 2];
-    const firstGreen = current.close > current.open && prevCandle.close < prevCandle.open;
-    const firstRed = current.close < current.open && prevCandle.close > prevCandle.open;
-
-    // ======== ATR Filter ========
-    const atrPercent = (atr / current.close) * 100;
-    if (atrPercent < 0.02 || atrPercent > 0.8) {
-      console.log(`   ${symbol} ❌ ATR غير مناسب (${atrPercent.toFixed(3)}%)`);
-      return null;
-    }
-
-    // ======== سبريد ========
-    const ticker = await getTicker(symbol);
-    if (ticker && ticker.bid && ticker.ask) {
-      const spread = ((ticker.ask - ticker.bid) / ticker.bid) * 100;
-      if (spread > 0.05) {
-        console.log(`   ${symbol} ❌ سبريد كبير (${spread.toFixed(3)}%)`);
-        return null;
-      }
-    }
-
-    // ======== الاتجاه ========
-    const isUptrend = ema20_5m > ema50_5m;
-    const isDowntrend = ema20_5m < ema50_5m;
-
-    // ======== Order Book ========
-    const orderBook = await getOrderBook(symbol);
-
-    // ======== نظام النقاط ========
-    let buyScore = 0;
-    let sellScore = 0;
-    let reasons = [];
-
-    // 🔵 شروط الشراء
-    if (last3Change <= -0.8 && last3Change >= -2) {
-      buyScore += 15;
-      reasons.push('هبوط 3 شموع 0.8-2%');
-    }
-
-    if (firstGreen) {
-      buyScore += 15;
-      reasons.push('أول شمعة خضراء');
-    }
-
-    if (rsi >= 25 && rsi <= 40) {
-      buyScore += 15;
-      reasons.push(`RSI ${rsi.toFixed(1)} (25-40)`);
-    }
-
-    if (volumeRatio >= 1.3) {
-      buyScore += 20;
-      reasons.push(`حجم ${volumeRatio.toFixed(1)}x`);
-    }
-
-    if (ema20 > ema20_5m * 0.99 && isUptrend) {
-      buyScore += 20;
-      reasons.push('EMA20 صاعد');
-    }
-
-    if (current.close < supportResistance.resistance * 1.01 && current.close > supportResistance.resistance * 0.99) {
-      buyScore += 15;
-      reasons.push('قرب من مقاومة');
-    }
-
-    if (macd.histogram > 0 && macd.macd > macd.signal) {
-      buyScore += 15;
-      reasons.push('MACD تقاطع صاعد');
-    }
-
-    if (orderBook && orderBook.bidPercent > 55) {
-      buyScore += 20;
-      reasons.push('Order Book شراء');
-    }
-
-    // 🔴 شروط البيع
-    if (last3Change >= 0.8 && last3Change <= 2) {
-      sellScore += 15;
-      reasons.push('صعود 3 شموع 0.8-2%');
-    }
-
-    if (firstRed) {
-      sellScore += 15;
-      reasons.push('أول شمعة حمراء');
-    }
-
-    if (rsi >= 60 && rsi <= 75) {
-      sellScore += 15;
-      reasons.push(`RSI ${rsi.toFixed(1)} (60-75)`);
-    }
-
-    if (volumeRatio >= 1.3) {
-      sellScore += 20;
-      reasons.push(`حجم ${volumeRatio.toFixed(1)}x`);
-    }
-
-    if (ema20 < ema20_5m * 1.01 && isDowntrend) {
-      sellScore += 20;
-      reasons.push('EMA20 هابط');
-    }
-
-    if (current.close > supportResistance.support * 1.01 && current.close < supportResistance.support * 1.03) {
-      sellScore += 15;
-      reasons.push('قرب من دعم');
-    }
-
-    if (macd.histogram < 0 && macd.macd < macd.signal) {
-      sellScore += 15;
-      reasons.push('MACD تقاطع هابط');
-    }
-
-    if (orderBook && orderBook.askPercent > 55) {
-      sellScore += 20;
-      reasons.push('Order Book بيع');
-    }
-
-    // ======== التحقق من الصفقة المفتوحة ========
-    if (currentPosition && currentPosition.symbol === symbol) {
-      console.log(`   ${symbol} ⏳ صفقة مفتوحة بالفعل`);
-      return null;
-    }
-
-    const maxScore = Math.max(buyScore, sellScore);
-    const confidence = Math.min(maxScore, 100);
-
-    console.log(`   📊 ${symbol} BUY=${buyScore} SELL=${sellScore} | RSI=${rsi.toFixed(1)} | Vol=${volumeRatio.toFixed(1)}x | 3m=${last3Change.toFixed(2)}% | ATR=${atrPercent.toFixed(3)}%`);
-    
-    if (buyScore >= SCORE_THRESHOLD && buyScore > sellScore) {
-      console.log(`   ✅ إشارة BUY (${buyScore}/${TOTAL_SCORE}) | الأسباب: ${reasons.slice(0, 3).join(', ')}...`);
-      return { signal: "BUY", atr: atr, entryPrice: current.close, confidence: confidence, reasons: reasons };
-    }
-
-    if (sellScore >= SCORE_THRESHOLD && sellScore > buyScore) {
-      console.log(`   ✅ إشارة SELL (${sellScore}/${TOTAL_SCORE}) | الأسباب: ${reasons.slice(0, 3).join(', ')}...`);
-      return { signal: "SELL", atr: atr, entryPrice: current.close, confidence: confidence, reasons: reasons };
-    }
-
-    console.log(`   ❌ لا إشارة (Need ${SCORE_THRESHOLD}/${TOTAL_SCORE})`);
-    return null;
-
-  } catch (error) {
-    console.error(`❌ خطأ في تحليل ${symbol}:`, error.message);
-    return null;
+  // ✅ بيع بعد ارتفاع حاد جداً (≥ 2%)
+  if (change >= 2.0) {
+    console.log(`   ✅ إشارة SELL (صعود ${change.toFixed(2)}%)`);
+    return { signal: "SELL", entryPrice: current.close };
   }
+
+  return null;
 }
 
 // ==========================================
@@ -810,8 +445,7 @@ async function placeOrder(symbol, signalData, balance) {
     console.log(`      price: ${price}`);
     console.log(`      quantity: ${roundedQuantity}`);
     console.log(`      side: ${signalData.signal}`);
-    console.log(`      confidence: ${signalData.confidence?.toFixed(1) || 'N/A'}%`);
-    console.log(`      reasons: ${signalData.reasons?.slice(0, 5).join(' | ') || 'N/A'}`);
+    console.log(`      التغير: ${signalData.change?.toFixed(2) || 'N/A'}%`);
 
     const isBuy = signalData.signal === 'BUY';
     const params = {
@@ -825,7 +459,7 @@ async function placeOrder(symbol, signalData, balance) {
     const response = await bingxRequest('POST', ENDPOINTS.FUTURES_ORDER, params);
 
     if (response && response.code === 0) {
-      console.log(`🚀 OPEN ${signalData.signal} ${symbol} (Confidence: ${signalData.confidence?.toFixed(1) || 'N/A'}%)`);
+      console.log(`🚀 OPEN ${signalData.signal} ${symbol}`);
       return {
         symbol,
         entryPrice: price,
@@ -833,8 +467,7 @@ async function placeOrder(symbol, signalData, balance) {
         type: isBuy ? 'LONG' : 'SHORT',
         orderId: response.data?.orderId || Date.now(),
         timestamp: Date.now(),
-        confidence: signalData.confidence || 0,
-        reasons: signalData.reasons || []
+        change: signalData.change || 0
       };
     }
     console.log(`   ❌ فشل الصفقة:`, response?.msg || response);
@@ -885,8 +518,7 @@ async function closePosition(position, result = 'MANUAL') {
         quantity: position.quantity,
         profit: finalProfit,
         result: finalProfit > 0 ? 'WIN' : 'LOSS',
-        confidence: position.confidence || 0,
-        reasons: position.reasons || [],
+        change: position.change || 0,
         timestamp: new Date().toISOString()
       });
 
@@ -1015,10 +647,19 @@ async function tradingCycle() {
             return { symbol, signalData: null };
           }
 
-          const signalData = await checkSignal(symbol);
+          const candles = await getCandles(symbol);
+          if (!candles || candles.length < 4) {
+            return { symbol, signalData: null };
+          }
+
+          const signalData = checkSignal(candles);
           if (!signalData) {
             return { symbol, signalData: null };
           }
+
+          // إضافة التغير إلى signalData
+          const last3 = candles.slice(-3);
+          signalData.change = ((last3[2].close - last3[0].open) / last3[0].open) * 100;
 
           return { symbol, signalData };
         } catch (error) {
@@ -1034,7 +675,7 @@ async function tradingCycle() {
 
       const { symbol, signalData } = result;
       
-      console.log(`🚀 إشارة ${signalData.signal}: ${symbol} (ثقة: ${signalData.confidence?.toFixed(1) || 'N/A'}%)`);
+      console.log(`🚀 إشارة ${signalData.signal}: ${symbol} (تغير ${signalData.change?.toFixed(2) || 'N/A'}%)`);
 
       await setLeverage(symbol);
 
@@ -1073,7 +714,7 @@ app.get('/dashboard', (req, res) => {
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>لوحة تحكم البوت - سكالبينج احترافي</title>
+      <title>لوحة تحكم البوت - سكالبينج</title>
       <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Arial', sans-serif; background: #0a0e17; color: #fff; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
@@ -1111,8 +752,8 @@ app.get('/dashboard', (req, res) => {
     </head>
     <body>
       <div class="container">
-        <h1>⚡ بوت سكالبينج احترافي</h1>
-        <p class="subtitle">📊 50 عملة | عتبة 90/140 | TP 0.10 | SL 0.20</p>
+        <h1>⚡ بوت سكالبينج</h1>
+        <p class="subtitle">📊 هبوط ≥2% ← BUY | صعود ≥2% ← SELL</p>
         <div class="status-grid" id="statusGrid">
           <div class="card"><div class="label">📊 الحالة</div><div class="value"><span class="status-badge" id="statusBadge">🟢 يعمل</span></div></div>
           <div class="card"><div class="label">💰 الرصيد</div><div class="value green" id="balance">0.00 USDT</div></div>
@@ -1121,8 +762,8 @@ app.get('/dashboard', (req, res) => {
         </div>
         <div class="trade-info" id="tradeInfo"><div class="label">💰 الربح / الخسارة</div><div class="value" id="profitDisplay">0.0000 USDT (0.00%)</div></div>
         <div class="settings-box">
-          <div class="label">⚙️ إعدادات البوت النهائية</div>
-          <div class="value">💰 <span class="highlight-green">0.42 USDT</span> | ⚡ <span class="highlight-gold">10x</span> | 🎯 <span class="highlight-gold">+0.10 USDT</span> | ⛔ <span class="highlight-red">-0.20 USDT</span> | 📊 <span class="highlight-purple">عتبة 90/140</span> | ⚡ <span class="highlight-purple">500ms</span></div>
+          <div class="label">⚙️ إعدادات البوت</div>
+          <div class="value">💰 <span class="highlight-green">0.42 USDT</span> | ⚡ <span class="highlight-gold">10x</span> | 🎯 <span class="highlight-gold">+0.10 USDT</span> | ⛔ <span class="highlight-red">-0.20 USDT</span> | 📊 <span class="highlight-purple">تغير ≥2%</span></div>
         </div>
         <button class="refresh-btn" onclick="fetchStatus()">🔄 تحديث</button>
         <div class="footer" id="lastUpdate">🕐 آخر تحديث: --</div>
@@ -1182,7 +823,7 @@ app.get('/', async (req, res) => {
     }
     
     res.json({
-      status: '⚡ بوت سكالبينج احترافي',
+      status: '⚡ بوت سكالبينج',
       timestamp: new Date().toISOString(),
       balance: `${usdtBalance.toFixed(4)} USDT`,
       leverage: `${LEVERAGE}x`,
@@ -1199,7 +840,7 @@ app.get('/', async (req, res) => {
         profitTarget: `${PROFIT_USDT_TARGET} USDT`,
         stopLoss: `${STOP_LOSS_USDT} USDT`,
         leverage: `${LEVERAGE}x`,
-        scoreThreshold: `${SCORE_THRESHOLD}/${TOTAL_SCORE}`,
+        trigger: 'تغير ≥2% خلال 3 شموع',
         scanInterval: `${SCAN_INTERVAL}ms`,
         symbols: SYMBOLS
       }
@@ -1217,17 +858,16 @@ async function startBot() {
   try {
     loadTradesHistory();
 
-    console.log('⚡⚡ بدء تشغيل بوت سكالبينج احترافي');
-    console.log('📊 ===== الإعدادات النهائية =====');
+    console.log('⚡⚡ بدء تشغيل بوت سكالبينج');
+    console.log('📊 ===== الإعدادات =====');
     console.log(`💰 حجم الصفقة: ${TRADE_AMOUNT} USDT`);
     console.log(`⚡ الرافعة: ${LEVERAGE}x`);
     console.log(`🎯 جني الأرباح: +${PROFIT_USDT_TARGET} USDT`);
     console.log(`⛔ وقف الخسارة: -${STOP_LOSS_USDT} USDT`);
-    console.log(`📊 نظام النقاط: ${TOTAL_SCORE} نقطة (عتبة ${SCORE_THRESHOLD})`);
-    console.log(`   📈 EMA: 20 | 📊 MACD: 15 | 📉 RSI: 15`);
-    console.log(`   📊 Volume: 20 | 📊 Order Book: 20 | ⚡ Momentum: 20`);
-    console.log(`   📊 S/R: 20 | 📊 ATR: 10`);
-    console.log(`🕐 الإطار الزمني: 1m (فلتر 5m)`);
+    console.log(`📊 منطق الدخول: تغير ≥2% خلال 3 شموع`);
+    console.log(`   📉 هبوط ≥2% → BUY`);
+    console.log(`   📈 صعود ≥2% → SELL`);
+    console.log(`🕐 الإطار الزمني: 1m`);
     console.log(`⚡ سرعة المسح: ${SCAN_INTERVAL}ms`);
     console.log(`📊 العملات: ${SYMBOLS.length} عملة`);
     console.log('================================');
@@ -1264,15 +904,14 @@ async function startBot() {
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`
   ╔═══════════════════════════════════════════════════════════════╗
-  ║   ⚡ بوت سكالبينج احترافي - النسخة النهائية                ║
+  ║   ⚡ بوت سكالبينج - منطق بسيط                              ║
   ║   📡 http://localhost:${PORT}                                  ║
   ║   📊 لوحة التحكم: http://localhost:${PORT}/dashboard          ║
   ║   🚀 رافعة: ${LEVERAGE}x | 💰 ${TRADE_AMOUNT} USDT            ║
   ║   🎯 هدف: +${PROFIT_USDT_TARGET} USDT | ⛔ وقف: -${STOP_LOSS_USDT} USDT ║
-  ║   📊 عتبة: ${SCORE_THRESHOLD}/${TOTAL_SCORE} نقطة             ║
-  ║   📊 شروط الشراء: 3 شموع هابطة + RSI 25-40 + حجم 1.3x       ║
-  ║   📊 شروط البيع: 3 شموع صاعدة + RSI 60-75 + حجم 1.3x        ║
-  ║   🕐 الإطار: 1m (فلتر 5m) | ⚡ سرعة: ${SCAN_INTERVAL}ms       ║
+  ║   📊 منطق الدخول: تغير ≥2% خلال 3 شموع                      ║
+  ║   📉 هبوط ≥2% → BUY | 📈 صعود ≥2% → SELL                    ║
+  ║   🕐 الإطار: 1m | ⚡ سرعة: ${SCAN_INTERVAL}ms                 ║
   ║   📊 العملات: ${SYMBOLS.length} عملة                          ║
   ║   ⚠️ تداول حقيقي - استخدم بحذر!                              ║
   ╚═══════════════════════════════════════════════════════════════╝
