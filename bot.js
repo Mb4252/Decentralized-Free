@@ -494,6 +494,10 @@ async function checkSignal(symbol) {
     const ema50 = calculateEMA(closes, 50);
     const ema200 = calculateEMA(closes, 200);
 
+    // ======== الزخم ========
+    const last5 = candles.slice(-5);
+    const momentum = ((last5[4].close - last5[0].open) / last5[0].open) * 100;
+
     // ======== آخر 3 شموع ========
     const last3 = candles.slice(-3);
     const allGreen = last3.every(c => c.close > c.open);
@@ -507,22 +511,34 @@ async function checkSignal(symbol) {
     const isUptrend = ema20 > ema50 && ema50 > ema200 && current.close > ema20;
     const isDowntrend = ema20 < ema50 && ema50 < ema200 && current.close < ema20;
 
-    // ======== ATR Filter ========
+    // ======== ATR Filter - مخفف ========
     const atrPercent = (atr / current.close) * 100;
-    if (atrPercent < 0.05) {
+    if (atrPercent < 0.03) {
       console.log(`   ${symbol} ❌ ATR صغير جداً (${atrPercent.toFixed(3)}%)`);
       return null;
     }
 
-    // ======== RSI Filters ========
-    // شراء: RSI بين 45 و 60
-    // بيع: RSI بين 40 و 55
-    if (rsi > 60) {
-      console.log(`   ${symbol} ❌ RSI مرتفع (${rsi.toFixed(1)}) > 60`);
+    // ======== RSI Filters - محسّنة ========
+    // شراء: RSI بين 45 و 65، أو RSI منخفض مع ارتداد
+    // بيع: RSI بين 35 و 75، أو RSI مرتفع مع ارتداد
+
+    // شراء
+    if (rsi < 25 && !(momentum > 0 && isUptrend)) {
+      console.log(`   ${symbol} ❌ RSI منخفض جداً (${rsi.toFixed(1)}) ولا يوجد ارتداد`);
       return null;
     }
-    if (rsi < 40) {
-      console.log(`   ${symbol} ❌ RSI منخفض (${rsi.toFixed(1)}) < 40`);
+    if (rsi > 65) {
+      console.log(`   ${symbol} ❌ RSI مرتفع (${rsi.toFixed(1)}) > 65`);
+      return null;
+    }
+
+    // بيع
+    if (rsi > 75 && !(momentum < 0 && isDowntrend)) {
+      console.log(`   ${symbol} ❌ RSI مرتفع جداً (${rsi.toFixed(1)}) ولا يوجد ارتداد`);
+      return null;
+    }
+    if (rsi < 35) {
+      console.log(`   ${symbol} ❌ RSI منخفض (${rsi.toFixed(1)}) < 35`);
       return null;
     }
 
@@ -560,10 +576,18 @@ async function checkSignal(symbol) {
     if (isPullback && isUptrend) buyScore += 25;
     if (isPullback && isDowntrend) sellScore += 25;
 
-    // RSI
+    // RSI - المرونة
     if (rsi > 45 && rsi < 55) {
       buyScore += 20;
       sellScore += 20;
+    }
+    // RSI منخفض مع ارتداد
+    if (rsi < 30 && momentum > 0 && isUptrend) {
+      buyScore += 25;
+    }
+    // RSI مرتفع مع ارتداد
+    if (rsi > 70 && momentum < 0 && isDowntrend) {
+      sellScore += 25;
     }
 
     // حجم التداول
@@ -585,30 +609,49 @@ async function checkSignal(symbol) {
     console.log(`   📊 ${symbol} BUY=${buyScore} SELL=${sellScore} | Diff=${difference} | RSI=${rsi.toFixed(1)} | Vol=${volumeRatio.toFixed(1)}x | ATR=${atrPercent.toFixed(3)}% | Trend=${isUptrend ? 'UP' : isDowntrend ? 'DOWN' : 'SIDE'}`);
 
     // ======== شروط الدخول الصارمة ========
-    // شراء: buyScore >= 80, فرق >= 25, RSI بين 45-60, اتجاه صاعد, Pullback
+    // شراء
     if (
       buyScore >= BUY_SCORE_THRESHOLD &&
       (buyScore - sellScore) >= MIN_SCORE_DIFF &&
-      rsi < 60 &&
-      rsi > 45 &&
-      isUptrend &&
-      isPullback &&
       confidence >= 85
     ) {
+      // تحقق إضافي من RSI حسب الحالة
+      const rsiOk = (rsi >= 30 && rsi <= 65) || (rsi < 30 && momentum > 0 && isUptrend);
+      if (!rsiOk) {
+        console.log(`   ${symbol} ❌ RSI غير مناسب للشراء (${rsi.toFixed(1)})`);
+        return null;
+      }
+      if (!isUptrend) {
+        console.log(`   ${symbol} ❌ الاتجاه ليس صاعداً`);
+        return null;
+      }
+      if (!isPullback) {
+        console.log(`   ${symbol} ❌ لا يوجد Pullback`);
+        return null;
+      }
       console.log(`   ✅ إشارة BUY (${buyScore}/${sellScore}) | Confidence: ${confidence.toFixed(1)}%`);
       return { signal: "BUY", atr: atr, entryPrice: current.close, confidence: confidence, isFastEntry: false };
     }
 
-    // بيع: sellScore >= 80, فرق >= 25, RSI بين 40-55, اتجاه هابط, Pullback
+    // بيع
     if (
       sellScore >= SELL_SCORE_THRESHOLD &&
       (sellScore - buyScore) >= MIN_SCORE_DIFF &&
-      rsi < 55 &&
-      rsi > 40 &&
-      isDowntrend &&
-      isPullback &&
       confidence >= 85
     ) {
+      const rsiOk = (rsi >= 35 && rsi <= 75) || (rsi > 70 && momentum < 0 && isDowntrend);
+      if (!rsiOk) {
+        console.log(`   ${symbol} ❌ RSI غير مناسب للبيع (${rsi.toFixed(1)})`);
+        return null;
+      }
+      if (!isDowntrend) {
+        console.log(`   ${symbol} ❌ الاتجاه ليس هابطاً`);
+        return null;
+      }
+      if (!isPullback) {
+        console.log(`   ${symbol} ❌ لا يوجد Pullback`);
+        return null;
+      }
       console.log(`   ✅ إشارة SELL (${buyScore}/${sellScore}) | Confidence: ${confidence.toFixed(1)}%`);
       return { signal: "SELL", atr: atr, entryPrice: current.close, confidence: confidence, isFastEntry: false };
     }
@@ -1015,7 +1058,7 @@ app.get('/dashboard', (req, res) => {
     <body>
       <div class="container">
         <h1>⚡ بوت سكالبينج متطور</h1>
-        <p class="subtitle">📊 23 عملة | عتبة 80+25 | فلتر RSI+Trend+Pullback | كولداون 60s</p>
+        <p class="subtitle">📊 23 عملة | عتبة 80+25 | RSI ذكي + ATR 0.03% | كولداون 60s</p>
         <div class="status-grid" id="statusGrid">
           <div class="card"><div class="label">📊 الحالة</div><div class="value"><span class="status-badge" id="statusBadge">🟢 يعمل</span></div></div>
           <div class="card"><div class="label">💰 الرصيد</div><div class="value green" id="balance">0.00 USDT</div></div>
@@ -1025,7 +1068,7 @@ app.get('/dashboard', (req, res) => {
         <div class="trade-info" id="tradeInfo"><div class="label">💰 الربح / الخسارة</div><div class="value" id="profitDisplay">0.0000 USDT (0.00%)</div></div>
         <div class="settings-box">
           <div class="label">⚙️ إعدادات متقدمة</div>
-          <div class="value">💰 <span class="highlight-green">0.5 USDT</span> | ⚡ <span class="highlight-gold">10x</span> | 🎯 <span class="highlight-gold">0.06 USDT</span> | ⛔ <span class="highlight-red">0.20 USDT</span> | 📊 <span class="highlight-purple">عتبة 80 + فرق 25</span> | 🛡️ <span class="highlight-purple">RSI 45-60 / 40-55</span> | ⏳ <span class="highlight-purple">كولداون 60s</span></div>
+          <div class="value">💰 <span class="highlight-green">0.5 USDT</span> | ⚡ <span class="highlight-gold">10x</span> | 🎯 <span class="highlight-gold">0.06 USDT</span> | ⛔ <span class="highlight-red">0.20 USDT</span> | 📊 <span class="highlight-purple">عتبة 80 + فرق 25</span> | 🛡️ <span class="highlight-purple">RSI ذكي + ارتداد</span> | ⏳ <span class="highlight-purple">كولداون 60s</span></div>
         </div>
         <button class="refresh-btn" onclick="fetchStatus()">🔄 تحديث</button>
         <div class="footer" id="lastUpdate">🕐 آخر تحديث: --</div>
@@ -1103,7 +1146,8 @@ app.get('/', async (req, res) => {
         stopLoss: `${STOP_LOSS_USDT} USDT`,
         leverage: `${LEVERAGE}x`,
         scoreThreshold: '80 + فرق 25',
-        rsiFilter: 'شراء 45-60, بيع 40-55',
+        rsiFilter: 'ذكي + ارتداد',
+        atrFilter: '0.03%',
         pullbackFilter: 'مفعل',
         cooldown: '60 ثانية',
         symbols: SYMBOLS
@@ -1129,7 +1173,8 @@ async function startBot() {
     console.log(`🎯 هدف الربح: ${PROFIT_USDT_TARGET} USDT (ثابت)`);
     console.log(`⛔ وقف الخسارة: ${STOP_LOSS_USDT} USDT (ثابت)`);
     console.log(`📊 نظام الدخول: عتبة ${BUY_SCORE_THRESHOLD} + فرق ${MIN_SCORE_DIFF}`);
-    console.log(`🛡️ فلتر RSI: شراء 45-60, بيع 40-55`);
+    console.log(`🛡️ فلتر RSI: ذكي + ارتداد (شراء RSI<30 مع ارتداد)`);
+    console.log(`🛡️ فلتر ATR: ≥0.03%`);
     console.log(`🛡️ فلتر الاتجاه: EMA20>EMA50>EMA200 للشراء`);
     console.log(`🛡️ فلتر Pullback: العودة إلى EMA20`);
     console.log(`🛡️ فلتر الثقة: ≥85%`);
@@ -1171,15 +1216,15 @@ async function startBot() {
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`
   ╔═══════════════════════════════════════════════════════════════╗
-  ║   ⚡ بوت سكالبينج متطور - النسخة النهائية                  ║
+  ║   ⚡ بوت سكالبينج متطور - RSI ذكي + ارتداد                ║
   ║   📡 http://localhost:${PORT}                                  ║
   ║   📊 لوحة التحكم: http://localhost:${PORT}/dashboard          ║
   ║   🚀 رافعة: ${LEVERAGE}x | 💰 ${TRADE_AMOUNT} USDT            ║
   ║   🎯 هدف: ${PROFIT_USDT_TARGET} USDT | ⛔ وقف: ${STOP_LOSS_USDT} USDT ║
   ║   📊 عتبة: ${BUY_SCORE_THRESHOLD} + فرق ${MIN_SCORE_DIFF}     ║
-  ║   🛡️ RSI: شراء 45-60, بيع 40-55                              ║
-  ║   🛡️ الاتجاه: EMA20>EMA50>EMA200 + Pullback                 ║
-  ║   🛡️ الثقة: ≥85% | الحجم: ≥1.8x | ATR: ≥0.05%              ║
+  ║   🛡️ RSI: ذكي (RSI<30 + ارتداد للشراء)                     ║
+  ║   🛡️ ATR: ≥0.03% | الاتجاه: EMA20>EMA50>EMA200             ║
+  ║   🛡️ Pullback: مفعل | الثقة: ≥85% | الحجم: ≥1.8x          ║
   ║   ⏳ كولداون: ${cooldown/1000} ثانية                          ║
   ║   📊 العملات: ${SYMBOLS.length} عملة قوية                     ║
   ║   ⚠️ تداول حقيقي - استخدم بحذر!                              ║
