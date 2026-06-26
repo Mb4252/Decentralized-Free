@@ -24,10 +24,10 @@ const API_KEY = process.env.BINGX_API_KEY;
 const API_SECRET = process.env.BINGX_API_SECRET;
 
 // ✅ إعدادات ثابتة
-const TRADE_AMOUNT = 0.42;
-const LEVERAGE = 10;
-const PROFIT_USDT_TARGET = 0.10;
-const STOP_LOSS_USDT = 0.20;
+const TRADE_AMOUNT = 0.6;
+const LEVERAGE = 50;
+const PROFIT_USDT_TARGET = 0.16;
+const STOP_LOSS_USDT = 0.25;
 const STOP_LOSS_ENABLED = true;
 
 // ✅ إعدادات الشمعة
