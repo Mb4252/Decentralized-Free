@@ -24,7 +24,7 @@ const API_KEY = process.env.BINGX_API_KEY;
 const API_SECRET = process.env.BINGX_API_SECRET;
 
 // ✅ إعدادات ثابتة
-const TRADE_AMOUNT = 0.62;
+const TRADE_AMOUNT = 0.5;
 const LEVERAGE = 50;
 const PROFIT_USDT_TARGET = 0.16;
 const STOP_LOSS_USDT = 0.26;
@@ -346,14 +346,14 @@ function checkSignal(candles) {
 
   console.log(`   📊 التغير خلال 3 شموع: ${change.toFixed(2)}%`);
 
-  // ✅ شراء بعد هبوط حاد جداً (≥ 2%)
-  if (change <= -2.0) {
+  // ✅ شراء بعد هبوط حاد جداً (≥ 5%)
+  if (change <= -5.0) {
     console.log(`   ✅ إشارة BUY (هبوط ${change.toFixed(2)}%)`);
     return { signal: "BUY", entryPrice: current.close };
   }
 
-  // ✅ بيع بعد ارتفاع حاد جداً (≥ 2%)
-  if (change >= 2.0) {
+  // ✅ بيع بعد ارتفاع حاد جداً (≥ 5%)
+  if (change >= 5.0) {
     console.log(`   ✅ إشارة SELL (صعود ${change.toFixed(2)}%)`);
     return { signal: "SELL", entryPrice: current.close };
   }
@@ -602,7 +602,7 @@ async function tradingCycle() {
       let profitPercent = (profitUSDT / (currentPosition.entryPrice * currentPosition.quantity)) * 100;
       console.log(`⚡ ${currentPosition.symbol} الربح الحالي: ${profitUSDT.toFixed(4)} USDT (${profitPercent.toFixed(2)}%)`);
 
-      // ✅ جني الربح (0.10 USDT)
+      // ✅ جني الربح (0.16 USDT)
       if (profitUSDT >= PROFIT_USDT_TARGET) {
         console.log(`🎯 جني ربح: ${profitUSDT.toFixed(4)} USDT (هدف ${PROFIT_USDT_TARGET} USDT)`);
         await closePosition(currentPosition, 'TAKE_PROFIT');
@@ -612,7 +612,7 @@ async function tradingCycle() {
         return;
       }
 
-      // ✅ وقف الخسارة (0.20 USDT)
+      // ✅ وقف الخسارة (0.26 USDT)
       if (STOP_LOSS_ENABLED && profitUSDT <= -STOP_LOSS_USDT) {
         console.log(`⛔ وقف خسارة: ${profitUSDT.toFixed(4)} USDT (حد ${STOP_LOSS_USDT} USDT)`);
         await closePosition(currentPosition, 'STOP_LOSS');
@@ -754,17 +754,17 @@ app.get('/dashboard', (req, res) => {
     <body>
       <div class="container">
         <h1>⚡ بوت سكالبينج</h1>
-        <p class="subtitle">📊 هبوط ≥2% ← BUY | صعود ≥2% ← SELL</p>
+        <p class="subtitle">📊 هبوط ≥5% ← BUY | صعود ≥5% ← SELL</p>
         <div class="status-grid" id="statusGrid">
           <div class="card"><div class="label">📊 الحالة</div><div class="value"><span class="status-badge" id="statusBadge">🟢 يعمل</span></div></div>
           <div class="card"><div class="label">💰 الرصيد</div><div class="value green" id="balance">0.00 USDT</div></div>
-          <div class="card"><div class="label">⚡ الرافعة</div><div class="value gold" id="leverage">10x</div></div>
+          <div class="card"><div class="label">⚡ الرافعة</div><div class="value gold" id="leverage">50x</div></div>
           <div class="card" style="grid-column: span 3;"><div class="label">📈 الصفقة الحالية</div><div class="value blue" id="position">لا توجد صفقة</div></div>
         </div>
         <div class="trade-info" id="tradeInfo"><div class="label">💰 الربح / الخسارة</div><div class="value" id="profitDisplay">0.0000 USDT (0.00%)</div></div>
         <div class="settings-box">
           <div class="label">⚙️ إعدادات البوت</div>
-          <div class="value">💰 <span class="highlight-green">0.42 USDT</span> | ⚡ <span class="highlight-gold">10x</span> | 🎯 <span class="highlight-gold">+0.10 USDT</span> | ⛔ <span class="highlight-red">-0.20 USDT</span> | 📊 <span class="highlight-purple">تغير ≥2%</span></div>
+          <div class="value">💰 <span class="highlight-green">0.5 USDT</span> | ⚡ <span class="highlight-gold">50x</span> | 🎯 <span class="highlight-gold">+0.16 USDT</span> | ⛔ <span class="highlight-red">-0.26 USDT</span> | 📊 <span class="highlight-purple">تغير ≥5%</span></div>
         </div>
         <button class="refresh-btn" onclick="fetchStatus()">🔄 تحديث</button>
         <div class="footer" id="lastUpdate">🕐 آخر تحديث: --</div>
@@ -841,7 +841,7 @@ app.get('/', async (req, res) => {
         profitTarget: `${PROFIT_USDT_TARGET} USDT`,
         stopLoss: `${STOP_LOSS_USDT} USDT`,
         leverage: `${LEVERAGE}x`,
-        trigger: 'تغير ≥2% خلال 3 شموع',
+        trigger: 'تغير ≥5% خلال 3 شموع',
         scanInterval: `${SCAN_INTERVAL}ms`,
         symbols: SYMBOLS
       }
@@ -865,9 +865,9 @@ async function startBot() {
     console.log(`⚡ الرافعة: ${LEVERAGE}x`);
     console.log(`🎯 جني الأرباح: +${PROFIT_USDT_TARGET} USDT`);
     console.log(`⛔ وقف الخسارة: -${STOP_LOSS_USDT} USDT`);
-    console.log(`📊 منطق الدخول: تغير ≥2% خلال 3 شموع`);
-    console.log(`   📉 هبوط ≥2% → BUY`);
-    console.log(`   📈 صعود ≥2% → SELL`);
+    console.log(`📊 منطق الدخول: تغير ≥5% خلال 3 شموع`);
+    console.log(`   📉 هبوط ≥5% → BUY`);
+    console.log(`   📈 صعود ≥5% → SELL`);
     console.log(`🕐 الإطار الزمني: 1m`);
     console.log(`⚡ سرعة المسح: ${SCAN_INTERVAL}ms`);
     console.log(`📊 العملات: ${SYMBOLS.length} عملة`);
@@ -910,8 +910,8 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   ║   📊 لوحة التحكم: http://localhost:${PORT}/dashboard          ║
   ║   🚀 رافعة: ${LEVERAGE}x | 💰 ${TRADE_AMOUNT} USDT            ║
   ║   🎯 هدف: +${PROFIT_USDT_TARGET} USDT | ⛔ وقف: -${STOP_LOSS_USDT} USDT ║
-  ║   📊 منطق الدخول: تغير ≥2% خلال 3 شموع                      ║
-  ║   📉 هبوط ≥2% → BUY | 📈 صعود ≥2% → SELL                    ║
+  ║   📊 منطق الدخول: تغير ≥5% خلال 3 شموع                      ║
+  ║   📉 هبوط ≥5% → BUY | 📈 صعود ≥5% → SELL                    ║
   ║   🕐 الإطار: 1m | ⚡ سرعة: ${SCAN_INTERVAL}ms                 ║
   ║   📊 العملات: ${SYMBOLS.length} عملة                          ║
   ║   ⚠️ تداول حقيقي - استخدم بحذر!                              ║
