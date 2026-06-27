@@ -50,7 +50,7 @@ const SYMBOLS = [
   "ENA-USDT", "MKR-USDT", "CRV-USDT", "UNI-USDT", "PENDLE-USDT",
   "ORDI-USDT", "GRT-USDT", "DYDX-USDT", "XLM-USDT", "SAND-USDT",
   "MANA-USDT", "ALGO-USDT", "EOS-USDT", "FLOW-USDT", "THETA-USDT",
-  "VELVET-USDT"
+  "VELVET-USDT", "MYX-USDT"
 ];
 
 // ✅ المتغيرات
@@ -346,13 +346,13 @@ function checkSignal(candles) {
 
   console.log(`   📊 التغير خلال 3 شموع: ${change.toFixed(2)}%`);
 
-  // ✅ شراء بعد هبوط حاد جداً (≥ 3.5%)
+  // ✅ شراء بعد هبوط حاد (≥ 3.5%)
   if (change <= -3.5) {
     console.log(`   ✅ إشارة BUY (هبوط ${change.toFixed(2)}%)`);
     return { signal: "BUY", entryPrice: current.close };
   }
 
-  // ✅ بيع بعد ارتفاع حاد جداً (≥ 3.5%)
+  // ✅ بيع بعد ارتفاع حاد (≥ 3.5%)
   if (change >= 3.5) {
     console.log(`   ✅ إشارة SELL (صعود ${change.toFixed(2)}%)`);
     return { signal: "SELL", entryPrice: current.close };
