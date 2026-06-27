@@ -24,10 +24,10 @@ const API_KEY = process.env.BINGX_API_KEY;
 const API_SECRET = process.env.BINGX_API_SECRET;
 
 // ✅ إعدادات ثابتة
-const TRADE_AMOUNT = 0.6;
-const LEVERAGE = 50;
-const PROFIT_USDT_TARGET = 0.16;
-const STOP_LOSS_USDT = 0.25;
+const TRADE_AMOUNT = 0.42;
+const LEVERAGE = 10;
+const PROFIT_USDT_TARGET = 0.10;
+const STOP_LOSS_USDT = 0.20;
 const STOP_LOSS_ENABLED = true;
 
 // ✅ إعدادات الشمعة
@@ -38,8 +38,19 @@ const CANDLE_LIMIT = 30;
 const SCAN_INTERVAL = 500;
 const cooldown = 1000;
 
-// ✅ العملات - سيتم تحميلها تلقائياً
-let SYMBOLS = [];
+// ✅ العملات
+const SYMBOLS = [
+  "BTC-USDT", "ETH-USDT", "SOL-USDT", "BNB-USDT", "XRP-USDT",
+  "DOGE-USDT", "ADA-USDT", "LINK-USDT", "AVAX-USDT", "DOT-USDT",
+  "TRX-USDT", "LTC-USDT", "BCH-USDT", "APT-USDT", "SUI-USDT",
+  "ATOM-USDT", "FIL-USDT", "AAVE-USDT", "ARB-USDT", "OP-USDT",
+  "INJ-USDT", "SEI-USDT", "ETC-USDT", "NEAR-USDT", "HBAR-USDT",
+  "ICP-USDT", "RUNE-USDT", "TIA-USDT", "JUP-USDT", "WIF-USDT",
+  "PEPE-USDT", "FET-USDT", "RENDER-USDT", "TAO-USDT", "ONDO-USDT",
+  "ENA-USDT", "MKR-USDT", "CRV-USDT", "UNI-USDT", "PENDLE-USDT",
+  "ORDI-USDT", "GRT-USDT", "DYDX-USDT", "XLM-USDT", "SAND-USDT",
+  "MANA-USDT", "ALGO-USDT", "EOS-USDT", "FLOW-USDT", "THETA-USDT"
+];
 
 // ✅ المتغيرات
 let currentPosition = null;
@@ -178,47 +189,6 @@ async function bingxRequest(method, endpoint, params = {}, signed = true) {
   } catch (error) {
     console.error('❌ BingX error:', error.response?.data || error.message);
     return null;
-  }
-}
-
-// ==========================================
-// ✅ جلب جميع العملات تلقائياً
-// ==========================================
-
-async function loadAllSymbols() {
-  try {
-    console.log('📡 جاري جلب قائمة العملات من BingX...');
-    
-    const response = await bingxRequest(
-      'GET',
-      ENDPOINTS.FUTURES_CONTRACTS,
-      {},
-      false
-    );
-
-    if (!response || response.code !== 0) {
-      console.error('❌ فشل جلب قائمة العملات');
-      return;
-    }
-
-    SYMBOLS = response.data
-      .filter(c => c.symbol && c.symbol.endsWith('-USDT'))
-      .map(c => c.symbol);
-
-    console.log(`✅ تم تحميل ${SYMBOLS.length} عملة من نوع USDT Futures`);
-    
-    // عرض أول 10 عملات كعينة
-    if (SYMBOLS.length > 0) {
-      console.log(`📊 عينة من العملات: ${SYMBOLS.slice(0, 10).join(', ')}`);
-      if (SYMBOLS.length > 10) {
-        console.log(`   ... و ${SYMBOLS.length - 10} عملة أخرى`);
-      }
-    }
-
-    return SYMBOLS;
-  } catch (error) {
-    console.error('❌ خطأ في تحميل العملات:', error.message);
-    return [];
   }
 }
 
@@ -667,12 +637,6 @@ async function tradingCycle() {
       return;
     }
 
-    if (SYMBOLS.length === 0) {
-      console.log('⚠️ لا توجد عملات للتحليل');
-      isRunning = false;
-      return;
-    }
-
     console.log(`🔍 جاري مسح ${SYMBOLS.length} عملة...`);
     
     // ✅ معالجة متوازية
@@ -789,7 +753,7 @@ app.get('/dashboard', (req, res) => {
     <body>
       <div class="container">
         <h1>⚡ بوت سكالبينج</h1>
-        <p class="subtitle">📊 ${SYMBOLS.length} عملة | هبوط ≥2% ← BUY | صعود ≥2% ← SELL</p>
+        <p class="subtitle">📊 هبوط ≥2% ← BUY | صعود ≥2% ← SELL</p>
         <div class="status-grid" id="statusGrid">
           <div class="card"><div class="label">📊 الحالة</div><div class="value"><span class="status-badge" id="statusBadge">🟢 يعمل</span></div></div>
           <div class="card"><div class="label">💰 الرصيد</div><div class="value green" id="balance">0.00 USDT</div></div>
@@ -799,7 +763,7 @@ app.get('/dashboard', (req, res) => {
         <div class="trade-info" id="tradeInfo"><div class="label">💰 الربح / الخسارة</div><div class="value" id="profitDisplay">0.0000 USDT (0.00%)</div></div>
         <div class="settings-box">
           <div class="label">⚙️ إعدادات البوت</div>
-          <div class="value">💰 <span class="highlight-green">0.42 USDT</span> | ⚡ <span class="highlight-gold">10x</span> | 🎯 <span class="highlight-gold">+0.10 USDT</span> | ⛔ <span class="highlight-red">-0.20 USDT</span> | 📊 <span class="highlight-purple">تغير ≥2%</span> | 📊 <span class="highlight-purple">${SYMBOLS.length} عملة</span></div>
+          <div class="value">💰 <span class="highlight-green">0.42 USDT</span> | ⚡ <span class="highlight-gold">10x</span> | 🎯 <span class="highlight-gold">+0.10 USDT</span> | ⛔ <span class="highlight-red">-0.20 USDT</span> | 📊 <span class="highlight-purple">تغير ≥2%</span></div>
         </div>
         <button class="refresh-btn" onclick="fetchStatus()">🔄 تحديث</button>
         <div class="footer" id="lastUpdate">🕐 آخر تحديث: --</div>
@@ -866,11 +830,11 @@ app.get('/', async (req, res) => {
       tradeAmount: `${TRADE_AMOUNT} USDT`,
       profitTarget: `${PROFIT_USDT_TARGET} USDT`,
       stopLoss: `${STOP_LOSS_USDT} USDT`,
-      symbolsCount: SYMBOLS.length,
       currentPosition: currentPosition ? `${currentPosition.symbol} (${currentPosition.type})` : 'لا توجد صفقة',
       profit: profit,
       profitPercent: profitPercent,
       tradesCount: tradesHistory.length,
+      symbolsCount: SYMBOLS.length,
       settings: {
         tradeAmount: `${TRADE_AMOUNT} USDT`,
         profitTarget: `${PROFIT_USDT_TARGET} USDT`,
@@ -878,7 +842,7 @@ app.get('/', async (req, res) => {
         leverage: `${LEVERAGE}x`,
         trigger: 'تغير ≥2% خلال 3 شموع',
         scanInterval: `${SCAN_INTERVAL}ms`,
-        symbols: SYMBOLS.length
+        symbols: SYMBOLS
       }
     });
   } catch (error) {
@@ -894,14 +858,6 @@ async function startBot() {
   try {
     loadTradesHistory();
 
-    // ✅ تحميل جميع العملات تلقائياً
-    await loadAllSymbols();
-
-    if (SYMBOLS.length === 0) {
-      console.error('❌ لا توجد عملات متاحة للتداول');
-      process.exit(1);
-    }
-
     console.log('⚡⚡ بدء تشغيل بوت سكالبينج');
     console.log('📊 ===== الإعدادات =====');
     console.log(`💰 حجم الصفقة: ${TRADE_AMOUNT} USDT`);
@@ -913,10 +869,9 @@ async function startBot() {
     console.log(`   📈 صعود ≥2% → SELL`);
     console.log(`🕐 الإطار الزمني: 1m`);
     console.log(`⚡ سرعة المسح: ${SCAN_INTERVAL}ms`);
-    console.log(`📊 العملات: ${SYMBOLS.length} عملة (تم جلبها تلقائياً)`);
+    console.log(`📊 العملات: ${SYMBOLS.length} عملة`);
     console.log('================================');
 
-    // جلب معلومات العقود لأول 5 عملات فقط لتسريع البداية
     for (const symbol of SYMBOLS.slice(0, 5)) {
       await getContractInfo(symbol);
     }
@@ -949,15 +904,15 @@ async function startBot() {
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`
   ╔═══════════════════════════════════════════════════════════════╗
-  ║   ⚡ بوت سكالبينج - تحميل تلقائي للعملات                   ║
+  ║   ⚡ بوت سكالبينج - منطق بسيط                              ║
   ║   📡 http://localhost:${PORT}                                  ║
   ║   📊 لوحة التحكم: http://localhost:${PORT}/dashboard          ║
   ║   🚀 رافعة: ${LEVERAGE}x | 💰 ${TRADE_AMOUNT} USDT            ║
   ║   🎯 هدف: +${PROFIT_USDT_TARGET} USDT | ⛔ وقف: -${STOP_LOSS_USDT} USDT ║
   ║   📊 منطق الدخول: تغير ≥2% خلال 3 شموع                      ║
   ║   📉 هبوط ≥2% → BUY | 📈 صعود ≥2% → SELL                    ║
-  ║   📊 العملات: يتم جلبها تلقائياً من BingX                   ║
   ║   🕐 الإطار: 1m | ⚡ سرعة: ${SCAN_INTERVAL}ms                 ║
+  ║   📊 العملات: ${SYMBOLS.length} عملة                          ║
   ║   ⚠️ تداول حقيقي - استخدم بحذر!                              ║
   ╚═══════════════════════════════════════════════════════════════╝
   `);
