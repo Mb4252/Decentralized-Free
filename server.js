@@ -22,111 +22,381 @@ const deepseek = new OpenAI({
 });
 
 // ============================================
-// 📋 قاعدة المعرفة الرسمية لسوداني
+// 📋 قاعدة المعرفة الرسمية لسوداني (محدثة بالكامل)
 // ============================================
 
 const sudaniInfo = {
+    // معلومات الاتصال
     customerService: '120',
     website: 'https://sudani.sd',
     mySudani: 'https://my.sudani.sd',
     sahLink: 'https://sah.sudani.sd',
+    
+    // أكواد الخدمات الرئيسية
     codes: {
-        internet: '*4#',
-        calls: '*6#',
-        sah: '*500#',
-        balance: '*444#',
-        recharge: '*123#',
-        cash: '*555#'
+        balance: '*222#',        // معرفة الرصيد
+        sah: '*500#',            // خدمة صاح
+        internet: '*4#',         // خدمات الإنترنت
+        prepaid: '*444#',        // قائمة الدفع الآجل
+        transfer: '*303#',       // تحويل الرصيد
+        lte: '*4*400#',         // التحويل من 3G إلى 4G
     },
-    internetPackages: {
-        daily: {
-            '500mb': { code: '*555#', price: '100 جنيه' },
-            '1gb': { code: '*556#', price: '200 جنيه' }
+    
+    // ============================================
+    // 1. باقات المكالمات (ريح بالك - خلي عنك - أحلى يوم)
+    // ============================================
+    callPackages: {
+        // ريح بالك
+        rihBalak: {
+            daily: { name: 'ريح بالك يوم', minutes: '50 دقيقة داخل الشبكة', code: '*1#', validity: 'يوم' },
+            weekly: { name: 'ريح بالك أسبوع', minutes: '500 دقيقة داخل الشبكة', code: '*5#', validity: 'أسبوع' },
+            monthly: { name: 'ريح بالك شهر', minutes: '1500 دقيقة داخل الشبكة', code: '*50#', validity: 'شهر' },
+            max: { name: 'ريح بالك Max', minutes: '1000 دقيقة داخل الشبكة', code: '*55#', validity: '30 يوم' }
         },
-        weekly: {
-            '3gb': { code: '*567#', price: '500 جنيه' },
-            '5gb': { code: '*568#', price: '800 جنيه' }
+        // أحلى يوم
+        ahlaYom: {
+            daily: { name: 'أحلى يوم', minutes: '100 دقيقة داخل الشبكة', code: '*60#', validity: 'يوم' }
         },
-        monthly: {
-            '15gb': { code: '*789#', price: '1500 جنيه' },
-            '30gb': { code: '*790#', price: '2500 جنيه' }
+        // خلي عنك
+        khaliAnak: {
+            weekly: { name: 'خلي عنك أسبوع', minutes: 'باقة مكالمات أسبوعية', code: '*12#', validity: 'أسبوع' },
+            monthly: { name: 'خلي عنك شهر', minutes: 'باقة مكالمات شهرية', code: '*40#', validity: 'شهر' }
         }
+    },
+    
+    // ============================================
+    // 2. باقات الإنترنت (الدفع المقدم)
+    // ============================================
+    internetPackages: {
+        // باقات يومية (عبر *4#)
+        daily: {
+            code: '*4#',
+            description: 'باقات يومية - اختر من القائمة'
+        },
+        // باقات شهرية
+        monthly: {
+            '1gb': { code: '*4*101#', size: '1 جيجابايت' },
+            '2gb': { code: '*4*102#', size: '2 جيجابايت' },
+            '5gb': { code: '*4*8#', size: '5 جيجابايت' },
+            '10gb': { code: '*4*9#', size: '10 جيجابايت' }
+        },
+        // باقات LTE (4G)
+        lte: {
+            '15gb': { code: '*4*115#', size: '15 جيجابايت' },
+            '30gb': { code: '*4*130#', size: '30 جيجابايت' },
+            '50gb': { code: '*4*150#', size: '50 جيجابايت' },
+            '100gb': { code: '*4*1100#', size: '100 جيجابايت' }
+        }
+    },
+    
+    // ============================================
+    // 3. خدمات صاح
+    // ============================================
+    sahServices: {
+        code: '*500#',
+        description: 'خدمة صاح من سوداني - خدمات مالية متكاملة',
+        features: [
+            'تحويل الأموال من بنك لآخر',
+            'دفع الفواتير',
+            'شراء رصيد',
+            'سحب نقدي'
+        ],
+        transferCode: '*303#'
     }
 };
 
 // ============================================
-// 📞 ردود محلية
+// 📞 ردود محلية للمعلومات المؤكدة (محدثة بالكامل)
 // ============================================
 
 function getLocalResponse(message) {
     const msg = message.toLowerCase();
     
+    // ============================================
+    // 1. خدمة العملاء
+    // ============================================
     if (msg.includes('خدمة العملاء') || msg.includes('اتصال') || msg.includes('رقم') || msg.includes('شكوى')) {
-        return `📞 **خدمة عملاء سوداني:**\n\n📱 رقم الخدمة: **120** (من أي خط سوداني)\n🕐 متاحة 24 ساعة\n\n🔗 **ماي سوداني:** ${sudaniInfo.mySudani}`;
+        return `📞 **خدمة عملاء سوداني:**\n\n` +
+               `📱 رقم الخدمة: **120** (من أي خط سوداني)\n` +
+               `🕐 متاحة 24 ساعة طوال الأسبوع\n\n` +
+               `🔗 **روابط مهمة:**\n` +
+               `• ماي سوداني: ${sudaniInfo.mySudani}\n` +
+               `• موقع سوداني: ${sudaniInfo.website}`;
     }
     
+    // ============================================
+    // 2. باقات المكالمات (ريح بالك)
+    // ============================================
+    if (msg.includes('ريح بالك') || msg.includes('ريح')) {
+        return `📞 **باقات ريح بالك من سوداني:**\n\n` +
+               `📱 **ريح بالك يوم:**\n` +
+               `• 50 دقيقة داخل الشبكة\n` +
+               `• كود التفعيل: **${sudaniInfo.callPackages.rihBalak.daily.code}**\n` +
+               `• الصلاحية: ${sudaniInfo.callPackages.rihBalak.daily.validity}\n\n` +
+               `📱 **ريح بالك أسبوع:**\n` +
+               `• 500 دقيقة داخل الشبكة\n` +
+               `• كود التفعيل: **${sudaniInfo.callPackages.rihBalak.weekly.code}**\n` +
+               `• الصلاحية: ${sudaniInfo.callPackages.rihBalak.weekly.validity}\n\n` +
+               `📱 **ريح بالك شهر:**\n` +
+               `• 1500 دقيقة داخل الشبكة\n` +
+               `• كود التفعيل: **${sudaniInfo.callPackages.rihBalak.monthly.code}**\n` +
+               `• الصلاحية: ${sudaniInfo.callPackages.rihBalak.monthly.validity}\n\n` +
+               `📱 **ريح بالك Max:**\n` +
+               `• 1000 دقيقة داخل الشبكة\n` +
+               `• كود التفعيل: **${sudaniInfo.callPackages.rihBalak.max.code}**\n` +
+               `• الصلاحية: ${sudaniInfo.callPackages.rihBalak.max.validity}\n\n` +
+               `💡 اطلب الكود المناسب لتفعيل الباقة.`;
+    }
+    
+    // ============================================
+    // 3. باقة أحلى يوم
+    // ============================================
+    if (msg.includes('أحلى يوم') || msg.includes('احلى يوم')) {
+        return `📞 **باقة أحلى يوم من سوداني:**\n\n` +
+               `📱 **أحلى يوم:**\n` +
+               `• 100 دقيقة داخل الشبكة\n` +
+               `• كود التفعيل: **${sudaniInfo.callPackages.ahlaYom.daily.code}**\n` +
+               `• الصلاحية: ${sudaniInfo.callPackages.ahlaYom.daily.validity}\n\n` +
+               `💡 اطلب **${sudaniInfo.callPackages.ahlaYom.daily.code}** لتفعيل الباقة.`;
+    }
+    
+    // ============================================
+    // 4. باقات خلي عنك
+    // ============================================
+    if (msg.includes('خلي عنك')) {
+        return `📞 **باقات خلي عنك من سوداني:**\n\n` +
+               `📱 **خلي عنك أسبوع:**\n` +
+               `• باقة مكالمات أسبوعية\n` +
+               `• كود التفعيل: **${sudaniInfo.callPackages.khaliAnak.weekly.code}**\n` +
+               `• الصلاحية: ${sudaniInfo.callPackages.khaliAnak.weekly.validity}\n\n` +
+               `📱 **خلي عنك شهر:**\n` +
+               `• باقة مكالمات شهرية\n` +
+               `• كود التفعيل: **${sudaniInfo.callPackages.khaliAnak.monthly.code}**\n` +
+               `• الصلاحية: ${sudaniInfo.callPackages.khaliAnak.monthly.validity}\n\n` +
+               `💡 اطلب الكود المناسب لتفعيل الباقة.`;
+    }
+    
+    // ============================================
+    // 5. باقات الإنترنت
+    // ============================================
     if (msg.includes('الإنترنت') || msg.includes('باقة') || msg.includes('نت') || msg.includes('انترنت')) {
-        return `📱 **خدمات الإنترنت من سوداني:**\n\n📶 كود الخدمة: **${sudaniInfo.codes.internet}**\n\n📅 **الباقات اليومية:**\n• 500 ميجا: ${sudaniInfo.internetPackages.daily['500mb'].code} (${sudaniInfo.internetPackages.daily['500mb'].price})\n• 1 جيجا: ${sudaniInfo.internetPackages.daily['1gb'].code} (${sudaniInfo.internetPackages.daily['1gb'].price})\n\n📆 **الباقات الأسبوعية:**\n• 3 جيجا: ${sudaniInfo.internetPackages.weekly['3gb'].code} (${sudaniInfo.internetPackages.weekly['3gb'].price})\n• 5 جيجا: ${sudaniInfo.internetPackages.weekly['5gb'].code} (${sudaniInfo.internetPackages.weekly['5gb'].price})\n\n📆 **الباقات الشهرية:**\n• 15 جيجا: ${sudaniInfo.internetPackages.monthly['15gb'].code} (${sudaniInfo.internetPackages.monthly['15gb'].price})\n• 30 جيجا: ${sudaniInfo.internetPackages.monthly['30gb'].code} (${sudaniInfo.internetPackages.monthly['30gb'].price})\n\n💡 اطلب **${sudaniInfo.codes.internet}** لمعرفة جميع الباقات.\n🔗 ماي سوداني: ${sudaniInfo.mySudani}`;
+        if (msg.includes('يوم') || msg.includes('يومية')) {
+            return `📱 **باقات الإنترنت اليومية من سوداني:**\n\n` +
+                   `📶 كود الخدمة: **${sudaniInfo.internetPackages.daily.code}**\n` +
+                   `💡 اطلب **${sudaniInfo.internetPackages.daily.code}** واختر الباقة المناسبة لك.\n\n` +
+                   `🔗 ماي سوداني: ${sudaniInfo.mySudani}`;
+        }
+        if (msg.includes('شهر') || msg.includes('شهري')) {
+            if (msg.includes('4g') || msg.includes('lte')) {
+                return `📱 **باقات LTE (4G) الشهرية من سوداني:**\n\n` +
+                       `📶 **15 جيجابايت:** ${sudaniInfo.internetPackages.lte['15gb'].code}\n` +
+                       `📶 **30 جيجابايت:** ${sudaniInfo.internetPackages.lte['30gb'].code}\n` +
+                       `📶 **50 جيجابايت:** ${sudaniInfo.internetPackages.lte['50gb'].code}\n` +
+                       `📶 **100 جيجابايت:** ${sudaniInfo.internetPackages.lte['100gb'].code}\n\n` +
+                       `💡 اطلب الكود المناسب للاشتراك.\n` +
+                       `🔗 ماي سوداني: ${sudaniInfo.mySudani}`;
+            }
+            return `📱 **باقات الإنترنت الشهرية من سوداني:**\n\n` +
+                   `📶 **1 جيجابايت:** ${sudaniInfo.internetPackages.monthly['1gb'].code}\n` +
+                   `📶 **2 جيجابايت:** ${sudaniInfo.internetPackages.monthly['2gb'].code}\n` +
+                   `📶 **5 جيجابايت:** ${sudaniInfo.internetPackages.monthly['5gb'].code}\n` +
+                   `📶 **10 جيجابايت:** ${sudaniInfo.internetPackages.monthly['10gb'].code}\n\n` +
+                   `📶 **باقات LTE (4G):**\n` +
+                   `• 15 جيجا: ${sudaniInfo.internetPackages.lte['15gb'].code}\n` +
+                   `• 30 جيجا: ${sudaniInfo.internetPackages.lte['30gb'].code}\n` +
+                   `• 50 جيجا: ${sudaniInfo.internetPackages.lte['50gb'].code}\n` +
+                   `• 100 جيجا: ${sudaniInfo.internetPackages.lte['100gb'].code}\n\n` +
+                   `💡 اطلب الكود المناسب للاشتراك.\n` +
+                   `🔗 ماي سوداني: ${sudaniInfo.mySudani}`;
+        }
+        return `📱 **خدمات الإنترنت من سوداني:**\n\n` +
+               `📶 كود الخدمة الرئيسي: **${sudaniInfo.codes.internet}**\n\n` +
+               `📅 **باقات يومية:** اطلب **${sudaniInfo.internetPackages.daily.code}**\n\n` +
+               `📆 **باقات شهرية:**\n` +
+               `• 1 جيجا: ${sudaniInfo.internetPackages.monthly['1gb'].code}\n` +
+               `• 2 جيجا: ${sudaniInfo.internetPackages.monthly['2gb'].code}\n` +
+               `• 5 جيجا: ${sudaniInfo.internetPackages.monthly['5gb'].code}\n` +
+               `• 10 جيجا: ${sudaniInfo.internetPackages.monthly['10gb'].code}\n\n` +
+               `📶 **باقات LTE (4G):**\n` +
+               `• 15 جيجا: ${sudaniInfo.internetPackages.lte['15gb'].code}\n` +
+               `• 30 جيجا: ${sudaniInfo.internetPackages.lte['30gb'].code}\n` +
+               `• 50 جيجا: ${sudaniInfo.internetPackages.lte['50gb'].code}\n` +
+               `• 100 جيجا: ${sudaniInfo.internetPackages.lte['100gb'].code}\n\n` +
+               `💡 اسأل عن باقة محددة لمزيد من التفاصيل.\n` +
+               `🔗 ماي سوداني: ${sudaniInfo.mySudani}`;
     }
     
-    if (msg.includes('المكالمات') || msg.includes('اتصال')) {
-        return `📞 **خدمات الاتصال من سوداني:**\n\n📱 كود الخدمة: **${sudaniInfo.codes.calls}**\n\n💡 استخدم الكود **${sudaniInfo.codes.calls}** للاطلاع على عروض المكالمات.\n\n🔗 ماي سوداني: ${sudaniInfo.mySudani}`;
-    }
-    
+    // ============================================
+    // 6. خدمة صاح
+    // ============================================
     if (msg.includes('صاح') || msg.includes('كاش') || msg.includes('تحويل') || msg.includes('فلوس')) {
-        return `💰 **خدمة صاح من سوداني:**\n\n📱 كود الخدمة: **${sudaniInfo.codes.sah}**\n🔗 رابط صاح: ${sudaniInfo.sahLink}\n\n✨ **المميزات:**\n• تحويل الأموال\n• دفع الفواتير\n• شراء رصيد\n• سحب نقدي\n\n💡 اطلب **${sudaniInfo.codes.sah}** لاستخدام الخدمة.`;
+        return `💰 **خدمة صاح من سوداني:**\n\n` +
+               `📱 كود الخدمة: **${sudaniInfo.codes.sah}**\n` +
+               `🔗 رابط صاح: ${sudaniInfo.sahLink}\n\n` +
+               `✨ **المميزات:**\n` +
+               `• تحويل الأموال من بنك لآخر\n` +
+               `• دفع الفواتير\n` +
+               `• شراء رصيد\n` +
+               `• سحب نقدي\n\n` +
+               `💳 **تحويل الرصيد:**\n` +
+               `• الكود: **${sudaniInfo.codes.transfer}**\n` +
+               `• مثال: *303*50*0xxxxxxxxx*0000#\n` +
+               `• (رقم المستلم 10 خانات)\n\n` +
+               `💡 اطلب **${sudaniInfo.codes.sah}** لاستخدام الخدمة.\n` +
+               `🔗 للمزيد: ${sudaniInfo.sahLink}`;
     }
     
-    if (msg.includes('رابط') || msg.includes('موقع') || msg.includes('ماي سوداني')) {
-        return `🔗 **روابط سوداني الرسمية:**\n\n🌐 الموقع: ${sudaniInfo.website}\n📱 ماي سوداني: ${sudaniInfo.mySudani}\n💰 صاح: ${sudaniInfo.sahLink}\n\n📞 خدمة العملاء: **120**`;
-    }
-    
+    // ============================================
+    // 7. الرصيد والشحن
+    // ============================================
     if (msg.includes('رصيد') || msg.includes('شحن')) {
-        return `💰 **خدمات الرصيد في سوداني:**\n\n• معرفة الرصيد: **${sudaniInfo.codes.balance}**\n• شحن الرصيد: **${sudaniInfo.codes.recharge}**\n• سوداني كاش: **${sudaniInfo.codes.cash}**\n\n🔗 ماي سوداني: ${sudaniInfo.mySudani}`;
+        return `💰 **خدمات الرصيد في سوداني:**\n\n` +
+               `📊 **معرفة الرصيد:** **${sudaniInfo.codes.balance}**\n` +
+               `💳 **شحن الرصيد:** عبر خدمة صاح **${sudaniInfo.codes.sah}**\n\n` +
+               `💡 **طرق الشحن:**\n` +
+               `1️⃣ عبر خدمة صاح: اطلب **${sudaniInfo.codes.sah}**\n` +
+               `2️⃣ عن طريق كروت الشحن\n` +
+               `3️⃣ من أي وكيل معتمد\n\n` +
+               `🔗 ماي سوداني: ${sudaniInfo.mySudani}`;
     }
     
+    // ============================================
+    // 8. التحويل من 3G إلى 4G
+    // ============================================
+    if (msg.includes('4g') || msg.includes('lte') || msg.includes('تحويل') && msg.includes('3g')) {
+        return `📶 **التحويل من 3G إلى 4G:**\n\n` +
+               `📱 كود التفعيل: **${sudaniInfo.codes.lte}**\n\n` +
+               `💡 بعد تفعيل الخدمة، استمتع بسرعات إنترنت أسرع.\n\n` +
+               `📶 **باقات LTE المتاحة:**\n` +
+               `• 15 جيجا: *4*115#\n` +
+               `• 30 جيجا: *4*130#\n` +
+               `• 50 جيجا: *4*150#\n` +
+               `• 100 جيجا: *4*1100#\n\n` +
+               `🔗 ماي سوداني: ${sudaniInfo.mySudani}`;
+    }
+    
+    // ============================================
+    // 9. الدفع الآجل
+    // ============================================
+    if (msg.includes('دفع آجل') || msg.includes('فاتورة') || msg.includes('الفاتورة')) {
+        return `📋 **خدمة الدفع الآجل من سوداني:**\n\n` +
+               `📱 كود الخدمة: **${sudaniInfo.codes.prepaid}**\n\n` +
+               `💡 **مميزات الخدمة:**\n` +
+               `• التحكم في الفاتورة\n` +
+               `• اختيار الباقات الإضافية\n` +
+               `• متابعة الاستهلاك\n\n` +
+               `📞 للاشتراك لأول مرة:\n` +
+               `• يفضل زيارة أقرب مركز خدمات سوداني\n\n` +
+               `🔗 ماي سوداني: ${sudaniInfo.mySudani}`;
+    }
+    
+    // ============================================
+    // 10. الروابط
+    // ============================================
+    if (msg.includes('رابط') || msg.includes('موقع') || msg.includes('ماي سوداني') || msg.includes('my sudani')) {
+        return `🔗 **روابط سوداني الرسمية:**\n\n` +
+               `🌐 الموقع الرسمي: ${sudaniInfo.website}\n` +
+               `📱 ماي سوداني: ${sudaniInfo.mySudani}\n` +
+               `💰 صاح: ${sudaniInfo.sahLink}\n\n` +
+               `📞 خدمة العملاء: **120**`;
+    }
+    
+    // ============================================
+    // 11. الترحيب
+    // ============================================
     if (msg.includes('سلام') || msg.includes('مرحب') || msg.includes('هلا')) {
-        return `👋 أهلاً وسهلاً بك في **خدمات سوداني**!\n\n📱 **أنا هنا لمساعدتك في:**\n• خدمات الإنترنت: **${sudaniInfo.codes.internet}**\n• خدمات الاتصال: **${sudaniInfo.codes.calls}**\n• خدمة صاح: **${sudaniInfo.codes.sah}**\n• الرصيد والشحن\n\n📞 خدمة العملاء: **120**\n🔗 ماي سوداني: ${sudaniInfo.mySudani}`;
+        return `👋 أهلاً وسهلاً بك في **خدمات سوداني**!\n\n` +
+               `📱 **أنا هنا لمساعدتك في:**\n` +
+               `• باقات المكالمات (ريح بالك، أحلى يوم، خلي عنك)\n` +
+               `• خدمات الإنترنت\n` +
+               `• خدمة صاح (تحويلات بنكية)\n` +
+               `• معرفة الرصيد والشحن\n` +
+               `• التحويل من 3G إلى 4G\n\n` +
+               `📞 خدمة العملاء: **120**\n` +
+               `🔗 ماي سوداني: ${sudaniInfo.mySudani}\n\n` +
+               `💬 اسألني عن أي خدمة!`;
     }
     
     return null;
 }
 
 // ============================================
-// 🤖 دالة الرد
+// 🤖 دالة الرد (DeepSeek + قاعدة معرفة)
 // ============================================
 
 async function getAIResponse(userMessage) {
+    // 1. التحقق من القاعدة المحلية أولاً
     const localReply = getLocalResponse(userMessage);
     if (localReply) {
-        console.log('✅ تم الرد من قاعدة المعرفة');
+        console.log('✅ تم الرد من قاعدة المعرفة المؤكدة');
         return localReply;
     }
     
+    // 2. استخدام DeepSeek مع تعليمات صارمة
     try {
         console.log('🧠 جاري الاتصال بـ DeepSeek...');
+        console.log('📩 الرسالة:', userMessage);
         
         const completion = await deepseek.chat.completions.create({
             model: 'deepseek-chat',
             messages: [
                 {
                     role: 'system',
-                    content: `أنت مساعد رسمي لشركة سوداني للاتصالات في السودان.
+                    content: `أنت مساعد رسمي لشركة **سوداني للاتصالات** في السودان.
 
-                    ⚠️ قواعد صارمة:
-                    1. أنت متخصص فقط في شركة سوداني. لا تقدم معلومات عن شركات أخرى.
-                    2. استخدم فقط المعلومات المزودة في هذه التعليمات.
-                    3. إذا سألك عن شركة أخرى، قل: "آسف، أنا متخصص فقط في خدمات سوداني."
+                    ⚠️ **قواعد صارمة - لا يمكن تجاوزها:**
                     
-                    معلومات سوداني:
-                    - خدمة العملاء: 120
-                    - الإنترنت: *4#
-                    - الاتصال: *6#
-                    - صاح: *500#
+                    1. **التخصص الحصري:** أنت متخصص فقط في شركة سوداني. لا تقدم أي معلومات عن شركات أخرى.
+                    
+                    2. **المعلومات الرسمية:** استخدم فقط المعلومات المزودة لك. لا تختلق معلومات.
+                    
+                    3. **الرد على الأسئلة خارج النطاق:** إذا سألك عن شركة أخرى، قل: 
+                    "آسف يا حبيبي، أنا متخصص فقط في خدمات شركة سوداني."
+                    
+                    **خدمات سوداني الرسمية:**
+                    
+                    📞 **خدمة العملاء:** 120
+                    
+                    📱 **باقات المكالمات:**
+                    - ريح بالك يوم: *1# (50 دقيقة)
+                    - ريح بالك أسبوع: *5# (500 دقيقة)
+                    - ريح بالك شهر: *50# (1500 دقيقة)
+                    - ريح بالك Max: *55# (1000 دقيقة)
+                    - أحلى يوم: *60# (100 دقيقة)
+                    - خلي عنك أسبوع: *12#
+                    - خلي عنك شهر: *40#
+                    
+                    📶 **باقات الإنترنت:**
+                    - كود الخدمة الرئيسي: *4#
+                    - يومية: *4#
+                    - 1 جيجا شهري: *4*101#
+                    - 2 جيجا شهري: *4*102#
+                    - 5 جيجا شهري: *4*8#
+                    - 10 جيجا شهري: *4*9#
+                    - 15 جيجا LTE: *4*115#
+                    - 30 جيجا LTE: *4*130#
+                    - 50 جيجا LTE: *4*150#
+                    - 100 جيجا LTE: *4*1100#
+                    
+                    💰 **خدمة صاح:**
+                    - كود الخدمة: *500#
+                    - تحويل الأموال من بنك لآخر
+                    - دفع الفواتير
+                    - شراء رصيد
+                    
+                    💳 **الرصيد والشحن:**
+                    - معرفة الرصيد: *222#
+                    - تحويل الرصيد: *303*50*رقم المستلم*0000#
+                    
+                    📋 **خدمات أخرى:**
+                    - التحويل من 3G إلى 4G: *4*400#
+                    - الدفع الآجل: *444#
+                    
+                    🔗 **الروابط:**
                     - ماي سوداني: https://my.sudani.sd
                     - صاح: https://sah.sudani.sd
                     
-                    تحدث باللهجة السودانية وكن ودوداً.`,
+                    تحدث باللهجة السودانية وكن ودوداً ومحترماً.`,
                 },
                 {
                     role: 'user',
@@ -137,16 +407,21 @@ async function getAIResponse(userMessage) {
             max_tokens: 600,
         });
 
-        return completion.choices[0].message.content;
+        const response = completion.choices[0].message.content;
+        console.log('✅ تم استلام الرد من DeepSeek');
+        return response;
 
     } catch (error) {
-        console.error('❌ خطأ:', error.message);
-        return `عذراً يا حبيبي، واجهتنا مشكلة.\n\n📞 تواصل مع خدمة العملاء على **120**\n🔗 أو زور ماي سوداني: ${sudaniInfo.mySudani}`;
+        console.error('❌ خطأ في DeepSeek:', error.message);
+        return `عذراً يا حبيبي، واجهتنا مشكلة تقنية.\n\n` +
+               `📞 لكن تقدر تتواصل مع خدمة عملاء سوداني على **120**\n` +
+               `🔗 أو تزور ماي سوداني: https://my.sudani.sd\n\n` +
+               `آسف على الإزعاج!`;
     }
 }
 
 // ============================================
-// 🎨 واجهة الويب - مع أزرار تعمل 100%
+// 🎨 واجهة الويب
 // ============================================
 
 app.get('/', (req, res) => {
@@ -195,6 +470,7 @@ app.get('/', (req, res) => {
         .input-area .send-btn:hover { transform: scale(1.06); }
         .input-area .send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         @media (max-width: 500px) { body { padding: 0; } .chat-container { height: 100vh; max-height: 100vh; border-radius: 0; } }
+        .bubble strong { color: #f7931e; }
     </style>
 </head>
 <body>
@@ -212,15 +488,16 @@ app.get('/', (req, res) => {
         </div>
         <div class="messages-area" id="messagesArea">
             <div class="message bot">
-                <div class="bubble">👋 أهلاً وسهلاً بك في خدمات سوداني!
+                <div class="bubble">👋 أهلاً وسهلاً بك في <strong>خدمات سوداني</strong>!
 
 📱 أنا هنا لمساعدتك في:
-• خدمات الإنترنت: *4#
-• خدمات الاتصال: *6#
-• خدمة صاح: *500#
-• الرصيد والشحن
+• باقات المكالمات (ريح بالك، أحلى يوم، خلي عنك)
+• خدمات الإنترنت
+• خدمة صاح (تحويلات بنكية)
+• معرفة الرصيد والشحن
+• التحويل من 3G إلى 4G
 
-📞 خدمة العملاء: 120
+📞 خدمة العملاء: <strong>120</strong>
 🔗 ماي سوداني: https://my.sudani.sd
 
 💬 اسألني عن أي خدمة!</div>
@@ -228,10 +505,10 @@ app.get('/', (req, res) => {
             </div>
         </div>
         <div class="quick-actions">
-            <button onclick="sendQuickMessage('عايز باقة نت سوداني')">📱 باقة نت</button>
-            <button onclick="sendQuickMessage('رصيدي خلص سوداني')">💰 الرصيد</button>
+            <button onclick="sendQuickMessage('عايز باقة ريح بالك')">📞 ريح بالك</button>
+            <button onclick="sendQuickMessage('عايز باقة إنترنت')">📶 إنترنت</button>
+            <button onclick="sendQuickMessage('عايز أعرف رصيدي')">💰 الرصيد</button>
             <button onclick="sendQuickMessage('خدمة صاح سوداني')">💵 صاح</button>
-            <button onclick="sendQuickMessage('خدمة العملاء سوداني')">📞 خدمة العملاء</button>
             <button onclick="sendQuickMessage('رابط ماي سوداني')">🔗 ماي سوداني</button>
         </div>
         <div class="input-area">
@@ -349,7 +626,7 @@ app.get('/', (req, res) => {
             }
             
             console.log('✅ سوداني بوت جاهز!');
-            console.log('📱 الأزرار تعمل 100%');
+            console.log('📱 جميع البيانات محدثة بالكامل');
         });
 
         // اختبار الاتصال
@@ -399,7 +676,8 @@ app.post('/api/chat/message', async (req, res) => {
 app.get('/health', (req, res) => {
     res.json({ 
         status: 'healthy', 
-        service: 'Sudani Bot'
+        service: 'Sudani Bot',
+        version: '2.0'
     });
 });
 
@@ -409,16 +687,21 @@ app.get('/health', (req, res) => {
 
 app.listen(PORT, '0.0.0.0', () => {
     console.log('=================================');
-    console.log('🚀 سوداني بوت - النسخة الرسمية');
+    console.log('🚀 سوداني بوت - النسخة الرسمية 2.0');
     console.log('=================================');
     console.log('✅ السيرفر يعمل على المنفذ: ' + PORT);
     console.log('🌐 http://localhost:' + PORT);
     console.log('=================================');
-    console.log('📱 خدمات سوداني:');
-    console.log('   • الإنترنت: *4#');
-    console.log('   • الاتصال: *6#');
-    console.log('   • صاح: *500#');
+    console.log('📱 **خدمات سوداني المحدثة:**');
     console.log('   • خدمة العملاء: 120');
+    console.log('   • معرفة الرصيد: *222#');
+    console.log('   • باقات ريح بالك: *1#, *5#, *50#, *55#');
+    console.log('   • باقة أحلى يوم: *60#');
+    console.log('   • باقات خلي عنك: *12#, *40#');
+    console.log('   • باقات الإنترنت: *4#');
+    console.log('   • خدمة صاح: *500#');
+    console.log('=================================');
+    console.log('🔗 ماي سوداني: https://my.sudani.sd');
     console.log('=================================');
 });
 
