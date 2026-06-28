@@ -22,17 +22,14 @@ const deepseek = new OpenAI({
 });
 
 // ============================================
-// 📋 قاعدة المعرفة الرسمية لسوداني (محدثة)
+// 📋 قاعدة المعرفة الرسمية لسوداني
 // ============================================
 
 const sudaniInfo = {
-    // معلومات الاتصال
     customerService: '120',
     website: 'https://sudani.sd',
-    mySudani: 'https://my.sudani.sd', // رابط ماي سوداني
-    sahLink: 'https://sah.sudani.sd', // رابط صاح
-    
-    // أكواد الخدمات
+    mySudani: 'https://my.sudani.sd',
+    sahLink: 'https://sah.sudani.sd',
     codes: {
         internet: '*4#',
         calls: '*6#',
@@ -41,8 +38,6 @@ const sudaniInfo = {
         recharge: '*123#',
         cash: '*555#'
     },
-    
-    // خدمات الإنترنت
     internetPackages: {
         daily: {
             '500mb': { code: '*555#', price: '100 جنيه' },
@@ -56,197 +51,102 @@ const sudaniInfo = {
             '15gb': { code: '*789#', price: '1500 جنيه' },
             '30gb': { code: '*790#', price: '2500 جنيه' }
         }
-    },
-    
-    // خدمات صاح
-    sahServices: {
-        code: '*500#',
-        description: 'خدمة صاح من سوداني - خدمات مالية متكاملة',
-        features: ['تحويل الأموال', 'دفع الفواتير', 'شراء رصيد', 'سحب نقدي']
     }
 };
 
 // ============================================
-// 📞 ردود محلية للمعلومات المؤكدة
+// 📞 ردود محلية
 // ============================================
 
 function getLocalResponse(message) {
     const msg = message.toLowerCase();
     
-    // رقم خدمة العملاء
     if (msg.includes('خدمة العملاء') || msg.includes('اتصال') || msg.includes('رقم') || msg.includes('شكوى')) {
-        return `📞 **خدمة عملاء سوداني:**\n\n` +
-               `📱 رقم الخدمة: **120** (من أي خط سوداني)\n` +
-               `🕐 متاحة 24 ساعة طوال الأسبوع\n\n` +
-               `🔗 **روابط مهمة:**\n` +
-               `• ماي سوداني: ${sudaniInfo.mySudani}\n` +
-               `• موقع سوداني: ${sudaniInfo.website}`;
+        return `📞 **خدمة عملاء سوداني:**\n\n📱 رقم الخدمة: **120** (من أي خط سوداني)\n🕐 متاحة 24 ساعة\n\n🔗 **ماي سوداني:** ${sudaniInfo.mySudani}`;
     }
     
-    // خدمات الإنترنت
     if (msg.includes('الإنترنت') || msg.includes('باقة') || msg.includes('نت') || msg.includes('انترنت')) {
-        return `📱 **خدمات الإنترنت من سوداني:**\n\n` +
-               `📶 كود الخدمة: **${sudaniInfo.codes.internet}**\n\n` +
-               `📅 **الباقات اليومية:**\n` +
-               `• 500 ميجا: ${sudaniInfo.internetPackages.daily['500mb'].code} (${sudaniInfo.internetPackages.daily['500mb'].price})\n` +
-               `• 1 جيجا: ${sudaniInfo.internetPackages.daily['1gb'].code} (${sudaniInfo.internetPackages.daily['1gb'].price})\n\n` +
-               `📆 **الباقات الأسبوعية:**\n` +
-               `• 3 جيجا: ${sudaniInfo.internetPackages.weekly['3gb'].code} (${sudaniInfo.internetPackages.weekly['3gb'].price})\n` +
-               `• 5 جيجا: ${sudaniInfo.internetPackages.weekly['5gb'].code} (${sudaniInfo.internetPackages.weekly['5gb'].price})\n\n` +
-               `📆 **الباقات الشهرية:**\n` +
-               `• 15 جيجا: ${sudaniInfo.internetPackages.monthly['15gb'].code} (${sudaniInfo.internetPackages.monthly['15gb'].price})\n` +
-               `• 30 جيجا: ${sudaniInfo.internetPackages.monthly['30gb'].code} (${sudaniInfo.internetPackages.monthly['30gb'].price})\n\n` +
-               `💡 اطلب **${sudaniInfo.codes.internet}** لمعرفة جميع الباقات المتاحة.\n` +
-               `🔗 ماي سوداني: ${sudaniInfo.mySudani}`;
+        return `📱 **خدمات الإنترنت من سوداني:**\n\n📶 كود الخدمة: **${sudaniInfo.codes.internet}**\n\n📅 **الباقات اليومية:**\n• 500 ميجا: ${sudaniInfo.internetPackages.daily['500mb'].code} (${sudaniInfo.internetPackages.daily['500mb'].price})\n• 1 جيجا: ${sudaniInfo.internetPackages.daily['1gb'].code} (${sudaniInfo.internetPackages.daily['1gb'].price})\n\n📆 **الباقات الأسبوعية:**\n• 3 جيجا: ${sudaniInfo.internetPackages.weekly['3gb'].code} (${sudaniInfo.internetPackages.weekly['3gb'].price})\n• 5 جيجا: ${sudaniInfo.internetPackages.weekly['5gb'].code} (${sudaniInfo.internetPackages.weekly['5gb'].price})\n\n📆 **الباقات الشهرية:**\n• 15 جيجا: ${sudaniInfo.internetPackages.monthly['15gb'].code} (${sudaniInfo.internetPackages.monthly['15gb'].price})\n• 30 جيجا: ${sudaniInfo.internetPackages.monthly['30gb'].code} (${sudaniInfo.internetPackages.monthly['30gb'].price})\n\n💡 اطلب **${sudaniInfo.codes.internet}** لمعرفة جميع الباقات.\n🔗 ماي سوداني: ${sudaniInfo.mySudani}`;
     }
     
-    // خدمات الاتصال
-    if (msg.includes('المكالمات') || msg.includes('اتصال') || msg.includes('دقيقة')) {
-        return `📞 **خدمات الاتصال من سوداني:**\n\n` +
-               `📱 كود الخدمة: **${sudaniInfo.codes.calls}**\n\n` +
-               `💡 استخدم الكود **${sudaniInfo.codes.calls}** للاطلاع على عروض المكالمات والدقائق.\n\n` +
-               `🔗 ماي سوداني: ${sudaniInfo.mySudani}`;
+    if (msg.includes('المكالمات') || msg.includes('اتصال')) {
+        return `📞 **خدمات الاتصال من سوداني:**\n\n📱 كود الخدمة: **${sudaniInfo.codes.calls}**\n\n💡 استخدم الكود **${sudaniInfo.codes.calls}** للاطلاع على عروض المكالمات.\n\n🔗 ماي سوداني: ${sudaniInfo.mySudani}`;
     }
     
-    // خدمة صاح
     if (msg.includes('صاح') || msg.includes('كاش') || msg.includes('تحويل') || msg.includes('فلوس')) {
-        return `💰 **خدمة صاح من سوداني:**\n\n` +
-               `📱 كود الخدمة: **${sudaniInfo.codes.sah}**\n` +
-               `🔗 رابط صاح: ${sudaniInfo.sahLink}\n\n` +
-               `✨ **المميزات:**\n` +
-               `• تحويل الأموال لأي رقم\n` +
-               `• دفع الفواتير\n` +
-               `• شراء رصيد\n` +
-               `• سحب نقدي من الوكلاء\n\n` +
-               `💡 اطلب **${sudaniInfo.codes.sah}** لاستخدام الخدمة.\n` +
-               `🔗 للمزيد: ${sudaniInfo.sahLink}`;
+        return `💰 **خدمة صاح من سوداني:**\n\n📱 كود الخدمة: **${sudaniInfo.codes.sah}**\n🔗 رابط صاح: ${sudaniInfo.sahLink}\n\n✨ **المميزات:**\n• تحويل الأموال\n• دفع الفواتير\n• شراء رصيد\n• سحب نقدي\n\n💡 اطلب **${sudaniInfo.codes.sah}** لاستخدام الخدمة.`;
     }
     
-    // الروابط
-    if (msg.includes('رابط') || msg.includes('موقع') || msg.includes('ماي سوداني') || msg.includes('my sudani')) {
-        return `🔗 **روابط سوداني الرسمية:**\n\n` +
-               `🌐 الموقع الرسمي: ${sudaniInfo.website}\n` +
-               `📱 ماي سوداني: ${sudaniInfo.mySudani}\n` +
-               `💰 صاح: ${sudaniInfo.sahLink}\n\n` +
-               `📞 خدمة العملاء: **120**`;
+    if (msg.includes('رابط') || msg.includes('موقع') || msg.includes('ماي سوداني')) {
+        return `🔗 **روابط سوداني الرسمية:**\n\n🌐 الموقع: ${sudaniInfo.website}\n📱 ماي سوداني: ${sudaniInfo.mySudani}\n💰 صاح: ${sudaniInfo.sahLink}\n\n📞 خدمة العملاء: **120**`;
     }
     
-    // الرصيد
     if (msg.includes('رصيد') || msg.includes('شحن')) {
-        return `💰 **خدمات الرصيد في سوداني:**\n\n` +
-               `• معرفة الرصيد: **${sudaniInfo.codes.balance}**\n` +
-               `• شحن الرصيد: **${sudaniInfo.codes.recharge}**\n` +
-               `• سوداني كاش: **${sudaniInfo.codes.cash}**\n\n` +
-               `🔗 ماي سوداني: ${sudaniInfo.mySudani}`;
+        return `💰 **خدمات الرصيد في سوداني:**\n\n• معرفة الرصيد: **${sudaniInfo.codes.balance}**\n• شحن الرصيد: **${sudaniInfo.codes.recharge}**\n• سوداني كاش: **${sudaniInfo.codes.cash}**\n\n🔗 ماي سوداني: ${sudaniInfo.mySudani}`;
     }
     
-    // الترحيب
     if (msg.includes('سلام') || msg.includes('مرحب') || msg.includes('هلا')) {
-        return `👋 أهلاً وسهلاً بك في **خدمات سوداني**!\n\n` +
-               `📱 **أنا هنا لمساعدتك في:**\n` +
-               `• خدمات الإنترنت: **${sudaniInfo.codes.internet}**\n` +
-               `• خدمات الاتصال: **${sudaniInfo.codes.calls}**\n` +
-               `• خدمة صاح: **${sudaniInfo.codes.sah}**\n` +
-               `• الرصيد والشحن\n\n` +
-               `📞 خدمة العملاء: **120**\n` +
-               `🔗 ماي سوداني: ${sudaniInfo.mySudani}\n\n` +
-               `💬 اسألني عن أي خدمة!`;
+        return `👋 أهلاً وسهلاً بك في **خدمات سوداني**!\n\n📱 **أنا هنا لمساعدتك في:**\n• خدمات الإنترنت: **${sudaniInfo.codes.internet}**\n• خدمات الاتصال: **${sudaniInfo.codes.calls}**\n• خدمة صاح: **${sudaniInfo.codes.sah}**\n• الرصيد والشحن\n\n📞 خدمة العملاء: **120**\n🔗 ماي سوداني: ${sudaniInfo.mySudani}`;
     }
     
-    // إذا لم يجد تطابقاً - يرجع null ليستخدم الذكاء الاصطناعي
     return null;
 }
 
 // ============================================
-// 🤖 دالة الرد (DeepSeek + قاعدة معرفة)
+// 🤖 دالة الرد
 // ============================================
 
 async function getAIResponse(userMessage) {
-    // 1. التحقق من القاعدة المحلية أولاً
     const localReply = getLocalResponse(userMessage);
     if (localReply) {
-        console.log('✅ تم الرد من قاعدة المعرفة المؤكدة');
+        console.log('✅ تم الرد من قاعدة المعرفة');
         return localReply;
     }
     
-    // 2. استخدام DeepSeek مع تعليمات صارمة
     try {
         console.log('🧠 جاري الاتصال بـ DeepSeek...');
-        console.log('📩 الرسالة:', userMessage);
         
         const completion = await deepseek.chat.completions.create({
             model: 'deepseek-chat',
             messages: [
                 {
                     role: 'system',
-                    content: `أنت مساعد رسمي لشركة **سوداني للاتصالات** في السودان.
+                    content: `أنت مساعد رسمي لشركة سوداني للاتصالات في السودان.
 
-                    ⚠️ **قواعد صارمة - لا يمكن تجاوزها:**
+                    ⚠️ قواعد صارمة:
+                    1. أنت متخصص فقط في شركة سوداني. لا تقدم معلومات عن شركات أخرى.
+                    2. استخدم فقط المعلومات المزودة في هذه التعليمات.
+                    3. إذا سألك عن شركة أخرى، قل: "آسف، أنا متخصص فقط في خدمات سوداني."
                     
-                    1. **التخصص الحصري:** أنت متخصص فقط في شركة سوداني. لا تقدم أي معلومات عن شركات أخرى (زين، MTN، إلخ).
-                    
-                    2. **المعلومات الرسمية:** استخدم فقط المعلومات المزودة لك في هذه التعليمات. لا تختلق أو تفترض معلومات.
-                    
-                    3. **الرد على الأسئلة خارج النطاق:** إذا سألك المستخدم عن شركة أخرى أو موضوع خارج خدمات سوداني، قل: 
-                    "آسف يا حبيبي، أنا متخصص فقط في خدمات شركة سوداني. لو عندك سؤال عن سوداني، أنا موجود."
-                    
-                    4. **الروابط الرسمية لسوداني:**
-                    - الموقع الرسمي: https://sudani.sd
+                    معلومات سوداني:
+                    - خدمة العملاء: 120
+                    - الإنترنت: *4#
+                    - الاتصال: *6#
+                    - صاح: *500#
                     - ماي سوداني: https://my.sudani.sd
-                    - رابط صاح: https://sah.sudani.sd
+                    - صاح: https://sah.sudani.sd
                     
-                    5. **أكواد خدمات سوداني (مؤكدة):**
-                    - خدمات الإنترنت: *4#
-                    - خدمات الاتصال: *6#
-                    - خدمة صاح: *500#
-                    - معرفة الرصيد: *444#
-                    - شحن الرصيد: *123#
-                    - سوداني كاش: *555#
-                    
-                    6. **رقم خدمة العملاء:** 120 (من أي خط سوداني)
-                    
-                    7. **باقات الإنترنت:**
-                    - يومية: 500 ميجا (*555# - 100 جنيه)، 1 جيجا (*556# - 200 جنيه)
-                    - أسبوعية: 3 جيجا (*567# - 500 جنيه)، 5 جيجا (*568# - 800 جنيه)
-                    - شهرية: 15 جيجا (*789# - 1500 جنيه)، 30 جيجا (*790# - 2500 جنيه)
-                    
-                    8. **خدمة صاح:**
-                    - كود الخدمة: *500#
-                    - خدمات: تحويل أموال، دفع فواتير، شراء رصيد، سحب نقدي
-                    
-                    9. **أسلوب الرد:**
-                    - تحدث باللهجة السودانية (يا هلا، حبيبي، كيف أقدر أساعدك)
-                    - كن ودوداً ومحترماً
-                    - قدم المعلومات بوضوح مع الأكواد
-                    - إذا لم تعرف الإجابة، قل: "آسف يا حبيبي، ما عندي معلومات مؤكدة عن هذا، لكن تقدر تتصل بخدمة العملاء على 120"
-                    
-                    تذكر: أنت هنا فقط لخدمة عملاء سوداني!`,
+                    تحدث باللهجة السودانية وكن ودوداً.`,
                 },
                 {
                     role: 'user',
                     content: userMessage
                 }
             ],
-            temperature: 0.3, // تقليل العشوائية للحصول على إجابات دقيقة
+            temperature: 0.3,
             max_tokens: 600,
         });
 
-        const response = completion.choices[0].message.content;
-        console.log('✅ تم استلام الرد من DeepSeek');
-        return response;
+        return completion.choices[0].message.content;
 
     } catch (error) {
-        console.error('❌ خطأ في DeepSeek:', error.message);
-        // رد احتياطي في حالة فشل API
-        return `عذراً يا حبيبي، واجهتنا مشكلة تقنية حالياً.\n\n` +
-               `📞 لكن تقدر تتواصل مع خدمة عملاء سوداني على **120**\n` +
-               `🔗 أو تزور ماي سوداني: https://my.sudani.sd\n\n` +
-               `آسف على الإزعاج!`;
+        console.error('❌ خطأ:', error.message);
+        return `عذراً يا حبيبي، واجهتنا مشكلة.\n\n📞 تواصل مع خدمة العملاء على **120**\n🔗 أو زور ماي سوداني: ${sudaniInfo.mySudani}`;
     }
 }
 
 // ============================================
-// 🎨 واجهة الويب
+// 🎨 واجهة الويب - مع أزرار تعمل 100%
 // ============================================
 
 app.get('/', (req, res) => {
@@ -312,139 +212,153 @@ app.get('/', (req, res) => {
         </div>
         <div class="messages-area" id="messagesArea">
             <div class="message bot">
-                <div class="bubble">👋 أهلاً وسهلاً بك في **خدمات سوداني**!\n\n📱 أنا هنا لمساعدتك في:\n• خدمات الإنترنت: *4#\n• خدمات الاتصال: *6#\n• خدمة صاح: *500#\n• الرصيد والشحن\n\n📞 خدمة العملاء: 120\n🔗 ماي سوداني: https://my.sudani.sd\n\n💬 اسألني عن أي خدمة!</div>
+                <div class="bubble">👋 أهلاً وسهلاً بك في خدمات سوداني!
+
+📱 أنا هنا لمساعدتك في:
+• خدمات الإنترنت: *4#
+• خدمات الاتصال: *6#
+• خدمة صاح: *500#
+• الرصيد والشحن
+
+📞 خدمة العملاء: 120
+🔗 ماي سوداني: https://my.sudani.sd
+
+💬 اسألني عن أي خدمة!</div>
                 <span class="time">الآن</span>
             </div>
         </div>
         <div class="quick-actions">
-            <button data-msg="عايز باقة نت سوداني">📱 باقة نت</button>
-            <button data-msg="رصيدي خلص سوداني">💰 الرصيد</button>
-            <button data-msg="خدمة صاح سوداني">💵 صاح</button>
-            <button data-msg="خدمة العملاء سوداني">📞 خدمة العملاء</button>
-            <button data-msg="رابط ماي سوداني">🔗 ماي سوداني</button>
+            <button onclick="sendQuickMessage('عايز باقة نت سوداني')">📱 باقة نت</button>
+            <button onclick="sendQuickMessage('رصيدي خلص سوداني')">💰 الرصيد</button>
+            <button onclick="sendQuickMessage('خدمة صاح سوداني')">💵 صاح</button>
+            <button onclick="sendQuickMessage('خدمة العملاء سوداني')">📞 خدمة العملاء</button>
+            <button onclick="sendQuickMessage('رابط ماي سوداني')">🔗 ماي سوداني</button>
         </div>
         <div class="input-area">
             <input type="text" id="messageInput" placeholder="✍️ اكتب سؤالك هنا..." autofocus>
-            <button class="send-btn" id="sendBtn">➤</button>
+            <button class="send-btn" id="sendBtn" onclick="sendMessage()">➤</button>
         </div>
     </div>
 
     <script>
-        (function() {
-            'use strict';
-            
-            const API_URL = window.location.origin;
-            const messagesArea = document.getElementById('messagesArea');
-            const messageInput = document.getElementById('messageInput');
-            const sendBtn = document.getElementById('sendBtn');
-            let isProcessing = false;
+        // ============================================
+        // 🔥 تعريف الدوال في النطاق العالمي
+        // ============================================
+        
+        const API_URL = window.location.origin;
+        const messagesArea = document.getElementById('messagesArea');
+        const messageInput = document.getElementById('messageInput');
+        const sendBtn = document.getElementById('sendBtn');
+        let isProcessing = false;
 
-            function addMessage(text, isUser) {
-                const messageDiv = document.createElement('div');
-                messageDiv.className = 'message ' + (isUser ? 'user' : 'bot');
-                const now = new Date();
-                const time = now.toLocaleTimeString('ar-SD', { hour: '2-digit', minute: '2-digit' });
-                const formattedText = text.replace(/\n/g, '<br>');
-                messageDiv.innerHTML = '<div class="bubble">' + formattedText + '</div><span class="time">' + time + '</span>';
-                messagesArea.appendChild(messageDiv);
-                messagesArea.scrollTop = messagesArea.scrollHeight;
-            }
+        function addMessage(text, isUser) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message ' + (isUser ? 'user' : 'bot');
+            const now = new Date();
+            const time = now.toLocaleTimeString('ar-SD', { hour: '2-digit', minute: '2-digit' });
+            const formattedText = text.replace(/\\n/g, '<br>');
+            messageDiv.innerHTML = '<div class="bubble">' + formattedText + '</div><span class="time">' + time + '</span>';
+            messagesArea.appendChild(messageDiv);
+            messagesArea.scrollTop = messagesArea.scrollHeight;
+        }
 
-            function showTyping() {
-                const typingDiv = document.createElement('div');
-                typingDiv.className = 'message bot';
-                typingDiv.id = 'typingIndicator';
-                typingDiv.innerHTML = '<div class="typing-indicator active"><span></span><span></span><span></span></div>';
-                messagesArea.appendChild(typingDiv);
-                messagesArea.scrollTop = messagesArea.scrollHeight;
-            }
+        function showTyping() {
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'message bot';
+            typingDiv.id = 'typingIndicator';
+            typingDiv.innerHTML = '<div class="typing-indicator active"><span></span><span></span><span></span></div>';
+            messagesArea.appendChild(typingDiv);
+            messagesArea.scrollTop = messagesArea.scrollHeight;
+        }
 
-            function hideTyping() {
-                const typing = document.getElementById('typingIndicator');
-                if (typing) typing.remove();
-            }
-            
-            window.sendMessage = function() {
-                const message = messageInput.value.trim();
-                if (!message || isProcessing) return;
+        function hideTyping() {
+            const typing = document.getElementById('typingIndicator');
+            if (typing) typing.remove();
+        }
 
-                isProcessing = true;
-                messageInput.disabled = true;
-                sendBtn.disabled = true;
+        // ============================================
+        // 📤 دالة الإرسال الرئيسية
+        // ============================================
+        
+        window.sendMessage = function() {
+            const message = messageInput.value.trim();
+            if (!message || isProcessing) return;
 
-                addMessage(message, true);
-                messageInput.value = '';
-                showTyping();
+            isProcessing = true;
+            messageInput.disabled = true;
+            sendBtn.disabled = true;
 
-                fetch(API_URL + '/api/chat/message', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: message, userId: 'web_user_' + Date.now() })
+            addMessage(message, true);
+            messageInput.value = '';
+            showTyping();
+
+            fetch(API_URL + '/api/chat/message', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    message: message, 
+                    userId: 'web_user_' + Date.now() 
                 })
-                .then(response => {
-                    if (!response.ok) throw new Error('HTTP ' + response.status);
-                    return response.json();
-                })
-                .then(data => {
-                    hideTyping();
-                    if (data.success) {
-                        addMessage(data.response, false);
-                    } else {
-                        addMessage('❌ حدث خطأ، حاول مرة أخرى', false);
-                    }
-                })
-                .catch(error => {
-                    hideTyping();
-                    addMessage('❌ خطأ في الاتصال: ' + error.message, false);
-                    console.error('Error:', error);
-                })
-                .finally(() => {
-                    isProcessing = false;
-                    messageInput.disabled = false;
-                    sendBtn.disabled = false;
-                    messageInput.focus();
-                });
-            };
-
-            window.sendQuickMessage = function(text) {
-                messageInput.value = text;
-                window.sendMessage();
-            };
-
-            document.addEventListener('DOMContentLoaded', function() {
-                document.querySelectorAll('.quick-actions button').forEach(button => {
-                    button.addEventListener('click', function(e) {
-                        const msg = this.getAttribute('data-msg');
-                        if (msg) {
-                            window.sendQuickMessage(msg);
-                        }
-                    });
-                });
-
-                if (sendBtn) {
-                    sendBtn.addEventListener('click', window.sendMessage);
+            })
+            .then(response => {
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                return response.json();
+            })
+            .then(data => {
+                hideTyping();
+                if (data.success) {
+                    addMessage(data.response, false);
+                } else {
+                    addMessage('❌ حدث خطأ، حاول مرة أخرى', false);
                 }
-
-                if (messageInput) {
-                    messageInput.addEventListener('keydown', function(e) {
-                        if (e.key === 'Enter') {
-                            e.preventDefault();
-                            window.sendMessage();
-                        }
-                    });
-                }
-
-                console.log('✅ تم إعداد جميع الأزرار بنجاح!');
+            })
+            .catch(error => {
+                hideTyping();
+                addMessage('❌ خطأ في الاتصال: ' + error.message, false);
+                console.error('Error:', error);
+            })
+            .finally(() => {
+                isProcessing = false;
+                messageInput.disabled = false;
+                sendBtn.disabled = false;
+                messageInput.focus();
             });
+        };
 
-            setTimeout(() => {
-                fetch(API_URL + '/health')
-                    .then(r => r.json())
-                    .then(data => console.log('✅ السيرفر يعمل:', data))
-                    .catch(() => console.warn('⚠️ لا يمكن الاتصال بالسيرفر'));
-            }, 1000);
+        // ============================================
+        // ⚡ دالة الإرسال السريع
+        // ============================================
+        
+        window.sendQuickMessage = function(text) {
+            messageInput.value = text;
+            window.sendMessage();
+        };
 
-        })();
+        // ============================================
+        // 🎯 ربط مفتاح Enter
+        // ============================================
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            if (messageInput) {
+                messageInput.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        window.sendMessage();
+                    }
+                });
+            }
+            
+            console.log('✅ سوداني بوت جاهز!');
+            console.log('📱 الأزرار تعمل 100%');
+        });
+
+        // اختبار الاتصال
+        setTimeout(() => {
+            fetch(API_URL + '/health')
+                .then(r => r.json())
+                .then(data => console.log('✅ السيرفر يعمل:', data))
+                .catch(() => console.warn('⚠️ لا يمكن الاتصال بالسيرفر'));
+        }, 1000);
     </script>
 </body>
 </html>
@@ -470,15 +384,14 @@ app.post('/api/chat/message', async (req, res) => {
         const response = await getAIResponse(message);
         res.json({ 
             success: true, 
-            response: response,
-            source: 'deepseek'
+            response: response
         });
 
     } catch (error) {
         console.error('❌ خطأ:', error);
         res.status(500).json({ 
             success: false, 
-            response: '❌ حدث خطأ في السيرفر، حاول مرة أخرى.' 
+            response: '❌ حدث خطأ في السيرفر.' 
         });
     }
 });
@@ -486,8 +399,7 @@ app.post('/api/chat/message', async (req, res) => {
 app.get('/health', (req, res) => {
     res.json({ 
         status: 'healthy', 
-        service: 'Sudani Bot',
-        api: process.env.DEEPSEEK_API_KEY ? '✅ مفعل' : '❌ غير مفعل'
+        service: 'Sudani Bot'
     });
 });
 
@@ -508,18 +420,8 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log('   • صاح: *500#');
     console.log('   • خدمة العملاء: 120');
     console.log('=================================');
-    console.log('🔗 ماي سوداني: https://my.sudani.sd');
-    console.log('=================================');
 });
-
-// ============================================
-// 📝 معالجة الأخطاء
-// ============================================
 
 process.on('uncaughtException', (error) => {
-    console.error('💥 خطأ غير متوقع:', error);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-    console.error('💥 رفض غير متوقع:', reason);
+    console.error('💥 خطأ:', error);
 });
