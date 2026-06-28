@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
-const OpenAI = require('openai');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 dotenv.config();
 
@@ -13,57 +13,43 @@ app.use(cors());
 app.use(express.json());
 
 // ============================================
-// 🤖 إعداد DeepSeek
+// 🤖 إعداد Google Gemini (مجاني)
 // ============================================
 
-const deepseek = new OpenAI({
-    apiKey: process.env.DEEPSEEK_API_KEY,
-    baseURL: 'https://api.deepseek.com',
-});
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // ============================================
-// 🤖 دالة الرد - فقط عبر API (بدون أي معلومات ملقنة)
+// 🤖 دالة الرد - عبر Gemini
 // ============================================
 
 async function getAIResponse(userMessage) {
     try {
-        console.log('🧠 جاري الاتصال بـ DeepSeek...');
+        console.log('🧠 جاري الاتصال بـ Gemini...');
         console.log('📩 الرسالة:', userMessage);
         
-        const completion = await deepseek.chat.completions.create({
-            model: 'deepseek-chat',
-            messages: [
-                {
-                    role: 'system',
-                    content: `أنت مساعد رسمي لشركة سوداني للاتصالات في السودان.
-                    
-                    قواعد صارمة:
-                    1. أنت متخصص فقط في شركة سوداني
-                    2. لا ترد على أي سؤال عن شركات أخرى (زين، MTN، إلخ)
-                    3. إذا سألك عن شركة أخرى، قل: "آسف، أنا متخصص فقط في خدمات سوداني"
-                    4. استخدم معرفتك العامة عن سوداني للرد على جميع الأسئلة
-                    5. تحدث باللهجة السودانية، كن ودوداً ومحترماً
-                    6. إذا لم تعرف الإجابة، قل بصراحة: "آسف يا حبيبي، ما عندي معلومات عن هذا، لكن تقدر تتصل بخدمة العملاء 120"
-                    7. أنت المسؤول عن جميع الأسئلة بما فيها الفروع والمراكز والأكواد والباقات
-                    
-                    ملاحظة: أنت تستخدم معرفتك الخاصة عن سوداني، وليس هناك أي معلومات مسبقة مزودة لك.`,
-                },
-                {
-                    role: 'user',
-                    content: userMessage
-                }
-            ],
-            temperature: 0.5,
-            max_tokens: 800,
-        });
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        
+        const prompt = `أنت مساعد رسمي لشركة سوداني للاتصالات في السودان.
+        
+        قواعد صارمة:
+        1. أنت متخصص فقط في شركة سوداني
+        2. لا ترد على أي سؤال عن شركات أخرى (زين، MTN، إلخ)
+        3. إذا سألك عن شركة أخرى، قل: "آسف، أنا متخصص فقط في خدمات سوداني"
+        4. استخدم معرفتك العامة عن سوداني للرد
+        5. تحدث باللهجة السودانية، كن ودوداً ومحترماً
+        6. إذا لم تعرف الإجابة، قل: "آسف يا حبيبي، ما عندي معلومات عن هذا، لكن تقدر تتصل بخدمة العملاء 120"
+        
+        السؤال: ${userMessage}`;
 
-        const response = completion.choices[0].message.content;
-        console.log('✅ تم استلام الرد من DeepSeek');
+        const result = await model.generateContent(prompt);
+        const response = result.response.text();
+        
+        console.log('✅ تم استلام الرد من Gemini');
         return response;
 
     } catch (error) {
-        console.error('❌ خطأ في DeepSeek:', error.message);
-        return `عذراً يا حبيبي، واجهتنا مشكلة تقنية.\n\n📞 تقدر تتواصل مع خدمة عملاء سوداني على **120**\n🔗 أو تزور ماي سوداني: https://my.sudani.sd\n\nآسف على الإزعاج!`;
+        console.error('❌ خطأ في Gemini:', error.message);
+        return `عذراً يا حبيبي، واجهتنا مشكلة.\n\n📞 تقدر تتواصل مع خدمة عملاء سوداني على **120**\n🔗 أو تزور ماي سوداني: https://my.sudani.sd`;
     }
 }
 
@@ -126,11 +112,11 @@ app.get('/', (req, res) => {
             <div class="avatar">س</div>
             <div class="info">
                 <h3>🤖 سوداني بوت</h3>
-                <p><span class="dot"></span> متصل <span class="badge" style="background:#f7931e;color:#1A2B4A;padding:2px 10px;border-radius:12px;font-size:11px;">AI 100%</span></p>
+                <p><span class="dot"></span> متصل <span class="badge" style="background:#f7931e;color:#1A2B4A;padding:2px 10px;border-radius:12px;font-size:11px;">Gemini</span></p>
             </div>
         </div>
         <div class="status-bar">
-            <span class="mode">🧠 ذكاء اصطناعي 100%</span>
+            <span class="mode">🧠 ذكاء اصطناعي</span>
             المساعد الذكي لشركة سوداني
         </div>
         <div class="messages-area" id="messagesArea">
@@ -160,10 +146,6 @@ app.get('/', (req, res) => {
     </div>
 
     <script>
-        // ============================================
-        // 🔥 تعريف الدوال في النطاق العالمي
-        // ============================================
-        
         const API_URL = window.location.origin;
         const messagesArea = document.getElementById('messagesArea');
         const messageInput = document.getElementById('messageInput');
@@ -194,10 +176,6 @@ app.get('/', (req, res) => {
             const typing = document.getElementById('typingIndicator');
             if (typing) typing.remove();
         }
-
-        // ============================================
-        // 📤 دالة الإرسال الرئيسية
-        // ============================================
         
         window.sendMessage = function() {
             const message = messageInput.value.trim();
@@ -244,19 +222,11 @@ app.get('/', (req, res) => {
             });
         };
 
-        // ============================================
-        // ⚡ دالة الإرسال السريع
-        // ============================================
-        
         window.sendQuickMessage = function(text) {
             messageInput.value = text;
             window.sendMessage();
         };
 
-        // ============================================
-        // 🎯 ربط مفتاح Enter
-        // ============================================
-        
         document.addEventListener('DOMContentLoaded', function() {
             if (messageInput) {
                 messageInput.addEventListener('keydown', function(e) {
@@ -266,12 +236,9 @@ app.get('/', (req, res) => {
                     }
                 });
             }
-            
             console.log('✅ سوداني بوت جاهز!');
-            console.log('🧠 جميع الردود عبر الذكاء الاصطناعي 100%');
         });
 
-        // اختبار الاتصال
         setTimeout(() => {
             fetch(API_URL + '/health')
                 .then(r => r.json())
@@ -318,8 +285,8 @@ app.post('/api/chat/message', async (req, res) => {
 app.get('/health', (req, res) => {
     res.json({ 
         status: 'healthy', 
-        service: 'Sudani Bot - Pure AI',
-        version: '6.0 - 100% AI'
+        service: 'Sudani Bot - Gemini',
+        version: '7.0'
     });
 });
 
@@ -329,16 +296,13 @@ app.get('/health', (req, res) => {
 
 app.listen(PORT, '0.0.0.0', () => {
     console.log('=================================');
-    console.log('🚀 سوداني بوت - 100% ذكاء اصطناعي');
+    console.log('🚀 سوداني بوت - Google Gemini');
     console.log('=================================');
     console.log('✅ السيرفر يعمل على المنفذ: ' + PORT);
     console.log('🌐 http://localhost:' + PORT);
     console.log('=================================');
-    console.log('🧠 **جميع الأسئلة عبر الذكاء الاصطناعي**');
-    console.log('📱 لا توجد معلومات ملقنة');
-    console.log('=================================');
-    console.log('📞 خدمة العملاء: 120');
-    console.log('🔗 ماي سوداني: https://my.sudani.sd');
+    console.log('🧠 النموذج: Gemini 1.5 Flash (مجاني)');
+    console.log('📱 جميع الأسئلة عبر الذكاء الاصطناعي');
     console.log('=================================');
 });
 
