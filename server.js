@@ -13,7 +13,7 @@ app.use(cors());
 app.use(express.json());
 
 // ============================================
-// 🤖 إعداد Google Gemini (مجاني)
+// 🤖 إعداد Google Gemini
 // ============================================
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -27,7 +27,8 @@ async function getAIResponse(userMessage) {
         console.log('🧠 جاري الاتصال بـ Gemini...');
         console.log('📩 الرسالة:', userMessage);
         
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        // استخدام النموذج الصحيح - gemini-pro
+        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
         
         const prompt = `أنت مساعد رسمي لشركة سوداني للاتصالات في السودان.
         
@@ -49,7 +50,22 @@ async function getAIResponse(userMessage) {
 
     } catch (error) {
         console.error('❌ خطأ في Gemini:', error.message);
-        return `عذراً يا حبيبي، واجهتنا مشكلة.\n\n📞 تقدر تتواصل مع خدمة عملاء سوداني على **120**\n🔗 أو تزور ماي سوداني: https://my.sudani.sd`;
+        
+        // محاولة استخدام نموذج بديل
+        try {
+            console.log('🔄 محاولة استخدام نموذج بديل...');
+            const model = genAI.getGenerativeModel({ model: "gemini-1.0-pro" });
+            
+            const prompt = `أنت مساعد شركة سوداني. تحدث باللهجة السودانية. السؤال: ${userMessage}`;
+            const result = await model.generateContent(prompt);
+            const response = result.response.text();
+            
+            console.log('✅ تم استلام الرد من Gemini (نموذج بديل)');
+            return response;
+        } catch (secondError) {
+            console.error('❌ فشل النموذج البديل أيضاً:', secondError.message);
+            return `عذراً يا حبيبي، واجهتنا مشكلة في الاتصال بالذكاء الاصطناعي.\n\n📞 تقدر تتواصل مع خدمة عملاء سوداني على **120**\n🔗 أو تزور ماي سوداني: https://my.sudani.sd\n\nآسف على الإزعاج!`;
+        }
     }
 }
 
@@ -301,7 +317,7 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log('✅ السيرفر يعمل على المنفذ: ' + PORT);
     console.log('🌐 http://localhost:' + PORT);
     console.log('=================================');
-    console.log('🧠 النموذج: Gemini 1.5 Flash (مجاني)');
+    console.log('🧠 النموذج: gemini-pro');
     console.log('📱 جميع الأسئلة عبر الذكاء الاصطناعي');
     console.log('=================================');
 });
