@@ -1,7 +1,16 @@
-const app = require('./src/app');
+const express = require('express');
+const cors = require('cors');
+const dotenv = require('dotenv');
 const path = require('path');
 
+dotenv.config();
+
+const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Middleware
+app.use(cors());
+app.use(express.json());
 
 // ============================================
 // 🎨 واجهة الويب المدمجة (Web Interface)
@@ -48,7 +57,6 @@ app.get('/', (req, res) => {
             position: relative;
         }
         
-        /* Header */
         .chat-header {
             background: linear-gradient(135deg, #1A2B4A, #2A3F66);
             padding: 18px 24px;
@@ -117,7 +125,6 @@ app.get('/', (req, res) => {
             font-weight: 600;
         }
         
-        /* Status Bar */
         .status-bar {
             padding: 8px 24px;
             background: linear-gradient(90deg, #e8f5e9, #c8e6c9);
@@ -129,7 +136,6 @@ app.get('/', (req, res) => {
             font-weight: 500;
         }
         
-        /* Messages Area */
         .messages-area {
             flex: 1;
             padding: 20px 18px;
@@ -221,7 +227,6 @@ app.get('/', (req, res) => {
             text-align: right;
         }
         
-        /* Typing Indicator */
         .typing-indicator {
             display: none;
             padding: 12px 20px;
@@ -260,7 +265,6 @@ app.get('/', (req, res) => {
             30% { transform: translateY(-8px); background: #1A2B4A; }
         }
         
-        /* Quick Actions */
         .quick-actions {
             padding: 10px 18px;
             background: #f8f9fa;
@@ -297,7 +301,6 @@ app.get('/', (req, res) => {
             transform: translateY(0);
         }
         
-        /* Input Area */
         .input-area {
             padding: 14px 18px;
             background: white;
@@ -367,7 +370,6 @@ app.get('/', (req, res) => {
             transform: none;
         }
         
-        /* Loading overlay */
         .loading-overlay {
             display: none;
             position: absolute;
@@ -409,7 +411,6 @@ app.get('/', (req, res) => {
             font-weight: 600;
         }
         
-        /* Responsive */
         @media (max-width: 500px) {
             body {
                 padding: 0;
@@ -427,13 +428,11 @@ app.get('/', (req, res) => {
 </head>
 <body>
     <div class="chat-container">
-        <!-- Loading Overlay -->
         <div class="loading-overlay" id="loadingOverlay">
             <div class="spinner"></div>
             <p>⏳ جاري التحميل...</p>
         </div>
         
-        <!-- Header -->
         <div class="chat-header">
             <div class="avatar">ب</div>
             <div class="info">
@@ -446,14 +445,11 @@ app.get('/', (req, res) => {
             </div>
         </div>
         
-        <!-- Status -->
         <div class="status-bar">
-            ⚡ مساعدك الذكي لخدمات سوداني | ${new Date().toLocaleDateString('ar-SD')}
+            ⚡ مساعدك الذكي لخدمات سوداني
         </div>
         
-        <!-- Messages -->
         <div class="messages-area" id="messagesArea">
-            <!-- رسالة ترحيب -->
             <div class="message bot">
                 <div class="bubble">
                     👋 أهلاً وسهلاً! أنا <strong>سوداني بوت</strong>، مساعدك الذكي.<br><br>
@@ -468,7 +464,6 @@ app.get('/', (req, res) => {
             </div>
         </div>
         
-        <!-- Quick Actions -->
         <div class="quick-actions">
             <button onclick="sendQuickMessage('عايز باقة نت')">📱 باقة نت</button>
             <button onclick="sendQuickMessage('رصيدي خلص')">💰 الرصيد</button>
@@ -477,7 +472,6 @@ app.get('/', (req, res) => {
             <button onclick="sendQuickMessage('عايز أعرف رصيدي')">📊 استعلام</button>
         </div>
         
-        <!-- Input -->
         <div class="input-area">
             <input 
                 type="text" 
@@ -491,11 +485,7 @@ app.get('/', (req, res) => {
     </div>
 
     <script>
-        // ============================================
-        // 🔗 API URL - يتكيف تلقائياً مع البيئة
-        // ============================================
         const API_URL = window.location.origin;
-        
         const messagesArea = document.getElementById('messagesArea');
         const messageInput = document.getElementById('messageInput');
         const sendBtn = document.getElementById('sendBtn');
@@ -503,21 +493,11 @@ app.get('/', (req, res) => {
         
         let isProcessing = false;
         
-        // ============================================
-        // 📝 وظائف المساعد
-        // ============================================
-        
         function showTyping() {
             const typingDiv = document.createElement('div');
             typingDiv.className = 'message bot';
             typingDiv.id = 'typingIndicator';
-            typingDiv.innerHTML = \`
-                <div class="typing-indicator active">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                </div>
-            \`;
+            typingDiv.innerHTML = '<div class="typing-indicator active"><span></span><span></span><span></span></div>';
             messagesArea.appendChild(typingDiv);
             messagesArea.scrollTop = messagesArea.scrollHeight;
         }
@@ -529,7 +509,7 @@ app.get('/', (req, res) => {
         
         function addMessage(text, isUser) {
             const messageDiv = document.createElement('div');
-            messageDiv.className = \`message \${isUser ? 'user' : 'bot'}\`;
+            messageDiv.className = 'message ' + (isUser ? 'user' : 'bot');
             
             const now = new Date();
             const time = now.toLocaleTimeString('ar-SD', { 
@@ -537,23 +517,14 @@ app.get('/', (req, res) => {
                 minute: '2-digit' 
             });
             
-            const formattedText = text.replace(
-                /\\*(\\d+#)/g, 
-                '<a href="tel:$1" style="color: #1A2B4A; font-weight: bold;">*$1</a>'
-            );
+            const formattedText = text.replace(/\*(\\d+#)/g, '<a href="tel:$1" style="color: #1A2B4A; font-weight: bold;">*$1</a>');
             
-            messageDiv.innerHTML = \`
-                <div class="bubble">\${formattedText}</div>
-                <span class="time">\${time}</span>
-            \`;
+            messageDiv.innerHTML = '<div class="bubble">' + formattedText + '</div><span class="time">' + time + '</span>';
             
             messagesArea.appendChild(messageDiv);
             messagesArea.scrollTop = messagesArea.scrollHeight;
         }
         
-        // ============================================
-        // 💬 إرسال رسالة
-        // ============================================
         async function sendMessage() {
             const message = messageInput.value.trim();
             if (!message || isProcessing) return;
@@ -568,7 +539,7 @@ app.get('/', (req, res) => {
             showTyping();
             
             try {
-                const response = await fetch(\`\${API_URL}/api/chat/message\`, {
+                const response = await fetch(API_URL + '/api/chat/message', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -587,7 +558,7 @@ app.get('/', (req, res) => {
                     addMessage(data.response, false);
                     
                     if (data.suggestions && data.suggestions.length > 0) {
-                        setTimeout(() => {
+                        setTimeout(function() {
                             const suggestionsText = '💡 اقتراحات: ' + data.suggestions.join(' • ');
                             addMessage(suggestionsText, false);
                         }, 500);
@@ -613,19 +584,12 @@ app.get('/', (req, res) => {
             sendMessage();
         }
         
-        setTimeout(() => {
+        setTimeout(function() {
             addMessage('💬 كيف أقدر أساعدك اليوم؟', false);
         }, 800);
         
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                messageInput.blur();
-            }
-        });
-        
         console.log('🤖 سوداني بوت يعمل بنجاح!');
         console.log('📍 API URL:', API_URL);
-        console.log('💬 مرحباً بك في المساعد الذكي لسوداني');
     </script>
 </body>
 </html>
@@ -643,26 +607,48 @@ app.get('/health', (req, res) => {
   });
 });
 
+// نقطة API للمحادثة
+app.post('/api/chat/message', (req, res) => {
+  const { message, userId } = req.body;
+  
+  // ردود مبدئية بدون OpenAI (للتجربة)
+  const responses = {
+    'عايز باقة نت': '🎯 يا هلا بك! عندنا باقات متنوعة:\n📱 اليومية: *555# (500 ميجا - 100 جنيه)\n📱 الأسبوعية: *567# (3 جيجا - 500 جنيه)\n📱 الشهرية: *789# (15 جيجا - 1500 جنيه)\n\n💡 أنصحك تشترك في باقة الشهرية لأنها أوفر!',
+    'رصيدي خلص': '💰 والله ما تقلق! عشان تشحن رصيدك:\n1️⃣ اطلب *123#\n2️⃣ اختر "شحن رصيد"\n3️⃣ أدخل رقم البطاقة\n\nأو استخدم سوداني كاش للشحن الفوري!',
+    'كيف أشحن؟': '💳 سهلة جداً! اتبع الخطوات:\n1️⃣ اطلب *123#\n2️⃣ اختر "شحن رصيد"\n3️⃣ أدخل رقم بطاقة الشحن\n4️⃣ اضغط تأكيد\n\n✅ خلال ثواني رصيدك يزيد!',
+    'سوداني كاش': '💵 خدمة سوداني كاش تقدم لك:\n• تحويل فلوس لأي رقم\n• سحب نقدي من الوكلاء\n• شراء رصيد\n• دفع الفواتير\n\n📱 اطلب *555# وابدأ!',
+    'عايز أعرف رصيدي': '📊 بكل بساطة! اطلب *444# من هاتفك، وستظهر لك رسالة برصيدك الحالي فوراً.'
+  };
+  
+  let response = responses[message];
+  
+  if (!response) {
+    // رد عام
+    const generalResponses = [
+      '🤔 والله ما فهمت سؤالك تماماً، لكن تقدر تسألني عن:\n• الباقات والنت\n• الرصيد والشحن\n• سوداني كاش\n\nأو اتصل على 123 للدعم المباشر.',
+      '😊 مرحباً! أنا هنا عشان أساعدك. اسألني عن أي خدمة من خدمات سوداني.',
+      '💬 كيف أقدر أساعدك اليوم؟ تقدر تسألني عن الباقات، الرصيد، أو سوداني كاش.'
+    ];
+    response = generalResponses[Math.floor(Math.random() * generalResponses.length)];
+  }
+  
+  res.json({
+    success: true,
+    response: response,
+    intent: { type: 'general', confidence: 0.8 },
+    timestamp: new Date().toISOString(),
+    suggestions: ['عايز باقة نت', 'رصيدي خلص', 'كيف أشحن؟', 'سوداني كاش']
+  });
+});
+
 // بدء السيرفر
 app.listen(PORT, () => {
   console.log('=================================');
   console.log('🚀 Sudani AI Assistant Server');
   console.log('=================================');
-  console.log(`✅ Server running on port: ${PORT}`);
-  console.log(`🌐 URL: http://localhost:${PORT}`);
-  console.log(`📊 Health Check: http://localhost:${PORT}/health`);
+  console.log('✅ Server running on port: ' + PORT);
+  console.log('🌐 URL: http://localhost:' + PORT);
   console.log('=================================');
   console.log('💡 Ready to serve Sudanese users!');
   console.log('=================================');
-});
-
-// معالجة إشارات الإيقاف
-process.on('SIGINT', () => {
-  console.log('\n👋 Shutting down server gracefully...');
-  process.exit(0);
-});
-
-process.on('uncaughtException', (err) => {
-  console.error('❌ Uncaught Exception:', err);
-  process.exit(1);
 });
