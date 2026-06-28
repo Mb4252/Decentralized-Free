@@ -13,63 +13,72 @@ app.use(cors());
 app.use(express.json());
 
 // ============================================
-// 🤖 إعداد DeepSeek (مجاني)
+// 🤖 إعداد Groq
 // ============================================
 
-const deepseek = new OpenAI({
-    apiKey: process.env.DEEPSEEK_API_KEY,
-    baseURL: 'https://api.deepseek.com',
+const groq = new OpenAI({
+    apiKey: process.env.GROQ_API_KEY,
+    baseURL: 'https://api.groq.com/openai/v1',
 });
 
 // ============================================
-// 🤖 دالة الرد - عبر DeepSeek
+// 🤖 دالة الرد - عبر Groq
 // ============================================
 
 async function getAIResponse(userMessage) {
     try {
-        console.log('🧠 جاري الاتصال بـ DeepSeek...');
+        console.log('🧠 جاري الاتصال بـ Groq...');
         console.log('📩 الرسالة:', userMessage);
-        
-        const completion = await deepseek.chat.completions.create({
-            model: 'deepseek-chat',
+
+        const completion = await groq.chat.completions.create({
+            model: "openai/gpt-oss-120b",
             messages: [
                 {
-                    role: 'system',
+                    role: "system",
                     content: `أنت مساعد رسمي لشركة سوداني للاتصالات في السودان.
-                    
-                    قواعد صارمة:
-                    1. أنت متخصص فقط في شركة سوداني
-                    2. لا ترد على أي سؤال عن شركات أخرى (زين، MTN، إلخ)
-                    3. إذا سألك عن شركة أخرى، قل: "آسف، أنا متخصص فقط في خدمات سوداني"
-                    4. استخدم معرفتك العامة عن سوداني للرد
-                    5. تحدث باللهجة السودانية، كن ودوداً ومحترماً
-                    6. إذا لم تعرف الإجابة، قل: "آسف يا حبيبي، ما عندي معلومات عن هذا، لكن تقدر تتصل بخدمة العملاء 120"
-                    
-                    ملاحظة: أنت تستخدم معرفتك الخاصة عن سوداني.`,
+
+قواعد صارمة:
+
+1- أنت متخصص فقط في شركة سوداني.
+
+2- لا تتحدث عن زين أو MTN أو أي شركة أخرى.
+
+3- إذا سألك المستخدم عن شركة أخرى قل:
+"آسف، أنا متخصص فقط في خدمات سوداني."
+
+4- أجب باللهجة السودانية.
+
+5- كن مختصراً وواضحاً.
+
+6- إذا لم تعرف الإجابة فقل:
+"آسف يا حبيبي، ما عندي معلومة مؤكدة، اتصل بخدمة العملاء 120."`
                 },
                 {
-                    role: 'user',
+                    role: "user",
                     content: userMessage
                 }
             ],
             temperature: 0.5,
-            max_tokens: 800,
+            max_tokens: 800
         });
 
         const response = completion.choices[0].message.content;
-        console.log('✅ تم استلام الرد من DeepSeek');
+        console.log("✅ تم استلام الرد من Groq");
         return response;
 
     } catch (error) {
-        console.error('❌ خطأ في DeepSeek:', error.message);
-        
-        // رد احتياطي في حالة فشل API
-        return `عذراً يا حبيبي، واجهتنا مشكلة تقنية.\n\n📞 تقدر تتواصل مع خدمة عملاء سوداني على **120**\n🔗 أو تزور ماي سوداني: https://my.sudani.sd\n\nآسف على الإزعاج!`;
+        console.error("❌ خطأ Groq:");
+        console.error(error);
+        return `عذراً يا حبيبي، حصلت مشكلة مؤقتة.
+
+📞 خدمة العملاء: 120
+
+حاول مرة أخرى بعد قليل.`;
     }
 }
 
 // ============================================
-// 🎨 واجهة الويب (نفس الكود السابق)
+// 🎨 واجهة الويب
 // ============================================
 
 app.get('/', (req, res) => {
@@ -127,7 +136,7 @@ app.get('/', (req, res) => {
             <div class="avatar">س</div>
             <div class="info">
                 <h3>🤖 سوداني بوت</h3>
-                <p><span class="dot"></span> متصل <span class="badge" style="background:#f7931e;color:#1A2B4A;padding:2px 10px;border-radius:12px;font-size:11px;">DeepSeek</span></p>
+                <p><span class="dot"></span> متصل <span class="badge" style="background:#f7931e;color:#1A2B4A;padding:2px 10px;border-radius:12px;font-size:11px;">Groq</span></p>
             </div>
         </div>
         <div class="status-bar">
@@ -300,7 +309,7 @@ app.post('/api/chat/message', async (req, res) => {
 app.get('/health', (req, res) => {
     res.json({ 
         status: 'healthy', 
-        service: 'Sudani Bot - DeepSeek',
+        service: 'Sudani Bot - Groq',
         version: '8.0'
     });
 });
@@ -311,12 +320,12 @@ app.get('/health', (req, res) => {
 
 app.listen(PORT, '0.0.0.0', () => {
     console.log('=================================');
-    console.log('🚀 سوداني بوت - DeepSeek');
+    console.log('🚀 سوداني بوت - Groq');
     console.log('=================================');
     console.log('✅ السيرفر يعمل على المنفذ: ' + PORT);
     console.log('🌐 http://localhost:' + PORT);
     console.log('=================================');
-    console.log('🧠 النموذج: deepseek-chat');
+    console.log('🧠 النموذج: openai/gpt-oss-120b');
     console.log('📱 جميع الأسئلة عبر الذكاء الاصطناعي');
     console.log('=================================');
 });
