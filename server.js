@@ -22,7 +22,7 @@ app.use(cors());
 app.use(express.json());
 
 // ============================================
-// 🎨 واجهة الويب المدمجة
+// 🎨 واجهة الويب المدمجة (مع التعديلات الجديدة)
 // ============================================
 
 app.get('/', (req, res) => {
@@ -136,7 +136,13 @@ app.get('/', (req, res) => {
             messagesArea.scrollTop = messagesArea.scrollHeight;
         }
 
+        // ============================================
+        // 💬 دالة sendMessage المحدثة (مع اختبار alert)
+        // ============================================
         async function sendMessage() {
+            // اختبار للتأكد من أن الدالة تعمل
+            alert("✅ sendMessage works!");
+
             const message = messageInput.value.trim();
             if (!message || isProcessing) return;
 
@@ -149,11 +155,22 @@ app.get('/', (req, res) => {
             showTyping();
 
             try {
+                // استخدام fetch محسن مع التحقق من الأخطاء
                 const response = await fetch(API_URL + '/api/chat/message', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: message, userId: 'web_user_' + Date.now() })
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message: message,
+                        userId: 'web_user_' + Date.now()
+                    })
                 });
+
+                // التحقق من نجاح الطلب
+                if (!response.ok) {
+                    throw new Error("HTTP " + response.status + ": " + response.statusText);
+                }
 
                 const data = await response.json();
                 hideTyping();
@@ -170,7 +187,8 @@ app.get('/', (req, res) => {
                 }
             } catch (error) {
                 hideTyping();
-                addMessage('❌ لا يمكن الاتصال بالسيرفر. تأكد من اتصالك بالإنترنت.', false);
+                // عرض رسالة خطأ مفصلة
+                addMessage('❌ لا يمكن الاتصال بالسيرفر: ' + error.message, false);
                 console.error('Error:', error);
             }
 
@@ -198,39 +216,59 @@ app.get('/', (req, res) => {
 });
 
 // ============================================
-// 🔗 نقطة API للمحادثة
+// 🔗 نقطة API للمحادثة (مع تحسين معالجة الأخطاء)
 // ============================================
 
 app.post('/api/chat/message', (req, res) => {
-  const { message } = req.body;
-  
-  // ردود نموذجية باللهجة السودانية
-  const responses = {
-    'عايز باقة نت': '🎯 يا هلا بك! عندنا باقات متنوعة:\n📱 اليومية: *555# (500 ميجا - 100 جنيه)\n📱 الأسبوعية: *567# (3 جيجا - 500 جنيه)\n📱 الشهرية: *789# (15 جيجا - 1500 جنيه)\n\n💡 أنصحك تشترك في باقة الشهرية لأنها أوفر!',
-    'رصيدي خلص': '💰 والله ما تقلق! عشان تشحن رصيدك:\n1️⃣ اطلب *123#\n2️⃣ اختر "شحن رصيد"\n3️⃣ أدخل رقم البطاقة\n\nأو استخدم سوداني كاش للشحن الفوري!',
-    'كيف أشحن؟': '💳 سهلة جداً! اتبع الخطوات:\n1️⃣ اطلب *123#\n2️⃣ اختر "شحن رصيد"\n3️⃣ أدخل رقم بطاقة الشحن\n4️⃣ اضغط تأكيد\n\n✅ خلال ثواني رصيدك يزيد!',
-    'سوداني كاش': '💵 خدمة سوداني كاش تقدم لك:\n• تحويل فلوس لأي رقم\n• سحب نقدي من الوكلاء\n• شراء رصيد\n• دفع الفواتير\n\n📱 اطلب *555# وابدأ!',
-    'عايز أعرف رصيدي': '📊 بكل بساطة! اطلب *444# من هاتفك، وستظهر لك رسالة برصيدك الحالي فوراً.'
-  };
-  
-  let response = responses[message];
-  
-  if (!response) {
-    const generalResponses = [
-      '🤔 والله ما فهمت سؤالك تماماً، لكن تقدر تسألني عن:\n• الباقات والنت\n• الرصيد والشحن\n• سوداني كاش\n\nأو اتصل على 123 للدعم المباشر.',
-      '😊 مرحباً! أنا هنا عشان أساعدك. اسألني عن أي خدمة من خدمات سوداني.',
-      '💬 كيف أقدر أساعدك اليوم؟ تقدر تسألني عن الباقات، الرصيد، أو سوداني كاش.'
-    ];
-    response = generalResponses[Math.floor(Math.random() * generalResponses.length)];
+  try {
+    const { message } = req.body;
+    
+    // التحقق من وجود الرسالة
+    if (!message) {
+      return res.status(400).json({
+        success: false,
+        response: '❌ الرجاء كتابة سؤال.',
+        error: 'Message is required'
+      });
+    }
+
+    console.log('📩 رسالة جديدة:', message);
+
+    // ردود نموذجية باللهجة السودانية
+    const responses = {
+      'عايز باقة نت': '🎯 يا هلا بك! عندنا باقات متنوعة:\n📱 اليومية: *555# (500 ميجا - 100 جنيه)\n📱 الأسبوعية: *567# (3 جيجا - 500 جنيه)\n📱 الشهرية: *789# (15 جيجا - 1500 جنيه)\n\n💡 أنصحك تشترك في باقة الشهرية لأنها أوفر!',
+      'رصيدي خلص': '💰 والله ما تقلق! عشان تشحن رصيدك:\n1️⃣ اطلب *123#\n2️⃣ اختر "شحن رصيد"\n3️⃣ أدخل رقم البطاقة\n\nأو استخدم سوداني كاش للشحن الفوري!',
+      'كيف أشحن؟': '💳 سهلة جداً! اتبع الخطوات:\n1️⃣ اطلب *123#\n2️⃣ اختر "شحن رصيد"\n3️⃣ أدخل رقم بطاقة الشحن\n4️⃣ اضغط تأكيد\n\n✅ خلال ثواني رصيدك يزيد!',
+      'سوداني كاش': '💵 خدمة سوداني كاش تقدم لك:\n• تحويل فلوس لأي رقم\n• سحب نقدي من الوكلاء\n• شراء رصيد\n• دفع الفواتير\n\n📱 اطلب *555# وابدأ!',
+      'عايز أعرف رصيدي': '📊 بكل بساطة! اطلب *444# من هاتفك، وستظهر لك رسالة برصيدك الحالي فوراً.'
+    };
+    
+    let response = responses[message];
+    
+    if (!response) {
+      const generalResponses = [
+        '🤔 والله ما فهمت سؤالك تماماً، لكن تقدر تسألني عن:\n• الباقات والنت\n• الرصيد والشحن\n• سوداني كاش\n\nأو اتصل على 123 للدعم المباشر.',
+        '😊 مرحباً! أنا هنا عشان أساعدك. اسألني عن أي خدمة من خدمات سوداني.',
+        '💬 كيف أقدر أساعدك اليوم؟ تقدر تسألني عن الباقات، الرصيد، أو سوداني كاش.'
+      ];
+      response = generalResponses[Math.floor(Math.random() * generalResponses.length)];
+    }
+    
+    res.json({
+      success: true,
+      response: response,
+      intent: { type: 'general', confidence: 0.8 },
+      timestamp: new Date().toISOString(),
+      suggestions: ['عايز باقة نت', 'رصيدي خلص', 'كيف أشحن؟', 'سوداني كاش']
+    });
+  } catch (error) {
+    console.error('❌ خطأ في API:', error);
+    res.status(500).json({
+      success: false,
+      response: '❌ عذراً، حدث خطأ داخلي في السيرفر.',
+      error: error.message
+    });
   }
-  
-  res.json({
-    success: true,
-    response: response,
-    intent: { type: 'general', confidence: 0.8 },
-    timestamp: new Date().toISOString(),
-    suggestions: ['عايز باقة نت', 'رصيدي خلص', 'كيف أشحن؟', 'سوداني كاش']
-  });
 });
 
 // ============================================
@@ -247,7 +285,10 @@ app.get('/health', (req, res) => {
   });
 });
 
-// بدء السيرفر - استخدم 0.0.0.0 لـ Render
+// ============================================
+// 🚀 بدء السيرفر
+// ============================================
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log('=================================');
   console.log('🚀 Sudani AI Assistant Server');
