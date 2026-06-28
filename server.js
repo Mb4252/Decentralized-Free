@@ -18,7 +18,6 @@ const PORT = process.env.PORT || 3000;
 // 📝 إعداد التسجيل (Logging)
 // ============================================
 
-// التأكد من وجود مجلد logs
 const logsDir = path.join(__dirname, 'logs');
 if (!fs.existsSync(logsDir)) {
     fs.mkdirSync(logsDir, { recursive: true });
@@ -49,20 +48,16 @@ const logger = winston.createLogger({
 // ============================================
 
 app.use(helmet({
-    contentSecurityPolicy: false, // للسماح بـ tel: links
+    contentSecurityPolicy: false,
 }));
 app.use(compression());
 app.use(cors());
-
-// ✅ تقديم الملفات الثابتة من مجلد public
 app.use(express.static(path.join(__dirname, 'public')));
-
 app.use(express.json({ limit: '10mb' }));
 
-// حماية من السبام
 const limiter = rateLimit({
-    windowMs: 60 * 1000, // 1 دقيقة
-    max: 10, // 10 رسائل
+    windowMs: 60 * 1000,
+    max: 15,
     message: '❌ تجاوزت الحد الأقصى للرسائل. انتظر 30 ثانية.',
     handler: (req, res) => {
         logger.warn(`🚫 سبام من ${req.ip}`);
@@ -75,20 +70,17 @@ app.use('/api/', limiter);
 // 💾 الذاكرة والتخزين المؤقت
 // ============================================
 
-const conversations = new Map(); // حفظ المحادثات
-const cache = new Map(); // التخزين المؤقت
-const userAnalytics = new Map(); // تحليل المستخدمين
-const suggestions = new Map(); // الاقتراحات
+const conversations = new Map();
+const cache = new Map();
+const userAnalytics = new Map();
 
 // ============================================
 // 📚 تحميل قاعدة المعرفة
 // ============================================
 
-// التأكد من وجود مجلد knowledge
 const knowledgeDir = path.join(__dirname, 'knowledge');
 if (!fs.existsSync(knowledgeDir)) {
     fs.mkdirSync(knowledgeDir, { recursive: true });
-    logger.warn('⚠️ مجلد knowledge غير موجود، تم إنشاؤه');
 }
 
 function loadKnowledge() {
@@ -116,16 +108,17 @@ function loadKnowledge() {
 const knowledgeBase = loadKnowledge();
 
 // ============================================
-// 🧠 اكتشاف نية المستخدم
+// 🧠 اكتشاف نية المستخدم (محسّن)
 // ============================================
 
 function detectIntent(message) {
-    const msg = message.toLowerCase();
+    const msg = message.toLowerCase().trim();
     
-    // الأخطاء الإملائية
+    // الأخطاء الإملائية الشائعة
     const corrections = {
         'يونكص': 'يونكس',
         'يونك': 'يونكس',
+        'يونيكس': 'يونكس',
         'رصيد': 'balance',
         'انترنت': 'internet',
         'نت': 'internet',
@@ -133,7 +126,15 @@ function detectIntent(message) {
         'صاح': 'sah',
         'كاش': 'sah',
         'ريح': 'packages',
-        'باقة': 'packages'
+        'باقة': 'packages',
+        'ابي': 'packages',
+        'عايز': 'packages',
+        'خدمة العملاء': 'contact',
+        'دعم': 'contact',
+        'شكوى': 'contact',
+        'فرع': 'branches',
+        'مركز': 'branches',
+        'موقع': 'branches'
     };
     
     for (let [key, value] of Object.entries(corrections)) {
@@ -151,6 +152,7 @@ function detectIntent(message) {
     if (msg.includes('فرع') || msg.includes('مركز') || msg.includes('موقع')) return 'branches';
     if (msg.includes('خدمة العملاء') || msg.includes('رقم') || msg.includes('اتصال')) return 'contact';
     if (msg.includes('4g') || msg.includes('lte')) return 'lte';
+    if (msg.includes('ابي') || msg.includes('عايز') || msg.includes('اريد')) return 'request';
     
     return null;
 }
@@ -183,7 +185,46 @@ function getHistory(userId) {
 }
 
 // ============================================
-// 🎯 الردود السريعة (بدون AI)
+// 🔍 البحث المتقدم في قاعدة المعرفة
+// ============================================
+
+function searchKnowledge(query) {
+    const results = [];
+    const msg = query.toLowerCase();
+    
+    // تقسيم السؤال إلى كلمات مفتاحية
+    const keywords = msg.split(/\s+/).filter(word => word.length > 2);
+    
+    for (const [key, data] of Object.entries(knowledgeBase)) {
+        try {
+            const jsonStr = JSON.stringify(data).toLowerCase();
+            // البحث عن أي كلمة مفتاحية
+            let found = false;
+            for (const keyword of keywords) {
+                if (jsonStr.includes(keyword)) {
+                    found = true;
+                    break;
+                }
+            }
+            // إذا كانت الكلمات قليلة، ابحث عن العبارة كاملة
+            if (!found && keywords.length <= 2) {
+                if (jsonStr.includes(msg)) {
+                    found = true;
+                }
+            }
+            if (found) {
+                results.push({ key, data });
+            }
+        } catch (err) {
+            // تجاهل الأخطاء
+        }
+    }
+    
+    return results;
+}
+
+// ============================================
+// 🎯 الردود السريعة (للكلمات المفتاحية فقط)
 // ============================================
 
 function getQuickResponse(intent) {
@@ -206,7 +247,6 @@ function getQuickResponse(intent) {
 ${unixData.features.map(f => `• ${f}`).join('\n')}`;
             break;
         case 'internet':
-            const internetData = knowledgeBase.internet || {};
             response = `📶 باقات الإنترنت:
 • يومية: <a href="tel:*4#">*4#</a>
 • شهرية: 
@@ -263,33 +303,12 @@ ${Object.entries(branches).map(([city, address]) => `• ${city}: ${address}`).j
 }
 
 // ============================================
-// 🔍 البحث في قاعدة المعرفة
-// ============================================
-
-function searchKnowledge(query) {
-    const results = [];
-    const msg = query.toLowerCase();
-    
-    for (const [key, data] of Object.entries(knowledgeBase)) {
-        try {
-            const jsonStr = JSON.stringify(data).toLowerCase();
-            if (jsonStr.includes(msg)) {
-                results.push({ key, data });
-            }
-        } catch (err) {
-            // تجاهل الأخطاء
-        }
-    }
-    
-    return results;
-}
-
-// ============================================
-// 🤖 دالة الرد الرئيسية (مع RAG + Cache + Memory)
+// 🤖 دالة الرد الرئيسية - التدفق الجديد
 // ============================================
 
 async function getAIResponse(userMessage, userId) {
     const startTime = Date.now();
+    const msg = userMessage.trim();
     
     // 1. تحليل المستخدم
     const analytics = getUserAnalytics(userId);
@@ -297,8 +316,11 @@ async function getAIResponse(userMessage, userId) {
     analytics.lastVisit = new Date();
     
     // 2. اكتشاف النية
-    const intent = detectIntent(userMessage);
-    if (intent) {
+    const intent = detectIntent(msg);
+    
+    // 3. إذا كانت كلمة واحدة أو قصيرة → رد سريع
+    const words = msg.split(/\s+/);
+    if (words.length <= 3 && intent) {
         const quickResponse = getQuickResponse(intent);
         if (quickResponse) {
             logger.info(`⚡ رد سريع لـ ${userId}: ${intent}`);
@@ -307,19 +329,20 @@ async function getAIResponse(userMessage, userId) {
         }
     }
     
-    // 3. البحث في قاعدة المعرفة
-    const knowledgeResults = searchKnowledge(userMessage);
+    // 4. البحث في قاعدة المعرفة
+    const knowledgeResults = searchKnowledge(msg);
     
-    // 4. التحقق من التخزين المؤقت
-    const cacheKey = `ai_${userId}_${userMessage}`;
-    if (cache.has(cacheKey)) {
-        logger.info(`💾 من التخزين المؤقت لـ ${userId}`);
-        return cache.get(cacheKey);
+    // 5. التحقق من التخزين المؤقت (للسؤوال الطويلة فقط)
+    if (words.length > 3) {
+        const cacheKey = `ai_${userId}_${msg}`;
+        if (cache.has(cacheKey)) {
+            logger.info(`💾 من التخزين المؤقت لـ ${userId}`);
+            return cache.get(cacheKey);
+        }
     }
     
-    // 5. استخدام الـ API
+    // 6. استخدام الـ API مع السياق الكامل
     try {
-        // تحضير السياق من المحادثة السابقة
         const history = getHistory(userId);
         const lastMessages = history.slice(-10);
         
@@ -329,6 +352,8 @@ async function getAIResponse(userMessage, userId) {
             knowledgeContext = knowledgeResults.map(r => 
                 `📚 معلومات عن ${r.key}:\n${JSON.stringify(r.data, null, 2)}`
             ).join('\n\n');
+        } else {
+            knowledgeContext = 'لا توجد معلومات محددة في قاعدة المعرفة عن هذا السؤال.';
         }
         
         // تحضير تحليل المستخدم
@@ -337,8 +362,16 @@ async function getAIResponse(userMessage, userId) {
             userContext = `آخر خدمة استخدمها المستخدم: ${analytics.lastService}`;
         }
         
+        // تحضير النية المكتشفة
+        let intentContext = '';
+        if (intent) {
+            intentContext = `نية المستخدم: ${intent}`;
+        }
+        
         console.log('🧠 جاري الاتصال بـ Groq...');
-        console.log('📩 الرسالة:', userMessage);
+        console.log('📩 الرسالة:', msg);
+        console.log('🔍 النية:', intent || 'غير محددة');
+        console.log('📚 نتائج المعرفة:', knowledgeResults.length);
         
         const groq = new OpenAI({
             apiKey: process.env.GROQ_API_KEY,
@@ -353,16 +386,18 @@ async function getAIResponse(userMessage, userId) {
                     content: `أنت المساعد الرسمي لشركة سوداني للاتصالات.
 
 القواعد:
-- أجب باختصار وباللهجة السودانية.
-- استخدم البيانات المرفقة فقط للإجابة.
-- لا تخترع أي معلومة.
-- إذا لم تعرف الإجابة اطلب من المستخدم الاتصال بـ 120.
-- استخدم <a href="tel:الكود">الكود</a> للأكواد.
-- استخدم <a href="الرابط" target="_blank">الرابط</a> للروابط.
+1. استخدم قاعدة المعرفة المرفقة أولاً.
+2. إذا لم تجد الإجابة فيها فاستخدم معرفتك العامة عن خدمات سوداني.
+3. إذا لم تكن متأكداً من الإجابة فاذكر أنها غير مؤكدة واطلب من المستخدم الاتصال بخدمة العملاء 120.
+4. لا تخترع أكواد أو أسعار غير مؤكدة.
+5. أجب باللهجة السودانية باختصار ووضوح.
+6. استخدم <a href="tel:الكود">الكود</a> للأكواد.
+7. استخدم <a href="الرابط" target="_blank">الرابط</a> للروابط.
 
-معلومات إضافية:
-${knowledgeContext}
-${userContext}`
+السياق:
+${intentContext}
+${userContext}
+${knowledgeContext}`
                 },
                 ...lastMessages.map(msg => ({
                     role: msg.role,
@@ -370,11 +405,11 @@ ${userContext}`
                 })),
                 {
                     role: "user",
-                    content: userMessage
+                    content: msg
                 }
             ],
             temperature: 0.5,
-            max_tokens: 500,
+            max_tokens: 600,
             stream: true
         });
         
@@ -388,14 +423,16 @@ ${userContext}`
         console.log("✅ تم استلام الرد من Groq");
         
         // حفظ المحادثة
-        history.push({ role: 'user', content: userMessage });
+        history.push({ role: 'user', content: msg });
         history.push({ role: 'assistant', content: fullResponse });
         conversations.set(userId, history);
         
-        // حفظ في التخزين المؤقت
-        cache.set(cacheKey, fullResponse);
+        // حفظ في التخزين المؤقت (للسؤوال الطويلة فقط)
+        if (words.length > 3) {
+            const cacheKey = `ai_${userId}_${msg}`;
+            cache.set(cacheKey, fullResponse);
+        }
         
-        // تسجيل الوقت
         const responseTime = Date.now() - startTime;
         logger.info(`📊 ${userId}: ${responseTime}ms, ${fullResponse.length} حروف`);
         
@@ -404,8 +441,8 @@ ${userContext}`
     } catch (error) {
         logger.error(`❌ خطأ لـ ${userId}:`, error);
         
-        // 6. النظام المحلي الاحتياطي
-        const fallbackResponse = getFallbackResponse(userMessage);
+        // 7. النظام المحلي الاحتياطي
+        const fallbackResponse = getFallbackResponse(msg);
         if (fallbackResponse) {
             return fallbackResponse;
         }
@@ -457,20 +494,18 @@ function getFallbackResponse(message) {
 // 🎨 واجهة الويب
 // ============================================
 
-// ✅ المسار الرئيسي - يعرض ملف index.html من مجلد public
 app.get('/', (req, res) => {
     const indexPath = path.join(__dirname, 'public', 'index.html');
     if (fs.existsSync(indexPath)) {
         res.sendFile(indexPath);
     } else {
-        // إذا لم يوجد الملف، نعرض واجهة مدمجة
         res.send(`
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>سودان بوت v10</title>
+    <title>سودان بوت v11</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #0a1628, #1A2B4A); height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; }
@@ -514,7 +549,7 @@ app.get('/', (req, res) => {
         .bubble a:hover { color: #d4831a; }
         .bubble a[href^="tel:"] { color: #4caf50; }
         .bubble a[href^="tel:"]:hover { color: #388e3c; }
-        .badge-v10 { background: #f7931e; color: #1A2B4A; padding: 2px 10px; border-radius: 12px; font-size: 10px; }
+        .badge-v11 { background: #f7931e; color: #1A2B4A; padding: 2px 10px; border-radius: 12px; font-size: 10px; }
     </style>
 </head>
 <body>
@@ -522,17 +557,17 @@ app.get('/', (req, res) => {
         <div class="chat-header">
             <div class="avatar">س</div>
             <div class="info">
-                <h3>🤖 سودان بوت <span class="badge-v10">v10</span></h3>
+                <h3>🤖 سودان بوت <span class="badge-v11">v11</span></h3>
                 <p><span class="dot"></span> متصل <span class="badge" style="background:#f7931e;color:#1A2B4A;padding:2px 10px;border-radius:12px;font-size:11px;">احترافي</span></p>
             </div>
         </div>
         <div class="status-bar">
-            <span class="mode">🧠 ذكاء اصطناعي + RAG</span>
+            <span class="mode">🧠 ذكاء اصطناعي + RAG محسّن</span>
             المساعد الذكي لشركة سوداني
         </div>
         <div class="messages-area" id="messagesArea">
             <div class="message bot">
-                <div class="bubble">👋 أهلاً وسهلاً بك في <strong>سودان بوت v10</strong>!
+                <div class="bubble">👋 أهلاً وسهلاً بك في <strong>سودان بوت v11</strong>!
 
 🤖 أنا المساعد الذكي لشركة <strong>سوداني للاتصالات</strong>.
 
@@ -650,7 +685,7 @@ app.get('/', (req, res) => {
                     }
                 });
             }
-            console.log('✅ سودان بوت v10 جاهز!');
+            console.log('✅ سودان بوت v11 جاهز!');
             console.log('🆔 معرف المستخدم:', userId);
         });
     </script>
@@ -705,8 +740,8 @@ app.get('/api/stats', (req, res) => {
 app.get('/api/health', (req, res) => {
     res.json({ 
         status: 'healthy', 
-        service: 'Sudan Bot v10',
-        version: '10.0.0'
+        service: 'Sudan Bot v11',
+        version: '11.0.0'
     });
 });
 
@@ -716,23 +751,24 @@ app.get('/api/health', (req, res) => {
 
 app.listen(PORT, '0.0.0.0', () => {
     console.log('=================================');
-    console.log('🚀 سودان بوت - الإصدار 10');
+    console.log('🚀 سودان بوت - الإصدار 11');
     console.log('=================================');
     console.log('✅ السيرفر يعمل على المنفذ: ' + PORT);
     console.log('🌐 http://localhost:' + PORT);
     console.log('=================================');
     console.log('🧠 الميزات النشطة:');
+    console.log('   • نظام RAG محسّن');
+    console.log('   • اكتشاف النية الذكي');
+    console.log('   • ردود سريعة للكلمات المفتاحية');
+    console.log('   • استخدام معرفة Groq العامة');
     console.log('   • حفظ المحادثات (Memory)');
-    console.log('   • نظام RAG (قاعدة معرفة)');
     console.log('   • تخزين مؤقت (Cache)');
-    console.log('   • اكتشاف النية');
     console.log('   • حماية من السبام');
     console.log('   • تسجيل الأخطاء');
     console.log('   • تحليل المستخدمين');
     console.log('=================================');
     console.log(`📁 مجلد المعرفة: ${knowledgeDir}`);
     console.log(`📁 مجلد السجلات: ${logsDir}`);
-    console.log(`📁 مجلد الملفات الثابتة: ${path.join(__dirname, 'public')}`);
     console.log('=================================');
 });
 
