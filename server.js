@@ -12,12 +12,122 @@ app.set('trust proxy', 1);
 app.use(cors());
 app.use(express.json());
 
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
+// ============================================
+// 🤖 إعداد DeepSeek (بدلاً من OpenAI)
+// ============================================
+
+// استخدام نفس مكتبة OpenAI ولكن مع تغيير الإعدادات
+const deepseek = new OpenAI({
+    apiKey: process.env.DEEPSEEK_API_KEY, // استخدم مفتاح DeepSeek
+    baseURL: 'https://api.deepseek.com',   // رابط DeepSeek API
 });
 
 // ============================================
-// ✅ واجهة مبسطة مع أزرار تعمل 100%
+// 📋 قاعدة ردود بديلة (في حالة فشل API)
+// ============================================
+
+function getLocalResponse(message) {
+    const msg = message.toLowerCase();
+    
+    if (msg.includes('باقة') || msg.includes('نت') || msg.includes('إنترنت')) {
+        return `📱 **باقات سوداني للإنترنت:**\n\n` +
+               `📶 **يومية:**\n` +
+               `• 500 ميجا: *555# (100 ج)\n` +
+               `• 1 جيجا: *556# (200 ج)\n\n` +
+               `📶 **أسبوعية:**\n` +
+               `• 3 جيجا: *567# (500 ج)\n` +
+               `• 5 جيجا: *568# (800 ج)\n\n` +
+               `📶 **شهرية:**\n` +
+               `• 15 جيجا: *789# (1500 ج)\n` +
+               `• 30 جيجا: *790# (2500 ج)\n\n` +
+               `💬 أخبرني أي باقة تناسبك.`;
+    }
+    
+    if (msg.includes('رصيد') || msg.includes('شحن')) {
+        return `💰 **خدمات الرصيد في سوداني:**\n\n` +
+               `💳 **شحن الرصيد:** *123#\n` +
+               `📊 **معرفة الرصيد:** *444#\n` +
+               `🔄 **تجديد تلقائي:** *777#\n\n` +
+               `💡 استخدم *444# أولاً عشان تعرف رصيدك.`;
+    }
+    
+    if (msg.includes('كاش') || msg.includes('تحويل')) {
+        return `💵 **سوداني كاش:**\n\n` +
+               `• تحويل فلوس: *555#\n` +
+               `• سحب نقدي من الوكلاء\n` +
+               `• شراء رصيد\n` +
+               `• دفع الفواتير\n\n` +
+               `🔐 لا تشارك رقمك السري مع أحد.`;
+    }
+    
+    if (msg.includes('عرض') || msg.includes('عروض')) {
+        return `🎁 **عروض سوداني:**\n\n` +
+               `🔥 10 جيجا: 1000 جنيه (شهرياً)\n` +
+               `🌙 عرض الليالي: 200 جنيه (5 جيجا)\n` +
+               `📱 تواصل اجتماعي: 300 جنيه (أسبوعياً)\n\n` +
+               `📞 اتصل 123 للتأكد من أحدث العروض.`;
+    }
+    
+    return `🤔 آسف يا حبيبي، ما فهمت سؤالك.\n\n` +
+           `📱 **اسألني عن:**\n` +
+           `• باقات الإنترنت\n` +
+           `• الرصيد والشحن\n` +
+           `• سوداني كاش\n` +
+           `• العروض\n\n` +
+           `📞 أو اتصل 123.`;
+}
+
+// ============================================
+// 🤖 دالة الرد (DeepSeek + بديل محلي)
+// ============================================
+
+async function getAIResponse(userMessage) {
+    // إذا لم يوجد مفتاح DeepSeek
+    if (!process.env.DEEPSEEK_API_KEY) {
+        console.log('⚠️ DeepSeek غير مفعل، استخدام الردود المحلية');
+        return getLocalResponse(userMessage);
+    }
+    
+    try {
+        console.log('🧠 جاري الاتصال بـ DeepSeek...');
+        console.log('📩 الرسالة:', userMessage);
+        
+        const completion = await deepseek.chat.completions.create({
+            model: 'deepseek-chat', // أو deepseek-v4-flash
+            messages: [
+                {
+                    role: 'system',
+                    content: `أنت مساعد شركة سوداني للاتصالات في السودان.
+                    
+                    خدمات سوداني:
+                    1. باقات الإنترنت: يومية، أسبوعية، شهرية
+                    2. الرصيد والشحن: *123# للشحن، *444# للرصيد
+                    3. سوداني كاش: تحويل وسحب
+                    4. العروض: عروض خاصة
+                    
+                    تحدث باللهجة السودانية. كن ودوداً ومحترماً.`,
+                },
+                {
+                    role: 'user',
+                    content: userMessage
+                }
+            ],
+            temperature: 0.7,
+            max_tokens: 600,
+        });
+
+        const response = completion.choices[0].message.content;
+        console.log('✅ تم استلام الرد من DeepSeek');
+        return response;
+
+    } catch (error) {
+        console.error('❌ خطأ في DeepSeek، استخدام الرد المحلي:', error.message);
+        return getLocalResponse(userMessage);
+    }
+}
+
+// ============================================
+// 🎨 واجهة الويب (نفس الكود السابق)
 // ============================================
 
 app.get('/', (req, res) => {
@@ -27,7 +137,7 @@ app.get('/', (req, res) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>سوداني بوت</title>
+    <title>سوداني بوت - DeepSeek</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #0a1628, #1A2B4A); height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; }
@@ -40,12 +150,13 @@ app.get('/', (req, res) => {
         .chat-header .info p .dot { display: inline-block; width: 8px; height: 8px; background: #4caf50; border-radius: 50%; animation: pulse 2s infinite; }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
         .status-bar { padding: 8px 24px; background: linear-gradient(90deg, #f7931e, #f5a623); text-align: center; font-size: 13px; color: #1A2B4A; border-bottom: 1px solid #e88a1a; flex-shrink: 0; font-weight: 700; }
+        .status-bar .mode { background: #1A2B4A; color: #f7931e; padding: 2px 12px; border-radius: 12px; font-size: 11px; margin-left: 8px; }
         .messages-area { flex: 1; padding: 20px 18px; overflow-y: auto; background: #f0f2f5; display: flex; flex-direction: column; gap: 6px; }
         .message { display: flex; flex-direction: column; animation: slideIn 0.3s ease; max-width: 90%; }
         .message.user { align-self: flex-end; align-items: flex-end; }
         .message.bot { align-self: flex-start; align-items: flex-start; }
         @keyframes slideIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-        .message .bubble { padding: 12px 18px; border-radius: 18px; word-wrap: break-word; line-height: 1.7; font-size: 15px; max-width: 100%; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+        .message .bubble { padding: 12px 18px; border-radius: 18px; word-wrap: break-word; line-height: 1.7; font-size: 15px; max-width: 100%; box-shadow: 0 1px 3px rgba(0,0,0,0.08); white-space: pre-wrap; }
         .message.user .bubble { background: linear-gradient(135deg, #1A2B4A, #2A3F66); color: white; border-bottom-right-radius: 4px; }
         .message.bot .bubble { background: white; color: #1a1a2e; border-bottom-left-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border-right: 4px solid #f7931e; }
         .message .time { font-size: 10px; color: #999; margin: 4px 8px 0; opacity: 0.7; }
@@ -73,10 +184,13 @@ app.get('/', (req, res) => {
             <div class="avatar">س</div>
             <div class="info">
                 <h3>🤖 سوداني بوت</h3>
-                <p><span class="dot"></span> متصل الآن</p>
+                <p><span class="dot"></span> متصل <span class="badge" style="background:#f7931e;color:#1A2B4A;padding:2px 10px;border-radius:12px;font-size:11px;">DeepSeek</span></p>
             </div>
         </div>
-        <div class="status-bar">🧠 المساعد الذكي لشركة سوداني</div>
+        <div class="status-bar">
+            <span class="mode">🧠 AI</span>
+            المساعد الذكي لشركة سوداني
+        </div>
         <div class="messages-area" id="messagesArea">
             <div class="message bot">
                 <div class="bubble">👋 أهلاً وسهلاً! أنا سوداني بوت، اسألني عن أي خدمة من خدمات سوداني</div>
@@ -206,7 +320,7 @@ app.get('/', (req, res) => {
             setTimeout(() => {
                 fetch(API_URL + '/health')
                     .then(r => r.json())
-                    .then(data => console.log('✅ السيرفر يعمل:', data.status))
+                    .then(data => console.log('✅ السيرفر يعمل:', data))
                     .catch(() => console.warn('⚠️ لا يمكن الاتصال بالسيرفر'));
             }, 1000);
 
@@ -216,92 +330,6 @@ app.get('/', (req, res) => {
 </html>
   `);
 });
-
-// ============================================
-// 🤖 دالة الرد من OpenAI - النموذج المُصحح
-// ============================================
-
-async function getAIResponse(userMessage) {
-    try {
-        console.log('🧠 جاري الاتصال بـ OpenAI...');
-        console.log('📩 الرسالة:', userMessage);
-        
-        const completion = await openai.chat.completions.create({
-            model: 'gpt-3.5-turbo', // ✅ تم التغيير من gpt-4-turbo-preview إلى gpt-3.5-turbo
-            messages: [
-                {
-                    role: 'system',
-                    content: `أنت مساعد ذكي رسمي لشركة "سوداني" للاتصالات في السودان.
-
-                    🔴 مهم جداً: أنت متخصص فقط في شركة سوداني. لا تقدم معلومات عن أي شركة أخرى.
-
-                    هويتك:
-                    - اسمك "سوداني بوت"
-                    - تتحدث باللهجة السودانية
-                    - أنت ودود، صبور، ومحترم
-
-                    خدمات سوداني التي تعرفها:
-
-                    1. باقات الإنترنت:
-                    - باقة اليومية 500 ميجا: *555# (100 جنيه)
-                    - باقة اليومية 1 جيجا: *556# (200 جنيه)
-                    - باقة الأسبوعية 3 جيجا: *567# (500 جنيه)
-                    - باقة الأسبوعية 5 جيجا: *568# (800 جنيه)
-                    - باقة الشهرية 15 جيجا: *789# (1500 جنيه)
-                    - باقة الشهرية 30 جيجا: *790# (2500 جنيه)
-                    - باقة التواصل الاجتماعي: *666# (300 جنيه)
-
-                    2. خدمات الرصيد والشحن:
-                    - شحن الرصيد: *123#
-                    - معرفة الرصيد: *444#
-                    - تجديد الباقة تلقائياً: *777#
-
-                    3. سوداني كاش:
-                    - خدمة التحويل والسحب: *555#
-                    - تحويل فلوس لأي رقم
-                    - سحب نقدي من الوكلاء
-
-                    4. عروض سوداني:
-                    - عرض الـ 10 جيجا: 1000 جنيه (شهرياً)
-                    - عرض الليالي: 200 جنيه (5 جيجا - ليلاً)
-
-                    قواعد الرد:
-                    - إذا عرفت الإجابة: قدمها بوضوح مع الكود
-                    - إذا لم تعرف: قل "آسف، ما عندي معلومات مؤكدة عن هذا، لكن ممكن تتصل بخدمة العملاء على 123"
-                    - استخدم اللهجة السودانية في الرد`,
-                },
-                {
-                    role: 'user',
-                    content: userMessage
-                }
-            ],
-            temperature: 0.7,
-            max_tokens: 600,
-        });
-
-        const response = completion.choices[0].message.content;
-        console.log('✅ تم استلام الرد من OpenAI');
-        return response;
-
-    } catch (error) {
-        console.error('❌ خطأ في OpenAI:', error);
-        
-        // رسائل بديلة حسب نوع الخطأ
-        if (error.code === 'insufficient_quota') {
-            return 'آسف يا حبيبي، النظام يواجه ضغط حالياً. لكن تقدر تتصل بخدمة عملاء سوداني على 123 من أي خط، أو تزور أقرب فرع ليك.';
-        }
-        
-        if (error.status === 401) {
-            return 'عذراً، هناك مشكلة في مفتاح API. الرجاء التواصل مع الدعم الفني.';
-        }
-
-        if (error.code === 'model_not_found') {
-            return 'عذراً، النموذج غير متاح. جاري استخدام نظام بديل.';
-        }
-        
-        return 'عذراً، حصل خطأ تقني. لكن لا تقلق! تقدر تتواصل مع خدمة عملاء سوداني على 123 أو تزور موقع سوداني الرسمي.';
-    }
-}
 
 // ============================================
 // 🔗 نقاط API
@@ -323,7 +351,7 @@ app.post('/api/chat/message', async (req, res) => {
         res.json({ 
             success: true, 
             response: response,
-            source: 'ai'
+            source: 'deepseek'
         });
 
     } catch (error) {
@@ -338,8 +366,8 @@ app.post('/api/chat/message', async (req, res) => {
 app.get('/health', (req, res) => {
     res.json({ 
         status: 'healthy', 
-        ai: !!process.env.OPENAI_API_KEY,
-        model: 'gpt-3.5-turbo'
+        service: 'DeepSeek',
+        api_key: process.env.DEEPSEEK_API_KEY ? '✅ مفعل' : '❌ غير مفعل'
     });
 });
 
@@ -349,16 +377,13 @@ app.get('/health', (req, res) => {
 
 app.listen(PORT, '0.0.0.0', () => {
     console.log('=================================');
-    console.log('🚀 سوداني بوت - النسخة النهائية');
+    console.log('🚀 سوداني بوت - نسخة DeepSeek');
     console.log('=================================');
     console.log('✅ السيرفر يعمل على المنفذ: ' + PORT);
-    console.log('🌐 الرابط: http://localhost:' + PORT);
+    console.log('🌐 http://localhost:' + PORT);
     console.log('=================================');
-    console.log('🧠 الذكاء الاصطناعي: ' + (process.env.OPENAI_API_KEY ? '✅ مفعل' : '❌ غير مفعل'));
-    console.log('📦 النموذج المستخدم: gpt-3.5-turbo');
-    console.log('📱 مختص بشركة سوداني فقط');
-    console.log('=================================');
-    console.log('💡 جاهز لخدمة عملاء سوداني!');
+    console.log('🧠 DeepSeek: ' + (process.env.DEEPSEEK_API_KEY ? '✅ مفعل' : '❌ غير مفعل'));
+    console.log('📦 النموذج: deepseek-chat');
     console.log('=================================');
 });
 
