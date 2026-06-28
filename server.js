@@ -1,12 +1,13 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
-const path = require('path');
+const OpenAI = require('openai');
 const fs = require('fs');
+const path = require('path');
+const winston = require('winston');
+const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
 const compression = require('compression');
-const rateLimit = require('express-rate-limit');
-const { OpenAI } = require('openai');
 
 dotenv.config();
 
@@ -14,7 +15,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ============================================
-// 📝 نظام التسجيل (Logging)
+// 📝 إعداد التسجيل (Logging)
 // ============================================
 
 const logsDir = path.join(__dirname, 'logs');
@@ -22,7 +23,6 @@ if (!fs.existsSync(logsDir)) {
     fs.mkdirSync(logsDir, { recursive: true });
 }
 
-const winston = require('winston');
 const logger = winston.createLogger({
     level: 'info',
     format: winston.format.combine(
@@ -47,13 +47,14 @@ const logger = winston.createLogger({
 // 🛡️ الأمان والحماية
 // ============================================
 
-app.use(helmet({ contentSecurityPolicy: false }));
+app.use(helmet({
+    contentSecurityPolicy: false,
+}));
 app.use(compression());
 app.use(cors());
+app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json({ limit: '10mb' }));
-app.use(express.static(path.join(__dirname, 'src', 'public')));
 
-// حماية من السبام
 const limiter = rateLimit({
     windowMs: 60 * 1000,
     max: 15,
@@ -66,17 +67,24 @@ const limiter = rateLimit({
 app.use('/api/', limiter);
 
 // ============================================
+// 💾 الذاكرة والتخزين المؤقت
+// ============================================
+
+const conversations = new Map();
+const cache = new Map();
+const userAnalytics = new Map();
+
+// ============================================
 // 📚 تحميل قاعدة المعرفة
 // ============================================
 
-const knowledgeDir = path.join(__dirname, 'src', 'knowledge');
+const knowledgeDir = path.join(__dirname, 'knowledge');
 if (!fs.existsSync(knowledgeDir)) {
     fs.mkdirSync(knowledgeDir, { recursive: true });
 }
 
-let knowledgeBase = {};
-
 function loadKnowledge() {
+    const knowledge = {};
     try {
         const files = fs.readdirSync(knowledgeDir);
         files.forEach(file => {
@@ -84,7 +92,7 @@ function loadKnowledge() {
                 const key = path.basename(file, '.json');
                 try {
                     const data = fs.readFileSync(path.join(knowledgeDir, file), 'utf8');
-                    knowledgeBase[key] = JSON.parse(data);
+                    knowledge[key] = JSON.parse(data);
                     logger.info(`✅ تم تحميل: ${file}`);
                 } catch (err) {
                     logger.error(`❌ خطأ في تحميل ${file}:`, err.message);
@@ -94,362 +102,288 @@ function loadKnowledge() {
     } catch (err) {
         logger.error('❌ خطأ في قراءة مجلد knowledge:', err.message);
     }
-    return knowledgeBase;
+    return knowledge;
 }
 
-loadKnowledge();
+const knowledgeBase = loadKnowledge();
 
 // ============================================
-// 💾 نظام التخزين المؤقت (Cache)
-// ============================================
-
-const LRU = require('lru-cache');
-const cache = new LRU({
-    max: 1000,
-    ttl: 1000 * 60 * 30
-});
-
-// ============================================
-// 🧠 نظام Embeddings
-// ============================================
-
-class EmbeddingsService {
-    constructor() {
-        this.embeddings = new Map();
-        this.openai = new OpenAI({
-            apiKey: process.env.GROQ_API_KEY,
-            baseURL: 'https://api.groq.com/openai/v1',
-        });
-        this.isReady = false;
-    }
-
-    async createEmbedding(text) {
-        try {
-            const response = await this.openai.embeddings.create({
-                model: "text-embedding-3-small",
-                input: text,
-                encoding_format: "float"
-            });
-            return response.data[0].embedding;
-        } catch (error) {
-            logger.error('❌ خطأ في إنشاء Embedding:', error.message);
-            return null;
-        }
-    }
-
-    cosineSimilarity(a, b) {
-        if (!a || !b || a.length !== b.length) return 0;
-        let dotProduct = 0, normA = 0, normB = 0;
-        for (let i = 0; i < a.length; i++) {
-            dotProduct += a[i] * b[i];
-            normA += a[i] * a[i];
-            normB += b[i] * b[i];
-        }
-        if (normA === 0 || normB === 0) return 0;
-        return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
-    }
-
-    async buildEmbeddings() {
-        logger.info('🧠 جاري بناء Embeddings...');
-        for (const [key, data] of Object.entries(knowledgeBase)) {
-            const text = JSON.stringify(data);
-            const vector = await this.createEmbedding(text);
-            if (vector) {
-                this.embeddings.set(key, { vector, data });
-                logger.info(`✅ تم بناء Embedding: ${key}`);
-            }
-        }
-        this.isReady = true;
-        logger.info('✅ تم بناء جميع Embeddings');
-    }
-
-    async search(query, threshold = 0.3) {
-        if (!this.isReady || this.embeddings.size === 0) {
-            return this.textSearch(query);
-        }
-
-        const queryVector = await this.createEmbedding(query);
-        if (!queryVector) return [];
-
-        const results = [];
-        for (const [key, entry] of this.embeddings) {
-            const similarity = this.cosineSimilarity(queryVector, entry.vector);
-            if (similarity > threshold) {
-                results.push({ key, data: entry.data, similarity });
-            }
-        }
-        results.sort((a, b) => b.similarity - a.similarity);
-        return results;
-    }
-
-    textSearch(query) {
-        const results = [];
-        const keywords = query.toLowerCase().split(/\s+/).filter(w => w.length > 2);
-        for (const [key, data] of Object.entries(knowledgeBase)) {
-            const jsonStr = JSON.stringify(data).toLowerCase();
-            let found = false;
-            for (const keyword of keywords) {
-                if (jsonStr.includes(keyword)) { found = true; break; }
-            }
-            if (found) results.push({ key, data, similarity: 0.5 });
-        }
-        return results;
-    }
-}
-
-const embeddingsService = new EmbeddingsService();
-embeddingsService.buildEmbeddings();
-
-// ============================================
-// 💾 نظام الذاكرة (SQLite)
-// ============================================
-
-const sqlite3 = require('sqlite3').verbose();
-const dbPath = path.join(__dirname, 'database', 'db.sqlite');
-const dbDir = path.dirname(dbPath);
-if (!fs.existsSync(dbDir)) {
-    fs.mkdirSync(dbDir, { recursive: true });
-}
-
-const db = new sqlite3.Database(dbPath);
-
-db.run(`
-    CREATE TABLE IF NOT EXISTS conversations (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id TEXT,
-        role TEXT,
-        content TEXT,
-        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-`);
-
-db.run(`
-    CREATE TABLE IF NOT EXISTS user_profiles (
-        user_id TEXT PRIMARY KEY,
-        last_service TEXT,
-        language TEXT,
-        customer_type TEXT,
-        last_package TEXT,
-        summary TEXT,
-        last_visit DATETIME,
-        message_count INTEGER DEFAULT 0
-    )
-`);
-
-db.run(`
-    CREATE TABLE IF NOT EXISTS feedback (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id TEXT,
-        question TEXT,
-        answer TEXT,
-        rating INTEGER,
-        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-`);
-
-// ============================================
-// 📞 دوال مساعدة
-// ============================================
-
-const levenshtein = require('levenshtein');
-
-function correctSpelling(word, dictionary) {
-    if (dictionary.includes(word)) return word;
-    let bestMatch = word, minDistance = Infinity;
-    for (const dictWord of dictionary) {
-        const distance = new levenshtein(word, dictWord).distance;
-        if (distance < minDistance && distance <= 2) {
-            minDistance = distance;
-            bestMatch = dictWord;
-        }
-    }
-    return bestMatch;
-}
-
-function cleanMessage(message) {
-    return message.replace(/\s+/g, ' ').trim().normalize('NFKC');
-}
-
-const blockedWords = ['ignore previous', 'api key', 'system prompt', 'كلمة السر', 'مفتاح api'];
-
-function isBlocked(message) {
-    const msg = message.toLowerCase();
-    return blockedWords.some(word => msg.includes(word));
-}
-
-// ============================================
-// 🎯 اكتشاف النية
+// 🧠 اكتشاف نية المستخدم (محسّن)
 // ============================================
 
 function detectIntent(message) {
     const msg = message.toLowerCase().trim();
-    const dictionary = ['يونكس', 'رصيد', 'انترنت', 'صاح', 'باقة', 'فرع', 'مركز', 'خدمة العملاء', '4g', 'lte'];
-    const words = msg.split(/\s+/);
     
-    for (const word of words) {
-        const corrected = correctSpelling(word, dictionary);
-        if (corrected !== word) {
-            logger.info(`🔧 تصحيح إملائي: ${word} → ${corrected}`);
-        }
-        switch(corrected) {
-            case 'يونكس': return 'unix';
-            case 'رصيد': return 'balance';
-            case 'انترنت': return 'internet';
-            case 'صاح': return 'sah';
-            case 'باقة': return 'packages';
-            case 'فرع':
-            case 'مركز': return 'branches';
-            case 'خدمة العملاء': return 'contact';
-            case '4g':
-            case 'lte': return 'lte';
-            default: break;
+    // الأخطاء الإملائية الشائعة
+    const corrections = {
+        'يونكص': 'يونكس',
+        'يونك': 'يونكس',
+        'يونيكس': 'يونكس',
+        'رصيد': 'balance',
+        'انترنت': 'internet',
+        'نت': 'internet',
+        'انترنيت': 'internet',
+        'صاح': 'sah',
+        'كاش': 'sah',
+        'ريح': 'packages',
+        'باقة': 'packages',
+        'ابي': 'packages',
+        'عايز': 'packages',
+        'خدمة العملاء': 'contact',
+        'دعم': 'contact',
+        'شكوى': 'contact',
+        'فرع': 'branches',
+        'مركز': 'branches',
+        'موقع': 'branches'
+    };
+    
+    for (let [key, value] of Object.entries(corrections)) {
+        if (msg.includes(key)) {
+            return value;
         }
     }
+    
+    // نوايا محددة
+    if (msg.includes('يونكس') || msg.includes('unix')) return 'unix';
+    if (msg.includes('رصيد') || msg.includes('balance')) return 'balance';
+    if (msg.includes('انترنت') || msg.includes('internet') || msg.includes('نت')) return 'internet';
+    if (msg.includes('صاح') || msg.includes('sah') || msg.includes('كاش')) return 'sah';
+    if (msg.includes('باقة') || msg.includes('ريح بالك') || msg.includes('ريح')) return 'packages';
+    if (msg.includes('فرع') || msg.includes('مركز') || msg.includes('موقع')) return 'branches';
+    if (msg.includes('خدمة العملاء') || msg.includes('رقم') || msg.includes('اتصال')) return 'contact';
+    if (msg.includes('4g') || msg.includes('lte')) return 'lte';
     if (msg.includes('ابي') || msg.includes('عايز') || msg.includes('اريد')) return 'request';
-    if (msg.includes('شكوى') || msg.includes('مشكلة')) return 'complaint';
-    if (msg.includes('دفع') || msg.includes('فاتورة')) return 'payment';
-    if (msg.includes('اعدادات') || msg.includes('ضبط')) return 'technical';
+    
     return null;
 }
 
 // ============================================
-// 📞 الردود السريعة
+// 📊 تحليل المستخدم
+// ============================================
+
+function getUserAnalytics(userId) {
+    if (!userAnalytics.has(userId)) {
+        userAnalytics.set(userId, {
+            lastService: null,
+            lastVisit: new Date(),
+            messageCount: 0,
+            history: []
+        });
+    }
+    return userAnalytics.get(userId);
+}
+
+// ============================================
+// 💬 الحصول على تاريخ المحادثة
+// ============================================
+
+function getHistory(userId) {
+    if (!conversations.has(userId)) {
+        conversations.set(userId, []);
+    }
+    return conversations.get(userId);
+}
+
+// ============================================
+// 🔍 البحث المتقدم في قاعدة المعرفة
+// ============================================
+
+function searchKnowledge(query) {
+    const results = [];
+    const msg = query.toLowerCase();
+    
+    // تقسيم السؤال إلى كلمات مفتاحية
+    const keywords = msg.split(/\s+/).filter(word => word.length > 2);
+    
+    for (const [key, data] of Object.entries(knowledgeBase)) {
+        try {
+            const jsonStr = JSON.stringify(data).toLowerCase();
+            // البحث عن أي كلمة مفتاحية
+            let found = false;
+            for (const keyword of keywords) {
+                if (jsonStr.includes(keyword)) {
+                    found = true;
+                    break;
+                }
+            }
+            // إذا كانت الكلمات قليلة، ابحث عن العبارة كاملة
+            if (!found && keywords.length <= 2) {
+                if (jsonStr.includes(msg)) {
+                    found = true;
+                }
+            }
+            if (found) {
+                results.push({ key, data });
+            }
+        } catch (err) {
+            // تجاهل الأخطاء
+        }
+    }
+    
+    return results;
+}
+
+// ============================================
+// 🎯 الردود السريعة (للكلمات المفتاحية فقط)
 // ============================================
 
 function getQuickResponse(intent) {
     const cacheKey = `quick_${intent}`;
-    const cached = cache.get(cacheKey);
-    if (cached) return cached;
+    if (cache.has(cacheKey)) {
+        return cache.get(cacheKey);
+    }
     
     let response = null;
+    
     switch(intent) {
         case 'balance':
             response = `💰 معرفة الرصيد: <a href="tel:*222#">*222#</a>`;
             break;
         case 'unix':
-            const unixData = knowledgeBase.unix || { features: ['نظام وحدات مرن'], code: '*6#' };
-            response = `📱 نظام يونكس (UNIX):\n🔹 كود الاشتراك: <a href="tel:*6#">*6#</a>\n✨ المميزات:\n${unixData.features.map(f => `• ${f}`).join('\n')}`;
+            const unixData = knowledgeBase.unix || { features: ['نظام وحدات مرن'] };
+            response = `📱 نظام يونكس (UNIX):
+🔹 كود الاشتراك: <a href="tel:*6#">*6#</a>
+✨ المميزات:
+${unixData.features.map(f => `• ${f}`).join('\n')}`;
             break;
         case 'internet':
-            response = `📶 باقات الإنترنت:\n• يومية: <a href="tel:*4#">*4#</a>\n• شهرية: \n  • 1GB: <a href="tel:*4*101#">*4*101#</a>\n  • 5GB: <a href="tel:*4*8#">*4*8#</a>\n  • 10GB: <a href="tel:*4*9#">*4*9#</a>\n• LTE: \n  • 15GB: <a href="tel:*4*115#">*4*115#</a>\n  • 30GB: <a href="tel:*4*130#">*4*130#</a>`;
+            response = `📶 باقات الإنترنت:
+• يومية: <a href="tel:*4#">*4#</a>
+• شهرية: 
+  • 1GB: <a href="tel:*4*101#">*4*101#</a>
+  • 5GB: <a href="tel:*4*8#">*4*8#</a>
+  • 10GB: <a href="tel:*4*9#">*4*9#</a>
+• LTE: 
+  • 15GB: <a href="tel:*4*115#">*4*115#</a>
+  • 30GB: <a href="tel:*4*130#">*4*130#</a>`;
             break;
         case 'sah':
-            response = `💰 خدمة صاح:\n📱 كود الخدمة: <a href="tel:*500#">*500#</a>\n✨ المميزات:\n• تحويل الأموال من بنك لآخر\n• دفع الفواتير\n• شراء رصيد\n• سحب نقدي`;
+            response = `💰 خدمة صاح:
+📱 كود الخدمة: <a href="tel:*500#">*500#</a>
+✨ المميزات:
+• تحويل الأموال من بنك لآخر
+• دفع الفواتير
+• شراء رصيد
+• سحب نقدي`;
             break;
         case 'packages':
-            response = `📞 باقات المكالمات:\nريح بالك:\n• يوم: <a href="tel:*1#">*1#</a> (50 دقيقة)\n• أسبوع: <a href="tel:*5#">*5#</a> (500 دقيقة)\n• شهر: <a href="tel:*50#">*50#</a> (1500 دقيقة)\n• Max: <a href="tel:*55#">*55#</a> (1000 دقيقة)\nأحلى يوم: <a href="tel:*60#">*60#</a>\nخلي عنك: <a href="tel:*12#">*12#</a> (أسبوع), <a href="tel:*40#">*40#</a> (شهر)`;
+            response = `📞 باقات المكالمات:
+ريح بالك:
+• يوم: <a href="tel:*1#">*1#</a> (50 دقيقة)
+• أسبوع: <a href="tel:*5#">*5#</a> (500 دقيقة)
+• شهر: <a href="tel:*50#">*50#</a> (1500 دقيقة)
+• Max: <a href="tel:*55#">*55#</a> (1000 دقيقة)
+أحلى يوم: <a href="tel:*60#">*60#</a>
+خلي عنك: <a href="tel:*12#">*12#</a> (أسبوع), <a href="tel:*40#">*40#</a> (شهر)`;
             break;
         case 'branches':
-            const branches = knowledgeBase.branches?.branches || {};
-            response = `📍 الفروع:\n${Object.entries(branches).map(([city, address]) => `• ${city}: ${address}`).join('\n')}`;
+            const branches = knowledgeBase.branches?.branches || {
+                'الخرطوم': 'شارع النيل، مجمع سوداني',
+                'أمدرمان': 'السوق الشعبي'
+            };
+            response = `📍 الفروع:
+${Object.entries(branches).map(([city, address]) => `• ${city}: ${address}`).join('\n')}`;
             break;
         case 'contact':
             response = `📞 خدمة العملاء: <a href="tel:120">120</a>`;
             break;
         case 'lte':
-            response = `📶 التحويل من 3G إلى 4G:\n📱 كود التفعيل: <a href="tel:*4*400#">*4*400#</a>`;
+            response = `📶 التحويل من 3G إلى 4G:
+📱 كود التفعيل: <a href="tel:*4*400#">*4*400#</a>
+💡 بعد تفعيل الخدمة، استمتع بسرعات إنترنت أسرع.`;
             break;
         default:
             return null;
     }
-    if (response) cache.set(cacheKey, response);
+    
+    if (response) {
+        cache.set(cacheKey, response);
+    }
     return response;
 }
 
 // ============================================
-// 🤖 دالة الرد الرئيسية
+// 🤖 دالة الرد الرئيسية - التدفق الجديد
 // ============================================
 
 async function getAIResponse(userMessage, userId) {
     const startTime = Date.now();
-    const msg = cleanMessage(userMessage);
-    const words = msg.split(/\s+/);
-
-    if (isBlocked(msg)) {
-        logger.warn(`🚫 محاولة اختراق من ${userId}`);
-        return '❌ عذراً، هذا السؤال غير مسموح.';
-    }
-
+    const msg = userMessage.trim();
+    
+    // 1. تحليل المستخدم
+    const analytics = getUserAnalytics(userId);
+    analytics.messageCount++;
+    analytics.lastVisit = new Date();
+    
+    // 2. اكتشاف النية
     const intent = detectIntent(msg);
+    
+    // 3. إذا كانت كلمة واحدة أو قصيرة → رد سريع
+    const words = msg.split(/\s+/);
     if (words.length <= 3 && intent) {
         const quickResponse = getQuickResponse(intent);
         if (quickResponse) {
             logger.info(`⚡ رد سريع لـ ${userId}: ${intent}`);
+            analytics.lastService = intent;
             return quickResponse;
         }
     }
-
-    const cacheKey = `ai_${userId}_${msg}`;
-    const cached = cache.get(cacheKey);
-    if (cached) {
-        logger.info(`💾 من التخزين المؤقت لـ ${userId}`);
-        return cached;
-    }
-
-    try {
-        // البحث في قاعدة المعرفة
-        let knowledgeResults = await embeddingsService.search(msg);
-        if (knowledgeResults.length === 0) {
-            knowledgeResults = embeddingsService.textSearch(msg);
+    
+    // 4. البحث في قاعدة المعرفة
+    const knowledgeResults = searchKnowledge(msg);
+    
+    // 5. التحقق من التخزين المؤقت (للسؤوال الطويلة فقط)
+    if (words.length > 3) {
+        const cacheKey = `ai_${userId}_${msg}`;
+        if (cache.has(cacheKey)) {
+            logger.info(`💾 من التخزين المؤقت لـ ${userId}`);
+            return cache.get(cacheKey);
         }
-
+    }
+    
+    // 6. استخدام الـ API مع السياق الكامل
+    try {
+        const history = getHistory(userId);
+        const lastMessages = history.slice(-10);
+        
+        // تحضير المعرفة المطلوبة
         let knowledgeContext = '';
         if (knowledgeResults.length > 0) {
             knowledgeContext = knowledgeResults.map(r => 
-                `📚 معلومات عن ${r.key} (التشابه: ${(r.similarity * 100).toFixed(0)}%):\n${JSON.stringify(r.data, null, 2)}`
+                `📚 معلومات عن ${r.key}:\n${JSON.stringify(r.data, null, 2)}`
             ).join('\n\n');
+        } else {
+            knowledgeContext = 'لا توجد معلومات محددة في قاعدة المعرفة عن هذا السؤال.';
         }
-
-        // الحصول على تاريخ المحادثة
-        const history = await new Promise((resolve) => {
-            db.all(
-                `SELECT role, content FROM conversations WHERE user_id = ? ORDER BY timestamp DESC LIMIT 10`,
-                [userId],
-                (err, rows) => {
-                    if (err) { resolve([]); return; }
-                    resolve(rows.reverse());
-                }
-            );
-        });
-
-        // الحصول على الملف الشخصي
-        const profile = await new Promise((resolve) => {
-            db.get(`SELECT * FROM user_profiles WHERE user_id = ?`, [userId], (err, row) => {
-                if (!row) {
-                    db.run(`INSERT INTO user_profiles (user_id, last_visit, message_count) VALUES (?, ?, ?)`,
-                        [userId, new Date().toISOString(), 0]);
-                    resolve({ user_id: userId, last_service: null, message_count: 0 });
-                } else {
-                    resolve(row);
-                }
-            });
-        });
-
+        
+        // تحضير تحليل المستخدم
         let userContext = '';
-        if (profile.last_service) userContext += `آخر خدمة استخدمها: ${profile.last_service}. `;
-
+        if (analytics.lastService) {
+            userContext = `آخر خدمة استخدمها المستخدم: ${analytics.lastService}`;
+        }
+        
+        // تحضير النية المكتشفة
+        let intentContext = '';
+        if (intent) {
+            intentContext = `نية المستخدم: ${intent}`;
+        }
+        
+        console.log('🧠 جاري الاتصال بـ Groq...');
+        console.log('📩 الرسالة:', msg);
+        console.log('🔍 النية:', intent || 'غير محددة');
+        console.log('📚 نتائج المعرفة:', knowledgeResults.length);
+        
         const groq = new OpenAI({
             apiKey: process.env.GROQ_API_KEY,
             baseURL: 'https://api.groq.com/openai/v1',
         });
-
-        // اختيار الموديل حسب طول السؤال
-        const model = words.length < 8 ? "llama-3.1-8b" : "openai/gpt-oss-120b";
-
-        logger.info(`🧠 جاري الاتصال بـ Groq (الموديل: ${model})...`);
-        logger.info(`📩 الرسالة: ${msg}`);
-
-        let attempts = 0;
-        let lastError = null;
-
-        while (attempts < 3) {
-            try {
-                const completion = await groq.chat.completions.create({
-                    model: model,
-                    messages: [
-                        {
-                            role: "system",
-                            content: `أنت المساعد الرسمي لشركة سوداني للاتصالات.
+        
+        const completion = await groq.chat.completions.create({
+            model: "openai/gpt-oss-120b",
+            messages: [
+                {
+                    role: "system",
+                    content: `أنت المساعد الرسمي لشركة سوداني للاتصالات.
 
 القواعد:
 1. استخدم قاعدة المعرفة المرفقة أولاً.
@@ -461,59 +395,99 @@ async function getAIResponse(userMessage, userId) {
 7. استخدم <a href="الرابط" target="_blank">الرابط</a> للروابط.
 
 السياق:
+${intentContext}
 ${userContext}
 ${knowledgeContext}`
-                        },
-                        ...history.map(h => ({ role: h.role, content: h.content })),
-                        { role: "user", content: msg }
-                    ],
-                    temperature: 0.5,
-                    max_tokens: 600,
-                    stream: false
-                });
-
-                const response = completion.choices[0].message.content;
-                logger.info(`✅ تم استلام الرد من Groq (${model})`);
-
-                // حفظ المحادثة
-                db.run(`INSERT INTO conversations (user_id, role, content) VALUES (?, ?, ?)`,
-                    [userId, 'user', msg]);
-                db.run(`INSERT INTO conversations (user_id, role, content) VALUES (?, ?, ?)`,
-                    [userId, 'assistant', response]);
-
-                // تحديث الملف الشخصي
-                db.run(
-                    `UPDATE user_profiles SET message_count = message_count + 1, last_visit = ?, last_service = ? WHERE user_id = ?`,
-                    [new Date().toISOString(), intent || profile.last_service, userId]
-                );
-
-                // حفظ في التخزين المؤقت
-                if (words.length > 3) {
-                    cache.set(cacheKey, response);
+                },
+                ...lastMessages.map(msg => ({
+                    role: msg.role,
+                    content: msg.content
+                })),
+                {
+                    role: "user",
+                    content: msg
                 }
-
-                const responseTime = Date.now() - startTime;
-                logger.info(`📊 ${userId}: ${responseTime}ms, ${response.length} حروف, الموديل: ${model}`);
-
-                return response;
-
-            } catch (error) {
-                lastError = error;
-                attempts++;
-                logger.error(`❌ محاولة ${attempts} فشلت:`, error.message);
-                if (attempts < 3) {
-                    await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
-                }
-            }
+            ],
+            temperature: 0.5,
+            max_tokens: 600,
+            stream: true
+        });
+        
+        // جمع الرد من البث
+        let fullResponse = '';
+        for await (const chunk of completion) {
+            const content = chunk.choices[0]?.delta?.content || '';
+            fullResponse += content;
         }
-
-        logger.error(`❌ فشل جميع المحاولات لـ ${userId}:`, lastError);
-        return `عذراً يا حبيبي، واجهتنا مشكلة تقنية.\n\n📞 خدمة العملاء: <a href="tel:120">120</a>\n🔗 <a href="https://my.sudani.sd" target="_blank">ماي سوداني</a>\n\nحاول مرة أخرى بعد قليل.`;
-
+        
+        console.log("✅ تم استلام الرد من Groq");
+        
+        // حفظ المحادثة
+        history.push({ role: 'user', content: msg });
+        history.push({ role: 'assistant', content: fullResponse });
+        conversations.set(userId, history);
+        
+        // حفظ في التخزين المؤقت (للسؤوال الطويلة فقط)
+        if (words.length > 3) {
+            const cacheKey = `ai_${userId}_${msg}`;
+            cache.set(cacheKey, fullResponse);
+        }
+        
+        const responseTime = Date.now() - startTime;
+        logger.info(`📊 ${userId}: ${responseTime}ms, ${fullResponse.length} حروف`);
+        
+        return fullResponse;
+        
     } catch (error) {
         logger.error(`❌ خطأ لـ ${userId}:`, error);
-        return `عذراً يا حبيبي، واجهتنا مشكلة.\n\n📞 خدمة العملاء: <a href="tel:120">120</a>`;
+        
+        // 7. النظام المحلي الاحتياطي
+        const fallbackResponse = getFallbackResponse(msg);
+        if (fallbackResponse) {
+            return fallbackResponse;
+        }
+        
+        return `عذراً يا حبيبي، واجهتنا مشكلة.
+
+📞 خدمة العملاء: <a href="tel:120">120</a>
+🔗 <a href="https://my.sudani.sd" target="_blank">ماي سوداني</a>
+
+حاول مرة أخرى بعد قليل.`;
     }
+}
+
+// ============================================
+// 📞 النظام المحلي الاحتياطي
+// ============================================
+
+function getFallbackResponse(message) {
+    const msg = message.toLowerCase();
+    
+    if (msg.includes('مرحب') || msg.includes('سلام') || msg.includes('هلا')) {
+        return `👋 أهلاً وسهلاً بك في سودان بوت!
+
+📱 اسألني عن أي خدمة من سوداني.
+
+📞 خدمة العملاء: <a href="tel:120">120</a>`;
+    }
+    
+    if (msg.includes('رصيد')) {
+        return `💰 معرفة الرصيد: <a href="tel:*222#">*222#</a>`;
+    }
+    
+    if (msg.includes('يونكس')) {
+        return `📱 نظام يونكس: <a href="tel:*6#">*6#</a>`;
+    }
+    
+    if (msg.includes('صاح')) {
+        return `💰 خدمة صاح: <a href="tel:*500#">*500#</a>`;
+    }
+    
+    if (msg.includes('انترنت') || msg.includes('نت')) {
+        return `📶 باقات الإنترنت: <a href="tel:*4#">*4#</a>`;
+    }
+    
+    return null;
 }
 
 // ============================================
@@ -521,7 +495,7 @@ ${knowledgeContext}`
 // ============================================
 
 app.get('/', (req, res) => {
-    const indexPath = path.join(__dirname, 'src', 'public', 'index.html');
+    const indexPath = path.join(__dirname, 'public', 'index.html');
     if (fs.existsSync(indexPath)) {
         res.sendFile(indexPath);
     } else {
@@ -531,7 +505,7 @@ app.get('/', (req, res) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>سودان بوت v12</title>
+    <title>سودان بوت v11</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #0a1628, #1A2B4A); height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; }
@@ -575,7 +549,7 @@ app.get('/', (req, res) => {
         .bubble a:hover { color: #d4831a; }
         .bubble a[href^="tel:"] { color: #4caf50; }
         .bubble a[href^="tel:"]:hover { color: #388e3c; }
-        .badge-v12 { background: #f7931e; color: #1A2B4A; padding: 2px 10px; border-radius: 12px; font-size: 10px; }
+        .badge-v11 { background: #f7931e; color: #1A2B4A; padding: 2px 10px; border-radius: 12px; font-size: 10px; }
     </style>
 </head>
 <body>
@@ -583,17 +557,17 @@ app.get('/', (req, res) => {
         <div class="chat-header">
             <div class="avatar">س</div>
             <div class="info">
-                <h3>🤖 سودان بوت <span class="badge-v12">v12</span></h3>
+                <h3>🤖 سودان بوت <span class="badge-v11">v11</span></h3>
                 <p><span class="dot"></span> متصل <span class="badge" style="background:#f7931e;color:#1A2B4A;padding:2px 10px;border-radius:12px;font-size:11px;">احترافي</span></p>
             </div>
         </div>
         <div class="status-bar">
-            <span class="mode">🧠 ذكاء اصطناعي + Embeddings</span>
+            <span class="mode">🧠 ذكاء اصطناعي + RAG محسّن</span>
             المساعد الذكي لشركة سوداني
         </div>
         <div class="messages-area" id="messagesArea">
             <div class="message bot">
-                <div class="bubble">👋 أهلاً وسهلاً بك في <strong>سودان بوت v12</strong>!
+                <div class="bubble">👋 أهلاً وسهلاً بك في <strong>سودان بوت v11</strong>!
 
 🤖 أنا المساعد الذكي لشركة <strong>سوداني للاتصالات</strong>.
 
@@ -711,7 +685,8 @@ app.get('/', (req, res) => {
                     }
                 });
             }
-            console.log('✅ سودان بوت v12 جاهز!');
+            console.log('✅ سودان بوت v11 جاهز!');
+            console.log('🆔 معرف المستخدم:', userId);
         });
     </script>
 </body>
@@ -754,32 +729,19 @@ app.post('/api/chat/message', async (req, res) => {
 });
 
 app.get('/api/stats', (req, res) => {
-    db.get(`SELECT COUNT(*) as total_messages, COUNT(DISTINCT user_id) as total_users FROM conversations`, (err, row) => {
-        res.json({
-            users: row?.total_users || 0,
-            messages: row?.total_messages || 0,
-            cache: { size: cache.size, max: 1000 },
-            embeddings: { total: embeddingsService.embeddings.size, ready: embeddingsService.isReady },
-            uptime: process.uptime()
-        });
+    res.json({
+        users: userAnalytics.size,
+        conversations: conversations.size,
+        cache: cache.size,
+        uptime: process.uptime()
     });
 });
 
 app.get('/api/health', (req, res) => {
     res.json({ 
         status: 'healthy', 
-        service: 'Sudan Bot v12',
-        version: '12.0.0',
-        features: [
-            'Embeddings',
-            'Memory (SQLite)',
-            'Cache (LRU)',
-            'Auto-retry',
-            'Model Selection',
-            'Spelling Correction',
-            'Rate Limiting',
-            'Logging'
-        ]
+        service: 'Sudan Bot v11',
+        version: '11.0.0'
     });
 });
 
@@ -789,24 +751,27 @@ app.get('/api/health', (req, res) => {
 
 app.listen(PORT, '0.0.0.0', () => {
     console.log('=================================');
-    console.log('🚀 سودان بوت - الإصدار 12 (الكامل)');
+    console.log('🚀 سودان بوت - الإصدار 11');
     console.log('=================================');
-    console.log(`✅ السيرفر يعمل على المنفذ: ${PORT}`);
-    console.log(`🌐 http://localhost:${PORT}`);
+    console.log('✅ السيرفر يعمل على المنفذ: ' + PORT);
+    console.log('🌐 http://localhost:' + PORT);
     console.log('=================================');
     console.log('🧠 الميزات النشطة:');
-    console.log('   • Embeddings (تشابه دلالي)');
-    console.log('   • Memory (SQLite)');
-    console.log('   • Cache (LRU)');
-    console.log('   • Auto-retry (3 محاولات)');
-    console.log('   • Model Selection (Llama/GPT)');
-    console.log('   • Spelling Correction (Levenshtein)');
-    console.log('   • Rate Limiting');
-    console.log('   • Logging');
+    console.log('   • نظام RAG محسّن');
+    console.log('   • اكتشاف النية الذكي');
+    console.log('   • ردود سريعة للكلمات المفتاحية');
+    console.log('   • استخدام معرفة Groq العامة');
+    console.log('   • حفظ المحادثات (Memory)');
+    console.log('   • تخزين مؤقت (Cache)');
+    console.log('   • حماية من السبام');
+    console.log('   • تسجيل الأخطاء');
+    console.log('   • تحليل المستخدمين');
+    console.log('=================================');
+    console.log(`📁 مجلد المعرفة: ${knowledgeDir}`);
+    console.log(`📁 مجلد السجلات: ${logsDir}`);
     console.log('=================================');
 });
 
 process.on('uncaughtException', (error) => {
-    console.error('💥 خطأ غير متوقع:', error);
     logger.error('💥 خطأ غير متوقع:', error);
 });
