@@ -11,21 +11,41 @@ const PORT = process.env.PORT || 3000;
 // ✅ حل مشكلة Proxy و Rate Limiting
 // ============================================
 
-// تفعيل trust proxy - ضروري لـ Render
 app.set('trust proxy', 1);
-
-// تعطيل rate limiting نهائياً للتجربة
-// ملاحظة: يمكنك إعادة تفعيله لاحقاً للإصدار الرسمي
-
-// Middleware
 app.use(cors());
 app.use(express.json());
 
 // ============================================
-// 🎨 واجهة الويب المدمجة (مع التعديلات الجديدة)
+// 📝 سجل الأخطاء (Logging)
+// ============================================
+
+// دالة لتسجيل الأخطاء مع الوقت
+function logError(context, error) {
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] ❌ خطأ في: ${context}`);
+    console.log(`[${timestamp}] 📝 التفاصيل:`, error);
+    if (error.stack) {
+        console.log(`[${timestamp}] 📚 Stack Trace:`, error.stack);
+    }
+    console.log('-----------------------------------');
+}
+
+// دالة لتسجيل الأحداث العادية
+function logEvent(context, data) {
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] ✅ ${context}:`, data);
+}
+
+// ============================================
+// 🎨 واجهة الويب المدمجة
 // ============================================
 
 app.get('/', (req, res) => {
+  logEvent('تحميل الصفحة الرئيسية', { 
+    ip: req.ip, 
+    userAgent: req.headers['user-agent'] 
+  });
+  
   res.send(`
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -105,46 +125,123 @@ app.get('/', (req, res) => {
     </div>
 
     <script>
+        // ============================================
+        // 📝 سجل الأخطاء في المتصفح (Browser Console)
+        // ============================================
+        
+        // دالة لتسجيل الأحداث في Console المتصفح
+        function logEvent(context, data) {
+            const timestamp = new Date().toISOString();
+            console.log(\`[\${timestamp}] ✅ \${context}:\`, data);
+        }
+        
+        function logError(context, error) {
+            const timestamp = new Date().toISOString();
+            console.error(\`[\${timestamp}] ❌ خطأ في: \${context}\`);
+            console.error(\`[\${timestamp}] 📝 التفاصيل:\`, error);
+            if (error.stack) {
+                console.error(\`[\${timestamp}] 📚 Stack Trace:\`, error.stack);
+            }
+            console.error('-----------------------------------');
+        }
+
+        // ============================================
+        // 🌐 إعدادات المتغيرات
+        // ============================================
+        
         const API_URL = window.location.origin;
         const messagesArea = document.getElementById('messagesArea');
         const messageInput = document.getElementById('messageInput');
         const sendBtn = document.getElementById('sendBtn');
         let isProcessing = false;
 
+        logEvent('🔧 بدء التطبيق', { 
+            API_URL: API_URL,
+            userAgent: navigator.userAgent,
+            timestamp: new Date().toISOString()
+        });
+
+        // ============================================
+        // 📝 دوال عرض الرسائل
+        // ============================================
+
         function showTyping() {
-            const typingDiv = document.createElement('div');
-            typingDiv.className = 'message bot';
-            typingDiv.id = 'typingIndicator';
-            typingDiv.innerHTML = '<div class="typing-indicator active"><span></span><span></span><span></span></div>';
-            messagesArea.appendChild(typingDiv);
-            messagesArea.scrollTop = messagesArea.scrollHeight;
+            try {
+                const typingDiv = document.createElement('div');
+                typingDiv.className = 'message bot';
+                typingDiv.id = 'typingIndicator';
+                typingDiv.innerHTML = '<div class="typing-indicator active"><span></span><span></span><span></span></div>';
+                messagesArea.appendChild(typingDiv);
+                messagesArea.scrollTop = messagesArea.scrollHeight;
+                logEvent('🔄 إظهار مؤشر الكتابة', { success: true });
+            } catch (error) {
+                logError('إظهار مؤشر الكتابة', error);
+            }
         }
 
         function hideTyping() {
-            const typing = document.getElementById('typingIndicator');
-            if (typing) typing.remove();
+            try {
+                const typing = document.getElementById('typingIndicator');
+                if (typing) typing.remove();
+                logEvent('🔄 إخفاء مؤشر الكتابة', { success: true });
+            } catch (error) {
+                logError('إخفاء مؤشر الكتابة', error);
+            }
         }
 
         function addMessage(text, isUser) {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = 'message ' + (isUser ? 'user' : 'bot');
-            const now = new Date();
-            const time = now.toLocaleTimeString('ar-SD', { hour: '2-digit', minute: '2-digit' });
-            const formattedText = text.replace(/\*(\\d+#)/g, '<a href="tel:$1" style="color: #1A2B4A; font-weight: bold;">*$1</a>');
-            messageDiv.innerHTML = '<div class="bubble">' + formattedText + '</div><span class="time">' + time + '</span>';
-            messagesArea.appendChild(messageDiv);
-            messagesArea.scrollTop = messagesArea.scrollHeight;
+            try {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'message ' + (isUser ? 'user' : 'bot');
+                const now = new Date();
+                const time = now.toLocaleTimeString('ar-SD', { hour: '2-digit', minute: '2-digit' });
+                const formattedText = text.replace(/\*(\\d+#)/g, '<a href="tel:$1" style="color: #1A2B4A; font-weight: bold;">*$1</a>');
+                messageDiv.innerHTML = '<div class="bubble">' + formattedText + '</div><span class="time">' + time + '</span>';
+                messagesArea.appendChild(messageDiv);
+                messagesArea.scrollTop = messagesArea.scrollHeight;
+                logEvent('📩 إضافة رسالة', { 
+                    isUser: isUser, 
+                    textLength: text.length,
+                    preview: text.substring(0, 50) + (text.length > 50 ? '...' : '')
+                });
+            } catch (error) {
+                logError('إضافة رسالة', error);
+            }
         }
 
         // ============================================
-        // 💬 دالة sendMessage المحدثة (مع اختبار alert)
+        // 💬 دالة sendMessage الرئيسية (مع سجل كامل)
         // ============================================
+        
         async function sendMessage() {
+            logEvent('🚀 بدء sendMessage', { 
+                isProcessing: isProcessing,
+                inputValue: messageInput.value,
+                inputLength: messageInput.value.length
+            });
+
             // اختبار للتأكد من أن الدالة تعمل
-            alert("✅ sendMessage works!");
+            try {
+                alert("✅ sendMessage works!");
+            } catch (alertError) {
+                logError('❌ فشل alert', alertError);
+            }
 
             const message = messageInput.value.trim();
-            if (!message || isProcessing) return;
+            logEvent('📝 قراءة الرسالة', { 
+                message: message,
+                isEmpty: message === '',
+                length: message.length
+            });
+
+            if (!message || isProcessing) {
+                logEvent('⏭️ تخطي الإرسال', { 
+                    reason: !message ? 'الرسالة فارغة' : 'جاري المعالجة',
+                    message: message,
+                    isProcessing: isProcessing
+                });
+                return;
+            }
 
             isProcessing = true;
             messageInput.disabled = true;
@@ -155,7 +252,13 @@ app.get('/', (req, res) => {
             showTyping();
 
             try {
-                // استخدام fetch محسن مع التحقق من الأخطاء
+                logEvent('📡 إرسال طلب إلى الـ API', { 
+                    url: API_URL + '/api/chat/message',
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: message, userId: 'web_user_' + Date.now() })
+                });
+
                 const response = await fetch(API_URL + '/api/chat/message', {
                     method: 'POST',
                     headers: {
@@ -167,12 +270,24 @@ app.get('/', (req, res) => {
                     })
                 });
 
-                // التحقق من نجاح الطلب
+                logEvent('📥 استلام الرد من الـ API', { 
+                    status: response.status,
+                    statusText: response.statusText,
+                    ok: response.ok,
+                    headers: Object.fromEntries(response.headers.entries())
+                });
+
                 if (!response.ok) {
                     throw new Error("HTTP " + response.status + ": " + response.statusText);
                 }
 
                 const data = await response.json();
+                logEvent('📦 تحليل البيانات', { 
+                    success: data.success,
+                    hasResponse: !!data.response,
+                    responsePreview: data.response ? data.response.substring(0, 100) : null
+                });
+
                 hideTyping();
 
                 if (data.success) {
@@ -182,33 +297,70 @@ app.get('/', (req, res) => {
                             addMessage('💡 اقتراحات: ' + data.suggestions.join(' • '), false);
                         }, 500);
                     }
+                    logEvent('✅ تم الرد بنجاح', { 
+                        responseLength: data.response.length,
+                        suggestionsCount: data.suggestions ? data.suggestions.length : 0
+                    });
                 } else {
                     addMessage('❌ عذراً، حدث خطأ. حاول مرة أخرى.', false);
+                    logError('❌ رد غير ناجح من الـ API', data);
                 }
             } catch (error) {
                 hideTyping();
-                // عرض رسالة خطأ مفصلة
-                addMessage('❌ لا يمكن الاتصال بالسيرفر: ' + error.message, false);
-                console.error('Error:', error);
+                const errorMessage = '❌ لا يمكن الاتصال بالسيرفر: ' + error.message;
+                addMessage(errorMessage, false);
+                logError('💥 خطأ في الاتصال بالـ API', {
+                    error: error.message,
+                    stack: error.stack,
+                    url: API_URL + '/api/chat/message'
+                });
+                console.error('💥 تفاصيل الخطأ الكاملة:', error);
             }
 
             isProcessing = false;
             messageInput.disabled = false;
             sendBtn.disabled = false;
             messageInput.focus();
+            logEvent('🔚 انتهاء sendMessage', { 
+                isProcessing: isProcessing,
+                inputDisabled: messageInput.disabled,
+                btnDisabled: sendBtn.disabled
+            });
         }
 
+        // ============================================
+        // ⚡ دوال مساعدة
+        // ============================================
+
         function sendQuickMessage(text) {
+            logEvent('⚡ إرسال رسالة سريعة', { text: text });
             messageInput.value = text;
             sendMessage();
         }
 
+        // ============================================
+        // 🎯 رسالة ترحيب إضافية
+        // ============================================
+
         setTimeout(function() {
             addMessage('💬 كيف أقدر أساعدك اليوم؟', false);
+            logEvent('📢 رسالة ترحيب إضافية', { success: true });
         }, 800);
 
-        console.log('🤖 سوداني بوت يعمل بنجاح!');
+        // ============================================
+        // 📊 معلومات التطبيق
+        // ============================================
+
+        console.log('=================================');
+        console.log('🤖 سوداني بوت - معلومات التطبيق');
+        console.log('=================================');
         console.log('📍 API URL:', API_URL);
+        console.log('📱 المتصفح:', navigator.userAgent);
+        console.log('🌐 الصفحة:', window.location.href);
+        console.log('=================================');
+        console.log('💬 مرحباً بك في المساعد الذكي لسوداني');
+        console.log('📝 انظر سجل الأحداث أعلاه لتتبع العمليات');
+        console.log('=================================');
     </script>
 </body>
 </html>
@@ -216,23 +368,41 @@ app.get('/', (req, res) => {
 });
 
 // ============================================
-// 🔗 نقطة API للمحادثة (مع تحسين معالجة الأخطاء)
+// 🔗 نقطة API للمحادثة (مع سجل كامل)
 // ============================================
 
 app.post('/api/chat/message', (req, res) => {
+  const requestId = Date.now() + '-' + Math.random().toString(36).substring(7);
+  logEvent('📨 استلام طلب API', { 
+    requestId: requestId,
+    body: req.body,
+    ip: req.ip,
+    userAgent: req.headers['user-agent']
+  });
+
   try {
-    const { message } = req.body;
+    const { message, userId } = req.body;
     
+    logEvent('📝 تحليل الطلب', { 
+      requestId: requestId,
+      message: message,
+      userId: userId,
+      messageType: typeof message,
+      isEmpty: !message
+    });
+
     // التحقق من وجود الرسالة
     if (!message) {
+      logError('❌ رسالة فارغة', { requestId: requestId, body: req.body });
       return res.status(400).json({
         success: false,
         response: '❌ الرجاء كتابة سؤال.',
-        error: 'Message is required'
+        error: 'Message is required',
+        requestId: requestId
       });
     }
 
-    console.log('📩 رسالة جديدة:', message);
+    console.log(`[${new Date().toISOString()}] 📩 رسالة جديدة من ${userId || 'مجهول'}: "${message}"`);
 
     // ردود نموذجية باللهجة السودانية
     const responses = {
@@ -244,6 +414,12 @@ app.post('/api/chat/message', (req, res) => {
     };
     
     let response = responses[message];
+    logEvent('🔍 البحث عن رد', { 
+      requestId: requestId,
+      found: !!response,
+      message: message,
+      responsePreview: response ? response.substring(0, 50) : null
+    });
     
     if (!response) {
       const generalResponses = [
@@ -252,21 +428,41 @@ app.post('/api/chat/message', (req, res) => {
         '💬 كيف أقدر أساعدك اليوم؟ تقدر تسألني عن الباقات، الرصيد، أو سوداني كاش.'
       ];
       response = generalResponses[Math.floor(Math.random() * generalResponses.length)];
+      logEvent('💬 استخدام رد عام', { 
+        requestId: requestId,
+        response: response
+      });
     }
     
-    res.json({
+    const responseData = {
       success: true,
       response: response,
       intent: { type: 'general', confidence: 0.8 },
       timestamp: new Date().toISOString(),
-      suggestions: ['عايز باقة نت', 'رصيدي خلص', 'كيف أشحن؟', 'سوداني كاش']
+      suggestions: ['عايز باقة نت', 'رصيدي خلص', 'كيف أشحن؟', 'سوداني كاش'],
+      requestId: requestId
+    };
+
+    logEvent('✅ إرسال الرد', { 
+      requestId: requestId,
+      responseLength: response.length,
+      suggestionsCount: responseData.suggestions.length
     });
+
+    res.json(responseData);
   } catch (error) {
-    console.error('❌ خطأ في API:', error);
+    logError('💥 خطأ في معالجة الطلب', {
+      requestId: requestId,
+      error: error.message,
+      stack: error.stack,
+      body: req.body
+    });
+    
     res.status(500).json({
       success: false,
       response: '❌ عذراً، حدث خطأ داخلي في السيرفر.',
-      error: error.message
+      error: error.message,
+      requestId: requestId
     });
   }
 });
@@ -276,6 +472,11 @@ app.post('/api/chat/message', (req, res) => {
 // ============================================
 
 app.get('/health', (req, res) => {
+  logEvent('📊 فحص الصحة', { 
+    ip: req.ip,
+    timestamp: new Date().toISOString()
+  });
+  
   res.json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
@@ -297,5 +498,18 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log('🌐 URL: https://crypto-api-c2v8.onrender.com');
   console.log('=================================');
   console.log('💡 Ready to serve Sudanese users!');
+  console.log('📝 سجل الأخطاء مفعل بالكامل');
   console.log('=================================');
+});
+
+// ============================================
+// 📝 معالجة الأخطاء العامة
+// ============================================
+
+process.on('uncaughtException', (error) => {
+  logError('💥 استثناء غير متوقع (uncaughtException)', error);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  logError('💥 رفض غير متوقع (unhandledRejection)', { reason, promise });
 });
