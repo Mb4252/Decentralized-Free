@@ -494,7 +494,7 @@ app.get('/', (req, res) => {
         // ============================================
         // 🔗 API URL - يتكيف تلقائياً مع البيئة
         // ============================================
-        const API_URL = window.location.origin; // يستخدم الرابط الحالي تلقائياً
+        const API_URL = window.location.origin;
         
         const messagesArea = document.getElementById('messagesArea');
         const messageInput = document.getElementById('messageInput');
@@ -507,7 +507,6 @@ app.get('/', (req, res) => {
         // 📝 وظائف المساعد
         // ============================================
         
-        // إظهار مؤشر الكتابة
         function showTyping() {
             const typingDiv = document.createElement('div');
             typingDiv.className = 'message bot';
@@ -523,13 +522,11 @@ app.get('/', (req, res) => {
             messagesArea.scrollTop = messagesArea.scrollHeight;
         }
         
-        // إخفاء مؤشر الكتابة
         function hideTyping() {
             const typing = document.getElementById('typingIndicator');
             if (typing) typing.remove();
         }
         
-        // إضافة رسالة
         function addMessage(text, isUser) {
             const messageDiv = document.createElement('div');
             messageDiv.className = \`message \${isUser ? 'user' : 'bot'}\`;
@@ -540,7 +537,6 @@ app.get('/', (req, res) => {
                 minute: '2-digit' 
             });
             
-            // تحويل النص لدعم الروابط
             const formattedText = text.replace(
                 /\\*(\\d+#)/g, 
                 '<a href="tel:$1" style="color: #1A2B4A; font-weight: bold;">*$1</a>'
@@ -566,15 +562,12 @@ app.get('/', (req, res) => {
             messageInput.disabled = true;
             sendBtn.disabled = true;
             
-            // إضافة رسالة المستخدم
             addMessage(message, true);
             messageInput.value = '';
             
-            // إظهار مؤشر الكتابة
             showTyping();
             
             try {
-                // إرسال إلى API
                 const response = await fetch(\`\${API_URL}/api/chat/message\`, {
                     method: 'POST',
                     headers: {
@@ -588,14 +581,11 @@ app.get('/', (req, res) => {
                 
                 const data = await response.json();
                 
-                // إخفاء مؤشر الكتابة
                 hideTyping();
                 
-                // عرض رد البوت
                 if (data.success) {
                     addMessage(data.response, false);
                     
-                    // عرض الاقتراحات إن وجدت
                     if (data.suggestions && data.suggestions.length > 0) {
                         setTimeout(() => {
                             const suggestionsText = '💡 اقتراحات: ' + data.suggestions.join(' • ');
@@ -618,33 +608,21 @@ app.get('/', (req, res) => {
             messageInput.focus();
         }
         
-        // ============================================
-        // ⚡ إرسال رسالة سريعة
-        // ============================================
         function sendQuickMessage(text) {
             messageInput.value = text;
             sendMessage();
         }
         
-        // ============================================
-        // 🎯 رسالة ترحيب إضافية
-        // ============================================
         setTimeout(() => {
             addMessage('💬 كيف أقدر أساعدك اليوم؟', false);
         }, 800);
         
-        // ============================================
-        // ⌨️ اختصارات لوحة المفاتيح
-        // ============================================
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 messageInput.blur();
             }
         });
         
-        // ============================================
-        // 📱 تحسين للتطبيقات
-        // ============================================
         console.log('🤖 سوداني بوت يعمل بنجاح!');
         console.log('📍 API URL:', API_URL);
         console.log('💬 مرحباً بك في المساعد الذكي لسوداني');
@@ -670,9 +648,9 @@ app.listen(PORT, () => {
   console.log('=================================');
   console.log('🚀 Sudani AI Assistant Server');
   console.log('=================================');
-  console.log(\`✅ Server running on port: \${PORT}\`);
-  console.log(\`🌐 URL: http://localhost:\${PORT}\`);
-  console.log(\`📊 Health Check: http://localhost:\${PORT}/health\`);
+  console.log(`✅ Server running on port: ${PORT}`);
+  console.log(`🌐 URL: http://localhost:${PORT}`);
+  console.log(`📊 Health Check: http://localhost:${PORT}/health`);
   console.log('=================================');
   console.log('💡 Ready to serve Sudanese users!');
   console.log('=================================');
@@ -680,7 +658,7 @@ app.listen(PORT, () => {
 
 // معالجة إشارات الإيقاف
 process.on('SIGINT', () => {
-  console.log('\\n👋 Shutting down server gracefully...');
+  console.log('\n👋 Shutting down server gracefully...');
   process.exit(0);
 });
 
