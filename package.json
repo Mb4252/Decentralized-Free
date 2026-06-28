@@ -14,8 +14,7 @@
     "chatbot",
     "sudanese-dialect",
     "openai",
-    "deepseek",
-    "gemini",
+    "groq",
     "nodejs",
     "express"
   ],
@@ -26,7 +25,6 @@
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "openai": "^4.20.0",
-    "@google/generative-ai": "^0.21.0",
     "@supabase/supabase-js": "^2.38.4",
     "helmet": "^7.0.0",
     "express-rate-limit": "^6.10.0"
