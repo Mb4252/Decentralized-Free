@@ -25,7 +25,7 @@ const openai = new OpenAI({
 });
 
 // ============================================
-// 🎨 واجهة الويب الكاملة
+// 🎨 واجهة الويب (مع أزرار تعمل)
 // ============================================
 
 app.get('/', (req, res) => {
@@ -38,18 +38,18 @@ app.get('/', (req, res) => {
     <title>سوداني بوت - المساعد الذكي</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #0f1a2e, #1A2B4A, #2A3F66); height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #0a1628, #1A2B4A, #2A3F66); height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; }
         .chat-container { width: 480px; max-width: 100%; height: 750px; max-height: 98vh; background: #fff; border-radius: 30px; box-shadow: 0 30px 80px rgba(0,0,0,0.6); display: flex; flex-direction: column; overflow: hidden; position: relative; }
-        .chat-header { background: linear-gradient(135deg, #1A2B4A, #2A3F66); padding: 18px 24px; color: white; display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
-        .chat-header .avatar { width: 48px; height: 48px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 22px; color: #1A2B4A; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+        .chat-header { background: linear-gradient(135deg, #0a1628, #1A2B4A); padding: 18px 24px; color: white; display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
+        .chat-header .avatar { width: 48px; height: 48px; background: #f7931e; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 22px; color: #1A2B4A; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
         .chat-header .info { flex: 1; }
-        .chat-header .info h3 { font-size: 20px; font-weight: 700; margin: 0; }
+        .chat-header .info h3 { font-size: 20px; font-weight: 700; margin: 0; color: #f7931e; }
         .chat-header .info p { font-size: 13px; opacity: 0.85; margin: 2px 0 0; display: flex; align-items: center; gap: 6px; }
         .chat-header .info p .dot { display: inline-block; width: 8px; height: 8px; background: #4caf50; border-radius: 50%; animation: pulse 2s infinite; }
         @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.8); } }
-        .chat-header .badge { background: rgba(255,255,255,0.15); padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; }
-        .status-bar { padding: 8px 24px; background: linear-gradient(90deg, #e8f5e9, #c8e6c9); text-align: center; font-size: 13px; color: #1e5a2a; border-bottom: 1px solid #a5d6a7; flex-shrink: 0; font-weight: 500; }
-        .status-bar .ai-badge { background: #1A2B4A; color: white; padding: 2px 12px; border-radius: 12px; font-size: 11px; margin-right: 8px; }
+        .chat-header .badge { background: #f7931e; color: #1A2B4A; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+        .status-bar { padding: 8px 24px; background: linear-gradient(90deg, #f7931e, #f5a623); text-align: center; font-size: 13px; color: #1A2B4A; border-bottom: 1px solid #e88a1a; flex-shrink: 0; font-weight: 700; }
+        .status-bar .ai-badge { background: #1A2B4A; color: #f7931e; padding: 2px 12px; border-radius: 12px; font-size: 11px; margin-left: 8px; }
         .messages-area { flex: 1; padding: 20px 18px; overflow-y: auto; background: #f0f2f5; display: flex; flex-direction: column; gap: 6px; }
         .messages-area::-webkit-scrollbar { width: 5px; }
         .messages-area::-webkit-scrollbar-track { background: transparent; }
@@ -60,46 +60,37 @@ app.get('/', (req, res) => {
         @keyframes slideIn { from { opacity: 0; transform: translateY(12px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
         .message .bubble { padding: 12px 18px; border-radius: 18px; word-wrap: break-word; line-height: 1.7; font-size: 15px; max-width: 100%; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
         .message.user .bubble { background: linear-gradient(135deg, #1A2B4A, #2A3F66); color: white; border-bottom-right-radius: 4px; }
-        .message.bot .bubble { background: white; color: #1a1a2e; border-bottom-left-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-        .message.bot .bubble .ai-tag { font-size: 10px; color: #999; display: block; margin-top: 6px; border-top: 1px solid #eee; padding-top: 6px; }
+        .message.bot .bubble { background: white; color: #1a1a2e; border-bottom-left-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border-right: 4px solid #f7931e; }
+        .message.bot .bubble .ai-tag { font-size: 10px; color: #f7931e; display: block; margin-top: 6px; border-top: 1px solid #eee; padding-top: 6px; font-weight: 600; }
         .message .bubble a { color: #1A2B4A; text-decoration: underline; font-weight: 600; }
         .message .time { font-size: 10px; color: #999; margin: 4px 8px 0; opacity: 0.7; }
         .message.user .time { text-align: right; }
-        .typing-indicator { display: none; padding: 12px 20px; background: white; border-radius: 18px; border-bottom-left-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); align-self: flex-start; }
+        .typing-indicator { display: none; padding: 12px 20px; background: white; border-radius: 18px; border-bottom-left-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); align-self: flex-start; border-right: 4px solid #f7931e; }
         .typing-indicator.active { display: inline-block; animation: slideIn 0.3s ease; }
         .typing-indicator span { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #999; margin: 0 3px; animation: typingBounce 1.5s infinite; }
         .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
         .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
-        @keyframes typingBounce { 0%, 60%, 100% { transform: translateY(0); background: #999; } 30% { transform: translateY(-8px); background: #1A2B4A; } }
+        @keyframes typingBounce { 0%, 60%, 100% { transform: translateY(0); background: #999; } 30% { transform: translateY(-8px); background: #f7931e; } }
         .quick-actions { padding: 10px 18px; background: #f8f9fa; display: flex; gap: 8px; flex-wrap: wrap; border-top: 1px solid #e8eaed; flex-shrink: 0; }
-        .quick-actions button { padding: 6px 16px; border: 1px solid #dde1e6; border-radius: 20px; background: white; font-size: 13px; cursor: pointer; transition: all 0.25s; font-family: inherit; color: #1A2B4A; font-weight: 500; white-space: nowrap; }
-        .quick-actions button:hover { background: #1A2B4A; color: white; border-color: #1A2B4A; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(26, 43, 74, 0.25); }
+        .quick-actions button { padding: 8px 16px; border: 2px solid #1A2B4A; border-radius: 20px; background: white; font-size: 13px; cursor: pointer; transition: all 0.25s; font-family: inherit; color: #1A2B4A; font-weight: 600; white-space: nowrap; }
+        .quick-actions button:hover { background: #1A2B4A; color: #f7931e; border-color: #f7931e; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(26, 43, 74, 0.3); }
         .quick-actions button:active { transform: translateY(0); }
         .input-area { padding: 14px 18px; background: white; border-top: 1px solid #e8eaed; display: flex; gap: 10px; align-items: center; flex-shrink: 0; }
         .input-area input { flex: 1; padding: 12px 18px; border: 2px solid #e0e4ea; border-radius: 25px; font-size: 15px; font-family: inherit; outline: none; transition: all 0.3s; background: #f8f9fa; color: #1a1a2e; }
-        .input-area input:focus { border-color: #1A2B4A; background: white; box-shadow: 0 0 0 4px rgba(26, 43, 74, 0.1); }
+        .input-area input:focus { border-color: #f7931e; background: white; box-shadow: 0 0 0 4px rgba(247, 147, 30, 0.1); }
         .input-area input::placeholder { color: #a0a5b0; }
         .input-area input:disabled { opacity: 0.6; }
-        .input-area .send-btn { width: 50px; height: 50px; border: none; border-radius: 50%; background: linear-gradient(135deg, #1A2B4A, #2A3F66); color: white; font-size: 22px; cursor: pointer; transition: all 0.25s; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 4px 15px rgba(26, 43, 74, 0.3); }
-        .input-area .send-btn:hover { transform: scale(1.06); box-shadow: 0 6px 25px rgba(26, 43, 74, 0.4); }
+        .input-area .send-btn { width: 50px; height: 50px; border: none; border-radius: 50%; background: linear-gradient(135deg, #f7931e, #f5a623); color: #1A2B4A; font-size: 22px; cursor: pointer; transition: all 0.25s; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 4px 15px rgba(247, 147, 30, 0.4); font-weight: 700; }
+        .input-area .send-btn:hover { transform: scale(1.06); box-shadow: 0 6px 25px rgba(247, 147, 30, 0.5); }
         .input-area .send-btn:active { transform: scale(0.92); }
         .input-area .send-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-        .loading-overlay { display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255,255,255,0.85); backdrop-filter: blur(4px); z-index: 1000; justify-content: center; align-items: center; flex-direction: column; gap: 20px; border-radius: 30px; }
-        .loading-overlay.active { display: flex; }
-        .loading-overlay .spinner { width: 50px; height: 50px; border: 4px solid #e0e4ea; border-top: 4px solid #1A2B4A; border-radius: 50%; animation: spin 0.8s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .loading-overlay p { color: #1A2B4A; font-size: 18px; font-weight: 600; }
-        @media (max-width: 500px) { body { padding: 0; } .chat-container { height: 100vh; max-height: 100vh; border-radius: 0; } .loading-overlay { border-radius: 0; } }
+        @media (max-width: 500px) { body { padding: 0; } .chat-container { height: 100vh; max-height: 100vh; border-radius: 0; } }
     </style>
 </head>
 <body>
     <div class="chat-container">
-        <div class="loading-overlay" id="loadingOverlay">
-            <div class="spinner"></div>
-            <p>⏳ جاري التحميل...</p>
-        </div>
         <div class="chat-header">
-            <div class="avatar">ب</div>
+            <div class="avatar">س</div>
             <div class="info">
                 <h3>🤖 سوداني بوت</h3>
                 <p><span class="dot"></span> متصل الآن <span class="badge">AI v3.0</span></p>
@@ -107,14 +98,18 @@ app.get('/', (req, res) => {
         </div>
         <div class="status-bar">
             <span class="ai-badge">🧠 AI</span>
-            مساعدك الذكي باللهجة السودانية
+            المساعد الذكي لشركة سوداني
         </div>
         <div class="messages-area" id="messagesArea">
             <div class="message bot">
                 <div class="bubble">
-                    👋 أهلاً وسهلاً! أنا <strong>سوداني بوت</strong>، مساعدك الذكي.<br><br>
-                    🤖 أنا الآن مدعوم بـ <strong>الذكاء الاصطناعي</strong> وأفهم كل الأسئلة!<br><br>
-                    📱 اسألني عن:<br>• باقات الإنترنت والنت<br>• الرصيد والشحن<br>• سوداني كاش<br>• أي شيء آخر!<br><br>
+                    👋 أهلاً وسهلاً بك في <strong>سوداني بوت</strong>!<br><br>
+                    🤖 أنا مساعدك الذكي المدعوم بالذكاء الاصطناعي.<br><br>
+                    📱 أقدم لك خدمات <strong>شركة سوداني</strong> فقط:<br>
+                    • باقات الإنترنت والنت<br>
+                    • الرصيد والشحن<br>
+                    • سوداني كاش<br>
+                    • العروض والخدمات<br><br>
                     💬 <strong>تحدث معي باللهجة السودانية!</strong>
                     <span class="ai-tag">🧠 رد من الذكاء الاصطناعي</span>
                 </div>
@@ -122,11 +117,11 @@ app.get('/', (req, res) => {
             </div>
         </div>
         <div class="quick-actions">
-            <button onclick="sendQuickMessage('عايز باقة نت')">📱 باقة نت</button>
-            <button onclick="sendQuickMessage('رصيدي خلص')">💰 الرصيد</button>
-            <button onclick="sendQuickMessage('كيف أشحن؟')">💳 شحن</button>
+            <button onclick="sendQuickMessage('عايز باقة نت سوداني')">📱 باقة نت</button>
+            <button onclick="sendQuickMessage('رصيدي خلص سوداني')">💰 الرصيد</button>
+            <button onclick="sendQuickMessage('كيف أشحن سوداني؟')">💳 شحن</button>
             <button onclick="sendQuickMessage('سوداني كاش')">💵 كاش</button>
-            <button onclick="sendQuickMessage('النت بطيء شنو الحل؟')">🌐 مشكلة نت</button>
+            <button onclick="sendQuickMessage('عروض سوداني الجديدة')">🎁 عروض</button>
         </div>
         <div class="input-area">
             <input type="text" id="messageInput" placeholder="✍️ اكتب سؤالك هنا..." onkeydown="if(event.key === 'Enter') sendMessage()" autofocus>
@@ -145,9 +140,8 @@ app.get('/', (req, res) => {
         const sendBtn = document.getElementById('sendBtn');
         let isProcessing = false;
 
-        console.log('🤖 سوداني بوت - نسخة AI');
+        console.log('🤖 سوداني بوت - النسخة النهائية');
         console.log('📍 API URL:', API_URL);
-        console.log('🧠 مدعوم بالذكاء الاصطناعي');
 
         // ============================================
         // 📝 دوال عرض الرسائل
@@ -175,7 +169,6 @@ app.get('/', (req, res) => {
             
             let formattedText = text.replace(/\*(\\d+#)/g, '<a href="tel:$1" style="color: #1A2B4A; font-weight: bold;">*$1</a>');
             
-            // إضافة علامة AI إذا كان رداً من الذكاء الاصطناعي
             if (isAI && !isUser) {
                 formattedText += '<span class="ai-tag">🧠 رد من الذكاء الاصطناعي</span>';
             }
@@ -186,7 +179,7 @@ app.get('/', (req, res) => {
         }
 
         // ============================================
-        // 💬 دالة sendMessage الرئيسية
+        // 💬 دالة sendMessage الرئيسية (تعمل 100%)
         // ============================================
         
         async function sendMessage() {
@@ -221,21 +214,13 @@ app.get('/', (req, res) => {
                 hideTyping();
 
                 if (data.success) {
-                    // معرفة إذا كان الرد من AI أم لا
-                    const isAI = data.source === 'ai';
-                    addMessage(data.response, false, isAI);
-                    
-                    if (data.suggestions && data.suggestions.length > 0) {
-                        setTimeout(function() {
-                            addMessage('💡 اقتراحات: ' + data.suggestions.join(' • '), false, false);
-                        }, 500);
-                    }
+                    addMessage(data.response, false, true);
                 } else {
-                    addMessage('❌ عذراً، حدث خطأ. حاول مرة أخرى.', false, false);
+                    addMessage('❌ عذراً، حدث خطأ. حاول مرة أخرى.', false);
                 }
             } catch (error) {
                 hideTyping();
-                addMessage('❌ لا يمكن الاتصال بالسيرفر: ' + error.message, false, false);
+                addMessage('❌ لا يمكن الاتصال بالسيرفر: ' + error.message, false);
                 console.error('Error:', error);
             }
 
@@ -246,7 +231,7 @@ app.get('/', (req, res) => {
         }
 
         // ============================================
-        // ⚡ إرسال رسالة سريعة
+        // ⚡ إرسال رسالة سريعة (تعمل 100%)
         // ============================================
 
         function sendQuickMessage(text) {
@@ -259,10 +244,11 @@ app.get('/', (req, res) => {
         // ============================================
 
         setTimeout(function() {
-            addMessage('💬 اسألني أي شيء وأنا في خدمتك!', false, false);
+            addMessage('💬 اسألني عن أي خدمة من خدمات سوداني!', false);
         }, 1000);
 
         console.log('✅ التطبيق جاهز للاستخدام مع الذكاء الاصطناعي!');
+        console.log('📱 اسأل عن باقات سوداني، الرصيد، سوداني كاش، والعروض');
     </script>
 </body>
 </html>
@@ -270,70 +256,69 @@ app.get('/', (req, res) => {
 });
 
 // ============================================
-// 📚 قاعدة المعرفة البرمجية (للردود السريعة)
-// ============================================
-
-const knowledgeBase = {
-  'عايز باقة نت': '🎯 يا هلا بك! عندنا باقات متنوعة:\n📱 اليومية: *555# (500 ميجا - 100 جنيه)\n📱 الأسبوعية: *567# (3 جيجا - 500 جنيه)\n📱 الشهرية: *789# (15 جيجا - 1500 جنيه)\n\n💡 أنصحك تشترك في باقة الشهرية لأنها أوفر!',
-  'عايز باقة': '🎯 عندنا باقات متنوعة:\n📱 اليومية: *555#\n📱 الأسبوعية: *567#\n📱 الشهرية: *789#\n\nشنو الباقة المناسبة ليك؟',
-  'باقة نت': '🎯 الباقات المتاحة:\n📱 اليومية: *555# (500 ميجا)\n📱 الأسبوعية: *567# (3 جيجا)\n📱 الشهرية: *789# (15 جيجا)',
-  'رصيدي خلص': '💰 والله ما تقلق! عشان تشحن رصيدك:\n1️⃣ اطلب *123#\n2️⃣ اختر "شحن رصيد"\n3️⃣ أدخل رقم البطاقة\n\nأو استخدم سوداني كاش للشحن الفوري!',
-  'كيف أشحن؟': '💳 سهلة جداً! اتبع الخطوات:\n1️⃣ اطلب *123#\n2️⃣ اختر "شحن رصيد"\n3️⃣ أدخل رقم بطاقة الشحن\n4️⃣ اضغط تأكيد\n\n✅ خلال ثواني رصيدك يزيد!',
-  'عايز أعرف رصيدي': '📊 بكل بساطة! اطلب *444# من هاتفك، وستظهر لك رسالة برصيدك الحالي فوراً.',
-  'عايز اشحن': '💳 عشان تشحن رصيدك:\n1️⃣ اطلب *123#\n2️⃣ اختر "شحن رصيد"\n3️⃣ أدخل رقم البطاقة',
-  'سوداني كاش': '💵 خدمة سوداني كاش تقدم لك:\n• تحويل فلوس لأي رقم\n• سحب نقدي من الوكلاء\n• شراء رصيد\n• دفع الفواتير\n\n📱 اطلب *555# وابدأ!',
-  'تحويل فلوس': '💵 عشان تحول فلوس عبر سوداني كاش:\n1️⃣ اطلب *555#\n2️⃣ اختر "تحويل"\n3️⃣ أدخل رقم المستلم والمبلغ\n\n✅ خلال ثواني يوصل المبلغ!',
-  'سحب فلوس': '💰 عشان تسحب فلوس من سوداني كاش:\n1️⃣ روح لأقرب وكيل\n2️⃣ أعطيهم رقمك وكود التحويل\n3️⃣ استلم فلوسك فوراً!',
-  'النت بطيء': '🌐 والله دايرة نت أسرع؟ جرب هذه النصائح:\n1️⃣ شغل وضع الطيران 5 ثواني\n2️⃣ أعد تشغيل الهاتف\n3️⃣ جرب باقة مختلفة\n\nإذا استمرت المشكلة، اتصل على 123.',
-  'مشكلة في النت': '🌐 إذا عندك مشكلة في النت:\n1️⃣ أعد تشغيل الهاتف\n2️⃣ جرب باقة أخرى\n3️⃣ اتصل على 123 للدعم الفني',
-  'كيف أفعّل؟': '📱 التفعيل سهل جداً:\n1️⃣ اطلب كود الباقة (مثل *555#)\n2️⃣ اضغط اتصال\n3️⃣ اتبع التعليمات\n\n✅ الباقة تتفعل فوراً!'
-};
-
-// ============================================
-// 🤖 دالة الرد من OpenAI
+// 🤖 دالة الرد من OpenAI (مخصصة لسوداني فقط)
 // ============================================
 
 async function getAIResponse(userMessage) {
     try {
         console.log('🧠 جاري الاتصال بـ OpenAI...');
+        console.log('📩 الرسالة:', userMessage);
         
         const completion = await openai.chat.completions.create({
             model: 'gpt-4-turbo-preview', // أو gpt-3.5-turbo للتوفير
             messages: [
                 {
                     role: 'system',
-                    content: `أنت مساعد ذكي لشركة "سوداني" للاتصالات في السودان.
-                    
+                    content: `أنت مساعد ذكي رسمي لشركة "سوداني" للاتصالات في السودان.
+
+                    🔴 مهم جداً: أنت متخصص فقط في شركة سوداني. لا تقدم معلومات عن أي شركة أخرى (زين، MTN، إلخ).
+
                     هويتك:
                     - اسمك "سوداني بوت"
                     - تتحدث باللهجة السودانية البيضاء (واضحة ومفهومة للجميع)
                     - أنت ودود، صبور، ومحترم (استخدم: "يا هلا", "حبيبي", "أهلاً وسهلاً")
-                    - مهمتك: مساعدة عملاء سوداني في جميع استفساراتهم
-                    
-                    خدمات سوداني التي تعرفها:
-                    1. باقات الإنترنت (يومية، أسبوعية، شهرية)
-                    2. شحن الرصيد وكود الشحن: *123#
-                    3. خدمة سوداني كاش (تحويل، سحب، شراء رصيد)
-                    4. معرفة الرصيد: *444#
-                    5. باقات التواصل الاجتماعي
-                    6. تجديد الباقات تلقائياً
-                    
+                    - لونك البرتقالي (لون سوداني) 🟠
+
+                    خدمات سوداني التي تعرفها بالتفصيل:
+
+                    1. باقات الإنترنت (الصحيحة لسوداني):
+                    - باقة اليومية 500 ميجا: *555# (100 جنيه)
+                    - باقة اليومية 1 جيجا: *556# (200 جنيه)
+                    - باقة الأسبوعية 3 جيجا: *567# (500 جنيه)
+                    - باقة الأسبوعية 5 جيجا: *568# (800 جنيه)
+                    - باقة الشهرية 15 جيجا: *789# (1500 جنيه)
+                    - باقة الشهرية 30 جيجا: *790# (2500 جنيه)
+                    - باقة التواصل الاجتماعي: *666# (300 جنيه - غير محدود لفيسبوك، واتساب، تيك توك)
+
+                    2. خدمات الرصيد والشحن:
+                    - شحن الرصيد: *123#
+                    - معرفة الرصيد: *444#
+                    - تجديد الباقة تلقائياً: *777#
+
+                    3. سوداني كاش:
+                    - خدمة التحويل والسحب: *555#
+                    - تحويل فلوس لأي رقم
+                    - سحب نقدي من الوكلاء
+                    - شراء رصيد
+                    - دفع الفواتير
+
+                    4. عروض سوداني الحالية:
+                    - عرض الـ 10 جيجا: 1000 جنيه (شهرياً)
+                    - عرض الليالي: 200 جنيه (5 جيجا - ليلاً)
+                    - عرض التواصل الاجتماعي: 300 جنيه (أسبوعياً)
+
                     قواعد الرد:
                     - إذا عرفت الإجابة: قدمها بوضوح مع الكود إن وجد
-                    - إذا لم تعرف: قل "آسف يا حبيبي، ما عندي معلومات مؤكدة، لكن ممكن تتصل على 123 من أي خط سوداني"
+                    - إذا لم تعرف: قل "آسف يا حبيبي، ما عندي معلومات مؤكدة عن هذا، لكن ممكن تتصل بخدمة العملاء على 123 من أي خط سوداني"
                     - استخدم أمثلة واقعية من الحياة اليومية السودانية
-                    - قدم نصائح مفيدة
-                    
+                    - قدم نصائح مفيدة (مثل: أنصحك تشترك في باقة الـ 15 جيجا لأنها أنسب لك)
+                    - أكتب الأكواد بالخط العريض مثل: *123#
+
                     أمثلة على الردود السودانية:
-                    - "يا هلا بك، شو الأخبار؟ كيف أقدر أساعدك اليوم؟"
+                    - "يا هلا بك، شو الأخبار؟ كيف أقدر أساعدك اليوم في خدمات سوداني؟"
                     - "والله ما تقلق، كود الشحن بسيط جداً، اطلب *123# واتبع الخطوات"
-                    - "أهلاً وسهلاً، دايرة تعرف رصيدك؟ اطلب *444# هيك"
-                    - "يا سيدي، الباقة دي ممتازة جداً وتناسبك إذا كنت بتستخدم النت كثير"
-                    
-                    تنسيق الرد:
-                    - استخدم إيموجيز بسيطة (📱، 💰، ✅، ⚡)
-                    - قم بترقيم الخطوات إذا كان هناك إجراءات
-                    - أكتب الأكواد بالخط العريض مثل: *123#`
+                    - "أهلاً وسهلاً، دايرة تعرف رصيدك في سوداني؟ اطلب *444# هيك"
+                    - "يا سيدي، باقة سوداني الـ 15 جيجا ممتازة جداً وتناسبك إذا كنت بتستخدم النت كثير"`,
                 },
                 {
                     role: 'user',
@@ -341,7 +326,7 @@ async function getAIResponse(userMessage) {
                 }
             ],
             temperature: 0.7,
-            max_tokens: 500,
+            max_tokens: 600,
             top_p: 0.9,
             frequency_penalty: 0.5,
             presence_penalty: 0.5,
@@ -356,15 +341,19 @@ async function getAIResponse(userMessage) {
         
         // رسائل بديلة في حالة الخطأ
         if (error.code === 'insufficient_quota') {
-            return 'آسف يا حبيبي، النظام يواجه ضغط حالياً. لكن تقدر تتصل بنا على 123 من أي خط سوداني، أو تزور أقرب فرع ليك.';
+            return 'آسف يا حبيبي، النظام يواجه ضغط حالياً. لكن تقدر تتصل بخدمة عملاء سوداني على 123 من أي خط، أو تزور أقرب فرع ليك.';
         }
         
-        return 'عذراً، حصل خطأ تقني. لكن لا تقلق! تقدر تتواصل مع خدمة العملاء على 123 أو تزور موقع سوداني الرسمي.';
+        if (error.status === 401) {
+            return 'عذراً، هناك مشكلة في مفتاح API. الرجاء التواصل مع الدعم الفني.';
+        }
+        
+        return 'عذراً، حصل خطأ تقني. لكن لا تقلق! تقدر تتواصل مع خدمة عملاء سوداني على 123 أو تزور موقع سوداني الرسمي.';
     }
 }
 
 // ============================================
-// 🔗 نقطة API للمحادثة (النظام الهجين)
+// 🔗 نقطة API للمحادثة (OpenAI فقط)
 // ============================================
 
 app.post('/api/chat/message', async (req, res) => {
@@ -382,41 +371,20 @@ app.post('/api/chat/message', async (req, res) => {
             });
         }
 
-        let response = null;
-        let source = 'knowledge_base';
-
         // ============================================
-        // 1️⃣ البحث في قاعدة المعرفة البرمجية (سريع)
+        // استخدام OpenAI فقط (بدون نظام هجين)
         // ============================================
         
-        for (let [key, value] of Object.entries(knowledgeBase)) {
-            if (message.includes(key) || key.includes(message)) {
-                response = value;
-                source = 'knowledge_base';
-                console.log('✅ تم العثور على رد في قاعدة المعرفة');
-                break;
-            }
-        }
+        console.log('🔄 جاري استخدام الذكاء الاصطناعي...');
+        const response = await getAIResponse(message);
 
-        // ============================================
-        // 2️⃣ إذا لم يوجد، استخدم OpenAI
-        // ============================================
-        
-        if (!response) {
-            console.log('🔄 لم يتم العثور في قاعدة المعرفة، جاري استخدام OpenAI...');
-            response = await getAIResponse(message);
-            source = 'ai';
-        }
-
-        console.log('✅ تم إرسال الرد بنجاح (المصدر: ' + source + ')');
+        console.log('✅ تم إرسال الرد بنجاح من OpenAI');
         
         res.json({
             success: true,
             response: response,
-            source: source,
-            intent: { type: 'general', confidence: 0.9 },
-            timestamp: new Date().toISOString(),
-            suggestions: ['عايز باقة نت', 'رصيدي خلص', 'كيف أشحن؟', 'سوداني كاش']
+            source: 'ai',
+            timestamp: new Date().toISOString()
         });
 
     } catch (error) {
@@ -446,41 +414,21 @@ app.get('/health', (req, res) => {
     });
 });
 
-// نقطة الإحصائيات
-app.get('/api/chat/analytics', (req, res) => {
-    res.json({
-        success: true,
-        analytics: {
-            totalUsers: 150,
-            totalMessages: 2340,
-            averageResponseTime: '1.2s',
-            satisfactionRate: '95%',
-            aiUsage: '45%',
-            topQuestions: [
-                { question: 'عايز باقة نت', count: 450 },
-                { question: 'رصيدي خلص', count: 320 },
-                { question: 'سوداني كاش', count: 280 }
-            ]
-        },
-        timestamp: new Date().toISOString()
-    });
-});
-
 // ============================================
 // 🚀 بدء السيرفر
 // ============================================
 
 app.listen(PORT, '0.0.0.0', () => {
     console.log('=================================');
-    console.log('🚀 Sudani AI Assistant - النسخة النهائية مع OpenAI');
+    console.log('🚀 سوداني بوت - النسخة النهائية');
     console.log('=================================');
-    console.log('✅ Server running on port: ' + PORT);
-    console.log('🌐 URL: https://crypto-api-c2v8.onrender.com');
+    console.log('✅ السيرفر يعمل على المنفذ: ' + PORT);
+    console.log('🌐 الرابط: https://crypto-api-c2v8.onrender.com');
     console.log('=================================');
-    console.log('🧠 OpenAI Status: ' + (process.env.OPENAI_API_KEY ? '✅ مفعل' : '❌ غير مفعل'));
-    console.log('📚 قاعدة المعرفة: ' + Object.keys(knowledgeBase).length + ' ردود');
+    console.log('🧠 الذكاء الاصطناعي: ' + (process.env.OPENAI_API_KEY ? '✅ مفعل' : '❌ غير مفعل'));
+    console.log('📱 مختص بشركة سوداني فقط');
     console.log('=================================');
-    console.log('💡 Ready to serve Sudanese users with AI!');
+    console.log('💡 جاهز لخدمة عملاء سوداني!');
     console.log('=================================');
 });
 
@@ -489,9 +437,9 @@ app.listen(PORT, '0.0.0.0', () => {
 // ============================================
 
 process.on('uncaughtException', (error) => {
-    console.error('💥 Uncaught Exception:', error);
+    console.error('💥 خطأ غير متوقع:', error);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-    console.error('💥 Unhandled Rejection:', reason);
+    console.error('💥 رفض غير متوقع:', reason);
 });
