@@ -22,7 +22,7 @@ const deepseek = new OpenAI({
 });
 
 // ============================================
-// 🤖 دالة الرد - فقط عبر API
+// 🤖 دالة الرد - فقط عبر API (بدون أي معلومات ملقنة)
 // ============================================
 
 async function getAIResponse(userMessage) {
@@ -41,11 +41,12 @@ async function getAIResponse(userMessage) {
                     1. أنت متخصص فقط في شركة سوداني
                     2. لا ترد على أي سؤال عن شركات أخرى (زين، MTN، إلخ)
                     3. إذا سألك عن شركة أخرى، قل: "آسف، أنا متخصص فقط في خدمات سوداني"
-                    4. استخدم معرفتك العامة عن سوداني للرد
+                    4. استخدم معرفتك العامة عن سوداني للرد على جميع الأسئلة
                     5. تحدث باللهجة السودانية، كن ودوداً ومحترماً
                     6. إذا لم تعرف الإجابة، قل بصراحة: "آسف يا حبيبي، ما عندي معلومات عن هذا، لكن تقدر تتصل بخدمة العملاء 120"
+                    7. أنت المسؤول عن جميع الأسئلة بما فيها الفروع والمراكز والأكواد والباقات
                     
-                    ملاحظة: أنت تستخدم معرفتك الخاصة عن سوداني، وليس هناك معلومات مسبقة مزودة لك.`,
+                    ملاحظة: أنت تستخدم معرفتك الخاصة عن سوداني، وليس هناك أي معلومات مسبقة مزودة لك.`,
                 },
                 {
                     role: 'user',
@@ -125,11 +126,11 @@ app.get('/', (req, res) => {
             <div class="avatar">س</div>
             <div class="info">
                 <h3>🤖 سوداني بوت</h3>
-                <p><span class="dot"></span> متصل <span class="badge" style="background:#f7931e;color:#1A2B4A;padding:2px 10px;border-radius:12px;font-size:11px;">AI</span></p>
+                <p><span class="dot"></span> متصل <span class="badge" style="background:#f7931e;color:#1A2B4A;padding:2px 10px;border-radius:12px;font-size:11px;">AI 100%</span></p>
             </div>
         </div>
         <div class="status-bar">
-            <span class="mode">🧠 ذكاء اصطناعي</span>
+            <span class="mode">🧠 ذكاء اصطناعي 100%</span>
             المساعد الذكي لشركة سوداني
         </div>
         <div class="messages-area" id="messagesArea">
@@ -138,7 +139,7 @@ app.get('/', (req, res) => {
 
 🤖 أنا المساعد الذكي لشركة **سوداني للاتصالات**.
 
-💬 اسألني عن أي خدمة من خدمات سوداني، وأنا هنا لمساعدتك.
+💬 اسألني عن أي شيء متعلق بسوداني، وأنا هنا لمساعدتك.
 
 📞 خدمة العملاء: 120
 🔗 ماي سوداني: https://my.sudani.sd</div>
@@ -149,11 +150,11 @@ app.get('/', (req, res) => {
             <button onclick="sendQuickMessage('عايز باقة نت سوداني')">📶 باقة نت</button>
             <button onclick="sendQuickMessage('عايز أعرف رصيدي')">💰 الرصيد</button>
             <button onclick="sendQuickMessage('خدمة صاح سوداني')">💵 صاح</button>
-            <button onclick="sendQuickMessage('رقم خدمة العملاء سوداني')">📞 خدمة العملاء</button>
+            <button onclick="sendQuickMessage('أين أقرب مركز سوداني')">📍 مركز سوداني</button>
             <button onclick="sendQuickMessage('رابط ماي سوداني')">🔗 ماي سوداني</button>
         </div>
         <div class="input-area">
-            <input type="text" id="messageInput" placeholder="✍️ اسأل عن أي خدمة من سوداني..." autofocus>
+            <input type="text" id="messageInput" placeholder="✍️ اسأل عن أي شيء..." autofocus>
             <button class="send-btn" id="sendBtn" onclick="sendMessage()">➤</button>
         </div>
     </div>
@@ -267,7 +268,7 @@ app.get('/', (req, res) => {
             }
             
             console.log('✅ سوداني بوت جاهز!');
-            console.log('🧠 جميع الردود عبر الذكاء الاصطناعي');
+            console.log('🧠 جميع الردود عبر الذكاء الاصطناعي 100%');
         });
 
         // اختبار الاتصال
@@ -317,8 +318,8 @@ app.post('/api/chat/message', async (req, res) => {
 app.get('/health', (req, res) => {
     res.json({ 
         status: 'healthy', 
-        service: 'Sudani Bot AI',
-        version: '4.0 - Pure API'
+        service: 'Sudani Bot - Pure AI',
+        version: '6.0 - 100% AI'
     });
 });
 
@@ -328,13 +329,16 @@ app.get('/health', (req, res) => {
 
 app.listen(PORT, '0.0.0.0', () => {
     console.log('=================================');
-    console.log('🚀 سوداني بوت - النسخة النهائية');
+    console.log('🚀 سوداني بوت - 100% ذكاء اصطناعي');
     console.log('=================================');
     console.log('✅ السيرفر يعمل على المنفذ: ' + PORT);
     console.log('🌐 http://localhost:' + PORT);
     console.log('=================================');
-    console.log('🧠 **جميع الردود عبر الذكاء الاصطناعي**');
-    console.log('📱 لا توجد معلومات ملقنة مني');
+    console.log('🧠 **جميع الأسئلة عبر الذكاء الاصطناعي**');
+    console.log('📱 لا توجد معلومات ملقنة');
+    console.log('=================================');
+    console.log('📞 خدمة العملاء: 120');
+    console.log('🔗 ماي سوداني: https://my.sudani.sd');
     console.log('=================================');
 });
 
