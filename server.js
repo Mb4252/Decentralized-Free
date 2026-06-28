@@ -97,21 +97,15 @@ app.get('/', (req, res) => {
     </div>
 
     <script>
-        // ============================================
-        // 🔥 الحل النهائي - تعريف كل شيء في النطاق العام
-        // ============================================
-        
         (function() {
             'use strict';
             
-            // المتغيرات العامة
             const API_URL = window.location.origin;
             const messagesArea = document.getElementById('messagesArea');
             const messageInput = document.getElementById('messageInput');
             const sendBtn = document.getElementById('sendBtn');
             let isProcessing = false;
 
-            // دالة إضافة رسالة
             function addMessage(text, isUser) {
                 const messageDiv = document.createElement('div');
                 messageDiv.className = 'message ' + (isUser ? 'user' : 'bot');
@@ -122,7 +116,6 @@ app.get('/', (req, res) => {
                 messagesArea.scrollTop = messagesArea.scrollHeight;
             }
 
-            // دالة إظهار الـ Typing
             function showTyping() {
                 const typingDiv = document.createElement('div');
                 typingDiv.className = 'message bot';
@@ -132,15 +125,10 @@ app.get('/', (req, res) => {
                 messagesArea.scrollTop = messagesArea.scrollHeight;
             }
 
-            // دالة إخفاء الـ Typing
             function hideTyping() {
                 const typing = document.getElementById('typingIndicator');
                 if (typing) typing.remove();
             }
-
-            // ============================================
-            // 🚀 الدالة الرئيسية - معرفة في النطاق العام
-            // ============================================
             
             window.sendMessage = function() {
                 const message = messageInput.value.trim();
@@ -184,21 +172,12 @@ app.get('/', (req, res) => {
                 });
             };
 
-            // ============================================
-            // ⚡ دالة الإرسال السريع - معرفة في النطاق العام
-            // ============================================
-            
             window.sendQuickMessage = function(text) {
                 messageInput.value = text;
                 window.sendMessage();
             };
 
-            // ============================================
-            // 🎯 ربط الأزرار بعد تحميل الصفحة
-            // ============================================
-            
             document.addEventListener('DOMContentLoaded', function() {
-                // ربط أزرار الإجراءات السريعة
                 document.querySelectorAll('.quick-actions button').forEach(button => {
                     button.addEventListener('click', function(e) {
                         const msg = this.getAttribute('data-msg');
@@ -208,12 +187,10 @@ app.get('/', (req, res) => {
                     });
                 });
 
-                // ربط زر الإرسال
                 if (sendBtn) {
                     sendBtn.addEventListener('click', window.sendMessage);
                 }
 
-                // ربط مفتاح Enter
                 if (messageInput) {
                     messageInput.addEventListener('keydown', function(e) {
                         if (e.key === 'Enter') {
@@ -224,13 +201,8 @@ app.get('/', (req, res) => {
                 }
 
                 console.log('✅ تم إعداد جميع الأزرار بنجاح!');
-                console.log('🔘 عدد الأزرار: ' + document.querySelectorAll('.quick-actions button').length);
             });
 
-            // ============================================
-            // 🧪 اختبار الاتصال
-            // ============================================
-            
             setTimeout(() => {
                 fetch(API_URL + '/health')
                     .then(r => r.json())
@@ -238,7 +210,7 @@ app.get('/', (req, res) => {
                     .catch(() => console.warn('⚠️ لا يمكن الاتصال بالسيرفر'));
             }, 1000);
 
-        })(); // نهاية الـ IIFE
+        })();
     </script>
 </body>
 </html>
@@ -246,17 +218,57 @@ app.get('/', (req, res) => {
 });
 
 // ============================================
-// 🤖 دالة الرد من OpenAI
+// 🤖 دالة الرد من OpenAI - النموذج المُصحح
 // ============================================
 
 async function getAIResponse(userMessage) {
     try {
+        console.log('🧠 جاري الاتصال بـ OpenAI...');
+        console.log('📩 الرسالة:', userMessage);
+        
         const completion = await openai.chat.completions.create({
-            model: 'gpt-4-turbo-preview',
+            model: 'gpt-3.5-turbo', // ✅ تم التغيير من gpt-4-turbo-preview إلى gpt-3.5-turbo
             messages: [
                 {
                     role: 'system',
-                    content: `أنت مساعد شركة سوداني للاتصالات. تحدث باللهجة السودانية. قدم معلومات عن باقات الإنترنت، الرصيد، الشحن، سوداني كاش، والعروض.`,
+                    content: `أنت مساعد ذكي رسمي لشركة "سوداني" للاتصالات في السودان.
+
+                    🔴 مهم جداً: أنت متخصص فقط في شركة سوداني. لا تقدم معلومات عن أي شركة أخرى.
+
+                    هويتك:
+                    - اسمك "سوداني بوت"
+                    - تتحدث باللهجة السودانية
+                    - أنت ودود، صبور، ومحترم
+
+                    خدمات سوداني التي تعرفها:
+
+                    1. باقات الإنترنت:
+                    - باقة اليومية 500 ميجا: *555# (100 جنيه)
+                    - باقة اليومية 1 جيجا: *556# (200 جنيه)
+                    - باقة الأسبوعية 3 جيجا: *567# (500 جنيه)
+                    - باقة الأسبوعية 5 جيجا: *568# (800 جنيه)
+                    - باقة الشهرية 15 جيجا: *789# (1500 جنيه)
+                    - باقة الشهرية 30 جيجا: *790# (2500 جنيه)
+                    - باقة التواصل الاجتماعي: *666# (300 جنيه)
+
+                    2. خدمات الرصيد والشحن:
+                    - شحن الرصيد: *123#
+                    - معرفة الرصيد: *444#
+                    - تجديد الباقة تلقائياً: *777#
+
+                    3. سوداني كاش:
+                    - خدمة التحويل والسحب: *555#
+                    - تحويل فلوس لأي رقم
+                    - سحب نقدي من الوكلاء
+
+                    4. عروض سوداني:
+                    - عرض الـ 10 جيجا: 1000 جنيه (شهرياً)
+                    - عرض الليالي: 200 جنيه (5 جيجا - ليلاً)
+
+                    قواعد الرد:
+                    - إذا عرفت الإجابة: قدمها بوضوح مع الكود
+                    - إذا لم تعرف: قل "آسف، ما عندي معلومات مؤكدة عن هذا، لكن ممكن تتصل بخدمة العملاء على 123"
+                    - استخدم اللهجة السودانية في الرد`,
                 },
                 {
                     role: 'user',
@@ -267,11 +279,27 @@ async function getAIResponse(userMessage) {
             max_tokens: 600,
         });
 
-        return completion.choices[0].message.content;
+        const response = completion.choices[0].message.content;
+        console.log('✅ تم استلام الرد من OpenAI');
+        return response;
 
     } catch (error) {
         console.error('❌ خطأ في OpenAI:', error);
-        return 'عذراً، حصل خطأ. لكن تقدر تتصل بخدمة عملاء سوداني على 123.';
+        
+        // رسائل بديلة حسب نوع الخطأ
+        if (error.code === 'insufficient_quota') {
+            return 'آسف يا حبيبي، النظام يواجه ضغط حالياً. لكن تقدر تتصل بخدمة عملاء سوداني على 123 من أي خط، أو تزور أقرب فرع ليك.';
+        }
+        
+        if (error.status === 401) {
+            return 'عذراً، هناك مشكلة في مفتاح API. الرجاء التواصل مع الدعم الفني.';
+        }
+
+        if (error.code === 'model_not_found') {
+            return 'عذراً، النموذج غير متاح. جاري استخدام نظام بديل.';
+        }
+        
+        return 'عذراً، حصل خطأ تقني. لكن لا تقلق! تقدر تتواصل مع خدمة عملاء سوداني على 123 أو تزور موقع سوداني الرسمي.';
     }
 }
 
@@ -285,20 +313,34 @@ app.post('/api/chat/message', async (req, res) => {
         console.log('📩 رسالة:', message);
 
         if (!message) {
-            return res.status(400).json({ success: false, response: 'الرجاء كتابة سؤال' });
+            return res.status(400).json({ 
+                success: false, 
+                response: '❌ الرجاء كتابة سؤال.' 
+            });
         }
 
         const response = await getAIResponse(message);
-        res.json({ success: true, response: response });
+        res.json({ 
+            success: true, 
+            response: response,
+            source: 'ai'
+        });
 
     } catch (error) {
         console.error('❌ خطأ:', error);
-        res.status(500).json({ success: false, response: 'حدث خطأ في السيرفر' });
+        res.status(500).json({ 
+            success: false, 
+            response: '❌ حدث خطأ في السيرفر، حاول مرة أخرى.' 
+        });
     }
 });
 
 app.get('/health', (req, res) => {
-    res.json({ status: 'healthy', ai: !!process.env.OPENAI_API_KEY });
+    res.json({ 
+        status: 'healthy', 
+        ai: !!process.env.OPENAI_API_KEY,
+        model: 'gpt-3.5-turbo'
+    });
 });
 
 // ============================================
@@ -307,9 +349,27 @@ app.get('/health', (req, res) => {
 
 app.listen(PORT, '0.0.0.0', () => {
     console.log('=================================');
-    console.log('🚀 سوداني بوت يعمل على المنفذ: ' + PORT);
-    console.log('🌐 http://localhost:' + PORT);
+    console.log('🚀 سوداني بوت - النسخة النهائية');
+    console.log('=================================');
+    console.log('✅ السيرفر يعمل على المنفذ: ' + PORT);
+    console.log('🌐 الرابط: http://localhost:' + PORT);
     console.log('=================================');
     console.log('🧠 الذكاء الاصطناعي: ' + (process.env.OPENAI_API_KEY ? '✅ مفعل' : '❌ غير مفعل'));
+    console.log('📦 النموذج المستخدم: gpt-3.5-turbo');
+    console.log('📱 مختص بشركة سوداني فقط');
     console.log('=================================');
+    console.log('💡 جاهز لخدمة عملاء سوداني!');
+    console.log('=================================');
+});
+
+// ============================================
+// 📝 معالجة الأخطاء
+// ============================================
+
+process.on('uncaughtException', (error) => {
+    console.error('💥 خطأ غير متوقع:', error);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('💥 رفض غير متوقع:', reason);
 });
