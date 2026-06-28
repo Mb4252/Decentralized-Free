@@ -25,7 +25,7 @@ const openai = new OpenAI({
 });
 
 // ============================================
-// 🎨 واجهة الويب (مع أزرار تعمل)
+// 🎨 واجهة الويب (مع أزرار تعمل 100%)
 // ============================================
 
 app.get('/', (req, res) => {
@@ -117,15 +117,15 @@ app.get('/', (req, res) => {
             </div>
         </div>
         <div class="quick-actions">
-            <button onclick="sendQuickMessage('عايز باقة نت سوداني')">📱 باقة نت</button>
-            <button onclick="sendQuickMessage('رصيدي خلص سوداني')">💰 الرصيد</button>
-            <button onclick="sendQuickMessage('كيف أشحن سوداني؟')">💳 شحن</button>
-            <button onclick="sendQuickMessage('سوداني كاش')">💵 كاش</button>
-            <button onclick="sendQuickMessage('عروض سوداني الجديدة')">🎁 عروض</button>
+            <button id="btnNet">📱 باقة نت</button>
+            <button id="btnBalance">💰 الرصيد</button>
+            <button id="btnRecharge">💳 شحن</button>
+            <button id="btnCash">💵 كاش</button>
+            <button id="btnOffers">🎁 عروض</button>
         </div>
         <div class="input-area">
-            <input type="text" id="messageInput" placeholder="✍️ اكتب سؤالك هنا..." onkeydown="if(event.key === 'Enter') sendMessage()" autofocus>
-            <button class="send-btn" id="sendBtn" onclick="sendMessage()">➤</button>
+            <input type="text" id="messageInput" placeholder="✍️ اكتب سؤالك هنا..." autofocus>
+            <button class="send-btn" id="sendBtn">➤</button>
         </div>
     </div>
 
@@ -240,12 +240,87 @@ app.get('/', (req, res) => {
         }
 
         // ============================================
+        // 🔧 جعل الدوال متاحة عالمياً
+        // ============================================
+
+        // تعريف الدوال في النطاق العالمي
+        window.sendMessage = sendMessage;
+        window.sendQuickMessage = sendQuickMessage;
+
+        // ============================================
+        // 🎯 إعداد الأزرار باستخدام Event Listeners
+        // ============================================
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // تعيين الأزرار السريعة
+            const buttonMessages = {
+                'btnNet': 'عايز باقة نت سوداني',
+                'btnBalance': 'رصيدي خلص سوداني',
+                'btnRecharge': 'كيف أشحن سوداني؟',
+                'btnCash': 'سوداني كاش',
+                'btnOffers': 'عروض سوداني الجديدة'
+            };
+
+            // إضافة مستمعات للأزرار
+            Object.keys(buttonMessages).forEach(buttonId => {
+                const button = document.getElementById(buttonId);
+                if (button) {
+                    button.addEventListener('click', function() {
+                        const message = buttonMessages[buttonId];
+                        messageInput.value = message;
+                        sendMessage();
+                    });
+                }
+            });
+
+            // إضافة مستمع لزر الإرسال
+            if (sendBtn) {
+                sendBtn.addEventListener('click', sendMessage);
+            }
+
+            // إضافة مستمع لحقل الإدخال (Enter)
+            if (messageInput) {
+                messageInput.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        sendMessage();
+                    }
+                });
+            }
+
+            console.log('✅ تم إعداد جميع الأزرار والمستمعات');
+        });
+
+        // ============================================
+        // ✅ اختبار الاتصال عند التحميل
+        // ============================================
+
+        async function testServerConnection() {
+            try {
+                const response = await fetch(API_URL + '/health');
+                if (response.ok) {
+                    console.log('✅ السيرفر يعمل بشكل جيد');
+                } else {
+                    console.warn('⚠️ السيرفر يعمل ولكن قد تكون هناك مشكلة');
+                }
+            } catch (error) {
+                console.error('❌ لا يمكن الاتصال بالسيرفر:', error);
+                setTimeout(() => {
+                    addMessage('⚠️ تحذير: لا يمكن الاتصال بالسيرفر. تأكد من تشغيل السيرفر.', false);
+                }, 2000);
+            }
+        }
+
+        // تنفيذ اختبار الاتصال بعد تحميل الصفحة
+        setTimeout(testServerConnection, 1000);
+
+        // ============================================
         // 🎯 رسالة ترحيب إضافية
         // ============================================
 
         setTimeout(function() {
             addMessage('💬 اسألني عن أي خدمة من خدمات سوداني!', false);
-        }, 1000);
+        }, 1500);
 
         console.log('✅ التطبيق جاهز للاستخدام مع الذكاء الاصطناعي!');
         console.log('📱 اسأل عن باقات سوداني، الرصيد، سوداني كاش، والعروض');
@@ -265,7 +340,7 @@ async function getAIResponse(userMessage) {
         console.log('📩 الرسالة:', userMessage);
         
         const completion = await openai.chat.completions.create({
-            model: 'gpt-4-turbo-preview', // أو gpt-3.5-turbo للتوفير
+            model: 'gpt-4-turbo-preview',
             messages: [
                 {
                     role: 'system',
@@ -339,7 +414,6 @@ async function getAIResponse(userMessage) {
     } catch (error) {
         console.error('❌ خطأ في OpenAI:', error);
         
-        // رسائل بديلة في حالة الخطأ
         if (error.code === 'insufficient_quota') {
             return 'آسف يا حبيبي، النظام يواجه ضغط حالياً. لكن تقدر تتصل بخدمة عملاء سوداني على 123 من أي خط، أو تزور أقرب فرع ليك.';
         }
@@ -371,10 +445,6 @@ app.post('/api/chat/message', async (req, res) => {
             });
         }
 
-        // ============================================
-        // استخدام OpenAI فقط (بدون نظام هجين)
-        // ============================================
-        
         console.log('🔄 جاري استخدام الذكاء الاصطناعي...');
         const response = await getAIResponse(message);
 
@@ -401,7 +471,6 @@ app.post('/api/chat/message', async (req, res) => {
 // 📊 نقاط إضافية
 // ============================================
 
-// نقطة الصحة
 app.get('/health', (req, res) => {
     res.json({
         status: 'healthy',
@@ -423,7 +492,7 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log('🚀 سوداني بوت - النسخة النهائية');
     console.log('=================================');
     console.log('✅ السيرفر يعمل على المنفذ: ' + PORT);
-    console.log('🌐 الرابط: https://crypto-api-c2v8.onrender.com');
+    console.log('🌐 الرابط: http://localhost:' + PORT);
     console.log('=================================');
     console.log('🧠 الذكاء الاصطناعي: ' + (process.env.OPENAI_API_KEY ? '✅ مفعل' : '❌ غير مفعل'));
     console.log('📱 مختص بشركة سوداني فقط');
