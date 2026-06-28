@@ -7,52 +7,22 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ============================================
-// ✅ حل مشكلة Proxy و Rate Limiting
-// ============================================
-
 app.set('trust proxy', 1);
 app.use(cors());
 app.use(express.json());
 
 // ============================================
-// 📝 سجل الأخطاء (Logging)
-// ============================================
-
-// دالة لتسجيل الأخطاء مع الوقت
-function logError(context, error) {
-    const timestamp = new Date().toISOString();
-    console.log(`[${timestamp}] ❌ خطأ في: ${context}`);
-    console.log(`[${timestamp}] 📝 التفاصيل:`, error);
-    if (error.stack) {
-        console.log(`[${timestamp}] 📚 Stack Trace:`, error.stack);
-    }
-    console.log('-----------------------------------');
-}
-
-// دالة لتسجيل الأحداث العادية
-function logEvent(context, data) {
-    const timestamp = new Date().toISOString();
-    console.log(`[${timestamp}] ✅ ${context}:`, data);
-}
-
-// ============================================
-// 🎨 واجهة الويب المدمجة
+// 🎨 واجهة الويب المبسطة مع اختبار قوي
 // ============================================
 
 app.get('/', (req, res) => {
-  logEvent('تحميل الصفحة الرئيسية', { 
-    ip: req.ip, 
-    userAgent: req.headers['user-agent'] 
-  });
-  
   res.send(`
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>سوداني بوت - المساعد الذكي</title>
+    <title>سوداني بوت - اختبار</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #0f1a2e, #1A2B4A, #2A3F66); height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; }
@@ -91,6 +61,8 @@ app.get('/', (req, res) => {
         .input-area .send-btn:hover { transform: scale(1.05); }
         .input-area .send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         @media (max-width: 500px) { body { padding: 0; } .chat-container { height: 100vh; max-height: 100vh; border-radius: 0; } }
+        .test-btn { background: #ff6b6b !important; color: white !important; border: none !important; padding: 10px 20px !important; border-radius: 10px !important; font-size: 16px !important; margin: 10px !important; }
+        .test-btn:hover { background: #ff4757 !important; }
     </style>
 </head>
 <body>
@@ -98,167 +70,107 @@ app.get('/', (req, res) => {
         <div class="chat-header">
             <div class="avatar">ب</div>
             <div class="info">
-                <h3>🤖 سوداني بوت</h3>
-                <p><span class="dot"></span> متصل الآن <span style="background:rgba(255,255,255,0.15);padding:2px 10px;border-radius:20px;font-size:11px;">v2.0</span></p>
+                <h3>🤖 سوداني بوت - اختبار</h3>
+                <p><span class="dot"></span> متصل الآن <span style="background:rgba(255,255,255,0.15);padding:2px 10px;border-radius:20px;font-size:11px;">v3.0</span></p>
             </div>
         </div>
-        <div class="status-bar">⚡ مساعدك الذكي لخدمات سوداني</div>
+        <div class="status-bar">⚡ اختبار الأزرار - اضغط F12 وشاهد Console</div>
         <div class="messages-area" id="messagesArea">
             <div class="message bot">
                 <div class="bubble">
-                    👋 أهلاً وسهلاً! أنا <strong>سوداني بوت</strong>، مساعدك الذكي.<br><br>
-                    📱 اسألني عن:<br>• باقات الإنترنت والنت<br>• الرصيد والشحن<br>• سوداني كاش
+                    🔴 <strong>وضع الاختبار</strong><br><br>
+                    اضغط على الأزرار أدناه أو اكتب رسالة.<br>
+                    تأكد من فتح Console (F12) لمشاهدة السجلات.
                 </div>
                 <span class="time">الآن</span>
             </div>
         </div>
         <div class="quick-actions">
-            <button onclick="sendQuickMessage('عايز باقة نت')">📱 باقة نت</button>
-            <button onclick="sendQuickMessage('رصيدي خلص')">💰 الرصيد</button>
-            <button onclick="sendQuickMessage('كيف أشحن؟')">💳 شحن</button>
-            <button onclick="sendQuickMessage('سوداني كاش')">💵 كاش</button>
+            <button onclick="testButton()" class="test-btn">🧪 زر اختبار (يظهر alert)</button>
+            <button onclick="sendMessage('عايز باقة نت')">📱 باقة نت</button>
+            <button onclick="sendMessage('رصيدي خلص')">💰 الرصيد</button>
+            <button onclick="sendMessage('كيف أشحن؟')">💳 شحن</button>
+            <button onclick="sendMessage('سوداني كاش')">💵 كاش</button>
         </div>
         <div class="input-area">
-            <input type="text" id="messageInput" placeholder="✍️ اكتب سؤالك هنا..." onkeydown="if(event.key === 'Enter') sendMessage()" autofocus>
-            <button class="send-btn" id="sendBtn" onclick="sendMessage()">➤</button>
+            <input type="text" id="messageInput" placeholder="✍️ اكتب سؤالك هنا..." onkeydown="if(event.key === 'Enter') sendMessage(document.getElementById('messageInput').value)">
+            <button class="send-btn" id="sendBtn" onclick="sendMessage(document.getElementById('messageInput').value)">➤</button>
         </div>
     </div>
 
     <script>
         // ============================================
-        // 📝 سجل الأخطاء في المتصفح (Browser Console)
+        // 🧪 دالة اختبار بسيطة
         // ============================================
         
-        // دالة لتسجيل الأحداث في Console المتصفح
-        function logEvent(context, data) {
-            const timestamp = new Date().toISOString();
-            console.log(\`[\${timestamp}] ✅ \${context}:\`, data);
+        function testButton() {
+            alert("✅ زر الاختبار يعمل!");
+            console.log("✅ زر الاختبار تم الضغط عليه");
+            
+            // إضافة رسالة في الشات
+            addMessage("🧪 زر الاختبار يعمل بنجاح!", false);
         }
-        
-        function logError(context, error) {
-            const timestamp = new Date().toISOString();
-            console.error(\`[\${timestamp}] ❌ خطأ في: \${context}\`);
-            console.error(\`[\${timestamp}] 📝 التفاصيل:\`, error);
-            if (error.stack) {
-                console.error(\`[\${timestamp}] 📚 Stack Trace:\`, error.stack);
-            }
-            console.error('-----------------------------------');
-        }
-
-        // ============================================
-        // 🌐 إعدادات المتغيرات
-        // ============================================
-        
-        const API_URL = window.location.origin;
-        const messagesArea = document.getElementById('messagesArea');
-        const messageInput = document.getElementById('messageInput');
-        const sendBtn = document.getElementById('sendBtn');
-        let isProcessing = false;
-
-        logEvent('🔧 بدء التطبيق', { 
-            API_URL: API_URL,
-            userAgent: navigator.userAgent,
-            timestamp: new Date().toISOString()
-        });
 
         // ============================================
         // 📝 دوال عرض الرسائل
         // ============================================
 
+        function addMessage(text, isUser) {
+            const messagesArea = document.getElementById('messagesArea');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message ' + (isUser ? 'user' : 'bot');
+            const now = new Date();
+            const time = now.toLocaleTimeString('ar-SD', { hour: '2-digit', minute: '2-digit' });
+            messageDiv.innerHTML = '<div class="bubble">' + text + '</div><span class="time">' + time + '</span>';
+            messagesArea.appendChild(messageDiv);
+            messagesArea.scrollTop = messagesArea.scrollHeight;
+        }
+
         function showTyping() {
-            try {
-                const typingDiv = document.createElement('div');
-                typingDiv.className = 'message bot';
-                typingDiv.id = 'typingIndicator';
-                typingDiv.innerHTML = '<div class="typing-indicator active"><span></span><span></span><span></span></div>';
-                messagesArea.appendChild(typingDiv);
-                messagesArea.scrollTop = messagesArea.scrollHeight;
-                logEvent('🔄 إظهار مؤشر الكتابة', { success: true });
-            } catch (error) {
-                logError('إظهار مؤشر الكتابة', error);
-            }
+            const messagesArea = document.getElementById('messagesArea');
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'message bot';
+            typingDiv.id = 'typingIndicator';
+            typingDiv.innerHTML = '<div class="typing-indicator active"><span></span><span></span><span></span></div>';
+            messagesArea.appendChild(typingDiv);
+            messagesArea.scrollTop = messagesArea.scrollHeight;
         }
 
         function hideTyping() {
-            try {
-                const typing = document.getElementById('typingIndicator');
-                if (typing) typing.remove();
-                logEvent('🔄 إخفاء مؤشر الكتابة', { success: true });
-            } catch (error) {
-                logError('إخفاء مؤشر الكتابة', error);
-            }
-        }
-
-        function addMessage(text, isUser) {
-            try {
-                const messageDiv = document.createElement('div');
-                messageDiv.className = 'message ' + (isUser ? 'user' : 'bot');
-                const now = new Date();
-                const time = now.toLocaleTimeString('ar-SD', { hour: '2-digit', minute: '2-digit' });
-                const formattedText = text.replace(/\*(\\d+#)/g, '<a href="tel:$1" style="color: #1A2B4A; font-weight: bold;">*$1</a>');
-                messageDiv.innerHTML = '<div class="bubble">' + formattedText + '</div><span class="time">' + time + '</span>';
-                messagesArea.appendChild(messageDiv);
-                messagesArea.scrollTop = messagesArea.scrollHeight;
-                logEvent('📩 إضافة رسالة', { 
-                    isUser: isUser, 
-                    textLength: text.length,
-                    preview: text.substring(0, 50) + (text.length > 50 ? '...' : '')
-                });
-            } catch (error) {
-                logError('إضافة رسالة', error);
-            }
+            const typing = document.getElementById('typingIndicator');
+            if (typing) typing.remove();
         }
 
         // ============================================
-        // 💬 دالة sendMessage الرئيسية (مع سجل كامل)
+        // 💬 دالة sendMessage المحسنة
         // ============================================
         
-        async function sendMessage() {
-            logEvent('🚀 بدء sendMessage', { 
-                isProcessing: isProcessing,
-                inputValue: messageInput.value,
-                inputLength: messageInput.value.length
-            });
-
-            // اختبار للتأكد من أن الدالة تعمل
-            try {
-                alert("✅ sendMessage works!");
-            } catch (alertError) {
-                logError('❌ فشل alert', alertError);
+        async function sendMessage(message) {
+            console.log("🚀 دالة sendMessage تم استدعاؤها!");
+            console.log("📝 الرسالة:", message);
+            
+            // إذا كانت الرسالة فارغة، اقرأ من حقل الإدخال
+            if (!message || message.trim() === '') {
+                const input = document.getElementById('messageInput');
+                message = input.value.trim();
+                if (!message) {
+                    alert("⚠️ الرجاء كتابة رسالة!");
+                    return;
+                }
             }
 
-            const message = messageInput.value.trim();
-            logEvent('📝 قراءة الرسالة', { 
-                message: message,
-                isEmpty: message === '',
-                length: message.length
-            });
+            // تأكيد أن الدالة تعمل
+            alert("✅ sendMessage تعمل! الرسالة: " + message);
 
-            if (!message || isProcessing) {
-                logEvent('⏭️ تخطي الإرسال', { 
-                    reason: !message ? 'الرسالة فارغة' : 'جاري المعالجة',
-                    message: message,
-                    isProcessing: isProcessing
-                });
-                return;
-            }
-
-            isProcessing = true;
-            messageInput.disabled = true;
-            sendBtn.disabled = true;
-
+            // إضافة رسالة المستخدم
             addMessage(message, true);
-            messageInput.value = '';
+            document.getElementById('messageInput').value = '';
             showTyping();
 
             try {
-                logEvent('📡 إرسال طلب إلى الـ API', { 
-                    url: API_URL + '/api/chat/message',
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: message, userId: 'web_user_' + Date.now() })
-                });
-
+                const API_URL = window.location.origin;
+                console.log("📡 إرسال طلب إلى:", API_URL + '/api/chat/message');
+                
                 const response = await fetch(API_URL + '/api/chat/message', {
                     method: 'POST',
                     headers: {
@@ -270,97 +182,43 @@ app.get('/', (req, res) => {
                     })
                 });
 
-                logEvent('📥 استلام الرد من الـ API', { 
-                    status: response.status,
-                    statusText: response.statusText,
-                    ok: response.ok,
-                    headers: Object.fromEntries(response.headers.entries())
-                });
+                console.log("📥 حالة الرد:", response.status);
 
                 if (!response.ok) {
                     throw new Error("HTTP " + response.status + ": " + response.statusText);
                 }
 
                 const data = await response.json();
-                logEvent('📦 تحليل البيانات', { 
-                    success: data.success,
-                    hasResponse: !!data.response,
-                    responsePreview: data.response ? data.response.substring(0, 100) : null
-                });
-
+                console.log("📦 البيانات:", data);
+                
                 hideTyping();
 
                 if (data.success) {
                     addMessage(data.response, false);
-                    if (data.suggestions && data.suggestions.length > 0) {
-                        setTimeout(function() {
-                            addMessage('💡 اقتراحات: ' + data.suggestions.join(' • '), false);
-                        }, 500);
-                    }
-                    logEvent('✅ تم الرد بنجاح', { 
-                        responseLength: data.response.length,
-                        suggestionsCount: data.suggestions ? data.suggestions.length : 0
-                    });
                 } else {
                     addMessage('❌ عذراً، حدث خطأ. حاول مرة أخرى.', false);
-                    logError('❌ رد غير ناجح من الـ API', data);
                 }
             } catch (error) {
                 hideTyping();
-                const errorMessage = '❌ لا يمكن الاتصال بالسيرفر: ' + error.message;
-                addMessage(errorMessage, false);
-                logError('💥 خطأ في الاتصال بالـ API', {
-                    error: error.message,
-                    stack: error.stack,
-                    url: API_URL + '/api/chat/message'
-                });
-                console.error('💥 تفاصيل الخطأ الكاملة:', error);
+                console.error("💥 خطأ:", error);
+                addMessage('❌ خطأ: ' + error.message, false);
             }
-
-            isProcessing = false;
-            messageInput.disabled = false;
-            sendBtn.disabled = false;
-            messageInput.focus();
-            logEvent('🔚 انتهاء sendMessage', { 
-                isProcessing: isProcessing,
-                inputDisabled: messageInput.disabled,
-                btnDisabled: sendBtn.disabled
-            });
         }
 
         // ============================================
-        // ⚡ دوال مساعدة
+        // 📢 رسائل ترحيب
         // ============================================
 
-        function sendQuickMessage(text) {
-            logEvent('⚡ إرسال رسالة سريعة', { text: text });
-            messageInput.value = text;
-            sendMessage();
-        }
-
-        // ============================================
-        // 🎯 رسالة ترحيب إضافية
-        // ============================================
-
+        console.log("=================================");
+        console.log("🤖 سوداني بوت - وضع الاختبار");
+        console.log("=================================");
+        console.log("📝 اضغط على زر 'اختبار' لترى إذا كانت الأزرار تعمل");
+        console.log("🔍 افتح هذا Console لمشاهدة السجلات");
+        console.log("=================================");
+        
         setTimeout(function() {
-            addMessage('💬 كيف أقدر أساعدك اليوم؟', false);
-            logEvent('📢 رسالة ترحيب إضافية', { success: true });
-        }, 800);
-
-        // ============================================
-        // 📊 معلومات التطبيق
-        // ============================================
-
-        console.log('=================================');
-        console.log('🤖 سوداني بوت - معلومات التطبيق');
-        console.log('=================================');
-        console.log('📍 API URL:', API_URL);
-        console.log('📱 المتصفح:', navigator.userAgent);
-        console.log('🌐 الصفحة:', window.location.href);
-        console.log('=================================');
-        console.log('💬 مرحباً بك في المساعد الذكي لسوداني');
-        console.log('📝 انظر سجل الأحداث أعلاه لتتبع العمليات');
-        console.log('=================================');
+            addMessage("🔴 وضع الاختبار: اضغط على زر '🧪 زر اختبار' أولاً!", false);
+        }, 500);
     </script>
 </body>
 </html>
@@ -368,101 +226,51 @@ app.get('/', (req, res) => {
 });
 
 // ============================================
-// 🔗 نقطة API للمحادثة (مع سجل كامل)
+// 🔗 نقطة API للمحادثة
 // ============================================
 
 app.post('/api/chat/message', (req, res) => {
-  const requestId = Date.now() + '-' + Math.random().toString(36).substring(7);
-  logEvent('📨 استلام طلب API', { 
-    requestId: requestId,
-    body: req.body,
-    ip: req.ip,
-    userAgent: req.headers['user-agent']
-  });
-
+  console.log('📨 استلام طلب:', req.body);
+  
   try {
-    const { message, userId } = req.body;
+    const { message } = req.body;
     
-    logEvent('📝 تحليل الطلب', { 
-      requestId: requestId,
-      message: message,
-      userId: userId,
-      messageType: typeof message,
-      isEmpty: !message
-    });
-
-    // التحقق من وجود الرسالة
     if (!message) {
-      logError('❌ رسالة فارغة', { requestId: requestId, body: req.body });
       return res.status(400).json({
         success: false,
         response: '❌ الرجاء كتابة سؤال.',
-        error: 'Message is required',
-        requestId: requestId
+        error: 'Message is required'
       });
     }
 
-    console.log(`[${new Date().toISOString()}] 📩 رسالة جديدة من ${userId || 'مجهول'}: "${message}"`);
+    console.log('💬 معالجة الرسالة:', message);
 
-    // ردود نموذجية باللهجة السودانية
+    // ردود نموذجية
     const responses = {
-      'عايز باقة نت': '🎯 يا هلا بك! عندنا باقات متنوعة:\n📱 اليومية: *555# (500 ميجا - 100 جنيه)\n📱 الأسبوعية: *567# (3 جيجا - 500 جنيه)\n📱 الشهرية: *789# (15 جيجا - 1500 جنيه)\n\n💡 أنصحك تشترك في باقة الشهرية لأنها أوفر!',
-      'رصيدي خلص': '💰 والله ما تقلق! عشان تشحن رصيدك:\n1️⃣ اطلب *123#\n2️⃣ اختر "شحن رصيد"\n3️⃣ أدخل رقم البطاقة\n\nأو استخدم سوداني كاش للشحن الفوري!',
-      'كيف أشحن؟': '💳 سهلة جداً! اتبع الخطوات:\n1️⃣ اطلب *123#\n2️⃣ اختر "شحن رصيد"\n3️⃣ أدخل رقم بطاقة الشحن\n4️⃣ اضغط تأكيد\n\n✅ خلال ثواني رصيدك يزيد!',
-      'سوداني كاش': '💵 خدمة سوداني كاش تقدم لك:\n• تحويل فلوس لأي رقم\n• سحب نقدي من الوكلاء\n• شراء رصيد\n• دفع الفواتير\n\n📱 اطلب *555# وابدأ!',
-      'عايز أعرف رصيدي': '📊 بكل بساطة! اطلب *444# من هاتفك، وستظهر لك رسالة برصيدك الحالي فوراً.'
+      'عايز باقة نت': '🎯 يا هلا بك! عندنا باقات متنوعة:\n📱 اليومية: *555#\n📱 الأسبوعية: *567#\n📱 الشهرية: *789#',
+      'رصيدي خلص': '💰 عشان تشحن رصيدك اطلب *123#',
+      'كيف أشحن؟': '💳 اطلب *123# واتبع الخطوات',
+      'سوداني كاش': '💵 اطلب *555# لخدمة سوداني كاش',
+      'عايز أعرف رصيدي': '📊 اطلب *444#'
     };
     
     let response = responses[message];
-    logEvent('🔍 البحث عن رد', { 
-      requestId: requestId,
-      found: !!response,
-      message: message,
-      responsePreview: response ? response.substring(0, 50) : null
-    });
-    
     if (!response) {
-      const generalResponses = [
-        '🤔 والله ما فهمت سؤالك تماماً، لكن تقدر تسألني عن:\n• الباقات والنت\n• الرصيد والشحن\n• سوداني كاش\n\nأو اتصل على 123 للدعم المباشر.',
-        '😊 مرحباً! أنا هنا عشان أساعدك. اسألني عن أي خدمة من خدمات سوداني.',
-        '💬 كيف أقدر أساعدك اليوم؟ تقدر تسألني عن الباقات، الرصيد، أو سوداني كاش.'
-      ];
-      response = generalResponses[Math.floor(Math.random() * generalResponses.length)];
-      logEvent('💬 استخدام رد عام', { 
-        requestId: requestId,
-        response: response
-      });
+      response = '🤔 كيف أقدر أساعدك؟ اسألني عن الباقات، الرصيد، أو سوداني كاش.';
     }
     
-    const responseData = {
+    res.json({
       success: true,
       response: response,
-      intent: { type: 'general', confidence: 0.8 },
       timestamp: new Date().toISOString(),
-      suggestions: ['عايز باقة نت', 'رصيدي خلص', 'كيف أشحن؟', 'سوداني كاش'],
-      requestId: requestId
-    };
-
-    logEvent('✅ إرسال الرد', { 
-      requestId: requestId,
-      responseLength: response.length,
-      suggestionsCount: responseData.suggestions.length
+      suggestions: ['عايز باقة نت', 'رصيدي خلص', 'كيف أشحن؟', 'سوداني كاش']
     });
-
-    res.json(responseData);
   } catch (error) {
-    logError('💥 خطأ في معالجة الطلب', {
-      requestId: requestId,
-      error: error.message,
-      stack: error.stack,
-      body: req.body
-    });
-    
+    console.error('❌ خطأ:', error);
     res.status(500).json({
       success: false,
-      response: '❌ عذراً، حدث خطأ داخلي في السيرفر.',
-      error: error.message,
-      requestId: requestId
+      response: '❌ حدث خطأ في السيرفر',
+      error: error.message
     });
   }
 });
@@ -472,17 +280,11 @@ app.post('/api/chat/message', (req, res) => {
 // ============================================
 
 app.get('/health', (req, res) => {
-  logEvent('📊 فحص الصحة', { 
-    ip: req.ip,
-    timestamp: new Date().toISOString()
-  });
-  
   res.json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
     service: 'Sudani AI Assistant',
-    version: '2.0.0',
-    environment: process.env.NODE_ENV || 'development'
+    version: '3.0.0'
   });
 });
 
@@ -492,24 +294,12 @@ app.get('/health', (req, res) => {
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log('=================================');
-  console.log('🚀 Sudani AI Assistant Server');
+  console.log('🚀 Sudani AI Assistant - وضع الاختبار');
   console.log('=================================');
   console.log('✅ Server running on port: ' + PORT);
   console.log('🌐 URL: https://crypto-api-c2v8.onrender.com');
   console.log('=================================');
-  console.log('💡 Ready to serve Sudanese users!');
-  console.log('📝 سجل الأخطاء مفعل بالكامل');
+  console.log('🧪 وضع الاختبار مفعل');
+  console.log('📝 اضغط على زر "اختبار" أولاً');
   console.log('=================================');
-});
-
-// ============================================
-// 📝 معالجة الأخطاء العامة
-// ============================================
-
-process.on('uncaughtException', (error) => {
-  logError('💥 استثناء غير متوقع (uncaughtException)', error);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  logError('💥 رفض غير متوقع (unhandledRejection)', { reason, promise });
 });
