@@ -1,0 +1,16 @@
+{
+  "service": "باقات المكالمات",
+  "rihBalak": {
+    "daily": { "name": "ريح بالك يوم", "minutes": "50 دقيقة داخل الشبكة", "code": "*1#", "validity": "يوم" },
+    "weekly": { "name": "ريح بالك أسبوع", "minutes": "500 دقيقة داخل الشبكة", "code": "*5#", "validity": "أسبوع" },
+    "monthly": { "name": "ريح بالك شهر", "minutes": "1500 دقيقة داخل الشبكة", "code": "*50#", "validity": "شهر" },
+    "max": { "name": "ريح بالك Max", "minutes": "1000 دقيقة داخل الشبكة", "code": "*55#", "validity": "30 يوم" }
+  },
+  "ahlaYom": {
+    "daily": { "name": "أحلى يوم", "minutes": "100 دقيقة داخل الشبكة", "code": "*60#", "validity": "يوم" }
+  },
+  "khaliAnak": {
+    "weekly": { "name": "خلي عنك أسبوع", "code": "*12#", "validity": "أسبوع" },
+    "monthly": { "name": "خلي عنك شهر", "code": "*40#", "validity": "شهر" }
+  }
+}
