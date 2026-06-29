@@ -1,777 +1,945 @@
+const axios = require('axios');
+const crypto = require('crypto');
+const dotenv = require('dotenv');
 const express = require('express');
 const cors = require('cors');
-const dotenv = require('dotenv');
-const OpenAI = require('openai');
 const fs = require('fs');
 const path = require('path');
-const winston = require('winston');
-const rateLimit = require('express-rate-limit');
-const helmet = require('helmet');
-const compression = require('compression');
-
 dotenv.config();
 
-const app = express();
-const PORT = process.env.PORT || 3000;
+// ==========================================
+// التحقق من المتغيرات البيئية
+// ==========================================
 
-// ============================================
-// 📝 إعداد التسجيل (Logging)
-// ============================================
-
-const logsDir = path.join(__dirname, 'logs');
-if (!fs.existsSync(logsDir)) {
-    fs.mkdirSync(logsDir, { recursive: true });
+if (!process.env.BINGX_API_KEY || !process.env.BINGX_API_SECRET) {
+  console.error('❌ خطأ: BINGX_API_KEY و BINGX_API_SECRET مطلوبان في ملف .env');
+  process.exit(1);
 }
 
-const logger = winston.createLogger({
-    level: 'info',
-    format: winston.format.combine(
-        winston.format.timestamp(),
-        winston.format.json()
-    ),
-    transports: [
-        new winston.transports.File({ 
-            filename: path.join(logsDir, 'error.log'), 
-            level: 'error' 
-        }),
-        new winston.transports.File({ 
-            filename: path.join(logsDir, 'chat.log') 
-        }),
-        new winston.transports.Console({ 
-            format: winston.format.simple() 
-        })
-    ]
-});
+// ==========================================
+// إعدادات البوت
+// ==========================================
 
-// ============================================
-// 🛡️ الأمان والحماية
-// ============================================
+const API_KEY = process.env.BINGX_API_KEY;
+const API_SECRET = process.env.BINGX_API_SECRET;
 
-app.use(helmet({
-    contentSecurityPolicy: false,
-}));
-app.use(compression());
-app.use(cors());
-app.use(express.static(path.join(__dirname, 'public')));
-app.use(express.json({ limit: '10mb' }));
+// ✅ إعدادات ثابتة
+const TRADE_AMOUNT = 0.5;
+const LEVERAGE = 10;
+const PROFIT_USDT_TARGET = 0.16;
+const STOP_LOSS_USDT = 0.26;
+const STOP_LOSS_ENABLED = true;
 
-const limiter = rateLimit({
-    windowMs: 60 * 1000,
-    max: 15,
-    message: '❌ تجاوزت الحد الأقصى للرسائل. انتظر 30 ثانية.',
-    handler: (req, res) => {
-        logger.warn(`🚫 سبام من ${req.ip}`);
-        res.status(429).json({ error: 'Too many requests' });
+// ✅ إعدادات الشمعة
+const CANDLE_INTERVAL = '1m';
+const CANDLE_LIMIT = 30;
+
+// ✅ سرعة المسح
+const SCAN_INTERVAL = 500;
+const cooldown = 1000;
+
+// ✅ العملات
+const SYMBOLS = [
+  "BTC-USDT", "ETH-USDT", "SOL-USDT", "BNB-USDT", "XRP-USDT",
+  "DOGE-USDT", "ADA-USDT", "LINK-USDT", "AVAX-USDT", "DOT-USDT",
+  "TRX-USDT", "LTC-USDT", "BCH-USDT", "APT-USDT", "SUI-USDT",
+  "ATOM-USDT", "FIL-USDT", "AAVE-USDT", "ARB-USDT", "OP-USDT",
+  "INJ-USDT", "SEI-USDT", "ETC-USDT", "NEAR-USDT", "HBAR-USDT",
+  "ICP-USDT", "RUNE-USDT", "TIA-USDT", "JUP-USDT", "WIF-USDT",
+  "PEPE-USDT", "FET-USDT", "RENDER-USDT", "TAO-USDT", "ONDO-USDT",
+  "ENA-USDT", "MKR-USDT", "CRV-USDT", "UNI-USDT", "PENDLE-USDT",
+  "ORDI-USDT", "GRT-USDT", "DYDX-USDT", "XLM-USDT", "SAND-USDT",
+  "MANA-USDT", "ALGO-USDT", "EOS-USDT", "FLOW-USDT", "THETA-USDT",
+];
+
+// ✅ المتغيرات
+let currentPosition = null;
+let isRunning = false;
+let lastTradeTime = 0;
+
+// ✅ سجل الصفقات
+const TRADES_FILE = path.join(__dirname, 'trades.json');
+let tradesHistory = [];
+let winRateBySymbol = {};
+
+// ==========================================
+// تحميل سجل الصفقات
+// ==========================================
+
+function loadTradesHistory() {
+  try {
+    if (fs.existsSync(TRADES_FILE)) {
+      const data = fs.readFileSync(TRADES_FILE, 'utf8');
+      tradesHistory = JSON.parse(data);
+      console.log(`📊 تم تحميل ${tradesHistory.length} صفقة سابقة`);
+      
+      const symbolStats = {};
+      for (const trade of tradesHistory) {
+        if (!symbolStats[trade.symbol]) {
+          symbolStats[trade.symbol] = { wins: 0, total: 0 };
+        }
+        symbolStats[trade.symbol].total++;
+        if (trade.result === 'WIN') {
+          symbolStats[trade.symbol].wins++;
+        }
+      }
+      
+      for (const [symbol, stats] of Object.entries(symbolStats)) {
+        winRateBySymbol[symbol] = (stats.wins / stats.total) * 100;
+        console.log(`   📊 ${symbol}: ${winRateBySymbol[symbol].toFixed(1)}% (${stats.wins}/${stats.total})`);
+      }
     }
-});
-app.use('/api/', limiter);
-
-// ============================================
-// 💾 الذاكرة والتخزين المؤقت
-// ============================================
-
-const conversations = new Map();
-const cache = new Map();
-const userAnalytics = new Map();
-
-// ============================================
-// 📚 تحميل قاعدة المعرفة
-// ============================================
-
-const knowledgeDir = path.join(__dirname, 'knowledge');
-if (!fs.existsSync(knowledgeDir)) {
-    fs.mkdirSync(knowledgeDir, { recursive: true });
+  } catch (error) {
+    console.error('❌ فشل تحميل سجل الصفقات:', error);
+    tradesHistory = [];
+  }
 }
 
-function loadKnowledge() {
-    const knowledge = {};
-    try {
-        const files = fs.readdirSync(knowledgeDir);
-        files.forEach(file => {
-            if (file.endsWith('.json')) {
-                const key = path.basename(file, '.json');
-                try {
-                    const data = fs.readFileSync(path.join(knowledgeDir, file), 'utf8');
-                    knowledge[key] = JSON.parse(data);
-                    logger.info(`✅ تم تحميل: ${file}`);
-                } catch (err) {
-                    logger.error(`❌ خطأ في تحميل ${file}:`, err.message);
-                }
-            }
-        });
-    } catch (err) {
-        logger.error('❌ خطأ في قراءة مجلد knowledge:', err.message);
-    }
-    return knowledge;
+function saveTrade(trade) {
+  tradesHistory.push(trade);
+  try {
+    fs.writeFileSync(TRADES_FILE, JSON.stringify(tradesHistory, null, 2));
+  } catch (error) {
+    console.error('❌ فشل حفظ الصفقة:', error);
+  }
 }
 
-const knowledgeBase = loadKnowledge();
+// ==========================================
+// تخزين معلومات العقود
+// ==========================================
 
-// ============================================
-// 🧠 اكتشاف نية المستخدم (محسّن)
-// ============================================
+let contractInfoCache = {};
+let lastContractFetch = 0;
+const CONTRACT_CACHE_TTL = 60000;
 
-function detectIntent(message) {
-    const msg = message.toLowerCase().trim();
-    
-    // الأخطاء الإملائية الشائعة
-    const corrections = {
-        'يونكص': 'يونكس',
-        'يونك': 'يونكس',
-        'يونيكس': 'يونكس',
-        'رصيد': 'balance',
-        'انترنت': 'internet',
-        'نت': 'internet',
-        'انترنيت': 'internet',
-        'صاح': 'sah',
-        'كاش': 'sah',
-        'ريح': 'packages',
-        'باقة': 'packages',
-        'ابي': 'packages',
-        'عايز': 'packages',
-        'خدمة العملاء': 'contact',
-        'دعم': 'contact',
-        'شكوى': 'contact',
-        'فرع': 'branches',
-        'مركز': 'branches',
-        'موقع': 'branches'
-    };
-    
-    for (let [key, value] of Object.entries(corrections)) {
-        if (msg.includes(key)) {
-            return value;
-        }
-    }
-    
-    // نوايا محددة
-    if (msg.includes('يونكس') || msg.includes('unix')) return 'unix';
-    if (msg.includes('رصيد') || msg.includes('balance')) return 'balance';
-    if (msg.includes('انترنت') || msg.includes('internet') || msg.includes('نت')) return 'internet';
-    if (msg.includes('صاح') || msg.includes('sah') || msg.includes('كاش')) return 'sah';
-    if (msg.includes('باقة') || msg.includes('ريح بالك') || msg.includes('ريح')) return 'packages';
-    if (msg.includes('فرع') || msg.includes('مركز') || msg.includes('موقع')) return 'branches';
-    if (msg.includes('خدمة العملاء') || msg.includes('رقم') || msg.includes('اتصال')) return 'contact';
-    if (msg.includes('4g') || msg.includes('lte')) return 'lte';
-    if (msg.includes('ابي') || msg.includes('عايز') || msg.includes('اريد')) return 'request';
-    
-    return null;
+// ==========================================
+// نقاط النهاية
+// ==========================================
+
+const ENDPOINTS = {
+  FUTURES_BALANCE: '/openApi/swap/v2/user/balance',
+  FUTURES_PRICE: '/openApi/swap/v2/quote/price',
+  FUTURES_LEVERAGE: '/openApi/swap/v2/trade/leverage',
+  FUTURES_ORDER: '/openApi/swap/v2/trade/order',
+  FUTURES_CANDLE: '/openApi/swap/v2/quote/klines',
+  FUTURES_TICKER: '/openApi/swap/v2/quote/ticker',
+  FUTURES_CONTRACTS: '/openApi/swap/v2/quote/contracts',
+};
+
+// ==========================================
+// دالة التوقيع
+// ==========================================
+
+function generateSignature(params, secret) {
+  const queryString = Object.keys(params)
+    .sort()
+    .map(key => `${key}=${params[key]}`)
+    .join('&');
+  
+  const signature = crypto
+    .createHmac('sha256', secret.trim())
+    .update(queryString)
+    .digest('hex');
+  
+  return signature;
 }
 
-// ============================================
-// 📊 تحليل المستخدم
-// ============================================
+// ==========================================
+// دالة BingX Request
+// ==========================================
 
-function getUserAnalytics(userId) {
-    if (!userAnalytics.has(userId)) {
-        userAnalytics.set(userId, {
-            lastService: null,
-            lastVisit: new Date(),
-            messageCount: 0,
-            history: []
-        });
-    }
-    return userAnalytics.get(userId);
-}
+async function bingxRequest(method, endpoint, params = {}, signed = true) {
+  const baseURL = 'https://open-api.bingx.com';
 
-// ============================================
-// 💬 الحصول على تاريخ المحادثة
-// ============================================
+  const allParams = {
+    ...params,
+    timestamp: Date.now().toString()
+  };
 
-function getHistory(userId) {
-    if (!conversations.has(userId)) {
-        conversations.set(userId, []);
-    }
-    return conversations.get(userId);
-}
+  let signature = '';
 
-// ============================================
-// 🔍 البحث المتقدم في قاعدة المعرفة
-// ============================================
+  if (signed) {
+    signature = generateSignature(allParams, API_SECRET);
+  }
 
-function searchKnowledge(query) {
-    const results = [];
-    const msg = query.toLowerCase();
-    
-    // تقسيم السؤال إلى كلمات مفتاحية
-    const keywords = msg.split(/\s+/).filter(word => word.length > 2);
-    
-    for (const [key, data] of Object.entries(knowledgeBase)) {
-        try {
-            const jsonStr = JSON.stringify(data).toLowerCase();
-            // البحث عن أي كلمة مفتاحية
-            let found = false;
-            for (const keyword of keywords) {
-                if (jsonStr.includes(keyword)) {
-                    found = true;
-                    break;
-                }
-            }
-            // إذا كانت الكلمات قليلة، ابحث عن العبارة كاملة
-            if (!found && keywords.length <= 2) {
-                if (jsonStr.includes(msg)) {
-                    found = true;
-                }
-            }
-            if (found) {
-                results.push({ key, data });
-            }
-        } catch (err) {
-            // تجاهل الأخطاء
-        }
-    }
-    
-    return results;
-}
+  const query = Object.keys(allParams)
+    .sort()
+    .map(k => `${k}=${allParams[k]}`)
+    .join('&');
 
-// ============================================
-// 🎯 الردود السريعة (للكلمات المفتاحية فقط)
-// ============================================
+  const finalQuery = signed ? `${query}&signature=${signature}` : query;
 
-function getQuickResponse(intent) {
-    const cacheKey = `quick_${intent}`;
-    if (cache.has(cacheKey)) {
-        return cache.get(cacheKey);
-    }
-    
-    let response = null;
-    
-    switch(intent) {
-        case 'balance':
-            response = `💰 معرفة الرصيد: <a href="tel:*222#">*222#</a>`;
-            break;
-        case 'unix':
-            const unixData = knowledgeBase.unix || { features: ['نظام وحدات مرن'] };
-            response = `📱 نظام يونكس (UNIX):
-🔹 كود الاشتراك: <a href="tel:*6#">*6#</a>
-✨ المميزات:
-${unixData.features.map(f => `• ${f}`).join('\n')}`;
-            break;
-        case 'internet':
-            response = `📶 باقات الإنترنت:
-• يومية: <a href="tel:*4#">*4#</a>
-• شهرية: 
-  • 1GB: <a href="tel:*4*101#">*4*101#</a>
-  • 5GB: <a href="tel:*4*8#">*4*8#</a>
-  • 10GB: <a href="tel:*4*9#">*4*9#</a>
-• LTE: 
-  • 15GB: <a href="tel:*4*115#">*4*115#</a>
-  • 30GB: <a href="tel:*4*130#">*4*130#</a>`;
-            break;
-        case 'sah':
-            response = `💰 خدمة صاح:
-📱 كود الخدمة: <a href="tel:*500#">*500#</a>
-✨ المميزات:
-• تحويل الأموال من بنك لآخر
-• دفع الفواتير
-• شراء رصيد
-• سحب نقدي`;
-            break;
-        case 'packages':
-            response = `📞 باقات المكالمات:
-ريح بالك:
-• يوم: <a href="tel:*1#">*1#</a> (50 دقيقة)
-• أسبوع: <a href="tel:*5#">*5#</a> (500 دقيقة)
-• شهر: <a href="tel:*50#">*50#</a> (1500 دقيقة)
-• Max: <a href="tel:*55#">*55#</a> (1000 دقيقة)
-أحلى يوم: <a href="tel:*60#">*60#</a>
-خلي عنك: <a href="tel:*12#">*12#</a> (أسبوع), <a href="tel:*40#">*40#</a> (شهر)`;
-            break;
-        case 'branches':
-            const branches = knowledgeBase.branches?.branches || {
-                'الخرطوم': 'شارع النيل، مجمع سوداني',
-                'أمدرمان': 'السوق الشعبي'
-            };
-            response = `📍 الفروع:
-${Object.entries(branches).map(([city, address]) => `• ${city}: ${address}`).join('\n')}`;
-            break;
-        case 'contact':
-            response = `📞 خدمة العملاء: <a href="tel:120">120</a>`;
-            break;
-        case 'lte':
-            response = `📶 التحويل من 3G إلى 4G:
-📱 كود التفعيل: <a href="tel:*4*400#">*4*400#</a>
-💡 بعد تفعيل الخدمة، استمتع بسرعات إنترنت أسرع.`;
-            break;
-        default:
-            return null;
-    }
-    
-    if (response) {
-        cache.set(cacheKey, response);
-    }
-    return response;
-}
+  const url = `${baseURL}${endpoint}?${finalQuery}`;
 
-// ============================================
-// 🤖 دالة الرد الرئيسية - التدفق الجديد
-// ============================================
+  const headers = {
+    'X-BX-APIKEY': API_KEY
+  };
 
-async function getAIResponse(userMessage, userId) {
-    const startTime = Date.now();
-    const msg = userMessage.trim();
-    
-    // 1. تحليل المستخدم
-    const analytics = getUserAnalytics(userId);
-    analytics.messageCount++;
-    analytics.lastVisit = new Date();
-    
-    // 2. اكتشاف النية
-    const intent = detectIntent(msg);
-    
-    // 3. إذا كانت كلمة واحدة أو قصيرة → رد سريع
-    const words = msg.split(/\s+/);
-    if (words.length <= 3 && intent) {
-        const quickResponse = getQuickResponse(intent);
-        if (quickResponse) {
-            logger.info(`⚡ رد سريع لـ ${userId}: ${intent}`);
-            analytics.lastService = intent;
-            return quickResponse;
-        }
-    }
-    
-    // 4. البحث في قاعدة المعرفة
-    const knowledgeResults = searchKnowledge(msg);
-    
-    // 5. التحقق من التخزين المؤقت (للسؤوال الطويلة فقط)
-    if (words.length > 3) {
-        const cacheKey = `ai_${userId}_${msg}`;
-        if (cache.has(cacheKey)) {
-            logger.info(`💾 من التخزين المؤقت لـ ${userId}`);
-            return cache.get(cacheKey);
-        }
-    }
-    
-    // 6. استخدام الـ API مع السياق الكامل
-    try {
-        const history = getHistory(userId);
-        const lastMessages = history.slice(-10);
-        
-        // تحضير المعرفة المطلوبة
-        let knowledgeContext = '';
-        if (knowledgeResults.length > 0) {
-            knowledgeContext = knowledgeResults.map(r => 
-                `📚 معلومات عن ${r.key}:\n${JSON.stringify(r.data, null, 2)}`
-            ).join('\n\n');
-        } else {
-            knowledgeContext = 'لا توجد معلومات محددة في قاعدة المعرفة عن هذا السؤال.';
-        }
-        
-        // تحضير تحليل المستخدم
-        let userContext = '';
-        if (analytics.lastService) {
-            userContext = `آخر خدمة استخدمها المستخدم: ${analytics.lastService}`;
-        }
-        
-        // تحضير النية المكتشفة
-        let intentContext = '';
-        if (intent) {
-            intentContext = `نية المستخدم: ${intent}`;
-        }
-        
-        console.log('🧠 جاري الاتصال بـ Groq...');
-        console.log('📩 الرسالة:', msg);
-        console.log('🔍 النية:', intent || 'غير محددة');
-        console.log('📚 نتائج المعرفة:', knowledgeResults.length);
-        
-        const groq = new OpenAI({
-            apiKey: process.env.GROQ_API_KEY,
-            baseURL: 'https://api.groq.com/openai/v1',
-        });
-        
-        const completion = await groq.chat.completions.create({
-            model: "openai/gpt-oss-120b",
-            messages: [
-                {
-                    role: "system",
-                    content: `أنت المساعد الرسمي لشركة سوداني للاتصالات.
+  try {
+    let response;
 
-القواعد:
-1. استخدم قاعدة المعرفة المرفقة أولاً.
-2. إذا لم تجد الإجابة فيها فاستخدم معرفتك العامة عن خدمات سوداني.
-3. إذا لم تكن متأكداً من الإجابة فاذكر أنها غير مؤكدة واطلب من المستخدم الاتصال بخدمة العملاء 120.
-4. لا تخترع أكواد أو أسعار غير مؤكدة.
-5. أجب باللهجة السودانية باختصار ووضوح.
-6. استخدم <a href="tel:الكود">الكود</a> للأكواد.
-7. استخدم <a href="الرابط" target="_blank">الرابط</a> للروابط.
-
-السياق:
-${intentContext}
-${userContext}
-${knowledgeContext}`
-                },
-                ...lastMessages.map(msg => ({
-                    role: msg.role,
-                    content: msg.content
-                })),
-                {
-                    role: "user",
-                    content: msg
-                }
-            ],
-            temperature: 0.5,
-            max_tokens: 600,
-            stream: true
-        });
-        
-        // جمع الرد من البث
-        let fullResponse = '';
-        for await (const chunk of completion) {
-            const content = chunk.choices[0]?.delta?.content || '';
-            fullResponse += content;
-        }
-        
-        console.log("✅ تم استلام الرد من Groq");
-        
-        // حفظ المحادثة
-        history.push({ role: 'user', content: msg });
-        history.push({ role: 'assistant', content: fullResponse });
-        conversations.set(userId, history);
-        
-        // حفظ في التخزين المؤقت (للسؤوال الطويلة فقط)
-        if (words.length > 3) {
-            const cacheKey = `ai_${userId}_${msg}`;
-            cache.set(cacheKey, fullResponse);
-        }
-        
-        const responseTime = Date.now() - startTime;
-        logger.info(`📊 ${userId}: ${responseTime}ms, ${fullResponse.length} حروف`);
-        
-        return fullResponse;
-        
-    } catch (error) {
-        logger.error(`❌ خطأ لـ ${userId}:`, error);
-        
-        // 7. النظام المحلي الاحتياطي
-        const fallbackResponse = getFallbackResponse(msg);
-        if (fallbackResponse) {
-            return fallbackResponse;
-        }
-        
-        return `عذراً يا حبيبي، واجهتنا مشكلة.
-
-📞 خدمة العملاء: <a href="tel:120">120</a>
-🔗 <a href="https://my.sudani.sd" target="_blank">ماي سوداني</a>
-
-حاول مرة أخرى بعد قليل.`;
-    }
-}
-
-// ============================================
-// 📞 النظام المحلي الاحتياطي
-// ============================================
-
-function getFallbackResponse(message) {
-    const msg = message.toLowerCase();
-    
-    if (msg.includes('مرحب') || msg.includes('سلام') || msg.includes('هلا')) {
-        return `👋 أهلاً وسهلاً بك في سودان بوت!
-
-📱 اسألني عن أي خدمة من سوداني.
-
-📞 خدمة العملاء: <a href="tel:120">120</a>`;
-    }
-    
-    if (msg.includes('رصيد')) {
-        return `💰 معرفة الرصيد: <a href="tel:*222#">*222#</a>`;
-    }
-    
-    if (msg.includes('يونكس')) {
-        return `📱 نظام يونكس: <a href="tel:*6#">*6#</a>`;
-    }
-    
-    if (msg.includes('صاح')) {
-        return `💰 خدمة صاح: <a href="tel:*500#">*500#</a>`;
-    }
-    
-    if (msg.includes('انترنت') || msg.includes('نت')) {
-        return `📶 باقات الإنترنت: <a href="tel:*4#">*4#</a>`;
-    }
-    
-    return null;
-}
-
-// ============================================
-// 🎨 واجهة الويب
-// ============================================
-
-app.get('/', (req, res) => {
-    const indexPath = path.join(__dirname, 'public', 'index.html');
-    if (fs.existsSync(indexPath)) {
-        res.sendFile(indexPath);
+    if (method === 'GET') {
+      response = await axios.get(url, { headers });
     } else {
-        res.send(`
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>سودان بوت v11</title>
-    <style>
+      response = await axios.post(url, null, { headers });
+    }
+
+    return response.data;
+
+  } catch (error) {
+    console.error('❌ BingX error:', error.response?.data || error.message);
+    return null;
+  }
+}
+
+// ==========================================
+// ✅ جلب معلومات العقود
+// ==========================================
+
+async function getContractInfo(symbol) {
+  const now = Date.now();
+  
+  if (contractInfoCache[symbol] && (now - lastContractFetch) < CONTRACT_CACHE_TTL) {
+    return contractInfoCache[symbol];
+  }
+
+  try {
+    const response = await bingxRequest(
+      'GET',
+      ENDPOINTS.FUTURES_CONTRACTS,
+      {},
+      false
+    );
+
+    if (response && response.code === 0 && response.data) {
+      const contracts = response.data;
+      const contract = contracts.find(c => c.symbol === symbol);
+      
+      if (contract) {
+        contractInfoCache[symbol] = {
+          minQty: Number(contract.minQty) || 0,
+          stepSize: Number(contract.stepSize) || 0.000001,
+          tickSize: Number(contract.tickSize) || 0.01,
+          pricePrecision: contract.pricePrecision || 2,
+          quantityPrecision: contract.quantityPrecision || 6
+        };
+        lastContractFetch = now;
+        return contractInfoCache[symbol];
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error(`❌ فشل جلب معلومات العقد ${symbol}:`, error);
+    return null;
+  }
+}
+
+// ==========================================
+// ✅ تعديل الكمية
+// ==========================================
+
+function adjustQuantity(quantity, contractInfo) {
+  if (!contractInfo) return quantity;
+  
+  const { minQty, stepSize } = contractInfo;
+  
+  if (isNaN(quantity) || quantity <= 0) {
+    return 0;
+  }
+  
+  let adjusted = Math.max(quantity, minQty || 0);
+  
+  if (stepSize && stepSize > 0) {
+    adjusted = Math.floor(adjusted / stepSize) * stepSize;
+  }
+  
+  return Number(adjusted.toFixed(6));
+}
+
+// ==========================================
+// ✅ جلب بيانات الشمعة
+// ==========================================
+
+async function getCandles(symbol) {
+  try {
+    const response = await bingxRequest('GET', ENDPOINTS.FUTURES_CANDLE, {
+      symbol,
+      interval: CANDLE_INTERVAL,
+      limit: CANDLE_LIMIT
+    }, false);
+
+    if (!response || response.code === 100400) return null;
+
+    const raw = response?.data;
+    let data = null;
+
+    if (Array.isArray(raw)) {
+      data = raw;
+    } else if (Array.isArray(raw?.data)) {
+      data = raw.data;
+    } else if (Array.isArray(response?.data?.data)) {
+      data = response.data.data;
+    }
+
+    if (!data || !Array.isArray(data) || data.length < 10) return null;
+
+    return data.map(candle => ({
+      open: Number(candle.open),
+      high: Number(candle.high),
+      low: Number(candle.low),
+      close: Number(candle.close),
+      volume: Number(candle.volume),
+      time: Number(candle.time)
+    })).filter(c => !isNaN(c.open) && !isNaN(c.high) && !isNaN(c.low) && !isNaN(c.close) && c.high > 0 && c.low > 0);
+  } catch (error) {
+    return null;
+  }
+}
+
+// ==========================================
+// ✅ جلب السعر الفوري (Ticker)
+// ==========================================
+
+async function getTicker(symbol) {
+  try {
+    const response = await bingxRequest(
+      'GET',
+      ENDPOINTS.FUTURES_TICKER,
+      { symbol },
+      false
+    );
+
+    if (response && response.code === 0 && response.data) {
+      const data = response.data;
+
+      const price = parseFloat(
+        data.lastPrice ||
+        data.bidPrice ||
+        data.askPrice ||
+        data.price ||
+        data.last ||
+        0
+      );
+
+      return { price };
+    }
+
+    return null;
+  } catch (error) {
+    return null;
+  }
+}
+
+// ==========================================
+// ✅ دالة الإشارة - المنطق البسيط
+// ==========================================
+
+function checkSignal(candles) {
+  if (!candles || candles.length < 4) return null;
+
+  const current = candles[candles.length - 1];
+  const last3 = candles.slice(-3);
+  
+  // حساب نسبة التغير خلال آخر 3 شموع
+  const change = ((last3[2].close - last3[0].open) / last3[0].open) * 100;
+
+  console.log(`   📊 التغير خلال 3 شموع: ${change.toFixed(2)}%`);
+
+  // ✅ شراء بعد هبوط حاد (≥ 3.5%)
+  if (change <= -3.5) {
+    console.log(`   ✅ إشارة BUY (هبوط ${change.toFixed(2)}%)`);
+    return { signal: "BUY", entryPrice: current.close };
+  }
+
+  // ✅ بيع بعد ارتفاع حاد (≥ 3.5%)
+  if (change >= 3.5) {
+    console.log(`   ✅ إشارة SELL (صعود ${change.toFixed(2)}%)`);
+    return { signal: "SELL", entryPrice: current.close };
+  }
+
+  return null;
+}
+
+// ==========================================
+// ✅ حساب كمية العقد
+// ==========================================
+
+function calculateQuantity(price) {
+  if (!price || isNaN(price) || price <= 0 || !Number.isFinite(price)) {
+    return 0;
+  }
+
+  const quantity = (TRADE_AMOUNT * LEVERAGE) / price;
+  return Number(quantity.toFixed(6));
+}
+
+// ==========================================
+// ✅ تعيين الرافعة
+// ==========================================
+
+async function setLeverage(symbol) {
+  try {
+    const longResponse = await bingxRequest(
+      'POST',
+      ENDPOINTS.FUTURES_LEVERAGE,
+      {
+        symbol,
+        leverage: LEVERAGE,
+        side: 'LONG'
+      }
+    );
+
+    const shortResponse = await bingxRequest(
+      'POST',
+      ENDPOINTS.FUTURES_LEVERAGE,
+      {
+        symbol,
+        leverage: LEVERAGE,
+        side: 'SHORT'
+      }
+    );
+
+    if (longResponse?.code === 0 && shortResponse?.code === 0) {
+      console.log(`   ✅ تم تثبيت الرافعة x${LEVERAGE} على ${symbol}`);
+      return true;
+    }
+    return false;
+  } catch (e) {
+    console.log("   ❌ leverage error", e.message);
+    return false;
+  }
+}
+
+// ==========================================
+// ✅ تنفيذ الأمر
+// ==========================================
+
+async function placeOrder(symbol, signalData, balance) {
+  try {
+    const ticker = await getTicker(symbol);
+    if (!ticker) {
+      console.log(`   ❌ لا يمكن جلب السعر لـ ${symbol}`);
+      return null;
+    }
+
+    const price = Number(ticker.price);
+    if (!Number.isFinite(price) || price <= 0) {
+      console.log(`   ❌ سعر غير صالح ${symbol}:`, ticker);
+      return null;
+    }
+
+    const contractInfo = await getContractInfo(symbol);
+    let roundedQuantity = calculateQuantity(price);
+
+    if (contractInfo) {
+      roundedQuantity = adjustQuantity(roundedQuantity, contractInfo);
+    }
+
+    if (roundedQuantity <= 0 || isNaN(roundedQuantity) || !Number.isFinite(roundedQuantity)) {
+      console.log(`   ❌ كمية غير صالحة: ${roundedQuantity}`);
+      return null;
+    }
+
+    console.log(`   📊 تفاصيل الأمر:`);
+    console.log(`      symbol: ${symbol}`);
+    console.log(`      price: ${price}`);
+    console.log(`      quantity: ${roundedQuantity}`);
+    console.log(`      side: ${signalData.signal}`);
+    console.log(`      التغير: ${signalData.change?.toFixed(2) || 'N/A'}%`);
+
+    const isBuy = signalData.signal === 'BUY';
+    const params = {
+      symbol: symbol,
+      side: isBuy ? 'BUY' : 'SELL',
+      type: 'MARKET',
+      quantity: roundedQuantity,
+      positionSide: isBuy ? 'LONG' : 'SHORT'
+    };
+
+    const response = await bingxRequest('POST', ENDPOINTS.FUTURES_ORDER, params);
+
+    if (response && response.code === 0) {
+      console.log(`🚀 OPEN ${signalData.signal} ${symbol}`);
+      return {
+        symbol,
+        entryPrice: price,
+        quantity: roundedQuantity,
+        type: isBuy ? 'LONG' : 'SHORT',
+        orderId: response.data?.orderId || Date.now(),
+        timestamp: Date.now(),
+        change: signalData.change || 0
+      };
+    }
+    console.log(`   ❌ فشل الصفقة:`, response?.msg || response);
+    return null;
+  } catch (error) {
+    console.log("   ❌ فشل الصفقة:", error.message);
+    return null;
+  }
+}
+
+// ==========================================
+// ✅ إغلاق صفقة
+// ==========================================
+
+async function closePosition(position, result = 'MANUAL') {
+  try {
+    const ticker = await getTicker(position.symbol);
+    if (!ticker) return false;
+
+    const currentPrice = Number(ticker.price);
+    if (!Number.isFinite(currentPrice) || currentPrice <= 0) {
+      console.log(`   ❌ سعر غير صالح للإغلاق: ${currentPrice}`);
+      return false;
+    }
+
+    const closeSide = position.type === 'LONG' ? 'SELL' : 'BUY';
+    const closePositionSide = position.type === 'LONG' ? 'LONG' : 'SHORT';
+
+    const params = {
+      symbol: position.symbol,
+      side: closeSide,
+      type: 'MARKET',
+      quantity: position.quantity,
+      positionSide: closePositionSide
+    };
+
+    const response = await bingxRequest('POST', ENDPOINTS.FUTURES_ORDER, params);
+
+    if (response && response.code === 0) {
+      const profit = (currentPrice - position.entryPrice) * position.quantity;
+      const finalProfit = position.type === 'SHORT' ? -profit : profit;
+      
+      saveTrade({
+        symbol: position.symbol,
+        type: position.type,
+        entryPrice: position.entryPrice,
+        exitPrice: currentPrice,
+        quantity: position.quantity,
+        profit: finalProfit,
+        result: finalProfit > 0 ? 'WIN' : 'LOSS',
+        change: position.change || 0,
+        timestamp: new Date().toISOString()
+      });
+
+      console.log(`✅ تم إغلاق صفقة ${position.type}: ${position.symbol} (${result})`);
+      return true;
+    }
+    console.log(`⚠️ فشل إغلاق الصفقة:`, response?.msg || response);
+    return false;
+  } catch (error) {
+    console.error(`❌ فشل إغلاق الصفقة:`, error);
+    return false;
+  }
+}
+
+// ==========================================
+// ✅ جلب الرصيد
+// ==========================================
+
+async function getFuturesBalance() {
+  try {
+    const response = await bingxRequest('GET', ENDPOINTS.FUTURES_BALANCE, {});
+    
+    if (response && response.code === 0) {
+      const data = response.data || {};
+      
+      if (data.balance && typeof data.balance === 'object') {
+        if (data.balance.balance) return parseFloat(data.balance.balance) || 0;
+        if (data.balance.availableMargin) return parseFloat(data.balance.availableMargin) || 0;
+        if (data.balance.equity) return parseFloat(data.balance.equity) || 0;
+      }
+      
+      if (data.balance && typeof data.balance === 'string') {
+        return parseFloat(data.balance) || 0;
+      }
+      
+      for (const key of Object.keys(data)) {
+        if (key.includes('balance') || key.includes('equity') || key.includes('available')) {
+          const val = parseFloat(data[key]);
+          if (!isNaN(val) && val > 0) return val;
+        }
+      }
+    }
+    return 0;
+  } catch (error) {
+    return 0;
+  }
+}
+
+// ==========================================
+// ✅ الدورة الرئيسية
+// ==========================================
+
+async function tradingCycle() {
+  if (isRunning) return;
+  isRunning = true;
+
+  try {
+    const balance = await getFuturesBalance();
+    console.log(`💰 الرصيد: ${balance.toFixed(4)} USDT`);
+
+    // ✅ إدارة الصفقة المفتوحة
+    if (currentPosition) {
+      const ticker = await getTicker(currentPosition.symbol);
+      if (!ticker) {
+        isRunning = false;
+        return;
+      }
+
+      const currentPrice = Number(ticker.price);
+      if (!Number.isFinite(currentPrice) || currentPrice <= 0) {
+        isRunning = false;
+        return;
+      }
+
+      let profitUSDT = (currentPrice - currentPosition.entryPrice) * currentPosition.quantity;
+      if (currentPosition.type === 'SHORT') {
+        profitUSDT = (currentPosition.entryPrice - currentPrice) * currentPosition.quantity;
+      }
+
+      let profitPercent = (profitUSDT / (currentPosition.entryPrice * currentPosition.quantity)) * 100;
+      console.log(`⚡ ${currentPosition.symbol} الربح الحالي: ${profitUSDT.toFixed(4)} USDT (${profitPercent.toFixed(2)}%)`);
+
+      // ✅ جني الربح (0.16 USDT)
+      if (profitUSDT >= PROFIT_USDT_TARGET) {
+        console.log(`🎯 جني ربح: ${profitUSDT.toFixed(4)} USDT (هدف ${PROFIT_USDT_TARGET} USDT)`);
+        await closePosition(currentPosition, 'TAKE_PROFIT');
+        currentPosition = null;
+        lastTradeTime = Date.now();
+        isRunning = false;
+        return;
+      }
+
+      // ✅ وقف الخسارة (0.26 USDT)
+      if (STOP_LOSS_ENABLED && profitUSDT <= -STOP_LOSS_USDT) {
+        console.log(`⛔ وقف خسارة: ${profitUSDT.toFixed(4)} USDT (حد ${STOP_LOSS_USDT} USDT)`);
+        await closePosition(currentPosition, 'STOP_LOSS');
+        currentPosition = null;
+        lastTradeTime = Date.now();
+        isRunning = false;
+        return;
+      }
+
+      isRunning = false;
+      return;
+    }
+
+    // ✅ كولداون
+    if (Date.now() - lastTradeTime < cooldown) {
+      isRunning = false;
+      return;
+    }
+
+    if (balance < TRADE_AMOUNT) {
+      console.log('⚠️ رصيد غير كافي');
+      isRunning = false;
+      return;
+    }
+
+    console.log(`🔍 جاري مسح ${SYMBOLS.length} عملة...`);
+    
+    // ✅ معالجة متوازية
+    const results = await Promise.all(
+      SYMBOLS.map(async (symbol) => {
+        try {
+          if (winRateBySymbol[symbol] !== undefined && winRateBySymbol[symbol] < 30) {
+            return { symbol, signalData: null };
+          }
+
+          const candles = await getCandles(symbol);
+          if (!candles || candles.length < 4) {
+            return { symbol, signalData: null };
+          }
+
+          const signalData = checkSignal(candles);
+          if (!signalData) {
+            return { symbol, signalData: null };
+          }
+
+          // إضافة التغير إلى signalData
+          const last3 = candles.slice(-3);
+          signalData.change = ((last3[2].close - last3[0].open) / last3[0].open) * 100;
+
+          return { symbol, signalData };
+        } catch (error) {
+          console.error(`❌ خطأ في تحليل ${symbol}:`, error.message);
+          return { symbol, signalData: null };
+        }
+      })
+    );
+
+    // ✅ تنفيذ أول إشارة صالحة
+    for (const result of results) {
+      if (!result.signalData) continue;
+
+      const { symbol, signalData } = result;
+      
+      console.log(`🚀 إشارة ${signalData.signal}: ${symbol} (تغير ${signalData.change?.toFixed(2) || 'N/A'}%)`);
+
+      await setLeverage(symbol);
+
+      const position = await placeOrder(symbol, signalData, balance);
+      if (position) {
+        currentPosition = position;
+        lastTradeTime = Date.now();
+        console.log(`✅ تم الدخول: ${symbol} (${signalData.signal})`);
+        console.log(`🎯 هدف الربح: +${PROFIT_USDT_TARGET} USDT`);
+        console.log(`⛔ وقف الخسارة: -${STOP_LOSS_USDT} USDT`);
+        break;
+      }
+    }
+
+  } catch (err) {
+    console.error('❌ خطأ:', err.message);
+  }
+
+  isRunning = false;
+}
+
+// ==========================================
+// خادم الويب
+// ==========================================
+
+const app = express();
+const PORT = process.env.PORT || 10000;
+
+app.use(cors());
+app.use(express.json());
+
+app.get('/dashboard', (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html dir="rtl" lang="ar">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>لوحة تحكم البوت - سكالبينج</title>
+      <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #0a1628, #1A2B4A); height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; }
-        .chat-container { width: 480px; max-width: 100%; height: 750px; max-height: 98vh; background: #fff; border-radius: 30px; box-shadow: 0 30px 80px rgba(0,0,0,0.6); display: flex; flex-direction: column; overflow: hidden; }
-        .chat-header { background: linear-gradient(135deg, #0a1628, #1A2B4A); padding: 18px 24px; color: white; display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
-        .chat-header .avatar { width: 48px; height: 48px; background: #f7931e; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 22px; color: #1A2B4A; }
-        .chat-header .info { flex: 1; }
-        .chat-header .info h3 { font-size: 20px; font-weight: 700; margin: 0; color: #f7931e; }
-        .chat-header .info p { font-size: 13px; opacity: 0.85; margin: 2px 0 0; display: flex; align-items: center; gap: 6px; }
-        .chat-header .info p .dot { display: inline-block; width: 8px; height: 8px; background: #4caf50; border-radius: 50%; animation: pulse 2s infinite; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-        .status-bar { padding: 8px 24px; background: linear-gradient(90deg, #f7931e, #f5a623); text-align: center; font-size: 13px; color: #1A2B4A; border-bottom: 1px solid #e88a1a; flex-shrink: 0; font-weight: 700; }
-        .status-bar .mode { background: #1A2B4A; color: #f7931e; padding: 2px 12px; border-radius: 12px; font-size: 11px; margin-left: 8px; }
-        .messages-area { flex: 1; padding: 20px 18px; overflow-y: auto; background: #f0f2f5; display: flex; flex-direction: column; gap: 6px; }
-        .message { display: flex; flex-direction: column; animation: slideIn 0.3s ease; max-width: 90%; }
-        .message.user { align-self: flex-end; align-items: flex-end; }
-        .message.bot { align-self: flex-start; align-items: flex-start; }
-        @keyframes slideIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-        .message .bubble { padding: 12px 18px; border-radius: 18px; word-wrap: break-word; line-height: 1.7; font-size: 15px; max-width: 100%; box-shadow: 0 1px 3px rgba(0,0,0,0.08); white-space: pre-wrap; }
-        .message.user .bubble { background: linear-gradient(135deg, #1A2B4A, #2A3F66); color: white; border-bottom-right-radius: 4px; }
-        .message.bot .bubble { background: white; color: #1a1a2e; border-bottom-left-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border-right: 4px solid #f7931e; }
-        .message .time { font-size: 10px; color: #999; margin: 4px 8px 0; opacity: 0.7; }
-        .typing-indicator { display: none; padding: 12px 20px; background: white; border-radius: 18px; border-bottom-left-radius: 4px; align-self: flex-start; border-right: 4px solid #f7931e; }
-        .typing-indicator.active { display: inline-block; }
-        .typing-indicator span { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #999; margin: 0 3px; animation: typingBounce 1.5s infinite; }
-        .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
-        .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
-        @keyframes typingBounce { 0%, 60%, 100% { transform: translateY(0); } 30% { transform: translateY(-8px); } }
-        .quick-actions { padding: 10px 18px; background: #f8f9fa; display: flex; gap: 8px; flex-wrap: wrap; border-top: 1px solid #e8eaed; flex-shrink: 0; }
-        .quick-actions button { padding: 8px 16px; border: 2px solid #1A2B4A; border-radius: 20px; background: white; font-size: 13px; cursor: pointer; transition: all 0.25s; font-family: inherit; color: #1A2B4A; font-weight: 600; }
-        .quick-actions button:hover { background: #1A2B4A; color: #f7931e; border-color: #f7931e; transform: translateY(-2px); }
-        .input-area { padding: 14px 18px; background: white; border-top: 1px solid #e8eaed; display: flex; gap: 10px; align-items: center; flex-shrink: 0; }
-        .input-area input { flex: 1; padding: 12px 18px; border: 2px solid #e0e4ea; border-radius: 25px; font-size: 15px; font-family: inherit; outline: none; transition: all 0.3s; background: #f8f9fa; }
-        .input-area input:focus { border-color: #f7931e; background: white; }
-        .input-area .send-btn { width: 50px; height: 50px; border: none; border-radius: 50%; background: linear-gradient(135deg, #f7931e, #f5a623); color: #1A2B4A; font-size: 22px; cursor: pointer; transition: all 0.25s; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(247, 147, 30, 0.4); }
-        .input-area .send-btn:hover { transform: scale(1.06); }
-        .input-area .send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        @media (max-width: 500px) { body { padding: 0; } .chat-container { height: 100vh; max-height: 100vh; border-radius: 0; } }
-        .bubble strong { color: #f7931e; }
-        .bubble a { color: #f7931e; text-decoration: underline; font-weight: bold; cursor: pointer; }
-        .bubble a:hover { color: #d4831a; }
-        .bubble a[href^="tel:"] { color: #4caf50; }
-        .bubble a[href^="tel:"]:hover { color: #388e3c; }
-        .badge-v11 { background: #f7931e; color: #1A2B4A; padding: 2px 10px; border-radius: 12px; font-size: 10px; }
-    </style>
-</head>
-<body>
-    <div class="chat-container">
-        <div class="chat-header">
-            <div class="avatar">س</div>
-            <div class="info">
-                <h3>🤖 سودان بوت <span class="badge-v11">v11</span></h3>
-                <p><span class="dot"></span> متصل <span class="badge" style="background:#f7931e;color:#1A2B4A;padding:2px 10px;border-radius:12px;font-size:11px;">احترافي</span></p>
-            </div>
+        body { font-family: 'Arial', sans-serif; background: #0a0e17; color: #fff; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
+        .container { background: #141b2b; border-radius: 20px; padding: 40px; max-width: 750px; width: 100%; box-shadow: 0 10px 30px rgba(0, 170, 85, 0.2); border: 1px solid #00aa55; }
+        h1 { text-align: center; color: #00aa55; font-size: 28px; margin-bottom: 5px; }
+        .subtitle { text-align: center; color: #8899bb; margin-bottom: 25px; font-size: 14px; }
+        .status-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+        .card { background: #1a2335; border-radius: 14px; padding: 16px 18px; border-left: 4px solid #00aa55; transition: 0.3s; }
+        .card:hover { background: #1f2a40; }
+        .card .label { font-size: 11px; color: #8899bb; text-transform: uppercase; letter-spacing: 0.5px; }
+        .card .value { font-size: 18px; font-weight: bold; margin-top: 4px; color: #fff; }
+        .card .value.green { color: #00aa55; }
+        .card .value.gold { color: #f0b90b; }
+        .card .value.blue { color: #4a9eff; }
+        .card .value.red { color: #ff4444; }
+        .card .value.purple { color: #a855f7; }
+        .status-badge { display: inline-block; padding: 4px 12px; border-radius: 30px; font-size: 13px; font-weight: bold; background: #00aa55; color: #fff; }
+        .footer { text-align: center; margin-top: 25px; font-size: 12px; color: #556688; border-top: 1px solid #1a2335; padding-top: 18px; }
+        .refresh-btn { display: block; margin: 18px auto 0; padding: 10px 30px; background: #00aa55; border: none; border-radius: 30px; color: #fff; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        .refresh-btn:hover { background: #008844; transform: scale(1.02); }
+        .settings-box { background: #1a2335; border-radius: 14px; padding: 14px 18px; margin-top: 16px; border: 1px solid #2a3a55; }
+        .settings-box .label { font-size: 11px; color: #8899bb; text-transform: uppercase; }
+        .settings-box .value { font-size: 15px; font-weight: bold; color: #aabbdd; margin-top: 4px; }
+        .settings-box .value .highlight-green { color: #00aa55; }
+        .settings-box .value .highlight-gold { color: #f0b90b; }
+        .settings-box .value .highlight-red { color: #ff4444; }
+        .settings-box .value .highlight-purple { color: #a855f7; }
+        .trade-info { background: #1a2335; border-radius: 14px; padding: 16px 18px; margin-top: 12px; border: 1px solid #2a3a55; text-align: center; }
+        .trade-info .label { font-size: 11px; color: #8899bb; text-transform: uppercase; }
+        .trade-info .value { font-size: 20px; font-weight: bold; margin-top: 4px; }
+        .profit-positive { color: #00aa55; }
+        .profit-negative { color: #ff4444; }
+        @media (max-width: 500px) { .status-grid { grid-template-columns: 1fr 1fr; } .container { padding: 20px; } }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <h1>⚡ بوت سكالبينج</h1>
+        <p class="subtitle">📊 هبوط ≥3.5% ← BUY | صعود ≥3.5% ← SELL</p>
+        <div class="status-grid" id="statusGrid">
+          <div class="card"><div class="label">📊 الحالة</div><div class="value"><span class="status-badge" id="statusBadge">🟢 يعمل</span></div></div>
+          <div class="card"><div class="label">💰 الرصيد</div><div class="value green" id="balance">0.00 USDT</div></div>
+          <div class="card"><div class="label">⚡ الرافعة</div><div class="value gold" id="leverage">10x</div></div>
+          <div class="card" style="grid-column: span 3;"><div class="label">📈 الصفقة الحالية</div><div class="value blue" id="position">لا توجد صفقة</div></div>
         </div>
-        <div class="status-bar">
-            <span class="mode">🧠 ذكاء اصطناعي + RAG محسّن</span>
-            المساعد الذكي لشركة سوداني
+        <div class="trade-info" id="tradeInfo"><div class="label">💰 الربح / الخسارة</div><div class="value" id="profitDisplay">0.0000 USDT (0.00%)</div></div>
+        <div class="settings-box">
+          <div class="label">⚙️ إعدادات البوت</div>
+          <div class="value">💰 <span class="highlight-green">0.5 USDT</span> | ⚡ <span class="highlight-gold">10x</span> | 🎯 <span class="highlight-gold">+0.16 USDT</span> | ⛔ <span class="highlight-red">-0.26 USDT</span> | 📊 <span class="highlight-purple">تغير ≥3.5%</span></div>
         </div>
-        <div class="messages-area" id="messagesArea">
-            <div class="message bot">
-                <div class="bubble">👋 أهلاً وسهلاً بك في <strong>سودان بوت v11</strong>!
-
-🤖 أنا المساعد الذكي لشركة <strong>سوداني للاتصالات</strong>.
-
-📱 اسألني عن أي خدمة وسأرد عليك فوراً!
-
-📞 خدمة العملاء: <a href="tel:120">120</a>
-🔗 <a href="https://my.sudani.sd" target="_blank">ماي سوداني</a>
-
-💬 اكتب سؤالك...</div>
-                <span class="time">الآن</span>
-            </div>
-        </div>
-        <div class="quick-actions">
-            <button onclick="sendQuickMessage('يونكس')">📱 يونكس</button>
-            <button onclick="sendQuickMessage('ريح بالك')">📞 ريح بالك</button>
-            <button onclick="sendQuickMessage('انترنت')">📶 إنترنت</button>
-            <button onclick="sendQuickMessage('رصيدي')">💰 الرصيد</button>
-            <button onclick="sendQuickMessage('صاح')">💵 صاح</button>
-        </div>
-        <div class="input-area">
-            <input type="text" id="messageInput" placeholder="✍️ اسأل عن أي خدمة..." autofocus>
-            <button class="send-btn" id="sendBtn" onclick="sendMessage()">➤</button>
-        </div>
-    </div>
-
-    <script>
-        const API_URL = window.location.origin;
-        const messagesArea = document.getElementById('messagesArea');
-        const messageInput = document.getElementById('messageInput');
-        const sendBtn = document.getElementById('sendBtn');
-        let isProcessing = false;
-        let userId = 'user_' + Date.now();
-
-        function addMessage(text, isUser) {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = 'message ' + (isUser ? 'user' : 'bot');
-            const now = new Date();
-            const time = now.toLocaleTimeString('ar-SD', { hour: '2-digit', minute: '2-digit' });
-            const formattedText = text.replace(/\\n/g, '<br>');
-            messageDiv.innerHTML = '<div class="bubble">' + formattedText + '</div><span class="time">' + time + '</span>';
-            messagesArea.appendChild(messageDiv);
-            messagesArea.scrollTop = messagesArea.scrollHeight;
-        }
-
-        function showTyping() {
-            const typingDiv = document.createElement('div');
-            typingDiv.className = 'message bot';
-            typingDiv.id = 'typingIndicator';
-            typingDiv.innerHTML = '<div class="typing-indicator active"><span></span><span></span><span></span></div>';
-            messagesArea.appendChild(typingDiv);
-            messagesArea.scrollTop = messagesArea.scrollHeight;
-        }
-
-        function hideTyping() {
-            const typing = document.getElementById('typingIndicator');
-            if (typing) typing.remove();
-        }
-        
-        window.sendMessage = function() {
-            const message = messageInput.value.trim();
-            if (!message || isProcessing) return;
-
-            isProcessing = true;
-            messageInput.disabled = true;
-            sendBtn.disabled = true;
-
-            addMessage(message, true);
-            messageInput.value = '';
-            showTyping();
-
-            fetch(API_URL + '/api/chat/message', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    message: message, 
-                    userId: userId 
-                })
-            })
-            .then(response => {
-                if (!response.ok) throw new Error('HTTP ' + response.status);
-                return response.json();
-            })
-            .then(data => {
-                hideTyping();
-                if (data.success) {
-                    addMessage(data.response, false);
-                } else {
-                    addMessage('❌ حدث خطأ، حاول مرة أخرى', false);
-                }
-            })
-            .catch(error => {
-                hideTyping();
-                addMessage('❌ خطأ في الاتصال: ' + error.message, false);
-                console.error('Error:', error);
-            })
-            .finally(() => {
-                isProcessing = false;
-                messageInput.disabled = false;
-                sendBtn.disabled = false;
-                messageInput.focus();
-            });
-        };
-
-        window.sendQuickMessage = function(text) {
-            messageInput.value = text;
-            window.sendMessage();
-        };
-
-        document.addEventListener('DOMContentLoaded', function() {
-            if (messageInput) {
-                messageInput.addEventListener('keydown', function(e) {
-                    if (e.key === 'Enter') {
-                        e.preventDefault();
-                        window.sendMessage();
-                    }
-                });
+        <button class="refresh-btn" onclick="fetchStatus()">🔄 تحديث</button>
+        <div class="footer" id="lastUpdate">🕐 آخر تحديث: --</div>
+      </div>
+      <script>
+        async function fetchStatus() {
+          try {
+            const res = await fetch('/');
+            const data = await res.json();
+            document.getElementById('balance').textContent = data.balance || '0.00 USDT';
+            document.getElementById('leverage').textContent = data.leverage || '--';
+            document.getElementById('position').textContent = data.currentPosition || 'لا توجد صفقة';
+            const profitDisplay = document.getElementById('profitDisplay');
+            if (data.profit !== undefined && data.profit !== null) {
+              const profit = data.profit;
+              const profitPercent = data.profitPercent || 0;
+              const isPositive = profit >= 0;
+              const sign = isPositive ? '+' : '';
+              profitDisplay.innerHTML = '<span class="' + (isPositive ? 'profit-positive' : 'profit-negative') + '">' + sign + profit.toFixed(4) + ' USDT (' + sign + profitPercent.toFixed(2) + '%)</span>';
+            } else {
+              profitDisplay.textContent = '0.0000 USDT (0.00%)';
             }
-            console.log('✅ سودان بوت v11 جاهز!');
-            console.log('🆔 معرف المستخدم:', userId);
-        });
-    </script>
-</body>
-</html>
-        `);
-    }
-});
-
-// ============================================
-// 🔗 نقاط API
-// ============================================
-
-app.post('/api/chat/message', async (req, res) => {
-    try {
-        const { message, userId } = req.body;
-        const uid = userId || `user_${Date.now()}`;
-        
-        logger.info(`📩 ${uid}: ${message}`);
-        
-        if (!message) {
-            return res.status(400).json({ 
-                success: false, 
-                response: '❌ الرجاء كتابة سؤال.' 
-            });
+            document.getElementById('lastUpdate').textContent = '🕐 آخر تحديث: ' + new Date().toLocaleTimeString('ar-EG');
+          } catch (error) {
+            console.error('خطأ في جلب البيانات:', error);
+          }
         }
-        
-        const response = await getAIResponse(message, uid);
-        res.json({ 
-            success: true, 
-            response: response
-        });
-        
-    } catch (error) {
-        logger.error('❌ خطأ:', error);
-        res.status(500).json({ 
-            success: false, 
-            response: '❌ حدث خطأ في السيرفر.' 
-        });
+        fetchStatus();
+        setInterval(fetchStatus, 5000);
+      </script>
+    </body>
+    </html>
+  `);
+});
+
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString(), uptime: process.uptime() });
+});
+
+app.get('/', async (req, res) => {
+  try {
+    const usdtBalance = await getFuturesBalance();
+    let profit = null;
+    let profitPercent = null;
+    
+    if (currentPosition) {
+      const ticker = await getTicker(currentPosition.symbol);
+      if (ticker && ticker.price && Number.isFinite(ticker.price) && ticker.price > 0) {
+        const currentPrice = ticker.price;
+        let rawProfit = (currentPrice - currentPosition.entryPrice) * currentPosition.quantity;
+        if (currentPosition.type === 'SHORT') {
+          rawProfit = (currentPosition.entryPrice - currentPrice) * currentPosition.quantity;
+        }
+        profit = rawProfit;
+        profitPercent = (profit / (currentPosition.entryPrice * currentPosition.quantity)) * 100;
+      }
     }
-});
-
-app.get('/api/stats', (req, res) => {
+    
     res.json({
-        users: userAnalytics.size,
-        conversations: conversations.size,
-        cache: cache.size,
-        uptime: process.uptime()
+      status: '⚡ بوت سكالبينج',
+      timestamp: new Date().toISOString(),
+      balance: `${usdtBalance.toFixed(4)} USDT`,
+      leverage: `${LEVERAGE}x`,
+      tradeAmount: `${TRADE_AMOUNT} USDT`,
+      profitTarget: `${PROFIT_USDT_TARGET} USDT`,
+      stopLoss: `${STOP_LOSS_USDT} USDT`,
+      currentPosition: currentPosition ? `${currentPosition.symbol} (${currentPosition.type})` : 'لا توجد صفقة',
+      profit: profit,
+      profitPercent: profitPercent,
+      tradesCount: tradesHistory.length,
+      symbolsCount: SYMBOLS.length,
+      settings: {
+        tradeAmount: `${TRADE_AMOUNT} USDT`,
+        profitTarget: `${PROFIT_USDT_TARGET} USDT`,
+        stopLoss: `${STOP_LOSS_USDT} USDT`,
+        leverage: `${LEVERAGE}x`,
+        trigger: 'تغير ≥3.5% خلال 3 شموع',
+        scanInterval: `${SCAN_INTERVAL}ms`,
+        symbols: SYMBOLS
+      }
     });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
-app.get('/api/health', (req, res) => {
-    res.json({ 
-        status: 'healthy', 
-        service: 'Sudan Bot v11',
-        version: '11.0.0'
-    });
+// ==========================================
+// تشغيل البوت
+// ==========================================
+
+async function startBot() {
+  try {
+    loadTradesHistory();
+
+    console.log('⚡⚡ بدء تشغيل بوت سكالبينج');
+    console.log('📊 ===== الإعدادات =====');
+    console.log(`💰 حجم الصفقة: ${TRADE_AMOUNT} USDT`);
+    console.log(`⚡ الرافعة: ${LEVERAGE}x`);
+    console.log(`🎯 جني الأرباح: +${PROFIT_USDT_TARGET} USDT`);
+    console.log(`⛔ وقف الخسارة: -${STOP_LOSS_USDT} USDT`);
+    console.log(`📊 منطق الدخول: تغير ≥3.5% خلال 3 شموع`);
+    console.log(`   📉 هبوط ≥3.5% → BUY`);
+    console.log(`   📈 صعود ≥3.5% → SELL`);
+    console.log(`🕐 الإطار الزمني: 1m`);
+    console.log(`⚡ سرعة المسح: ${SCAN_INTERVAL}ms`);
+    console.log(`📊 العملات: ${SYMBOLS.length} عملة`);
+    console.log('================================');
+
+    for (const symbol of SYMBOLS.slice(0, 5)) {
+      await getContractInfo(symbol);
+    }
+
+    const balance = await getFuturesBalance();
+    console.log(`💰 رصيد USDT: ${balance.toFixed(4)}`);
+
+    await tradingCycle();
+
+    setInterval(async () => {
+      try {
+        await tradingCycle();
+      } catch (error) {
+        console.error('❌ خطأ:', error);
+      }
+    }, SCAN_INTERVAL);
+
+    console.log(`✅ البوت يعمل! مسح كل ${SCAN_INTERVAL}ms`);
+
+  } catch (error) {
+    console.error(`❌ فشل بدء البوت: ${error.message}`);
+    setTimeout(startBot, 30000);
+  }
+}
+
+// ==========================================
+// بدء الخادم
+// ==========================================
+
+const server = app.listen(PORT, '0.0.0.0', () => {
+  console.log(`
+  ╔═══════════════════════════════════════════════════════════════╗
+  ║   ⚡ بوت سكالبينج - منطق بسيط                              ║
+  ║   📡 http://localhost:${PORT}                                  ║
+  ║   📊 لوحة التحكم: http://localhost:${PORT}/dashboard          ║
+  ║   🚀 رافعة: ${LEVERAGE}x | 💰 ${TRADE_AMOUNT} USDT            ║
+  ║   🎯 هدف: +${PROFIT_USDT_TARGET} USDT | ⛔ وقف: -${STOP_LOSS_USDT} USDT ║
+  ║   📊 منطق الدخول: تغير ≥3.5% خلال 3 شموع                    ║
+  ║   📉 هبوط ≥3.5% → BUY | 📈 صعود ≥3.5% → SELL                ║
+  ║   🕐 الإطار: 1m | ⚡ سرعة: ${SCAN_INTERVAL}ms                 ║
+  ║   📊 العملات: ${SYMBOLS.length} عملة                          ║
+  ║   ⚠️ تداول حقيقي - استخدم بحذر!                              ║
+  ╚═══════════════════════════════════════════════════════════════╝
+  `);
+  
+  startBot();
 });
 
-// ============================================
-// 🚀 بدء السيرفر
-// ============================================
+// ==========================================
+// معالجة الإيقاف
+// ==========================================
 
-app.listen(PORT, '0.0.0.0', () => {
-    console.log('=================================');
-    console.log('🚀 سودان بوت - الإصدار 11');
-    console.log('=================================');
-    console.log('✅ السيرفر يعمل على المنفذ: ' + PORT);
-    console.log('🌐 http://localhost:' + PORT);
-    console.log('=================================');
-    console.log('🧠 الميزات النشطة:');
-    console.log('   • نظام RAG محسّن');
-    console.log('   • اكتشاف النية الذكي');
-    console.log('   • ردود سريعة للكلمات المفتاحية');
-    console.log('   • استخدام معرفة Groq العامة');
-    console.log('   • حفظ المحادثات (Memory)');
-    console.log('   • تخزين مؤقت (Cache)');
-    console.log('   • حماية من السبام');
-    console.log('   • تسجيل الأخطاء');
-    console.log('   • تحليل المستخدمين');
-    console.log('=================================');
-    console.log(`📁 مجلد المعرفة: ${knowledgeDir}`);
-    console.log(`📁 مجلد السجلات: ${logsDir}`);
-    console.log('=================================');
+process.on('SIGTERM', () => {
+  console.log('🛑 إيقاف البوت...');
+  server.close(() => process.exit(0));
+});
+
+process.on('SIGINT', () => {
+  console.log('🛑 إيقاف البوت...');
+  server.close(() => process.exit(0));
 });
 
 process.on('uncaughtException', (error) => {
-    logger.error('💥 خطأ غير متوقع:', error);
+  console.error('❌ خطأ غير متوقع:', error);
 });
+
+process.on('unhandledRejection', (reason) => {
+  console.error('❌ رفض غير معالج:', reason);
+});
+
+console.log('🚀 جاري تشغيل البوت...');
