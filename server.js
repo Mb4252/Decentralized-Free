@@ -707,6 +707,37 @@ const PORT = process.env.PORT || 10000;
 app.use(cors());
 app.use(express.json());
 
+// ✅ صفحة الترحيب الرئيسية
+app.get('/', (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>بوت سكالبينج</title>
+      <style>
+        body { font-family: Arial, sans-serif; background: #0a0e17; color: #fff; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .container { text-align: center; background: #141b2b; padding: 50px; border-radius: 20px; border: 1px solid #00aa55; }
+        h1 { color: #00aa55; font-size: 36px; }
+        .btn { display: inline-block; margin-top: 20px; padding: 15px 40px; background: #00aa55; color: #fff; text-decoration: none; border-radius: 30px; font-weight: bold; }
+        .btn:hover { background: #008844; }
+        .info { color: #8899bb; margin-top: 20px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <h1>⚡ بوت سكالبينج</h1>
+        <p>بوت تداول آلي على منصة BingX</p>
+        <a href="/dashboard" class="btn">📊 لوحة التحكم</a>
+        <p class="info">💰 0.45 USDT | ⚡ 5x | 🎯 +0.12 USDT | ⛔ -0.2 USDT</p>
+      </div>
+    </body>
+    </html>
+  `);
+});
+
+// ✅ لوحة التحكم
 app.get('/dashboard', (req, res) => {
   res.send(`
     <!DOCTYPE html>
@@ -771,7 +802,7 @@ app.get('/dashboard', (req, res) => {
       <script>
         async function fetchStatus() {
           try {
-            const res = await fetch('/');
+            const res = await fetch('/api/status');
             const data = await res.json();
             document.getElementById('balance').textContent = data.balance || '0.00 USDT';
             document.getElementById('leverage').textContent = data.leverage || '--';
@@ -799,11 +830,42 @@ app.get('/dashboard', (req, res) => {
   `);
 });
 
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString(), uptime: process.uptime() });
+// ✅ API للحصول على الحالة (للوحة التحكم)
+app.get('/api/status', async (req, res) => {
+  try {
+    const usdtBalance = await getFuturesBalance();
+    let profit = null;
+    let profitPercent = null;
+    
+    if (currentPosition) {
+      const ticker = await getTicker(currentPosition.symbol);
+      if (ticker && ticker.price && Number.isFinite(ticker.price) && ticker.price > 0) {
+        const currentPrice = ticker.price;
+        let rawProfit = (currentPrice - currentPosition.entryPrice) * currentPosition.quantity;
+        if (currentPosition.type === 'SHORT') {
+          rawProfit = (currentPosition.entryPrice - currentPrice) * currentPosition.quantity;
+        }
+        profit = rawProfit;
+        profitPercent = (profit / (currentPosition.entryPrice * currentPosition.quantity)) * 100;
+      }
+    }
+    
+    res.json({
+      status: 'يعمل',
+      balance: `${usdtBalance.toFixed(4)} USDT`,
+      leverage: `${LEVERAGE}x`,
+      currentPosition: currentPosition ? `${currentPosition.symbol} (${currentPosition.type})` : 'لا توجد صفقة',
+      profit: profit,
+      profitPercent: profitPercent,
+      tradesCount: tradesHistory.length
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
-app.get('/', async (req, res) => {
+// ✅ نقطة النهاية الرئيسية (JSON)
+app.get('/data', async (req, res) => {
   try {
     const usdtBalance = await getFuturesBalance();
     let profit = null;
@@ -848,6 +910,10 @@ app.get('/', async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
+});
+
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString(), uptime: process.uptime() });
 });
 
 // ==========================================
