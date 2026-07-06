@@ -1,12 +1,11 @@
 {
   "name": "mobile-phone-scanner",
   "version": "2.0.0",
-  "description": "تطبيق فحص شامل للهاردوير والسوفت وير للهواتف المحمولة",
+  "description": "تطبيق فحص شامل للهاردوير والسوفت وير - يعمل على Render",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js",
-    "mobile": "MOBILE_ENV=true node server.js"
+    "dev": "nodemon server.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
@@ -16,15 +15,17 @@
   "devDependencies": {
     "nodemon": "^3.0.1"
   },
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "keywords": [
     "mobile",
     "scanner",
     "hardware",
     "software",
-    "android",
-    "phone",
-    "checker"
+    "render",
+    "cloud"
   ],
-  "author": "Mobile Scanner Team",
+  "author": "Mobile Scanner",
   "license": "MIT"
 }
