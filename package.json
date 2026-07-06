@@ -1,28 +1,21 @@
 {
-  "name": "scalping-bot-bingx",
+  "name": "mobile-phone-scanner",
   "version": "1.0.0",
-  "description": "بوت سكالبينج لتداول العملات الرقمية على منصة BingX",
-  "main": "bot.js",
+  "description": "تطبيق فحص الهاتف المحمول - هاردوير وسوفت وير",
+  "main": "server.js",
   "scripts": {
-    "start": "node bot.js",
-    "dev": "nodemon bot.js"
+    "start": "node server.js",
+    "dev": "nodemon server.js"
   },
-  "keywords": [
-    "bingx",
-    "trading-bot",
-    "scalping",
-    "crypto",
-    "futures"
-  ],
-  "author": "",
-  "license": "MIT",
   "dependencies": {
-    "axios": "^1.6.0",
     "cors": "^2.8.5",
-    "dotenv": "^16.3.1",
-    "express": "^4.18.2"
+    "express": "^4.18.2",
+    "systeminformation": "^5.21.8"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
-  }
+  },
+  "keywords": ["mobile", "scanner", "hardware", "software", "android"],
+  "author": "Your Name",
+  "license": "MIT"
 }
