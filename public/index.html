@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>فحص الهاتف المحمول - Mobile Scanner</title>
+    <title>📱 فحص الهاتف المحمول - Mobile Scanner</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         /* ===== RESET & BASE ===== */
@@ -21,17 +21,28 @@
             color: #fff;
         }
         
-        /* ===== MAIN CONTAINER ===== */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, #f7971e, #ffd200);
+            border-radius: 10px;
+        }
+        
+        /* ===== CONTAINER ===== */
         .container {
-            max-width: 1200px;
+            max-width: 1300px;
             margin: 0 auto;
         }
         
         /* ===== HEADER ===== */
         .header {
             text-align: center;
-            padding: 30px 0 40px;
-            position: relative;
+            padding: 30px 0 35px;
         }
         
         .header h1 {
@@ -40,23 +51,27 @@
             background: linear-gradient(90deg, #f7971e, #ffd200);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            text-shadow: none;
+        }
+        
+        .header h1 i {
+            -webkit-text-fill-color: #ffd200;
+            margin-left: 10px;
         }
         
         .header p {
             color: #a8b2d1;
             font-size: 1.1rem;
-            margin-top: 10px;
+            margin-top: 8px;
             letter-spacing: 1px;
         }
         
         .header .status-badge {
             display: inline-block;
-            margin-top: 15px;
-            padding: 8px 25px;
+            margin-top: 12px;
+            padding: 8px 28px;
             border-radius: 50px;
-            background: rgba(255, 255, 255, 0.08);
-            border: 1px solid rgba(255, 255, 255, 0.15);
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.1);
             font-size: 0.9rem;
             color: #64ffda;
         }
@@ -71,65 +86,77 @@
             50% { opacity: 0.3; }
         }
         
-        /* ===== STATS CARDS ===== */
+        /* ===== STATS GRID ===== */
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 16px;
+            margin-bottom: 25px;
         }
         
         .stat-card {
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(255, 255, 255, 0.04);
             backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.06);
             border-radius: 16px;
-            padding: 20px 20px 18px;
+            padding: 18px 15px 15px;
             text-align: center;
             transition: all 0.3s ease;
         }
         
         .stat-card:hover {
-            transform: translateY(-4px);
-            border-color: rgba(255, 255, 255, 0.2);
+            transform: translateY(-3px);
+            border-color: rgba(255, 255, 255, 0.15);
             box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
         }
         
         .stat-card .icon {
-            font-size: 2.2rem;
-            margin-bottom: 8px;
+            font-size: 1.8rem;
+            margin-bottom: 5px;
             color: #ffd700;
         }
         
         .stat-card .value {
-            font-size: 2rem;
+            font-size: 1.6rem;
             font-weight: 700;
             color: #fff;
         }
         
         .stat-card .label {
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             color: #8892b0;
-            margin-top: 4px;
+            margin-top: 3px;
         }
         
         .stat-card .sub-value {
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             color: #64ffda;
             margin-top: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         
-        /* ===== TEST BUTTONS ===== */
+        .stat-card.env-card {
+            background: rgba(100, 255, 218, 0.05);
+            border-color: rgba(100, 255, 218, 0.15);
+        }
+        
+        .stat-card.env-card .value {
+            font-size: 1rem;
+        }
+        
+        /* ===== ACTION BUTTONS ===== */
         .action-bar {
             display: flex;
             flex-wrap: wrap;
             gap: 12px;
             justify-content: center;
-            margin-bottom: 30px;
+            margin-bottom: 25px;
         }
         
         .btn {
-            padding: 12px 28px;
+            padding: 12px 26px;
             border: none;
             border-radius: 12px;
             font-size: 0.95rem;
@@ -141,7 +168,7 @@
             gap: 10px;
             color: #fff;
             background: rgba(255, 255, 255, 0.06);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.08);
         }
         
         .btn:hover {
@@ -154,25 +181,31 @@
             color: #1a1a2e;
             border: none;
         }
-        
-        .btn-primary:hover {
-            box-shadow: 0 6px 30px rgba(247, 151, 30, 0.35);
-        }
+        .btn-primary:hover { box-shadow: 0 6px 30px rgba(247, 151, 30, 0.35); }
         
         .btn-success {
             background: linear-gradient(135deg, #11998e, #38ef7d);
             border: none;
         }
-        
-        .btn-danger {
-            background: linear-gradient(135deg, #cb2d3e, #ef473a);
-            border: none;
-        }
+        .btn-success:hover { box-shadow: 0 6px 30px rgba(56, 239, 125, 0.3); }
         
         .btn-info {
             background: linear-gradient(135deg, #2193b0, #6dd5ed);
             border: none;
         }
+        .btn-info:hover { box-shadow: 0 6px 30px rgba(109, 213, 237, 0.3); }
+        
+        .btn-danger {
+            background: linear-gradient(135deg, #cb2d3e, #ef473a);
+            border: none;
+        }
+        .btn-danger:hover { box-shadow: 0 6px 30px rgba(239, 71, 58, 0.3); }
+        
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+        .btn-secondary:hover { background: rgba(255, 255, 255, 0.15); }
         
         .btn:disabled {
             opacity: 0.5;
@@ -180,49 +213,49 @@
             transform: none !important;
         }
         
-        /* ===== RESULTS SECTION ===== */
+        /* ===== RESULTS GRID ===== */
         .results-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 25px;
+            gap: 20px;
             margin-top: 20px;
         }
         
-        @media (max-width: 768px) {
+        @media (max-width: 900px) {
             .results-grid {
                 grid-template-columns: 1fr;
             }
         }
         
         .result-card {
-            background: rgba(255, 255, 255, 0.04);
+            background: rgba(255, 255, 255, 0.03);
             backdrop-filter: blur(12px);
             border: 1px solid rgba(255, 255, 255, 0.06);
             border-radius: 20px;
-            padding: 25px;
+            padding: 22px;
             transition: all 0.3s ease;
         }
         
         .result-card:hover {
-            border-color: rgba(255, 255, 255, 0.12);
+            border-color: rgba(255, 255, 255, 0.1);
         }
         
         .result-card .card-header {
             display: flex;
             align-items: center;
             gap: 12px;
-            margin-bottom: 18px;
-            padding-bottom: 12px;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.06);
         }
         
         .result-card .card-header i {
-            font-size: 1.5rem;
+            font-size: 1.4rem;
             color: #ffd700;
         }
         
         .result-card .card-header h3 {
-            font-size: 1.2rem;
+            font-size: 1.1rem;
             font-weight: 600;
             color: #e6f1ff;
         }
@@ -230,13 +263,14 @@
         .result-item {
             display: flex;
             justify-content: space-between;
-            padding: 8px 0;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-            font-size: 0.95rem;
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+            font-size: 0.9rem;
         }
         
         .result-item .label {
             color: #8892b0;
+            font-weight: 400;
         }
         
         .result-item .value {
@@ -244,25 +278,20 @@
             font-weight: 500;
             text-align: left;
             direction: ltr;
+            word-break: break-word;
+            max-width: 60%;
         }
         
-        .result-item .value.pass {
-            color: #38ef7d;
-        }
+        .result-item .value.pass { color: #38ef7d; }
+        .result-item .value.fail { color: #ef473a; }
+        .result-item .value.warning { color: #ffd700; }
+        .result-item .value.info { color: #6dd5ed; }
         
-        .result-item .value.fail {
-            color: #ef473a;
-        }
-        
-        .result-item .value.warning {
-            color: #ffd700;
-        }
-        
-        /* ===== LOADING SPINNER ===== */
+        /* ===== LOADER ===== */
         .loader {
             display: none;
             text-align: center;
-            padding: 20px;
+            padding: 30px;
         }
         
         .loader.active {
@@ -270,20 +299,114 @@
         }
         
         .loader .spinner {
-            width: 40px;
-            height: 40px;
-            border: 4px solid rgba(255, 255, 255, 0.1);
+            width: 45px;
+            height: 45px;
+            border: 4px solid rgba(255, 255, 255, 0.08);
             border-top: 4px solid #ffd700;
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
-            margin: 0 auto 10px;
+            margin: 0 auto 12px;
         }
         
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
         
-        /* ===== TOAST NOTIFICATIONS ===== */
+        .loader p {
+            color: #8892b0;
+            font-size: 0.95rem;
+        }
+        
+        /* ===== FULL REPORT ===== */
+        .report-card {
+            margin-top: 20px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 20px;
+            padding: 22px;
+            display: none;
+        }
+        
+        .report-card .card-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+        
+        .report-card .card-header i {
+            font-size: 1.4rem;
+            color: #ffd700;
+        }
+        
+        .report-card .card-header h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #e6f1ff;
+        }
+        
+        .report-card pre {
+            background: rgba(0, 0, 0, 0.35);
+            padding: 16px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            color: #a8b2d1;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+            direction: ltr;
+            text-align: left;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        /* ===== TEST RESULTS ===== */
+        .test-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        
+        @media (max-width: 600px) {
+            .test-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .test-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        
+        .test-item .test-status {
+            font-size: 1.2rem;
+        }
+        
+        .test-item .test-name {
+            color: #a8b2d1;
+            font-size: 0.85rem;
+            flex: 1;
+        }
+        
+        .test-item .test-result {
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+        
+        .test-item .test-result.pass { color: #38ef7d; }
+        .test-item .test-result.fail { color: #ef473a; }
+        .test-item .test-result.warning { color: #ffd700; }
+        .test-item .test-result.info { color: #6dd5ed; }
+        
+        /* ===== TOAST ===== */
         .toast-container {
             position: fixed;
             top: 20px;
@@ -292,24 +415,26 @@
             display: flex;
             flex-direction: column;
             gap: 10px;
+            max-width: 380px;
         }
         
         .toast {
-            padding: 14px 24px;
+            padding: 14px 22px;
             border-radius: 12px;
-            background: rgba(30, 30, 60, 0.95);
+            background: rgba(20, 20, 50, 0.95);
             backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.08);
             color: #fff;
             font-size: 0.9rem;
             font-weight: 500;
             animation: slideInRight 0.4s ease;
-            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
         }
         
         .toast.success { border-right: 4px solid #38ef7d; }
         .toast.error { border-right: 4px solid #ef473a; }
         .toast.info { border-right: 4px solid #6dd5ed; }
+        .toast.warning { border-right: 4px solid #ffd700; }
         
         @keyframes slideInRight {
             from { transform: translateX(120%); opacity: 0; }
@@ -317,10 +442,20 @@
         }
         
         /* ===== RESPONSIVE ===== */
-        @media (max-width: 480px) {
-            .header h1 { font-size: 2rem; }
-            .action-bar .btn { padding: 10px 18px; font-size: 0.85rem; }
-            .stat-card .value { font-size: 1.5rem; }
+        @media (max-width: 600px) {
+            .header h1 { font-size: 1.8rem; }
+            .header p { font-size: 0.9rem; }
+            .action-bar .btn { padding: 10px 16px; font-size: 0.8rem; }
+            .stat-card .value { font-size: 1.2rem; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .result-item { font-size: 0.8rem; flex-wrap: wrap; }
+            .result-item .value { max-width: 100%; text-align: right; }
+        }
+        
+        @media (max-width: 400px) {
+            .stats-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+            .stat-card { padding: 12px 10px; }
+            .stat-card .value { font-size: 1rem; }
         }
     </style>
 </head>
@@ -330,34 +465,34 @@
 
     <div class="container">
         
-        <!-- HEADER -->
+        <!-- ===== HEADER ===== -->
         <div class="header">
-            <h1><i class="fas fa-mobile-alt" style="color:#ffd700; -webkit-text-fill-color:#ffd700;"></i> فحص الهاتف</h1>
+            <h1><i class="fas fa-mobile-alt"></i> فحص الهاتف</h1>
             <p>تحليل شامل للهاردوير والسوفت وير مع تقرير فوري</p>
-            <div class="status-badge">
+            <div class="status-badge" id="statusBadge">
                 <i class="fas fa-circle"></i> النظام جاهز
             </div>
         </div>
 
-        <!-- STATS -->
+        <!-- ===== STATS ===== -->
         <div class="stats-grid" id="statsGrid">
             <div class="stat-card">
                 <div class="icon"><i class="fas fa-microchip"></i></div>
                 <div class="value" id="statCpu">--</div>
                 <div class="label">المعالج</div>
-                <div class="sub-value" id="statCpuDetail">غير معروف</div>
+                <div class="sub-value" id="statCpuDetail">--</div>
             </div>
             <div class="stat-card">
                 <div class="icon"><i class="fas fa-memory"></i></div>
                 <div class="value" id="statRam">--</div>
                 <div class="label">الذاكرة (RAM)</div>
-                <div class="sub-value" id="statRamDetail">0 MB مستخدمة</div>
+                <div class="sub-value" id="statRamDetail">--</div>
             </div>
             <div class="stat-card">
                 <div class="icon"><i class="fas fa-hdd"></i></div>
                 <div class="value" id="statStorage">--</div>
                 <div class="label">التخزين</div>
-                <div class="sub-value" id="statStorageDetail">0 GB متاح</div>
+                <div class="sub-value" id="statStorageDetail">--</div>
             </div>
             <div class="stat-card">
                 <div class="icon"><i class="fas fa-battery-three-quarters"></i></div>
@@ -365,9 +500,21 @@
                 <div class="label">البطارية</div>
                 <div class="sub-value" id="statBatteryDetail">--</div>
             </div>
+            <div class="stat-card env-card">
+                <div class="icon"><i class="fas fa-server"></i></div>
+                <div class="value" id="statDeviceType">--</div>
+                <div class="label">نوع الجهاز</div>
+                <div class="sub-value" id="statPlatform">--</div>
+            </div>
+            <div class="stat-card env-card">
+                <div class="icon"><i class="fas fa-clock"></i></div>
+                <div class="value" id="statTime" style="font-size:0.9rem;">--</div>
+                <div class="label">آخر تحديث</div>
+                <div class="sub-value" id="statUptime">--</div>
+            </div>
         </div>
 
-        <!-- ACTION BUTTONS -->
+        <!-- ===== ACTION BUTTONS ===== -->
         <div class="action-bar">
             <button class="btn btn-primary" onclick="runFullScan()">
                 <i class="fas fa-sync-alt"></i> فحص شامل
@@ -381,70 +528,94 @@
             <button class="btn btn-danger" onclick="clearResults()">
                 <i class="fas fa-trash-alt"></i> مسح النتائج
             </button>
+            <button class="btn btn-secondary" onclick="toggleReport()">
+                <i class="fas fa-file-alt"></i> عرض التقرير
+            </button>
         </div>
 
-        <!-- LOADER -->
+        <!-- ===== LOADER ===== -->
         <div class="loader" id="loader">
             <div class="spinner"></div>
-            <p style="color:#8892b0;">جاري الفحص ... يرجى الانتظار</p>
+            <p>جاري الفحص ... يرجى الانتظار</p>
         </div>
 
-        <!-- RESULTS -->
+        <!-- ===== RESULTS ===== -->
         <div class="results-grid" id="resultsGrid">
 
-            <!-- Hardware Results -->
+            <!-- Hardware -->
             <div class="result-card">
                 <div class="card-header">
                     <i class="fas fa-microchip"></i>
-                    <h3>الهاردوير</h3>
+                    <h3>🔧 الهاردوير</h3>
                 </div>
                 <div id="hardwareResults">
                     <div class="result-item"><span class="label">المعالج (CPU)</span><span class="value" id="resCpu">--</span></div>
                     <div class="result-item"><span class="label">الذاكرة (RAM)</span><span class="value" id="resRam">--</span></div>
                     <div class="result-item"><span class="label">التخزين الداخلي</span><span class="value" id="resStorage">--</span></div>
                     <div class="result-item"><span class="label">البطارية</span><span class="value" id="resBattery">--</span></div>
-                    <div class="result-item"><span class="label">الشاشة (DPI)</span><span class="value" id="resDisplay">--</span></div>
-                    <div class="result-item"><span class="label">الكاميرات</span><span class="value" id="resCamera">--</span></div>
+                    <div class="result-item"><span class="label">الشاشة</span><span class="value" id="resDisplay">--</span></div>
+                    <div class="result-item"><span class="label">وحدة المعالجة الرسومية</span><span class="value" id="resGpu">--</span></div>
+                    <div class="result-item"><span class="label">الكاميرات</span><span class="value" id="resCameras">--</span></div>
                     <div class="result-item"><span class="label">المستشعرات</span><span class="value" id="resSensors">--</span></div>
+                    <div class="result-item"><span class="label">البلوتوث</span><span class="value" id="resBluetooth">--</span></div>
                 </div>
             </div>
 
-            <!-- Software Results -->
+            <!-- Software -->
             <div class="result-card">
                 <div class="card-header">
                     <i class="fas fa-code"></i>
-                    <h3>السوفت وير</h3>
+                    <h3>💻 السوفت وير</h3>
                 </div>
                 <div id="softwareResults">
                     <div class="result-item"><span class="label">نظام التشغيل</span><span class="value" id="resOs">--</span></div>
                     <div class="result-item"><span class="label">إصدار الأندرويد</span><span class="value" id="resAndroidVer">--</span></div>
                     <div class="result-item"><span class="label">مستوى تصحيح الأمان</span><span class="value" id="resSecurityPatch">--</span></div>
                     <div class="result-item"><span class="label">حالة الجذر (Root)</span><span class="value" id="resRoot">--</span></div>
-                    <div class="result-item"><span class="label">مشغل التطبيق (Launcher)</span><span class="value" id="resLauncher">--</span></div>
-                    <div class="result-item"><span class="label">إصدار التطبيق</span><span class="value" id="resAppVersion">1.0.0</span></div>
+                    <div class="result-item"><span class="label">مشغل التطبيق</span><span class="value" id="resLauncher">--</span></div>
+                    <div class="result-item"><span class="label">وقت تشغيل النظام</span><span class="value" id="resUptime">--</span></div>
                     <div class="result-item"><span class="label">حالة الشبكة</span><span class="value" id="resNetwork">--</span></div>
+                    <div class="result-item"><span class="label">الواي فاي</span><span class="value" id="resWifi">--</span></div>
+                    <div class="result-item"><span class="label">شبكات الواي فاي المتاحة</span><span class="value" id="resWifiNetworks">--</span></div>
                 </div>
             </div>
 
         </div>
 
-        <!-- FULL REPORT (hidden by default) -->
-        <div style="margin-top: 25px;">
-            <div class="result-card" id="fullReportCard" style="display:none;">
-                <div class="card-header">
-                    <i class="fas fa-file-alt"></i>
-                    <h3>التقرير الكامل</h3>
-                </div>
-                <pre id="fullReport" style="background:rgba(0,0,0,0.3); padding:15px; border-radius:12px; font-size:0.85rem; color:#a8b2d1; overflow-x:auto; white-space:pre-wrap; direction:ltr; text-align:left;"></pre>
+        <!-- ===== TEST RESULTS ===== -->
+        <div class="result-card" id="testResultsCard" style="margin-top:20px; display:none;">
+            <div class="card-header">
+                <i class="fas fa-check-circle"></i>
+                <h3>🧪 نتائج اختبار الهاردوير</h3>
+                <span id="testScore" style="margin-right:auto; font-weight:700; color:#ffd700;"></span>
             </div>
+            <div class="test-grid" id="testGrid"></div>
+        </div>
+
+        <!-- ===== FULL REPORT ===== -->
+        <div class="report-card" id="reportCard">
+            <div class="card-header">
+                <i class="fas fa-file-alt"></i>
+                <h3>📄 التقرير الكامل (JSON)</h3>
+                <button class="btn btn-secondary" onclick="copyReport()" style="margin-right:auto; padding:6px 14px; font-size:0.8rem;">
+                    <i class="fas fa-copy"></i> نسخ
+                </button>
+            </div>
+            <pre id="fullReport">--</pre>
         </div>
 
     </div>
 
     <script>
-        // ============================================================
-        //  TOAST NOTIFICATIONS
-        // ============================================================
+        // ================================================================
+        //  STATE
+        // ================================================================
+        let currentData = null;
+        let reportVisible = false;
+
+        // ================================================================
+        //  TOAST
+        // ================================================================
         function showToast(message, type = 'info') {
             const container = document.getElementById('toastContainer');
             const toast = document.createElement('div');
@@ -458,82 +629,158 @@
             }, 4000);
         }
 
-        // ============================================================
+        // ================================================================
         //  LOADER
-        // ============================================================
+        // ================================================================
         function setLoading(active) {
             document.getElementById('loader').classList.toggle('active', active);
             document.querySelectorAll('.action-bar .btn').forEach(btn => btn.disabled = active);
         }
 
-        // ============================================================
+        // ================================================================
         //  API CALLS
-        // ============================================================
-        async function apiCall(endpoint, data = null) {
+        // ================================================================
+        async function apiCall(endpoint, method = 'GET', data = null) {
             const options = {
-                method: data ? 'POST' : 'GET',
-                headers: { 'Content-Type': 'application/json' },
-                body: data ? JSON.stringify(data) : null
+                method: method,
+                headers: { 'Content-Type': 'application/json' }
             };
+            if (data) options.body = JSON.stringify(data);
+            
             const response = await fetch(`/api/${endpoint}`, options);
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'خطأ في الاتصال');
+            }
             return response.json();
         }
 
-        // ============================================================
-        //  UPDATE UI FROM RESULTS
-        // ============================================================
+        // ================================================================
+        //  UPDATE UI
+        // ================================================================
         function updateUI(data) {
+            currentData = data;
+            
             // Stats
-            document.getElementById('statCpu').textContent = data.cpu?.cores || '--';
-            document.getElementById('statCpuDetail').textContent = data.cpu?.model || 'غير معروف';
-            document.getElementById('statRam').textContent = data.ram?.total || '--';
-            document.getElementById('statRamDetail').textContent = data.ram?.used || '0 MB مستخدمة';
-            document.getElementById('statStorage').textContent = data.storage?.total || '--';
-            document.getElementById('statStorageDetail').textContent = data.storage?.free || '0 GB متاح';
-            document.getElementById('statBattery').textContent = data.battery?.level || '--';
-            document.getElementById('statBatteryDetail').textContent = data.battery?.status || '--';
+            const hw = data.hardware || data;
+            const sw = data.software || data;
+            
+            document.getElementById('statCpu').textContent = hw.cpu?.cores || '--';
+            document.getElementById('statCpuDetail').textContent = hw.cpu?.brand?.substring(0, 25) || '--';
+            document.getElementById('statRam').textContent = hw.memory?.total || '--';
+            document.getElementById('statRamDetail').textContent = hw.memory?.used || '--';
+            document.getElementById('statStorage').textContent = hw.storage?.total || '--';
+            document.getElementById('statStorageDetail').textContent = hw.storage?.free || '--';
+            
+            const bat = hw.battery || {};
+            document.getElementById('statBattery').textContent = bat.level || '--';
+            document.getElementById('statBatteryDetail').textContent = bat.status || '--';
+            
+            document.getElementById('statDeviceType').textContent = data.deviceType || '--';
+            document.getElementById('statPlatform').textContent = sw.os?.platform || '--';
+            document.getElementById('statTime').textContent = data.timestamp ? new Date(data.timestamp).toLocaleString('ar-EG') : '--';
+            document.getElementById('statUptime').textContent = sw.os?.uptime || '--';
 
             // Hardware
-            document.getElementById('resCpu').textContent = `${data.cpu?.model} (${data.cpu?.cores} أنوية)`;
-            document.getElementById('resRam').textContent = `${data.ram?.total} (${data.ram?.used} مستخدمة)`;
-            document.getElementById('resStorage').textContent = `${data.storage?.total} (${data.storage?.free} متاح)`;
-            document.getElementById('resBattery').textContent = `${data.battery?.level}% - ${data.battery?.status}`;
-            document.getElementById('resDisplay').textContent = data.display || '--';
-            document.getElementById('resCamera').textContent = data.cameras || '--';
-            document.getElementById('resSensors').textContent = data.sensors || '--';
+            document.getElementById('resCpu').textContent = `${hw.cpu?.brand} (${hw.cpu?.cores} أنوية)`;
+            document.getElementById('resRam').textContent = `${hw.memory?.total} (${hw.memory?.used} مستخدمة)`;
+            document.getElementById('resStorage').textContent = `${hw.storage?.total} (${hw.storage?.free} متاح)`;
+            document.getElementById('resBattery').textContent = bat.level ? `${bat.level}% - ${bat.status}` : 'غير متاح';
+            document.getElementById('resDisplay').textContent = hw.display?.resolution || '--';
+            document.getElementById('resGpu').textContent = hw.gpu?.length > 0 ? hw.gpu.map(g => g.model).join(', ') : 'غير معروف';
+            
+            // Cameras
+            const cams = hw.cameras || [];
+            document.getElementById('resCameras').textContent = cams.length > 0 ? cams.map(c => c.name).join(', ') : 'لم يتم اكتشاف كاميرات';
+            
+            // Sensors
+            const sensors = hw.sensors || [];
+            document.getElementById('resSensors').textContent = sensors.length > 0 ? sensors.map(s => s.name).join(' • ') : 'لم يتم اكتشاف مستشعرات';
+            
+            // Bluetooth
+            const bt = hw.bluetooth || [];
+            document.getElementById('resBluetooth').textContent = bt.length > 0 ? bt.map(b => b.name).join(', ') : 'لم يتم اكتشاف بلوتوث';
 
             // Software
-            document.getElementById('resOs').textContent = data.os || '--';
-            document.getElementById('resAndroidVer').textContent = data.androidVersion || '--';
-            document.getElementById('resSecurityPatch').textContent = data.securityPatch || '--';
-            document.getElementById('resRoot').textContent = data.rootStatus || '--';
-            document.getElementById('resLauncher').textContent = data.launcher || '--';
-            document.getElementById('resNetwork').textContent = data.network || '--';
+            document.getElementById('resOs').textContent = `${sw.os?.platform} ${sw.os?.release}`;
+            
+            const android = sw.android || {};
+            document.getElementById('resAndroidVer').textContent = android.version || 'غير مكتشف';
+            document.getElementById('resSecurityPatch').textContent = android.securityPatch || 'غير مكتشف';
+            document.getElementById('resRoot').textContent = sw.root?.status || '--';
+            document.getElementById('resLauncher').textContent = sw.launcher || '--';
+            document.getElementById('resUptime').textContent = sw.os?.uptime || '--';
+            
+            // Network
+            const net = sw.network || {};
+            if (net.wifi) {
+                document.getElementById('resNetwork').textContent = `📶 واي فاي (${net.wifi.ip})`;
+                document.getElementById('resWifi').textContent = net.wifi.interface || '--';
+            } else if (net.ethernet) {
+                document.getElementById('resNetwork').textContent = `🔌 إيثرنت (${net.ethernet.ip})`;
+                document.getElementById('resWifi').textContent = net.ethernet.interface || '--';
+            } else {
+                document.getElementById('resNetwork').textContent = 'غير متصل';
+                document.getElementById('resWifi').textContent = '--';
+            }
+            
+            const wifiNetworks = net.wifiNetworks || [];
+            document.getElementById('resWifiNetworks').textContent = wifiNetworks.length > 0 ? 
+                wifiNetworks.slice(0, 5).map(w => w.ssid).join(', ') : 'لا توجد شبكات قريبة';
+
+            // Update status badge
+            document.getElementById('statusBadge').innerHTML = `<i class="fas fa-check-circle"></i> تم التحديث`;
+            document.getElementById('statusBadge').style.color = '#38ef7d';
+            
+            // Update report
+            document.getElementById('fullReport').textContent = JSON.stringify(data, null, 2);
         }
 
-        // ============================================================
-        //  FULL REPORT
-        // ============================================================
-        function showFullReport(data) {
-            const card = document.getElementById('fullReportCard');
-            const pre = document.getElementById('fullReport');
-            card.style.display = 'block';
-            pre.textContent = JSON.stringify(data, null, 2);
+        // ================================================================
+        //  TEST RESULTS UI
+        // ================================================================
+        function updateTestResults(data) {
+            const card = document.getElementById('testResultsCard');
+            const grid = document.getElementById('testGrid');
+            
+            if (data.tests) {
+                card.style.display = 'block';
+                document.getElementById('testScore').textContent = `النتيجة: ${data.summary?.score || '--'} (${data.summary?.status || '--'})`;
+                
+                grid.innerHTML = '';
+                for (const [key, test] of Object.entries(data.tests)) {
+                    const div = document.createElement('div');
+                    div.className = 'test-item';
+                    
+                    const statusIcons = {
+                        pass: '✅',
+                        fail: '❌',
+                        warning: '⚠️',
+                        info: 'ℹ️'
+                    };
+                    
+                    div.innerHTML = `
+                        <span class="test-status">${statusIcons[test.status] || '❓'}</span>
+                        <span class="test-name">${key.charAt(0).toUpperCase() + key.slice(1)}</span>
+                        <span class="test-result ${test.status}">${test.details}</span>
+                    `;
+                    grid.appendChild(div);
+                }
+            }
         }
 
-        // ============================================================
+        // ================================================================
         //  SCAN ACTIONS
-        // ============================================================
+        // ================================================================
         async function runFullScan() {
             setLoading(true);
-            showToast('جاري الفحص الشامل ...', 'info');
+            showToast('🔄 جاري الفحص الشامل ...', 'info');
             try {
                 const data = await apiCall('scan/full');
                 updateUI(data);
-                showFullReport(data);
                 showToast('✅ تم الفحص الشامل بنجاح', 'success');
             } catch (err) {
-                showToast('❌ خطأ في الفحص: ' + err.message, 'error');
+                showToast('❌ خطأ: ' + err.message, 'error');
             } finally {
                 setLoading(false);
             }
@@ -541,7 +788,7 @@
 
         async function runQuickCheck() {
             setLoading(true);
-            showToast('جاري الفحص السريع ...', 'info');
+            showToast('⚡ جاري الفحص السريع ...', 'info');
             try {
                 const data = await apiCall('scan/quick');
                 updateUI(data);
@@ -555,11 +802,12 @@
 
         async function runHardwareTest() {
             setLoading(true);
-            showToast('جاري اختبار الهاردوير ...', 'info');
+            showToast('🧪 جاري اختبار الهاردوير ...', 'info');
             try {
-                const data = await apiCall('test/hardware');
+                const data = await apiCall('test/hardware', 'POST');
                 updateUI(data);
-                showToast('✅ تم اختبار الهاردوير', 'success');
+                updateTestResults(data);
+                showToast(`✅ تم اختبار الهاردوير - النتيجة: ${data.summary?.score || '--'}`, 'success');
             } catch (err) {
                 showToast('❌ خطأ: ' + err.message, 'error');
             } finally {
@@ -568,21 +816,68 @@
         }
 
         function clearResults() {
-            document.getElementById('fullReportCard').style.display = 'none';
-            document.getElementById('fullReport').textContent = '';
-            // Reset all result fields
+            document.getElementById('reportCard').style.display = 'none';
+            document.getElementById('testResultsCard').style.display = 'none';
+            document.getElementById('fullReport').textContent = '--';
+            
             document.querySelectorAll('#hardwareResults .value, #softwareResults .value').forEach(el => {
                 el.textContent = '--';
             });
             document.querySelectorAll('.stat-card .value').forEach(el => {
-                if (el.id !== 'statCpu') el.textContent = '--';
+                if (!['statTime', 'statDeviceType'].includes(el.id)) {
+                    el.textContent = '--';
+                }
             });
+            document.querySelectorAll('.stat-card .sub-value').forEach(el => {
+                el.textContent = '--';
+            });
+            
+            document.getElementById('statusBadge').innerHTML = `<i class="fas fa-circle"></i> النظام جاهز`;
+            document.getElementById('statusBadge').style.color = '#64ffda';
+            
+            currentData = null;
+            reportVisible = false;
             showToast('🗑️ تم مسح جميع النتائج', 'info');
         }
 
-        // ============================================================
-        //  LOAD DEFAULT DATA ON PAGE LOAD
-        // ============================================================
+        function toggleReport() {
+            const card = document.getElementById('reportCard');
+            if (reportVisible) {
+                card.style.display = 'none';
+                reportVisible = false;
+            } else {
+                if (currentData) {
+                    card.style.display = 'block';
+                    reportVisible = true;
+                } else {
+                    showToast('⚠️ قم بتشغيل فحص أولاً', 'warning');
+                }
+            }
+        }
+
+        function copyReport() {
+            const text = document.getElementById('fullReport').textContent;
+            if (text && text !== '--') {
+                navigator.clipboard.writeText(text).then(() => {
+                    showToast('📋 تم نسخ التقرير', 'success');
+                }).catch(() => {
+                    // Fallback
+                    const area = document.createElement('textarea');
+                    area.value = text;
+                    document.body.appendChild(area);
+                    area.select();
+                    document.execCommand('copy');
+                    area.remove();
+                    showToast('📋 تم نسخ التقرير', 'success');
+                });
+            } else {
+                showToast('⚠️ لا يوجد تقرير للنسخ', 'warning');
+            }
+        }
+
+        // ================================================================
+        //  AUTO LOAD ON PAGE LOAD
+        // ================================================================
         window.onload = async function() {
             try {
                 const data = await apiCall('scan/quick');
@@ -590,6 +885,7 @@
                 showToast('📱 تم تحميل بيانات الجهاز', 'info');
             } catch (err) {
                 console.warn('Could not load initial data:', err);
+                showToast('⚠️ تعذر تحميل البيانات الأولية', 'warning');
             }
         };
     </script>
