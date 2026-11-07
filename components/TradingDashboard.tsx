@@ -1,7 +1,8 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { supabase } from '@/lib/supabase'
+import { supabase, getUserProfile } from '@/lib/supabase'
+import { formatNumber } from '@/lib/utils'
 import StatsBar from './StatsBar'
 import CandlestickChart from './CandlestickChart'
 import OrderBook from './OrderBook'
@@ -13,23 +14,43 @@ type TF = '15m' | '4h' | '1d'
 
 export default function TradingDashboard() {
   const [user, setUser] = useState<any>(null)
+  const [profile, setProfile] = useState<any>(null)
   const [tf, setTf] = useState<TF>('15m')
   const [showLogin, setShowLogin] = useState(false)
-  
-  // فحص الأدمن مباشرة من البريد الإلكتروني لضمان ظهور الزر
+
+  // فحص الأدمن مباشرة من البريد لضمان ظهور الزر
   const isAdmin = user?.email === 'mb425262@gmail.com'
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUser(data.user))
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+    async function loadUser() {
+      const { data } = await supabase.auth.getUser()
+      setUser(data.user)
+      if (data.user) {
+        const p = await getUserProfile()
+        setProfile(p)
+      } else {
+        setProfile(null)
+      }
+    }
+    loadUser()
+
+    const { data: sub } = supabase.auth.onAuthStateChange(async (_e, session) => {
       setUser(session?.user ?? null)
+      if (session?.user) {
+        const p = await getUserProfile()
+        setProfile(p)
+      } else {
+        setProfile(null)
+      }
     })
+
     return () => { sub.subscription.unsubscribe() }
   }, [])
 
   async function logout() {
     await supabase.auth.signOut()
     setUser(null)
+    setProfile(null)
   }
 
   return (
@@ -44,7 +65,6 @@ export default function TradingDashboard() {
           <p className="text-[10px] text-slate-500">تداول آمن عبر بنكك</p>
         </div>
         <div className="flex items-center gap-2">
-          {/* زر الأدمن يظهر الآن بمجرد تسجيل الدخول بالبريد المحدد */}
           {isAdmin && (
             <Link href="/admin"
               className="text-xs bg-amber-600 hover:bg-amber-500 text-white px-3 py-1.5 rounded font-bold">
@@ -69,6 +89,18 @@ export default function TradingDashboard() {
       </header>
 
       <StatsBar />
+
+      {/* شريط الرصيد */}
+      {profile && (
+        <div className="bg-slate-900 rounded-lg p-2 flex justify-around text-xs flex-wrap gap-2">
+          <span className="text-slate-400">الرصيد المتاح:</span>
+          <span className="text-white font-bold">{formatNumber(profile.nil_balance ?? 0)} NIL</span>
+          <span className="text-white font-bold">{formatNumber(profile.sdg_balance ?? 0)} SDG</span>
+          <span className="text-slate-500">
+            (محجوز: {formatNumber(profile.nil_locked ?? 0)} NIL / {formatNumber(profile.sdg_locked ?? 0)} SDG)
+          </span>
+        </div>
+      )}
 
       <div className="flex gap-2">
         {(['15m', '4h', '1d'] as TF[]).map(t => (
