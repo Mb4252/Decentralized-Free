@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
-import { createChart, CandlestickSeries } from 'lightweight-charts'
+// 1. إزالة CandlestickSeries من الاستيراد
+import { createChart } from 'lightweight-charts'
 import { supabase } from '@/lib/supabase'
 
 type TF = '15m' | '4h' | '1d'
@@ -14,7 +15,6 @@ export default function CandlestickChart({ timeframe }: { timeframe: TF }) {
   useEffect(() => {
     if (!containerRef.current) return
 
-    // إجبار الاتجاه ليكون من اليسار لليمين لضمان ظهور الشموع صحيحة
     containerRef.current.setAttribute('dir', 'ltr')
 
     const chart = createChart(containerRef.current, {
@@ -26,7 +26,8 @@ export default function CandlestickChart({ timeframe }: { timeframe: TF }) {
       rightPriceScale: { borderColor: '#2b3139' },
     })
 
-    const series = chart.addSeries(CandlestickSeries, {
+    // 2. استخدام الدالة القديمة المتوافقة مع الإصدار الرابع
+    const series = chart.addCandlestickSeries({
       upColor: '#0ecb81', downColor: '#f6465d',
       borderUpColor: '#0ecb81', borderDownColor: '#f6465d',
       wickUpColor: '#0ecb81', wickDownColor: '#f6465d',
@@ -64,7 +65,6 @@ export default function CandlestickChart({ timeframe }: { timeframe: TF }) {
           open: Number(c.open), high: Number(c.high), low: Number(c.low), close: Number(c.close)
         }))
         
-        // فلترة البيانات للتأكد من ترتيبها الزمني الصحيح
         const sortedData = formattedData.sort((a, b) => a.time - b.time)
         
         seriesRef.current.setData(sortedData)
