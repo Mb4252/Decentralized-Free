@@ -3,19 +3,15 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { supabase, getUserProfile } from '@/lib/supabase'
 import { formatNumber } from '@/lib/utils'
-import StatsBar from './StatsBar'
 import CandlestickChart from './CandlestickChart'
 import OrderBook from './OrderBook'
 import P2POrderForm from './P2POrderForm'
 import LoginModal from './LoginModal'
 import ToastHost from './Toast'
 
-type TF = '15m' | '4h' | '1d'
-
 export default function TradingDashboard() {
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
-  const [tf, setTf] = useState<TF>('15m')
   const [showLogin, setShowLogin] = useState(false)
   const isAdmin = user?.email === 'mb425262@gmail.com'
 
@@ -34,70 +30,69 @@ export default function TradingDashboard() {
     return () => { sub.subscription.unsubscribe() }
   }, [])
 
-  async function logout() {
-    await supabase.auth.signOut()
-    setUser(null); setProfile(null)
-  }
-
   return (
-    <div className="min-h-screen bg-[#0b0e11] text-white">
+    <div className="min-h-screen bg-[#0b0e11] text-[#eaecef] font-sans">
       <ToastHost />
       
-      {/* Header */}
-      <header className="border-b border-[#2b3139] bg-[#181a20] px-4 py-3 flex justify-between items-center">
-        <div className="flex items-center gap-3">
-          <h1 className="text-xl font-bold">NIL/SDG</h1>
-          <span className="text-xs text-[#848e9c]">منصة نيل كوين</span>
+      {/* الشريط العلوي (Header) */}
+      <header className="border-b border-[#2b3139] px-4 py-3 flex justify-between items-center bg-[#181a20]">
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 bg-yellow-500 rounded-full flex items-center justify-center font-bold text-black text-xs">N</div>
+          <h1 className="text-lg font-bold">NIL/SDG</h1>
+          <span className="text-[#0ecb81] text-xs font-bold bg-[#0ecb81]/10 px-2 py-0.5 rounded">+2.45%</span>
         </div>
-        <div className="flex items-center gap-3 text-sm">
-          {isAdmin && <Link href="/admin" className="text-yellow-500 hover:text-yellow-400">⚙️ الإدارة</Link>}
+        <div className="flex gap-3 items-center">
+          {isAdmin && <Link href="/admin" className="text-yellow-500 text-sm">⚙️ الأدمن</Link>}
           {user ? (
-            <>
-              <span className="text-[#848e9c] hidden sm:inline">{user.email}</span>
-              <button onClick={logout} className="text-red-400 hover:text-red-300">خروج</button>
-            </>
+            <button onClick={() => supabase.auth.signOut()} className="text-sm text-[#848e9c] hover:text-white">خروج</button>
           ) : (
-            <button onClick={() => setShowLogin(true)} className="bg-[#0ecb81] text-black px-4 py-1 rounded font-bold">تسجيل الدخول</button>
+            <button onClick={() => setShowLogin(true)} className="bg-[#0ecb81] text-black px-4 py-1.5 rounded text-sm font-bold">تسجيل الدخول</button>
           )}
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto p-2 md:p-4 space-y-4">
-        <StatsBar />
-
+      <main className="max-w-6xl mx-auto p-2 lg:p-4 space-y-4">
+        {/* الرصيد المتاح */}
         {profile && (
-          <div className="bg-[#181a20] border border-[#2b3139] rounded p-2 flex flex-wrap gap-4 text-xs">
-            <span className="text-[#848e9c]">الرصيد المتاح:</span>
-            <span className="text-white font-bold">{formatNumber(profile.nil_balance)} NIL</span>
-            <span className="text-white font-bold">{formatNumber(profile.sdg_balance)} SDG</span>
-            <span className="text-[#848e9c]">(محجوز: {formatNumber(profile.nil_locked)} NIL / {formatNumber(profile.sdg_locked)} SDG)</span>
+          <div className="grid grid-cols-2 gap-2 text-xs bg-[#181a20] p-3 rounded-lg border border-[#2b3139]">
+            <div className="text-[#848e9c]">الرصيد المتاح:</div>
+            <div className="text-left font-bold text-[#0ecb81]">{formatNumber(profile.nil_balance)} NIL</div>
+            <div className="text-[#848e9c]">المحجوز (Escrow):</div>
+            <div className="text-left font-bold text-[#f6465d]">{formatNumber(profile.nil_locked)} NIL</div>
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {/* العمود الأيمن: الرسم البياني */}
-          <div className="lg:col-span-2 space-y-2">
-            <div className="flex gap-1 bg-[#181a20] p-1 rounded w-fit border border-[#2b3139]">
-              {(['15m', '4h', '1d'] as TF[]).map(t => (
-                <button key={t} onClick={() => setTf(t)} className={`px-3 py-1 rounded text-xs font-bold transition ${tf === t ? 'bg-[#2b3139] text-white' : 'text-[#848e9c] hover:text-white'}`}>
-                  {t === '15m' ? '١٥ دقيقة' : t === '4h' ? '٤ ساعات' : 'يومي'}
-                </button>
-              ))}
+        {/* الرسم البياني - يظهر في الأعلى على الجوال، وعلى اليسار في الشاشات الكبيرة */}
+        <div className="w-full">
+           <CandlestickChart timeframe="15m" />
+        </div>
+
+        {/* شبكة التداول: دفتر الطلبات (يمين) + نموذج التداول (يسار) */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+          
+          {/* دفتر الطلبات (Order Book) */}
+          <div className="bg-[#181a20] rounded-lg border border-[#2b3139] overflow-hidden flex flex-col h-[500px]">
+            <div className="flex border-b border-[#2b3139] text-sm">
+              <div className="flex-1 text-center py-2 font-bold text-white border-b-2 border-[#0ecb81]">دفتر الطلبات</div>
+              <div className="flex-1 text-center py-2 text-[#848e9c]">آخر الصفقات</div>
             </div>
-            <CandlestickChart timeframe={tf} />
+            <div className="flex-1 p-2 overflow-y-auto">
+              <OrderBook />
+            </div>
           </div>
 
-          {/* العمود الأيسر: دفتر الطلبات والنموذج */}
-          <div className="space-y-4">
-            <OrderBook />
-            {user ? <P2POrderForm userId={user.id} /> : (
-               <div className="bg-[#181a20] border border-[#2b3139] p-6 rounded text-center text-sm text-[#848e9c]">
-                  سجّل الدخول لإنشاء طلب P2P
-                  <button onClick={() => setShowLogin(true)} className="block w-full mt-3 bg-[#0ecb81] text-black py-2 rounded font-bold">دخول</button>
-               </div>
+          {/* نموذج الشراء/البيع (P2P Order Form) */}
+          <div className="bg-[#181a20] rounded-lg border border-[#2b3139] p-4">
+            {user ? (
+              <P2POrderForm userId={user.id} />
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full py-10">
+                <p className="text-[#848e9c] mb-4">سجّل الدخول للتداول</p>
+                <button onClick={() => setShowLogin(true)} className="bg-[#0ecb81] text-black px-6 py-2 rounded font-bold">تسجيل الدخول</button>
+              </div>
             )}
           </div>
+
         </div>
       </main>
       {showLogin && <LoginModal onClose={() => setShowLogin(false)} />}
