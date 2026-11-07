@@ -30,7 +30,7 @@ export default function ToastHost() {
     <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 space-y-2 w-[90%] max-w-sm">
       {items.map(i => (
         <div key={i.id}
-          className={`px-4 py-2 rounded shadow-lg text-sm text-white ${
+          className={`px-4 py-2 rounded shadow-lg text-sm text-white text-center ${
             i.type === 'success' ? 'bg-green-600' :
             i.type === 'error' ? 'bg-red-600' : 'bg-slate-700'
           }`}>
