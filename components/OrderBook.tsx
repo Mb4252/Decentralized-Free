@@ -10,32 +10,28 @@ export default function OrderBook() {
   const loadData = async () => {
     const { data: orders } = await supabase.from('orders').select('id, side, price, amount').eq('status', 'open')
     if (orders) {
-      // أعلى 6 طلبات شراء
-      setBids(orders.filter(o => o.side === 'buy').sort((a, b) => b.price - a.price).slice(0, 6))
-      // أدنى 6 طلبات بيع
-      setAsks(orders.filter(o => o.side === 'sell').sort((a, b) => a.price - b.price).slice(0, 6))
+      setBids(orders.filter(o => o.side === 'buy').sort((a, b) => b.price - a.price).slice(0, 8))
+      setAsks(orders.filter(o => o.side === 'sell').sort((a, b) => a.price - b.price).slice(0, 8))
     }
   }
 
   useEffect(() => {
     loadData()
-    const ch = supabase.channel('ob')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, loadData).subscribe()
+    const ch = supabase.channel('ob').on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, loadData).subscribe()
     return () => { supabase.removeChannel(ch) }
   }, [])
 
   const maxAmount = Math.max(...bids.map(b => b.amount), ...asks.map(a => a.amount), 1)
+  const midPrice = asks[0]?.price || bids[0]?.price || 0
 
   return (
     <div className="flex flex-col h-full text-xs font-mono" dir="ltr">
-      {/* العناوين */}
+      {/* شريط المبيعات (Asks) */}
       <div className="flex justify-between text-[10px] text-[#848e9c] mb-1 px-2">
-        <span>Price (SDG)</span>
-        <span>Amount (NIL)</span>
+        <span>السعر (SDG)</span>
+        <span>الكمية (NIL)</span>
       </div>
-
-      {/* طلبات البيع (Asks) - حمراء */}
-      <div className="flex flex-col-reverse">
+      <div className="flex flex-col-reverse mb-2">
         {asks.map((a, i) => (
           <div key={i} className="relative flex justify-between py-1 px-2 hover:bg-[#2b3139]">
             <div className="absolute inset-y-0 right-0 bg-[#f6465d]/15" style={{ width: `${(a.amount / maxAmount) * 100}%` }} />
@@ -47,10 +43,10 @@ export default function OrderBook() {
 
       {/* السعر الحالي */}
       <div className="text-lg font-bold text-[#0ecb81] py-2 border-y border-[#2b3139] text-center my-1 bg-[#0b0e11]">
-        {formatNumber(bids[0]?.price || asks[0]?.price || 0)}
+        {formatNumber(midPrice)}
       </div>
 
-      {/* طلبات الشراء (Bids) - خضراء */}
+      {/* شريط المشتريات (Bids) */}
       <div>
         {bids.map((b, i) => (
           <div key={i} className="relative flex justify-between py-1 px-2 hover:bg-[#2b3139]">
