@@ -17,123 +17,89 @@ export default function TradingDashboard() {
   const [profile, setProfile] = useState<any>(null)
   const [tf, setTf] = useState<TF>('15m')
   const [showLogin, setShowLogin] = useState(false)
-
-  // فحص الأدمن مباشرة من البريد لضمان ظهور الزر
   const isAdmin = user?.email === 'mb425262@gmail.com'
 
   useEffect(() => {
     async function loadUser() {
       const { data } = await supabase.auth.getUser()
       setUser(data.user)
-      if (data.user) {
-        const p = await getUserProfile()
-        setProfile(p)
-      } else {
-        setProfile(null)
-      }
+      if (data.user) setProfile(await getUserProfile())
     }
     loadUser()
-
     const { data: sub } = supabase.auth.onAuthStateChange(async (_e, session) => {
       setUser(session?.user ?? null)
-      if (session?.user) {
-        const p = await getUserProfile()
-        setProfile(p)
-      } else {
-        setProfile(null)
-      }
+      if (session?.user) setProfile(await getUserProfile())
+      else setProfile(null)
     })
-
     return () => { sub.subscription.unsubscribe() }
   }, [])
 
   async function logout() {
     await supabase.auth.signOut()
-    setUser(null)
-    setProfile(null)
+    setUser(null); setProfile(null)
   }
 
   return (
-    <div className="max-w-5xl mx-auto p-3 md:p-4 space-y-3">
+    <div className="min-h-screen bg-[#0b0e11] text-white">
       <ToastHost />
-
-      <header className="flex items-center justify-between flex-wrap gap-2">
-        <div>
-          <h1 className="text-lg md:text-xl font-bold text-white">
-            منصة نيل كوين <span className="text-blue-400">NIL/SDG</span>
-          </h1>
-          <p className="text-[10px] text-slate-500">تداول آمن عبر بنكك</p>
+      
+      {/* Header */}
+      <header className="border-b border-[#2b3139] bg-[#181a20] px-4 py-3 flex justify-between items-center">
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-bold">NIL/SDG</h1>
+          <span className="text-xs text-[#848e9c]">منصة نيل كوين</span>
         </div>
-        <div className="flex items-center gap-2">
-          {isAdmin && (
-            <Link href="/admin"
-              className="text-xs bg-amber-600 hover:bg-amber-500 text-white px-3 py-1.5 rounded font-bold">
-              ⚙️ لوحة الأدمن
-            </Link>
-          )}
+        <div className="flex items-center gap-3 text-sm">
+          {isAdmin && <Link href="/admin" className="text-yellow-500 hover:text-yellow-400">⚙️ الإدارة</Link>}
           {user ? (
             <>
-              <span className="text-xs text-slate-400 hidden sm:inline">{user.email}</span>
-              <button onClick={logout}
-                className="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded text-white">
-                خروج
-              </button>
+              <span className="text-[#848e9c] hidden sm:inline">{user.email}</span>
+              <button onClick={logout} className="text-red-400 hover:text-red-300">خروج</button>
             </>
           ) : (
-            <button onClick={() => setShowLogin(true)}
-              className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded font-bold">
-              دخول / تسجيل
-            </button>
+            <button onClick={() => setShowLogin(true)} className="bg-[#0ecb81] text-black px-4 py-1 rounded font-bold">تسجيل الدخول</button>
           )}
         </div>
       </header>
 
-      <StatsBar />
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto p-2 md:p-4 space-y-4">
+        <StatsBar />
 
-      {/* شريط الرصيد */}
-      {profile && (
-        <div className="bg-slate-900 rounded-lg p-2 flex justify-around text-xs flex-wrap gap-2">
-          <span className="text-slate-400">الرصيد المتاح:</span>
-          <span className="text-white font-bold">{formatNumber(profile.nil_balance ?? 0)} NIL</span>
-          <span className="text-white font-bold">{formatNumber(profile.sdg_balance ?? 0)} SDG</span>
-          <span className="text-slate-500">
-            (محجوز: {formatNumber(profile.nil_locked ?? 0)} NIL / {formatNumber(profile.sdg_locked ?? 0)} SDG)
-          </span>
-        </div>
-      )}
-
-      <div className="flex gap-2">
-        {(['15m', '4h', '1d'] as TF[]).map(t => (
-          <button key={t} onClick={() => setTf(t)}
-            className={`px-3 py-1.5 rounded text-xs font-bold transition ${
-              tf === t ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400'
-            }`}>
-            {t === '15m' ? '١٥ دقيقة' : t === '4h' ? '٤ ساعات' : 'يومي'}
-          </button>
-        ))}
-      </div>
-
-      <CandlestickChart timeframe={tf} />
-
-      <div className="grid md:grid-cols-2 gap-3">
-        <OrderBook />
-        {user ? (
-          <P2POrderForm userId={user.id} />
-        ) : (
-          <div className="bg-slate-900 rounded-lg p-6 flex flex-col items-center justify-center text-center">
-            <p className="text-slate-400 text-sm mb-3">سجّل الدخول لإنشاء طلب P2P</p>
-            <button onClick={() => setShowLogin(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-bold text-sm">
-              تسجيل الدخول
-            </button>
+        {profile && (
+          <div className="bg-[#181a20] border border-[#2b3139] rounded p-2 flex flex-wrap gap-4 text-xs">
+            <span className="text-[#848e9c]">الرصيد المتاح:</span>
+            <span className="text-white font-bold">{formatNumber(profile.nil_balance)} NIL</span>
+            <span className="text-white font-bold">{formatNumber(profile.sdg_balance)} SDG</span>
+            <span className="text-[#848e9c]">(محجوز: {formatNumber(profile.nil_locked)} NIL / {formatNumber(profile.sdg_locked)} SDG)</span>
           </div>
         )}
-      </div>
 
-      <footer className="text-center text-[10px] text-slate-600 pt-4">
-        © {new Date().getFullYear()} منصة نيل كوين — جميع الحقوق محفوظة
-      </footer>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* العمود الأيمن: الرسم البياني */}
+          <div className="lg:col-span-2 space-y-2">
+            <div className="flex gap-1 bg-[#181a20] p-1 rounded w-fit border border-[#2b3139]">
+              {(['15m', '4h', '1d'] as TF[]).map(t => (
+                <button key={t} onClick={() => setTf(t)} className={`px-3 py-1 rounded text-xs font-bold transition ${tf === t ? 'bg-[#2b3139] text-white' : 'text-[#848e9c] hover:text-white'}`}>
+                  {t === '15m' ? '١٥ دقيقة' : t === '4h' ? '٤ ساعات' : 'يومي'}
+                </button>
+              ))}
+            </div>
+            <CandlestickChart timeframe={tf} />
+          </div>
 
+          {/* العمود الأيسر: دفتر الطلبات والنموذج */}
+          <div className="space-y-4">
+            <OrderBook />
+            {user ? <P2POrderForm userId={user.id} /> : (
+               <div className="bg-[#181a20] border border-[#2b3139] p-6 rounded text-center text-sm text-[#848e9c]">
+                  سجّل الدخول لإنشاء طلب P2P
+                  <button onClick={() => setShowLogin(true)} className="block w-full mt-3 bg-[#0ecb81] text-black py-2 rounded font-bold">دخول</button>
+               </div>
+            )}
+          </div>
+        </div>
+      </main>
       {showLogin && <LoginModal onClose={() => setShowLogin(false)} />}
     </div>
   )
