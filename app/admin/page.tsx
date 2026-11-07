@@ -27,21 +27,14 @@ export default function AdminPage() {
   useEffect(() => {
     async function init() {
       const { data } = await supabase.auth.getSession()
-      if (!data.session) {
+      
+      // التحقق المباشر من البريد الإلكتروني (بدون استعلام قاعدة البيانات)
+      if (!data.session || data.session.user.email !== 'mb425262@gmail.com') {
         router.push('/')
         return
       }
+      
       setSession(data.session)
-      // تحقق من الدور
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', data.session.user.id)
-        .single()
-      if (profile?.role !== 'admin') {
-        router.push('/')
-        return
-      }
       load(data.session.access_token)
     }
     init()
@@ -93,10 +86,16 @@ export default function AdminPage() {
     <div className="max-w-5xl mx-auto p-4 space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold">⚙️ لوحة الأدمن</h1>
-        <button onClick={() => session && load(session.access_token)}
-          className="text-xs bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded font-bold">
-          🔄 تحديث
-        </button>
+        <div className="flex gap-2">
+          <button onClick={() => router.push('/')}
+            className="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded text-white">
+            ← العودة للمنصة
+          </button>
+          <button onClick={() => session && load(session.access_token)}
+            className="text-xs bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded font-bold text-white">
+            🔄 تحديث
+          </button>
+        </div>
       </div>
 
       <p className="text-xs text-slate-400">
@@ -110,20 +109,19 @@ export default function AdminPage() {
           <div key={o.id} className="bg-slate-900 rounded-lg p-3 grid md:grid-cols-[1fr_auto] gap-3">
             <div className="space-y-1">
               <div className="flex flex-wrap items-center gap-2 text-sm">
-                <span className={`px-2 py-0.5 rounded text-xs font-bold ${
+                <span className={`px-2 py-0.5 rounded text-xs font-bold text-white ${
                   o.side === 'buy' ? 'bg-green-600' : 'bg-red-600'
                 }`}>
                   {o.side === 'buy' ? 'شراء' : 'بيع'}
                 </span>
-                <span className="font-mono">{formatNumber(o.amount)} NIL</span>
+                <span className="font-mono text-white">{formatNumber(o.amount)} NIL</span>
                 <span className="text-slate-500">@</span>
                 <span className="font-mono text-blue-400">{formatNumber(o.price)} SDG</span>
-                <span className={`text-xs px-2 py-0.5 rounded ${
+                <span className={`text-xs px-2 py-0.5 rounded text-white ${
                   o.status === 'open' ? 'bg-yellow-700' :
                   o.status === 'paid' ? 'bg-blue-700' :
                   o.status === 'released' ? 'bg-green-700' : 'bg-slate-700'
                 }`}>{o.status}</span>
-                {o.escrow_locked && <span className="text-xs text-orange-400">🔒 escrow</span>}
               </div>
               <div className="text-xs text-slate-400">
                 مرجع: {o.payment_ref ?? '—'} · {new Date(o.created_at).toLocaleString('ar-EG')}
@@ -137,15 +135,15 @@ export default function AdminPage() {
             </div>
             <div className="flex flex-wrap gap-1 self-center">
               <button onClick={() => act(o.id, 'mark_paid')}
-                className="text-xs bg-blue-700 hover:bg-blue-600 px-2.5 py-1.5 rounded">
+                className="text-xs bg-blue-700 hover:bg-blue-600 px-2.5 py-1.5 rounded text-white">
                 تأكيد الدفع
               </button>
               <button onClick={() => act(o.id, 'release')}
-                className="text-xs bg-green-700 hover:bg-green-600 px-2.5 py-1.5 rounded">
-                الإفراج عن العملات
+                className="text-xs bg-green-700 hover:bg-green-600 px-2.5 py-1.5 rounded text-white">
+                الإفراج
               </button>
               <button onClick={() => act(o.id, 'cancel')}
-                className="text-xs bg-red-700 hover:bg-red-600 px-2.5 py-1.5 rounded">
+                className="text-xs bg-red-700 hover:bg-red-600 px-2.5 py-1.5 rounded text-white">
                 إلغاء
               </button>
             </div>
