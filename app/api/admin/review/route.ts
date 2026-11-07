@@ -1,18 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 import { getAdminClient } from '@/lib/supabaseAdmin'
 
 export const dynamic = 'force-dynamic'
 
-function checkAdmin(req: NextRequest): boolean {
-  const key = req.headers.get('x-admin-key')
-  const expected = process.env.ADMIN_SECRET_KEY
-  return !!expected && key === expected
+// التحقق من أن الطالب أدمن عبر توكن الجلسة
+async function requireAdmin(req: NextRequest): Promise<{ ok: boolean; userId?: string }> {
+  const auth = req.headers.get('authorization')
+  if (!auth?.startsWith('Bearer ')) return { ok: false }
+  const token = auth.slice(7)
+
+  const anon = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+  const { data: { user }, error } = await anon.auth.getUser(token)
+  if (error || !user) return { ok: false }
+
+  const admin = getAdminClient()
+  const { data: profile } = await admin
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  return { ok: profile?.role === 'admin', userId: user.id }
 }
 
 export async function GET(req: NextRequest) {
-  if (!checkAdmin(req)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const { ok } = await requireAdmin(req)
+  if (!ok) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const admin = getAdminClient()
   const { data, error } = await admin
@@ -27,13 +44,13 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  if (!checkAdmin(req)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { ok } = await requireAdmin(req)
+  if (!ok) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { orderId, action } = await req.json() as {
+    orderId: string
+    action: 'release' | 'cancel' | 'mark_paid'
   }
-
-  const body = await req.json()
-  const { orderId, action } = body as { orderId: string; action: 'release' | 'cancel' | 'mark_paid' }
-
   if (!orderId || !action) {
     return NextResponse.json({ error: 'orderId و action مطلوبان' }, { status: 400 })
   }
@@ -59,10 +76,7 @@ export async function POST(req: NextRequest) {
         .update({ status: 'paid' })
         .eq('id', orderId)
       if (error) throw error
-    } else {
-      return NextResponse.json({ error: 'إجراء غير معروف' }, { status: 400 })
     }
-
     return NextResponse.json({ success: true })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
