@@ -1,5 +1,7 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { supabase } from '@/lib/supabase'
 import { formatNumber } from '@/lib/utils'
 
 type AdminOrder = {
@@ -16,17 +18,41 @@ type AdminOrder = {
 }
 
 export default function AdminPage() {
-  const [key, setKey] = useState('')
+  const router = useRouter()
   const [orders, setOrders] = useState<AdminOrder[]>([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [session, setSession] = useState<any>(null)
 
-  async function load() {
+  useEffect(() => {
+    async function init() {
+      const { data } = await supabase.auth.getSession()
+      if (!data.session) {
+        router.push('/')
+        return
+      }
+      setSession(data.session)
+      // تحقق من الدور
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', data.session.user.id)
+        .single()
+      if (profile?.role !== 'admin') {
+        router.push('/')
+        return
+      }
+      load(data.session.access_token)
+    }
+    init()
+  }, [router])
+
+  async function load(token: string) {
     setLoading(true)
     setError(null)
     try {
       const res = await fetch('/api/admin/review', {
-        headers: { 'x-admin-key': key }
+        headers: { Authorization: `Bearer ${token}` }
       })
       if (!res.ok) {
         const j = await res.json().catch(() => ({}))
@@ -42,30 +68,42 @@ export default function AdminPage() {
 
   async function act(orderId: string, action: 'release' | 'cancel' | 'mark_paid') {
     if (!confirm(`تأكيد الإجراء: ${action}؟`)) return
+    if (!session) return
     const res = await fetch('/api/admin/review', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-admin-key': key },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`
+      },
       body: JSON.stringify({ orderId, action })
     })
-    if (res.ok) load()
+    if (res.ok) load(session.access_token)
     else alert('فشل الإجراء')
+  }
+
+  if (loading && !orders.length) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-slate-400">
+        جاري التحقق من صلاحيات الأدمن...
+      </div>
+    )
   }
 
   return (
     <div className="max-w-5xl mx-auto p-4 space-y-4">
-      <h1 className="text-xl font-bold">لوحة الأدمن — مراجعة الطلبات</h1>
-
-      <div className="flex gap-2">
-        <input type="password" placeholder="مفتاح الأدمن"
-          value={key} onChange={e => setKey(e.target.value)}
-          className="p-2 bg-slate-800 rounded flex-1" />
-        <button onClick={load} disabled={loading || !key}
-          className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded font-bold disabled:opacity-50">
-          {loading ? '...' : 'جلب الطلبات'}
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-bold">⚙️ لوحة الأدمن</h1>
+        <button onClick={() => session && load(session.access_token)}
+          className="text-xs bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded font-bold">
+          🔄 تحديث
         </button>
       </div>
 
-      {error && <p className="text-red-400 text-sm">خطأ: {error}</p>}
+      <p className="text-xs text-slate-400">
+        مسجّل الدخول كأدمن: <span className="text-amber-400">{session?.user?.email}</span>
+      </p>
+
+      {error && <p className="text-red-400 text-sm bg-red-950/40 p-2 rounded">خطأ: {error}</p>}
 
       <div className="space-y-2">
         {orders.map(o => (
@@ -114,7 +152,7 @@ export default function AdminPage() {
           </div>
         ))}
         {!orders.length && !loading && (
-          <p className="text-slate-500 text-center py-8">لا توجد طلبات. أدخل المفتاح ثم اضغط جلب.</p>
+          <p className="text-slate-500 text-center py-8">لا توجد طلبات حالياً.</p>
         )}
       </div>
     </div>
