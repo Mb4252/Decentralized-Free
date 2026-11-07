@@ -1,8 +1,7 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
-import { createChart, CandlestickSeries } from 'lightweight-charts'
+import { createChart } from 'lightweight-charts'
 import { supabase } from '@/lib/supabase'
-import { timeToUnix } from '@/lib/utils'
 
 type TF = '15m' | '4h' | '1d'
 
@@ -15,15 +14,19 @@ export default function CandlestickChart({ timeframe }: { timeframe: TF }) {
   useEffect(() => {
     if (!containerRef.current) return
 
+    // إجبار المكتبة على العمل من اليسار لليمين (LTR) حتى لا تنعكس الشموع
+    containerRef.current.setAttribute('dir', 'ltr')
+
     const chart = createChart(containerRef.current, {
-      autoSize: true,
+      width: containerRef.current.clientWidth,
+      height: 350,
       layout: { background: { color: '#181a20' }, textColor: '#848e9c' },
       grid: { vertLines: { color: '#2b3139' }, horzLines: { color: '#2b3139' } },
       timeScale: { timeVisible: true, secondsVisible: false, borderColor: '#2b3139' },
       rightPriceScale: { borderColor: '#2b3139' },
     })
 
-    const series = chart.addSeries(CandlestickSeries, {
+    const series = chart.addCandlestickSeries({
       upColor: '#0ecb81', downColor: '#f6465d',
       borderUpColor: '#0ecb81', borderDownColor: '#f6465d',
       wickUpColor: '#0ecb81', wickDownColor: '#f6465d',
@@ -32,7 +35,18 @@ export default function CandlestickChart({ timeframe }: { timeframe: TF }) {
     chartRef.current = chart
     seriesRef.current = series
 
-    return () => chart.remove()
+    // مراقبة تغير حجم الشاشة
+    const handleResize = () => {
+      if (containerRef.current) {
+        chart.applyOptions({ width: containerRef.current.clientWidth })
+      }
+    }
+    window.addEventListener('resize', handleResize)
+
+    return () => {
+      window.removeEventListener('resize', handleResize)
+      chart.remove()
+    }
   }, [])
 
   useEffect(() => {
@@ -47,34 +61,28 @@ export default function CandlestickChart({ timeframe }: { timeframe: TF }) {
         .limit(500)
 
       if (data && seriesRef.current) {
-        seriesRef.current.setData(data.map(c => ({
-          time: timeToUnix(c.open_time),
-          open: Number(c.open), high: Number(c.high), low: Number(c.low), close: Number(c.close)
-        })))
+        const formattedData = data.map(c => ({
+          time: Math.floor(new Date(c.open_time).getTime() / 1000),
+          open: Number(c.open), 
+          high: Number(c.high), 
+          low: Number(c.low), 
+          close: Number(c.close)
+        }))
+        
+        seriesRef.current.setData(formattedData)
         chartRef.current?.timeScale().fitContent()
       }
       setLoading(false)
     }
 
     load()
-
-    const ch = supabase.channel(`candles-${timeframe}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'candles', filter: `timeframe=eq.${timeframe}` }, payload => {
-        if (!seriesRef.current) return
-        const c: any = payload.new
-        seriesRef.current.update({
-          time: timeToUnix(c.open_time),
-          open: Number(c.open), high: Number(c.high), low: Number(c.low), close: Number(c.close)
-        })
-      }).subscribe()
-
-    return () => { supabase.removeChannel(ch) }
   }, [timeframe])
 
   return (
-    <div className="relative w-full h-[300px] md:h-[400px] bg-[#181a20] rounded-lg border border-[#2b3139]">
+    <div className="relative w-full bg-[#181a20] rounded-lg border border-[#2b3139] overflow-hidden">
       {loading && <div className="absolute inset-0 flex items-center justify-center text-[#848e9c] text-sm z-10">جاري تحميل الشموع...</div>}
-      <div ref={containerRef} className="w-full h-full" />
+      {/* تم تحديد ارتفاع ثابت هنا لضمان الظهور */}
+      <div ref={containerRef} className="w-full h-[350px]" />
     </div>
   )
 }
