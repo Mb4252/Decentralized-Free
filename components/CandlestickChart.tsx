@@ -19,7 +19,7 @@ export default function CandlestickChart({ timeframe }: { timeframe: TF }) {
 
     const chart = createChart(containerRef.current, {
       width: containerRef.current.clientWidth,
-      height: 300,
+      height: 350,
       layout: { background: { color: '#181a20' }, textColor: '#848e9c' },
       grid: { vertLines: { color: '#2b3139' }, horzLines: { color: '#2b3139' } },
       timeScale: { timeVisible: true, borderColor: '#2b3139' },
