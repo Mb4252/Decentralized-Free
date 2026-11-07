@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import Link from 'next/link'
+import { supabase, isCurrentUserAdmin } from '@/lib/supabase'
 import StatsBar from './StatsBar'
 import CandlestickChart from './CandlestickChart'
 import OrderBook from './OrderBook'
@@ -12,13 +13,21 @@ type TF = '15m' | '4h' | '1d'
 
 export default function TradingDashboard() {
   const [user, setUser] = useState<any>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
   const [tf, setTf] = useState<TF>('15m')
   const [showLogin, setShowLogin] = useState(false)
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUser(data.user))
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+    async function check() {
+      const { data } = await supabase.auth.getUser()
+      setUser(data.user)
+      setIsAdmin(data.user ? await isCurrentUserAdmin() : false)
+    }
+    check()
+
+    const { data: sub } = supabase.auth.onAuthStateChange(async (_e, session) => {
       setUser(session?.user ?? null)
+      setIsAdmin(session?.user ? await isCurrentUserAdmin() : false)
     })
     return () => { sub.subscription.unsubscribe() }
   }, [])
@@ -26,31 +35,35 @@ export default function TradingDashboard() {
   async function logout() {
     await supabase.auth.signOut()
     setUser(null)
+    setIsAdmin(false)
   }
 
   return (
     <div className="max-w-5xl mx-auto p-3 md:p-4 space-y-3">
       <ToastHost />
 
-      {/* Header */}
-      <header className="flex items-center justify-between">
+      <header className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h1 className="text-lg md:text-xl font-bold text-white">
             منصة نيل كوين <span className="text-blue-400">NIL/SDG</span>
           </h1>
           <p className="text-[10px] text-slate-500">تداول آمن عبر بنكك</p>
         </div>
-        <div>
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <Link href="/admin"
+              className="text-xs bg-amber-600 hover:bg-amber-500 px-3 py-1.5 rounded font-bold">
+              ⚙️ لوحة الأدمن
+            </Link>
+          )}
           {user ? (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-400 hidden sm:inline">
-                {user.email}
-              </span>
+            <>
+              <span className="text-xs text-slate-400 hidden sm:inline">{user.email}</span>
               <button onClick={logout}
                 className="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded">
                 خروج
               </button>
-            </div>
+            </>
           ) : (
             <button onClick={() => setShowLogin(true)}
               className="text-xs bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded font-bold">
@@ -60,10 +73,8 @@ export default function TradingDashboard() {
         </div>
       </header>
 
-      {/* Stats */}
       <StatsBar />
 
-      {/* Timeframes */}
       <div className="flex gap-2">
         {(['15m', '4h', '1d'] as TF[]).map(t => (
           <button key={t} onClick={() => setTf(t)}
@@ -75,10 +86,8 @@ export default function TradingDashboard() {
         ))}
       </div>
 
-      {/* Chart */}
       <CandlestickChart timeframe={tf} />
 
-      {/* Order book + P2P form */}
       <div className="grid md:grid-cols-2 gap-3">
         <OrderBook />
         {user ? (
