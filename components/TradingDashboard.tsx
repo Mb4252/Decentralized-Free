@@ -13,22 +13,44 @@ export default function TradingDashboard() {
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
   const [showLogin, setShowLogin] = useState(false)
+  const [tf, setTf] = useState<'15m' | '4h' | '1d'>('15m')
+  const [bottomTab, setBottomTab] = useState<'open' | 'history'>('open')
+  const [myOrders, setMyOrders] = useState<any[]>([])
+  const [tradeHistory, setTradeHistory] = useState<any[]>([])
+  
   const isAdmin = user?.email === 'mb425262@gmail.com'
 
   useEffect(() => {
     async function loadUser() {
       const { data } = await supabase.auth.getUser()
       setUser(data.user)
-      if (data.user) setProfile(await getUserProfile())
+      if (data.user) {
+        setProfile(await getUserProfile())
+        loadUserData(data.user.id)
+      }
     }
     loadUser()
     const { data: sub } = supabase.auth.onAuthStateChange(async (_e, session) => {
       setUser(session?.user ?? null)
-      if (session?.user) setProfile(await getUserProfile())
-      else setProfile(null)
+      if (session?.user) {
+        setProfile(await getUserProfile())
+        loadUserData(session.user.id)
+      } else {
+        setProfile(null); setMyOrders([]); setTradeHistory([])
+      }
     })
     return () => { sub.subscription.unsubscribe() }
   }, [])
+
+  const loadUserData = async (userId: string) => {
+    // جلب طلباتي المفتوحة
+    const { data: orders } = await supabase.from('orders').select('*').eq('user_id', userId).eq('status', 'open').order('created_at', { ascending: false })
+    if (orders) setMyOrders(orders)
+
+    // جلب سجل الصفقات
+    const { data: trades } = await supabase.from('trades').select('*').or(`buy_order_id.in.(select id from orders where user_id='${userId}'),sell_order_id.in.(select id from orders where user_id='${userId}')`).order('executed_at', { ascending: false }).limit(10)
+    if (trades) setTradeHistory(trades)
+  }
 
   return (
     <div className="min-h-screen bg-[#0b0e11] text-[#eaecef] font-sans pb-10">
@@ -39,7 +61,6 @@ export default function TradingDashboard() {
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center font-bold text-black">N</div>
           <h1 className="text-lg font-bold">NIL/SDG</h1>
-          <span className="text-[#0ecb81] text-xs font-bold bg-[#0ecb81]/10 px-2 py-1 rounded">+2.45%</span>
         </div>
         <div className="flex gap-3 items-center">
           {isAdmin && <Link href="/admin" className="text-yellow-500 text-sm hover:underline">⚙️ الأدمن</Link>}
@@ -54,7 +75,7 @@ export default function TradingDashboard() {
       <main className="max-w-7xl mx-auto p-2 md:p-4 space-y-3">
         {/* شريط الأرصدة */}
         {profile && (
-          <div className="grid grid-cols-2 gap-4 text-xs bg-[#181a20] p-3 rounded-lg border border-[#2b3139]">
+          <div className="grid grid-cols-2 gap-4 text-xs bg-[#181a20] p-3 rounded border border-[#2b3139]">
             <div>
               <span className="text-[#848e9c] block mb-1">الرصيد المتاح</span>
               <div className="flex justify-between">
@@ -73,41 +94,83 @@ export default function TradingDashboard() {
         )}
 
         {/* الرسم البياني */}
-        <div className="w-full bg-[#181a20] rounded-lg border border-[#2b3139]">
+        <div className="w-full bg-[#181a20] rounded border border-[#2b3139]">
            <div className="flex justify-between items-center p-2 border-b border-[#2b3139]">
-              <span className="text-sm font-bold text-white">شموع 15 دقيقة</span>
+              <div className="flex gap-2">
+                {(['15m', '4h', '1d'] as const).map(t => (
+                  <button key={t} onClick={() => setTf(t)} className={`px-3 py-1 rounded text-xs font-bold ${tf === t ? 'bg-[#2b3139] text-white' : 'text-[#848e9c]'}`}>
+                    {t === '15m' ? '15 دقيقة' : t === '4h' ? '4 ساعات' : 'يومي'}
+                  </button>
+                ))}
+              </div>
               <span className="text-xs text-[#0ecb81] font-mono">NIL/SDG</span>
            </div>
-           <CandlestickChart timeframe="15m" />
+           <CandlestickChart timeframe={tf} />
         </div>
 
         {/* شبكة التداول */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           
           {/* دفتر الطلبات */}
-          <div className="bg-[#181a20] rounded-lg border border-[#2b3139] flex flex-col h-[400px]">
-            <div className="flex border-b border-[#2b3139] text-sm">
-              <div className="flex-1 text-center py-2 font-bold text-white border-b-2 border-[#0ecb81]">دفتر الطلبات</div>
-              <div className="flex-1 text-center py-2 text-[#848e9c]">آخر الصفقات</div>
-            </div>
+          <div className="bg-[#181a20] rounded border border-[#2b3139] flex flex-col h-[450px]">
+            <div className="p-2 border-b border-[#2b3139] text-sm font-bold text-white">دفتر الطلبات</div>
             <div className="flex-1 overflow-y-auto p-2">
               <OrderBook />
             </div>
           </div>
 
-          {/* نموذج الشراء/البيع */}
-          <div className="bg-[#181a20] rounded-lg border border-[#2b3139] p-4 h-[400px] overflow-y-auto">
-            {user ? (
-              <P2POrderForm userId={user.id} />
-            ) : (
-              <div className="flex flex-col items-center justify-center h-full">
-                <p className="text-[#848e9c] mb-4">سجّل الدخول للتداول</p>
-                <button onClick={() => setShowLogin(true)} className="bg-[#0ecb81] text-black px-6 py-2 rounded font-bold">تسجيل الدخول</button>
-              </div>
-            )}
+          {/* نموذج التداول */}
+          <div className="bg-[#181a20] rounded border border-[#2b3139] p-4 h-[450px] overflow-y-auto">
+            {user ? <P2POrderForm userId={user.id} /> : <div className="text-center text-[#848e9c] mt-10">سجل الدخول للتداول</div>}
           </div>
 
         </div>
+
+        {/* التبويبات السفلية (الطلبات المفتوحة / سجل الصفقات) */}
+        <div className="bg-[#181a20] rounded border border-[#2b3139] overflow-hidden">
+          <div className="flex border-b border-[#2b3139]">
+            <button onClick={() => setBottomTab('open')} className={`flex-1 py-3 text-sm font-bold ${bottomTab === 'open' ? 'text-white border-b-2 border-[#0ecb81]' : 'text-[#848e9c]'}`}>الطلبات المفتوحة ({myOrders.length})</button>
+            <button onClick={() => setBottomTab('history')} className={`flex-1 py-3 text-sm font-bold ${bottomTab === 'history' ? 'text-white border-b-2 border-[#0ecb81]' : 'text-[#848e9c]'}`}>سجل الصفقات</button>
+          </div>
+          
+          <div className="p-2 h-[200px] overflow-y-auto">
+            {bottomTab === 'open' ? (
+              <table className="w-full text-xs text-right font-mono">
+                <thead className="text-[#848e9c]">
+                  <tr><th className="pb-2">النوع</th><th>السعر</th><th>الكمية</th><th>الحالة</th></tr>
+                </thead>
+                <tbody>
+                  {myOrders.map(o => (
+                    <tr key={o.id} className="border-t border-[#2b3139]/50 py-1">
+                      <td className={o.side === 'buy' ? 'text-[#0ecb81]' : 'text-[#f6465d]'}>{o.side === 'buy' ? 'شراء' : 'بيع'}</td>
+                      <td className="text-white">{formatNumber(o.price)}</td>
+                      <td className="text-white">{formatNumber(o.amount)}</td>
+                      <td className="text-yellow-500">مفتوح</td>
+                    </tr>
+                  ))}
+                  {!myOrders.length && <tr><td colSpan={4} className="text-center text-[#848e9c] py-4">لا توجد طلبات مفتوحة</td></tr>}
+                </tbody>
+              </table>
+            ) : (
+              <table className="w-full text-xs text-right font-mono">
+                <thead className="text-[#848e9c]">
+                  <tr><th className="pb-2">السعر</th><th>الكمية</th><th>الوقت</th></tr>
+                </thead>
+                <tbody>
+                  {tradeHistory.map(t => (
+                    <tr key={t.id} className="border-t border-[#2b3139]/50 py-1">
+                      <td className="text-[#0ecb81]">{formatNumber(t.price)}</td>
+                      <td className="text-white">{formatNumber(t.amount)}</td>
+                      <td className="text-[#848e9c]">{new Date(t.executed_at).toLocaleTimeString('ar-EG')}</td>
+                    </tr>
+                  ))}
+                  {!tradeHistory.length && <tr><td colSpan={3} className="text-center text-[#848e9c] py-4">لا توجد صفقات سابقة</td></tr>}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+
       </main>
       {showLogin && <LoginModal onClose={() => setShowLogin(false)} />}
     </div>
