@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { supabase, isCurrentUserAdmin } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase'
 import StatsBar from './StatsBar'
 import CandlestickChart from './CandlestickChart'
 import OrderBook from './OrderBook'
@@ -13,21 +13,16 @@ type TF = '15m' | '4h' | '1d'
 
 export default function TradingDashboard() {
   const [user, setUser] = useState<any>(null)
-  const [isAdmin, setIsAdmin] = useState(false)
   const [tf, setTf] = useState<TF>('15m')
   const [showLogin, setShowLogin] = useState(false)
+  
+  // فحص الأدمن مباشرة من البريد الإلكتروني لضمان ظهور الزر
+  const isAdmin = user?.email === 'mb425262@gmail.com'
 
   useEffect(() => {
-    async function check() {
-      const { data } = await supabase.auth.getUser()
-      setUser(data.user)
-      setIsAdmin(data.user ? await isCurrentUserAdmin() : false)
-    }
-    check()
-
-    const { data: sub } = supabase.auth.onAuthStateChange(async (_e, session) => {
+    supabase.auth.getUser().then(({ data }) => setUser(data.user))
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
       setUser(session?.user ?? null)
-      setIsAdmin(session?.user ? await isCurrentUserAdmin() : false)
     })
     return () => { sub.subscription.unsubscribe() }
   }, [])
@@ -35,7 +30,6 @@ export default function TradingDashboard() {
   async function logout() {
     await supabase.auth.signOut()
     setUser(null)
-    setIsAdmin(false)
   }
 
   return (
@@ -50,9 +44,10 @@ export default function TradingDashboard() {
           <p className="text-[10px] text-slate-500">تداول آمن عبر بنكك</p>
         </div>
         <div className="flex items-center gap-2">
+          {/* زر الأدمن يظهر الآن بمجرد تسجيل الدخول بالبريد المحدد */}
           {isAdmin && (
             <Link href="/admin"
-              className="text-xs bg-amber-600 hover:bg-amber-500 px-3 py-1.5 rounded font-bold">
+              className="text-xs bg-amber-600 hover:bg-amber-500 text-white px-3 py-1.5 rounded font-bold">
               ⚙️ لوحة الأدمن
             </Link>
           )}
@@ -60,13 +55,13 @@ export default function TradingDashboard() {
             <>
               <span className="text-xs text-slate-400 hidden sm:inline">{user.email}</span>
               <button onClick={logout}
-                className="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded">
+                className="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded text-white">
                 خروج
               </button>
             </>
           ) : (
             <button onClick={() => setShowLogin(true)}
-              className="text-xs bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded font-bold">
+              className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded font-bold">
               دخول / تسجيل
             </button>
           )}
@@ -96,7 +91,7 @@ export default function TradingDashboard() {
           <div className="bg-slate-900 rounded-lg p-6 flex flex-col items-center justify-center text-center">
             <p className="text-slate-400 text-sm mb-3">سجّل الدخول لإنشاء طلب P2P</p>
             <button onClick={() => setShowLogin(true)}
-              className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded font-bold text-sm">
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-bold text-sm">
               تسجيل الدخول
             </button>
           </div>
