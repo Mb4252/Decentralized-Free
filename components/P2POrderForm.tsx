@@ -1,82 +1,35 @@
 'use client'
-import { useState, useEffect } from 'react'
-import { supabase, getUserProfile } from '@/lib/supabase'
-import { toast } from './Toast'
-import { formatNumber } from '@/lib/utils'
+import { useState } from 'react'
 
-export default function P2POrderForm({ userId }: { userId: string }) {
-  const [side, setSide] = useState<'buy' | 'sell'>('buy')
-  const [price, setPrice] = useState('')
-  const [amount, setAmount] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-  const [profile, setProfile] = useState<any>(null)
-
-  useEffect(() => { getUserProfile().then(setProfile) }, [])
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!profile) return
-    const numPrice = Number(price)
-    const numAmount = Number(amount)
-
-    if (numPrice <= 0 || numAmount <= 0) return toast('أدخل سعر وكمية صحيحة', 'error')
-    
-    setSubmitting(true)
-    try {
-      const { error } = await supabase.from('orders').insert({ user_id: userId, side, price: numPrice, amount: numAmount, status: 'open' })
-      if (error) throw error
-      toast('تم الإرسال', 'success')
-      setPrice(''); setAmount('')
-      getUserProfile().then(setProfile)
-    } catch (err: any) {
-      toast(err.message, 'error')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  const isBuy = side === 'buy'
+export default function P2PModal({ onClose }: { onClose: () => void }) {
+  // بيانات وهمية للعرض (يجب جلبها من الداتابيز)
+  const [ads] = useState([
+    { id: 1, seller: 'Ahmed', price: 1300, min: 10, max: 500, type: 'sell' },
+    { id: 2, seller: 'Ali', price: 1280, min: 50, max: 1000, type: 'buy' },
+  ])
 
   return (
-    // تنسيق الحاوية الداكنة
-    <form onSubmit={handleSubmit} className="flex flex-col gap-2">
-      {/* أزرار التبديل */}
-      <div className="flex bg-[#2b3139] rounded p-0.5">
-        <button type="button" onClick={() => setSide('buy')} className={`flex-1 py-1.5 text-xs font-bold rounded ${isBuy ? 'bg-[#0ecb81] text-black' : 'text-[#848e9c]'}`}>شراء</button>
-        <button type="button" onClick={() => setSide('sell')} className={`flex-1 py-1.5 text-xs font-bold rounded ${!isBuy ? 'bg-[#f6465d] text-white' : 'text-[#848e9c]'}`}>بيع</button>
-      </div>
-
-      {/* السعر */}
-      <div>
-        <div className="text-[10px] text-[#848e9c] mb-1">السعر (SDG)</div>
-        <input 
-          type="number" required value={price} onChange={e => setPrice(e.target.value)} placeholder="0.00" 
-          className="w-full !bg-[#2b3139] !text-white !border-[#2b3139] rounded px-2 py-1.5 text-xs outline-none text-right font-mono focus:border-[#0ecb81]" 
-        />
-      </div>
-
-      {/* الكمية */}
-      <div>
-        <div className="flex justify-between text-[10px] text-[#848e9c] mb-1">
-          <span>الكمية (NIL)</span>
-          <span>متاح: {formatNumber(isBuy ? profile?.nil_balance : profile?.sdg_balance, 0)}</span>
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
+      <div style={{ backgroundColor: '#181a20', padding: '20px', borderRadius: '8px', width: '90%', maxWidth: '400px', border: '1px solid #2b3139', maxHeight: '80vh', overflowY: 'auto' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px' }}>
+          <h2 style={{ color: 'white', fontSize: '16px', margin: 0 }}>سوق P2P (إعلانات)</h2>
+          <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#848e9c', fontSize: '20px' }}>×</button>
         </div>
-        <input 
-          type="number" required value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" 
-          className="w-full !bg-[#2b3139] !text-white !border-[#2b3139] rounded px-2 py-1.5 text-xs outline-none text-right font-mono focus:border-[#0ecb81]" 
-        />
+        
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {ads.map(ad => (
+            <div key={ad.id} style={{ backgroundColor: '#2b3139', padding: '12px', borderRadius: '6px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <span style={{ color: 'white', fontWeight: 'bold' }}>{ad.seller}</span>
+                <span style={{ color: ad.type === 'sell' ? '#0ecb81' : '#f6465d' }}>{ad.type === 'sell' ? 'يبيع' : 'يشتري'} NIL</span>
+              </div>
+              <div style={{ color: '#eaecef', fontSize: '14px', marginBottom: '4px' }}>السعر: {ad.price} SDG</div>
+              <div style={{ color: '#848e9c', fontSize: '11px', marginBottom: '12px' }}>الحد الأدنى: {ad.min} - الأقصى: {ad.max}</div>
+              <button style={{ width: '100%', padding: '8px', backgroundColor: ad.type === 'sell' ? '#0ecb81' : '#f6465d', color: ad.type === 'sell' ? 'black' : 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold' }}>تداول</button>
+            </div>
+          ))}
+        </div>
       </div>
-
-      {/* الإجمالي */}
-      <div className="flex justify-between text-[10px] mt-1">
-        <span className="text-[#848e9c]">الإجمالي (SDG)</span>
-        <span className="text-white font-bold font-mono">{formatNumber(Number(price) * Number(amount), 0)}</span>
-      </div>
-
-      {/* زر الإرسال */}
-      <button type="submit" disabled={submitting} className={`w-full py-2 mt-2 rounded font-bold text-black text-xs transition ${isBuy ? 'bg-[#0ecb81]' : 'bg-[#f6465d]'}`}>
-        {submitting ? '...' : isBuy ? 'شراء NIL' : 'بيع NIL'}
-      </button>
-    </form>
+    </div>
   )
 }
