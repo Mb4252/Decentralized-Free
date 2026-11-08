@@ -11,22 +11,22 @@ export default function DepositModal({ onClose }: { onClose: () => void }) {
   async function handleDeposit() {
     if (!amount || !ref) return toast('أدخل المبلغ ورقم العملية', 'error')
     setLoading(true)
-    // هنا يتم إرسال طلب إيداع للأدمن للمراجعة
-    // (لتبسيط الأمر، سنقوم بتحديث الرصيد مباشرة للمستخدم في هذا المثال)
+    
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
-    const { error } = await supabase.rpc('admin_add_balance', { 
-      target_email: user.email, 
-      nils: 0, 
-      sdgs: Number(amount) 
+    const { error } = await supabase.from('deposits').insert({
+      user_id: user.id,
+      amount: Number(amount),
+      receipt_ref: ref,
+      status: 'pending'
     })
 
-    if (error) toast('حدث خطأ', 'error')
-    else {
-      toast('تم إيداع المبلغ بنجاح', 'success')
+    if (error) {
+      toast(error.message, 'error')
+    } else {
+      toast('تم إرسال الطلب، بانتظار موافقة الأدمن', 'success')
       onClose()
-      window.location.reload()
     }
     setLoading(false)
   }
@@ -40,8 +40,7 @@ export default function DepositModal({ onClose }: { onClose: () => void }) {
         </div>
         
         <p style={{ color: '#848e9c', fontSize: '12px', marginBottom: '16px' }}>
-          حول المبلغ إلى حساب بنكك:
-          <br /> <strong style={{ color: 'white' }}>رقم الحساب: 4426148بي اسم محمد علد المعطي علي</strong>
+          حول المبلغ إلى حساب بنكك: <strong style={{ color: 'white' }}>1234567890</strong>
         </p>
 
         <input type="number" placeholder="المبلغ (SDG)" value={amount} onChange={(e) => setAmount(e.target.value)} style={{ width: '100%', padding: '10px', backgroundColor: '#2b3139', color: 'white', border: 'none', borderRadius: '4px', marginBottom: '10px' }} />
