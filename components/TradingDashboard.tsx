@@ -62,6 +62,7 @@ export default function TradingDashboard() {
   }
 
   return (
+    // 1. إجبار الخلفية على أن تكون سوداء بالكامل
     <div className="min-h-screen bg-[#0b0e11] text-[#eaecef] font-sans pb-10">
       <ToastHost />
       
@@ -74,14 +75,14 @@ export default function TradingDashboard() {
         <div className="flex gap-2 items-center text-xs">
           {isAdmin && <Link href="/admin" className="text-yellow-500 hover:underline">⚙️</Link>}
           {user ? (
-            <button onClick={() => supabase.auth.signOut()} className="bg-[#2b3139] px-2 py-1 rounded">خروج</button>
+            <button onClick={() => supabase.auth.signOut()} className="bg-[#2b3139] px-2 py-1 rounded hover:bg-[#3b434b]">خروج</button>
           ) : (
             <button onClick={() => setShowLogin(true)} className="bg-[#0ecb81] text-black px-3 py-1 rounded font-bold">دخول</button>
           )}
         </div>
       </header>
 
-      <main className="max-w-md mx-auto space-y-1">
+      <main className="max-w-md mx-auto space-y-1 bg-[#0b0e11]">
         {/* الأرصدة */}
         {profile && (
           <div className="grid grid-cols-2 text-[10px] bg-[#181a20] p-2 border-b border-[#2b3139]">
@@ -114,10 +115,10 @@ export default function TradingDashboard() {
            </div>
         </div>
 
-        {/* القسم الأوسط: دفتر الطلبات + نموذج التداول */}
+        {/* 2. القسم الأوسط: دفتر الطلبات + نموذج التداول (مثل Binance) */}
         <div className="grid grid-cols-2 bg-[#181a20] border-y border-[#2b3139] h-[350px]">
           {/* يمين: دفتر الطلبات */}
-          <div className="border-l border-[#2b3139] flex flex-col h-full">
+          <div className="border-l border-[#2b3139] flex flex-col h-full bg-[#181a20]">
             <div className="p-1 text-[10px] text-center border-b border-[#2b3139] font-bold text-white bg-[#1e2329]">Order Book</div>
             <div className="flex-1 overflow-y-auto">
               <OrderBook />
@@ -125,7 +126,7 @@ export default function TradingDashboard() {
           </div>
 
           {/* يسار: نموذج التداول */}
-          <div className="p-2 overflow-y-auto">
+          <div className="p-2 overflow-y-auto bg-[#181a20]">
             {user ? <P2POrderForm userId={user.id} /> : <div className="text-center text-[#848e9c] mt-10 text-xs">سجل الدخول</div>}
           </div>
         </div>
