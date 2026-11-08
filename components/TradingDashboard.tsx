@@ -5,9 +5,9 @@ import { supabase, getUserProfile } from '@/lib/supabase'
 import { formatNumber } from '@/lib/utils'
 import CandlestickChart from './CandlestickChart'
 import LoginModal from './LoginModal'
-import DepositModal from './DepositModal' // جديد
-import WithdrawModal from './WithdrawModal' // جديد
-import P2PModal from './P2PModal' // جديد
+import DepositModal from './DepositModal'
+import WithdrawModal from './WithdrawModal'
+import P2PModal from './P2PModal'
 import ToastHost, { toast } from './Toast'
 
 export default function TradingDashboard() {
@@ -18,9 +18,8 @@ export default function TradingDashboard() {
   const [showWithdraw, setShowWithdraw] = useState(false)
   const [showP2P, setShowP2P] = useState(false)
   
-  // حالة الرسم البياني
   const [tf, setTf] = useState<'15m' | '4h' | '1d'>('15m')
-  const [livePrice, setLivePrice] = useState<number>(1290.00) // السعر الحي
+  const [livePrice, setLivePrice] = useState<number>(1290.00)
 
   const [myOrders, setMyOrders] = useState<any[]>([])
   const [bids, setBids] = useState<any[]>([])
@@ -33,11 +32,8 @@ export default function TradingDashboard() {
 
   const isAdmin = user?.email === 'mb425262@gmail.com'
 
-  const colors = {
-    bg: '#0b0e11', panel: '#181a20', border: '#2b3139', green: '#0ecb81', red: '#f6465d', text: '#eaecef', subtext: '#848e9c',
-  }
+  const colors = { bg: '#0b0e11', panel: '#181a20', border: '#2b3139', green: '#0ecb81', red: '#f6465d', text: '#eaecef', subtext: '#848e9c' }
 
-  // جلب البيانات والسعر الحي (محاكاة لـ Binance)
   const loadData = async () => {
     const { data: orders } = await supabase.from('orders').select('*').eq('status', 'open')
     if (orders) {
@@ -45,7 +41,6 @@ export default function TradingDashboard() {
       setAsks(orders.filter(o => o.side === 'sell').sort((a, b) => a.price - b.price).slice(0, 5))
       if (user) setMyOrders(orders.filter(o => o.user_id === user.id))
       
-      // تحديث السعر الحي بناءً على آخر طلب
       const bestAsk = orders.filter(o => o.side === 'sell').sort((a, b) => a.price - b.price)[0]
       const bestBid = orders.filter(o => o.side === 'buy').sort((a, b) => b.price - a.price)[0]
       if (bestAsk || bestBid) setLivePrice(bestAsk?.price || bestBid?.price)
@@ -60,8 +55,6 @@ export default function TradingDashboard() {
       loadData()
     }
     init()
-
-    // تحديث مباشر للطلبات والأسعار
     const ch = supabase.channel('live_data').on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, loadData).subscribe()
     return () => { supabase.removeChannel(ch) }
   }, [user?.id])
@@ -69,21 +62,17 @@ export default function TradingDashboard() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!profile) return toast('سجل الدخول أولاً', 'error')
-    
     const numPrice = Number(price)
     const numAmount = Number(amount)
     
-    // التحقق من الرصيد (نظام أمان)
     if (side === 'buy' && profile.sdg_balance < (numPrice * numAmount)) return toast('رصيد SDG غير كافٍ', 'error')
     if (side === 'sell' && profile.nil_balance < numAmount) return toast('رصيد NIL غير كافٍ', 'error')
 
     setSubmitting(true)
     try {
-      const { error } = await supabase.from('orders').insert({ 
-        user_id: user.id, side, price: numPrice, amount: numAmount, status: 'open' 
-      })
+      const { error } = await supabase.from('orders').insert({ user_id: user.id, side, price: numPrice, amount: numAmount, status: 'open' })
       if (error) throw error
-      toast('تم إرسال الطلب بنجاح', 'success')
+      toast('تم إرسال الطلب', 'success')
       setPrice(''); setAmount('')
       setProfile(await getUserProfile())
       loadData()
@@ -107,10 +96,8 @@ export default function TradingDashboard() {
     <div style={{ minHeight: '100vh', backgroundColor: colors.bg, color: colors.text, fontFamily: 'sans-serif', paddingBottom: '40px' }} dir="rtl">
       <ToastHost />
       
-      {/* الشريط العلوي */}
       <header style={{ borderBottom: `1px solid ${colors.border}`, padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.panel }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          {/* صورة العملة */}
           <div style={{ width: '24px', height: '24px', backgroundColor: '#f3ba2f', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: 'black' }}>N</div>
           <h1 style={{ fontSize: '18px', fontWeight: 'bold', margin: 0 }}>NIL<span style={{ color: colors.subtext }}>/</span>SDG</h1>
         </div>
@@ -127,7 +114,6 @@ export default function TradingDashboard() {
 
       <main style={{ maxWidth: '450px', margin: '0 auto' }}>
         
-        {/* الأرصدة وأزرار الإيداع والسحب */}
         {profile && (
           <div style={{ backgroundColor: colors.panel, padding: '12px', borderBottom: `1px solid ${colors.border}` }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '12px' }}>
@@ -149,7 +135,6 @@ export default function TradingDashboard() {
           </div>
         )}
 
-        {/* الرسم البياني */}
         <div style={{ backgroundColor: colors.panel, borderBottom: `1px solid ${colors.border}` }}>
            <div style={{ display: 'flex', gap: '16px', padding: '8px 12px', borderBottom: `1px solid ${colors.border}` }}>
               {(['15m', '4h', '1d'] as const).map(t => (
@@ -159,7 +144,6 @@ export default function TradingDashboard() {
               ))}
            </div>
            <div style={{ height: '240px', padding: '4px', position: 'relative' }}>
-             {/* تمرير الإطار الزمني (tf) للمكتبة لتعمل الشموع */}
              <CandlestickChart timeframe={tf} livePrice={livePrice} />
              <div style={{ position: 'absolute', top: '10px', left: '10px', backgroundColor: 'rgba(24,26,32,0.8)', padding: '4px 8px', borderRadius: '4px', fontSize: '10px' }}>
                Live: <span style={{color: colors.green}}>{formatNumber(livePrice, 2)}</span>
@@ -167,10 +151,8 @@ export default function TradingDashboard() {
            </div>
         </div>
 
-        {/* دفتر الطلبات ونموذج التداول */}
         <div style={{ display: 'flex', flexDirection: 'row', backgroundColor: colors.panel, borderBottom: `1px solid ${colors.border}`, height: '340px' }}>
           
-          {/* دفتر الطلبات */}
           <div style={{ width: '55%', borderLeft: `1px solid ${colors.border}`, display: 'flex', flexDirection: 'column' }}>
             <div style={{ padding: '6px', fontSize: '11px', fontWeight: 'bold', color: colors.subtext, textAlign: 'center', borderBottom: `1px solid ${colors.border}` }}>دفتر الطلبات</div>
             <div style={{ display: 'flex', flexDirection: 'column', height: '100%', fontSize: '10px', fontFamily: 'monospace' }} dir="ltr">
@@ -202,7 +184,6 @@ export default function TradingDashboard() {
             </div>
           </div>
 
-          {/* نموذج التداول */}
           <div style={{ width: '45%', padding: '10px', backgroundColor: colors.panel, display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <div style={{ display: 'flex', gap: '4px' }}>
               <button type="button" onClick={() => setSide('buy')} style={{ flex: 1, padding: '6px', fontSize: '11px', fontWeight: 'bold', borderRadius: '4px', border: 'none', backgroundColor: side === 'buy' ? colors.green : colors.border, color: side === 'buy' ? 'black' : colors.subtext }}>شراء</button>
@@ -232,7 +213,6 @@ export default function TradingDashboard() {
           </div>
         </div>
 
-        {/* الطلبات المفتوحة */}
         <div style={{ backgroundColor: colors.panel }}>
           <div style={{ display: 'flex', borderBottom: `1px solid ${colors.border}`, fontSize: '11px' }}>
             <div style={{ flex: 1, padding: '8px 0', textAlign: 'center', color: colors.text, fontWeight: 'bold', borderBottom: `2px solid ${colors.green}` }}>الطلبات المفتوحة ({myOrders.length})</div>
@@ -263,7 +243,6 @@ export default function TradingDashboard() {
         </div>
       </main>
 
-      {/* المودالات (النوافذ المنبثقة) */}
       {showLogin && <LoginModal onClose={() => setShowLogin(false)} />}
       {showDeposit && <DepositModal onClose={() => setShowDeposit(false)} />}
       {showWithdraw && <WithdrawModal onClose={() => setShowWithdraw(false)} />}
