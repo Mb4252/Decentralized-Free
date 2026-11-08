@@ -14,18 +14,17 @@ export default function WithdrawModal({ onClose }: { onClose: () => void }) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
-    // هنا يتم إرسال طلب سحب (بخصم الرصيد وإضافته في قائمة المعلقة)
-    const { error } = await supabase.rpc('admin_add_balance', { 
-      target_email: user.email, 
-      nils: 0, 
-      sdgs: -Number(amount) 
+    const { error } = await supabase.from('withdrawals').insert({
+      user_id: user.id,
+      amount: Number(amount),
+      status: 'pending'
     })
 
-    if (error) toast('حدث خطأ', 'error')
-    else {
-      toast('تم طلب السحب بنجاح', 'success')
+    if (error) {
+      toast(error.message, 'error')
+    } else {
+      toast('تم إرسال طلب السحب، بانتظار الأدمن', 'success')
       onClose()
-      window.location.reload()
     }
     setLoading(false)
   }
