@@ -4,10 +4,8 @@ import Link from 'next/link'
 import { supabase, getUserProfile } from '@/lib/supabase'
 import { formatNumber } from '@/lib/utils'
 import CandlestickChart from './CandlestickChart'
-import OrderBook from './OrderBook'
-import P2POrderForm from './P2POrderForm'
 import LoginModal from './LoginModal'
-import ToastHost from './Toast'
+import ToastHost, { toast } from './Toast'
 
 export default function TradingDashboard() {
   const [user, setUser] = useState<any>(null)
@@ -15,27 +13,81 @@ export default function TradingDashboard() {
   const [showLogin, setShowLogin] = useState(false)
   const [tf, setTf] = useState<'15m' | '4h' | '1d'>('15m')
   const [myOrders, setMyOrders] = useState<any[]>([])
+  
+  // حالة دفتر الطلبات
+  const [bids, setBids] = useState<any[]>([])
+  const [asks, setAsks] = useState<any[]>([])
+
+  // حالة نموذج التداول
+  const [side, setSide] = useState<'buy' | 'sell'>('buy')
+  const [price, setPrice] = useState('')
+  const [amount, setAmount] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
   const isAdmin = user?.email === 'mb425262@gmail.com'
 
+  // 1. جلب البيانات
+  const loadData = async () => {
+    // جلب دفتر الطلبات
+    const { data: orders } = await supabase.from('orders').select('*').eq('status', 'open')
+    if (orders) {
+      setBids(orders.filter(o => o.side === 'buy').sort((a, b) => b.price - a.price).slice(0, 5))
+      setAsks(orders.filter(o => o.side === 'sell').sort((a, b) => a.price - b.price).slice(0, 5))
+      if (user) setMyOrders(orders.filter(o => o.user_id === user.id))
+    }
+  }
+
   useEffect(() => {
-    async function loadUser() {
+    async function init() {
       const { data } = await supabase.auth.getUser()
       setUser(data.user)
-      if (data.user) {
-        setProfile(await getUserProfile())
-        const { data: orders } = await supabase.from('orders').select('*').eq('user_id', data.user.id).eq('status', 'open')
-        if (orders) setMyOrders(orders)
-      }
+      if (data.user) setProfile(await getUserProfile())
+      loadData()
     }
-    loadUser()
-  }, [])
+    init()
 
-  async function cancelOrder(id: string) {
-    if (!confirm('إلغاء الطلب؟')) return
-    await supabase.from('orders').update({ status: 'cancelled', escrow_locked: false }).eq('id', id)
-    window.location.reload()
+    // الاستماع للتحديثات اللحظية
+    const ch = supabase.channel('live_data')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, loadData)
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [user?.id])
+
+  // 2. إرسال طلب جديد
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!profile) return toast('يرجى تسجيل الدخول أولاً', 'error')
+    
+    const numPrice = Number(price)
+    const numAmount = Number(amount)
+    if (numPrice <= 0 || numAmount <= 0) return toast('أدخل سعر وكمية صحيحة', 'error')
+
+    setSubmitting(true)
+    try {
+      const { error } = await supabase.from('orders').insert({ 
+        user_id: user.id, side, price: numPrice, amount: numAmount, status: 'open' 
+      })
+      if (error) throw error
+      toast('تم إرسال الطلب بنجاح', 'success')
+      setPrice(''); setAmount('')
+      setProfile(await getUserProfile())
+      loadData()
+    } catch (err: any) {
+      toast(err.message, 'error')
+    } finally {
+      setSubmitting(false)
+    }
   }
+
+  // 3. إلغاء طلب
+  async function cancelOrder(id: string) {
+    if (!confirm('هل تريد إلغاء هذا الطلب؟')) return
+    await supabase.from('orders').update({ status: 'cancelled' }).eq('id', id)
+    toast('تم الإلغاء', 'success')
+    loadData()
+  }
+
+  const maxAmount = Math.max(...bids.map(b => b.amount), ...asks.map(a => a.amount), 1)
 
   return (
     <div className="min-h-screen bg-[#0b0e11] text-[#eaecef] font-sans pb-10" dir="rtl">
@@ -45,7 +97,6 @@ export default function TradingDashboard() {
       <header className="border-b border-[#2b3139] px-4 py-3 flex justify-between items-center bg-[#181a20]">
         <div className="flex items-center gap-2">
           <h1 className="text-lg font-bold">NIL/SDG</h1>
-          <span className="text-[#0ecb81] text-xs">+2.45%</span>
         </div>
         <div className="flex gap-2 items-center text-xs">
           {isAdmin && <Link href="/admin" className="text-yellow-500">⚙️</Link>}
@@ -83,20 +134,84 @@ export default function TradingDashboard() {
            <CandlestickChart timeframe={tf} />
         </div>
 
-        {/* القسم الأوسط: دفتر الطلبات + نموذج التداول (جنباً إلى جنب مثل Binance) */}
+        {/* القسم الأوسط: دفتر الطلبات + نموذج التداول (مدمج بالكامل) */}
         <div className="grid grid-cols-2 bg-[#181a20] border-b border-[#2b3139] h-[400px]">
           
           {/* العمود الأيمن: دفتر الطلبات */}
           <div className="border-l border-[#2b3139] flex flex-col h-full overflow-hidden">
             <div className="p-2 text-xs font-bold text-center text-white border-b border-[#2b3139] bg-[#1e2329]">دفتر الطلبات</div>
-            <div className="flex-1 overflow-y-auto">
-              <OrderBook />
+            
+            <div className="flex flex-col h-full text-[10px] font-mono w-full" dir="ltr">
+              <div className="flex justify-between text-[#848e9c] px-2 py-1 border-b border-[#2b3139]">
+                <span className="w-1/2 text-left">Price(SDG)</span>
+                <span className="w-1/2 text-right">Amt(NIL)</span>
+              </div>
+
+              {/* طلبات البيع (حمراء) */}
+              <div className="flex flex-col-reverse flex-1">
+                {asks.map((a, i) => (
+                  <div key={i} className="relative flex justify-between py-1 px-2">
+                    <div className="absolute inset-y-0 right-0 bg-[#f6465d]/15" style={{ width: `${(a.amount / maxAmount) * 100}%` }} />
+                    <span className="text-[#f6465d] z-10 w-1/2 text-left">{formatNumber(a.price, 1)}</span>
+                    <span className="text-white z-10 w-1/2 text-right">{formatNumber(a.amount, 1)}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* السعر الحالي */}
+              <div className="text-sm font-bold text-[#0ecb81] py-2 border-y border-[#2b3139] text-center my-1 bg-[#0b0e11]">
+                {formatNumber(asks[0]?.price || bids[0]?.price || 0, 1)}
+              </div>
+
+              {/* طلبات الشراء (خضراء) */}
+              <div className="flex flex-col flex-1">
+                {bids.map((b, i) => (
+                  <div key={i} className="relative flex justify-between py-1 px-2">
+                    <div className="absolute inset-y-0 right-0 bg-[#0ecb81]/15" style={{ width: `${(b.amount / maxAmount) * 100}%` }} />
+                    <span className="text-[#0ecb81] z-10 w-1/2 text-left">{formatNumber(b.price, 1)}</span>
+                    <span className="text-white z-10 w-1/2 text-right">{formatNumber(b.amount, 1)}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
-          {/* العمود الأيسر: نموذج التداول */}
+          {/* العمود الأيسر: نموذج التداول المدمج */}
           <div className="p-2 overflow-y-auto bg-[#181a20]">
-            {user ? <P2POrderForm userId={user.id} /> : <div className="text-center text-[#848e9c] mt-10 text-xs">سجل الدخول للتداول</div>}
+            <form onSubmit={handleSubmit} className="flex flex-col gap-2">
+              {/* أزرار التبديل */}
+              <div className="flex bg-[#2b3139] rounded p-0.5">
+                <button type="button" onClick={() => setSide('buy')} className={`flex-1 py-1.5 text-xs font-bold rounded ${side === 'buy' ? 'bg-[#0ecb81] text-black' : 'text-[#848e9c]'}`}>شراء</button>
+                <button type="button" onClick={() => setSide('sell')} className={`flex-1 py-1.5 text-xs font-bold rounded ${side === 'sell' ? 'bg-[#f6465d] text-white' : 'text-[#848e9c]'}`}>بيع</button>
+              </div>
+
+              {/* السعر - تم إجبار اللون الداكن */}
+              <div>
+                <div className="text-[10px] text-[#848e9c] mb-1">السعر (SDG)</div>
+                <input 
+                  type="number" required value={price} onChange={e => setPrice(e.target.value)} placeholder="0.00" 
+                  className="w-full bg-[#2b3139] text-white border-none rounded px-2 py-1.5 text-xs outline-none text-right font-mono" 
+                  style={{ backgroundColor: '#2b3139', color: 'white' }} // حماية إضافية
+                />
+              </div>
+
+              {/* الكمية - تم إجبار اللون الداكن */}
+              <div>
+                <div className="flex justify-between text-[10px] text-[#848e9c] mb-1">
+                  <span>الكمية (NIL)</span>
+                </div>
+                <input 
+                  type="number" required value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" 
+                  className="w-full bg-[#2b3139] text-white border-none rounded px-2 py-1.5 text-xs outline-none text-right font-mono" 
+                  style={{ backgroundColor: '#2b3139', color: 'white' }} // حماية إضافية
+                />
+              </div>
+
+              {/* زر الإرسال */}
+              <button type="submit" disabled={submitting} className={`w-full py-2 mt-2 rounded font-bold text-black text-xs ${side === 'buy' ? 'bg-[#0ecb81]' : 'bg-[#f6465d] text-white'}`}>
+                {submitting ? 'جاري التنفيذ...' : side === 'buy' ? 'شراء NIL' : 'بيع NIL'}
+              </button>
+            </form>
           </div>
         </div>
 
