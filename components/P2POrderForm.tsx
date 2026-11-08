@@ -59,7 +59,8 @@ export default function P2POrderForm({ userId }: { userId: string }) {
 
       <div>
         <div className="text-[9px] text-[#848e9c] mb-0.5">السعر (SDG)</div>
-        <input type="number" required value={price} onChange={e => setPrice(e.target.value)} placeholder="0.00" className="w-full bg-[#2b3139] text-white rounded px-2 py-1 text-[11px] outline-none text-right font-mono" />
+        {/* تم إجبار الخلفية الداكنة للحقل */}
+        <input type="number" required value={price} onChange={e => setPrice(e.target.value)} placeholder="0.00" className="w-full bg-[#2b3139] text-white border-none rounded px-2 py-1 text-[11px] outline-none text-right font-mono" />
       </div>
 
       <div>
@@ -67,7 +68,7 @@ export default function P2POrderForm({ userId }: { userId: string }) {
           <span>الكمية (NIL)</span>
           <span>متاح: {formatNumber(isBuy ? profile?.sdg_balance : profile?.nil_balance, 0)}</span>
         </div>
-        <input type="number" required value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" className="w-full bg-[#2b3139] text-white rounded px-2 py-1 text-[11px] outline-none text-right font-mono" />
+        <input type="number" required value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" className="w-full bg-[#2b3139] text-white border-none rounded px-2 py-1 text-[11px] outline-none text-right font-mono" />
       </div>
 
       <input type="range" min="0" max="100" step="25" onChange={(e) => handlePercentage(Number(e.target.value))} className="w-full h-1 bg-[#2b3139] rounded appearance-none cursor-pointer accent-[#0ecb81]" />
@@ -77,7 +78,7 @@ export default function P2POrderForm({ userId }: { userId: string }) {
         <span className="text-white font-mono">{formatNumber(Number(price) * Number(amount), 0)}</span>
       </div>
 
-      <button type="submit" disabled={submitting} className={`w-full py-1.5 rounded font-bold text-black text-[11px] ${isBuy ? 'bg-[#0ecb81]' : 'bg-[#f6465d]'}`}>
+      <button type="submit" disabled={submitting} className={`w-full py-1.5 rounded font-bold text-black text-[11px] ${isBuy ? 'bg-[#0ecb81]' : 'bg-[#f6465d] text-white'}`}>
         {submitting ? '...' : isBuy ? 'شراء NIL' : 'بيع NIL'}
       </button>
     </form>
