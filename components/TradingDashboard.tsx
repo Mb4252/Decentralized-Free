@@ -23,6 +23,7 @@ export default function TradingDashboard() {
   const [myOrders, setMyOrders] = useState<any[]>([])
   const [bids, setBids] = useState<any[]>([])
   const [asks, setAsks] = useState<any[]>([])
+
   const [side, setSide] = useState<'buy' | 'sell'>('buy')
   const [price, setPrice] = useState('')
   const [amount, setAmount] = useState('')
@@ -48,22 +49,51 @@ export default function TradingDashboard() {
     async function init() {
       const { data } = await supabase.auth.getUser()
       setUser(data.user)
-      if (data.user) setProfile(await getUserProfile())
+      if (data.user) {
+        // جلب الملف الشخصي، وإذا لم يكن موجوداً (مستخدم جديد)، نعيد المحاولة
+        let p = await getUserProfile()
+        if (!p) {
+          // في حال تأخر إنشاء الملف من قاعدة البيانات
+          await new Promise(r => setTimeout(r, 1000))
+          p = await getUserProfile()
+        }
+        setProfile(p)
+      }
       loadData()
     }
     init()
+
+    // مراقبة تغير حالة تسجيل الدخول
+    const { data: sub } = supabase.auth.onAuthStateChange(async (_e, session) => {
+      setUser(session?.user ?? null)
+      if (session?.user) {
+        let p = await getUserProfile()
+        if (!p) {
+          await new Promise(r => setTimeout(r, 1000))
+          p = await getUserProfile()
+        }
+        setProfile(p)
+        loadData()
+      } else {
+        setProfile(null); setMyOrders([])
+      }
+    })
+
     const ch = supabase.channel('live_data').on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, loadData).subscribe()
-    return () => { supabase.removeChannel(ch) }
+    return () => { sub.subscription.unsubscribe(); supabase.removeChannel(ch) }
   }, [user?.id])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!profile) return toast('سجل الدخول أولاً', 'error')
-    const numPrice = Number(price); const numAmount = Number(amount)
+    if (!user) return setShowLogin(true)
+    if (!profile) return toast('جاري تهيئة الحساب، انتظر لحظة...', 'error')
     
-    // التحقق سيتم في قاعدة البيانات، لكننا نتحقق هنا لتجربة مستخدم أفضل
-    if (side === 'buy' && profile.sdg_balance < (numPrice * numAmount)) return toast('رصيد SDG غير كافٍ', 'error')
-    if (side === 'sell' && profile.nil_balance < numAmount) return toast('رصيد NIL غير كافٍ', 'error')
+    const numPrice = Number(price); const numAmount = Number(amount)
+    if (numPrice <= 0 || numAmount <= 0) return toast('أدخل سعر وكمية صحيحة', 'error')
+
+    // التحقق من الرصيد
+    if (side === 'buy' && profile.sdg_balance < (numPrice * numAmount)) return toast('رصيد SDG غير كافٍ، يرجى الإيداع أولاً', 'error')
+    if (side === 'sell' && profile.nil_balance < numAmount) return toast('رصيد NIL غير كافٍ، يرجى الإيداع أولاً', 'error')
 
     setSubmitting(true)
     try {
@@ -103,18 +133,24 @@ export default function TradingDashboard() {
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '12px' }}>
           {isAdmin && <Link href="/admin" style={{ color: '#facc15' }}>⚙️</Link>}
-          <button onClick={() => setShowP2P(true)} style={{ backgroundColor: '#f3ba2f', color: 'black', border: 'none', padding: '6px 12px', borderRadius: '4px', fontWeight: 'bold' }}>P2P</button>
-          {user ? (
-            <button onClick={() => supabase.auth.signOut()} style={{ backgroundColor: colors.border, color: 'white', border: 'none', padding: '6px 12px', borderRadius: '4px' }}>خروج</button>
-          ) : (
-            <button onClick={() => setShowLogin(true)} style={{ backgroundColor: colors.green, color: 'black', border: 'none', padding: '6px 16px', borderRadius: '4px', fontWeight: 'bold' }}>دخول</button>
+          
+          {/* أزرار الإيداع والسحب تظهر فقط لمن سجل دخول */}
+          {user && (
+            <>
+              <button onClick={() => setShowP2P(true)} style={{ backgroundColor: '#f3ba2f', color: 'black', border: 'none', padding: '6px 12px', borderRadius: '4px', fontWeight: 'bold' }}>P2P</button>
+              <button onClick={() => supabase.auth.signOut()} style={{ backgroundColor: colors.border, color: 'white', border: 'none', padding: '6px 12px', borderRadius: '4px' }}>خروج</button>
+            </>
+          )}
+          {!user && (
+            <button onClick={() => setShowLogin(true)} style={{ backgroundColor: colors.green, color: 'black', border: 'none', padding: '6px 16px', borderRadius: '4px', fontWeight: 'bold' }}>دخول / تسجيل</button>
           )}
         </div>
       </header>
 
       <main style={{ maxWidth: '450px', margin: '0 auto' }}>
         
-        {profile && (
+        {/* عرض الرصيد أو دعوة للتسجيل */}
+        {user && profile ? (
           <div style={{ backgroundColor: colors.panel, padding: '12px', borderBottom: `1px solid ${colors.border}` }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '12px' }}>
               <div>
@@ -132,6 +168,15 @@ export default function TradingDashboard() {
               <button onClick={() => setShowDeposit(true)} style={{ flex: 1, padding: '8px', backgroundColor: colors.border, color: 'white', border: 'none', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' }}>إيداع</button>
               <button onClick={() => setShowWithdraw(true)} style={{ flex: 1, padding: '8px', backgroundColor: colors.border, color: 'white', border: 'none', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' }}>سحب</button>
             </div>
+          </div>
+        ) : user && !profile ? (
+          <div style={{ backgroundColor: colors.panel, padding: '12px', borderBottom: `1px solid ${colors.border}`, textAlign: 'center', fontSize: '12px', color: colors.subtext }}>
+            جاري تجهيز حسابك...
+          </div>
+        ) : (
+          <div style={{ backgroundColor: colors.panel, padding: '12px', borderBottom: `1px solid ${colors.border}`, textAlign: 'center', fontSize: '12px' }}>
+            <p style={{ marginBottom: '8px' }}>مرحباً بك في منصة نيل كوين</p>
+            <button onClick={() => setShowLogin(true)} style={{ backgroundColor: colors.green, color: 'black', border: 'none', padding: '6px 16px', borderRadius: '4px', fontWeight: 'bold' }}>سجل الدخول للتداول والإيداع</button>
           </div>
         )}
 
@@ -189,27 +234,35 @@ export default function TradingDashboard() {
               <button type="button" onClick={() => setSide('buy')} style={{ flex: 1, padding: '6px', fontSize: '11px', fontWeight: 'bold', borderRadius: '4px', border: 'none', backgroundColor: side === 'buy' ? colors.green : colors.border, color: side === 'buy' ? 'black' : colors.subtext }}>شراء</button>
               <button type="button" onClick={() => setSide('sell')} style={{ flex: 1, padding: '6px', fontSize: '11px', fontWeight: 'bold', borderRadius: '4px', border: 'none', backgroundColor: side === 'sell' ? colors.red : colors.border, color: side === 'sell' ? 'white' : colors.subtext }}>بيع</button>
             </div>
-            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: colors.subtext }}>
-                <span>السعر (SDG)</span>
+            
+            {/* إذا لم يكن هناك مستخدم، أظهر رسالة */}
+            {!user ? (
+              <div style={{ textAlign: 'center', marginTop: '20px', fontSize: '11px', color: colors.subtext }}>
+                سجل الدخول لإنشاء طلب
               </div>
-              <div style={{ position: 'relative' }}>
-                <input type="number" step="any" required value={price} onChange={e => setPrice(e.target.value)} placeholder="0.00" dir="ltr"
-                  style={{ width: '100%', backgroundColor: colors.border, color: 'white', border: '1px solid transparent', borderRadius: '4px', padding: '6px 8px', fontSize: '12px', outline: 'none', textAlign: 'left', boxSizing: 'border-box' }} />
-                <span style={{ position: 'absolute', right: '8px', top: '6px', fontSize: '10px', color: colors.subtext }}>SDG</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: colors.subtext }}>
-                <span>الكمية (NIL)</span>
-              </div>
-              <div style={{ position: 'relative' }}>
-                <input type="number" step="any" required value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" dir="ltr"
-                  style={{ width: '100%', backgroundColor: colors.border, color: 'white', border: '1px solid transparent', borderRadius: '4px', padding: '6px 8px', fontSize: '12px', outline: 'none', textAlign: 'left', boxSizing: 'border-box' }} />
-                <span style={{ position: 'absolute', right: '8px', top: '6px', fontSize: '10px', color: colors.subtext }}>NIL</span>
-              </div>
-              <button type="submit" disabled={submitting} style={{ width: '100%', padding: '8px', marginTop: '8px', borderRadius: '4px', fontWeight: 'bold', fontSize: '11px', border: 'none', backgroundColor: side === 'buy' ? colors.green : colors.red, color: side === 'buy' ? 'black' : 'white' }}>
-                {submitting ? 'جاري...' : side === 'buy' ? 'شراء NIL' : 'بيع NIL'}
-              </button>
-            </form>
+            ) : (
+              <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: colors.subtext }}>
+                  <span>السعر (SDG)</span>
+                </div>
+                <div style={{ position: 'relative' }}>
+                  <input type="number" step="any" required value={price} onChange={e => setPrice(e.target.value)} placeholder="0.00" dir="ltr"
+                    style={{ width: '100%', backgroundColor: colors.border, color: 'white', border: '1px solid transparent', borderRadius: '4px', padding: '6px 8px', fontSize: '12px', outline: 'none', textAlign: 'left', boxSizing: 'border-box' }} />
+                  <span style={{ position: 'absolute', right: '8px', top: '6px', fontSize: '10px', color: colors.subtext }}>SDG</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: colors.subtext }}>
+                  <span>الكمية (NIL)</span>
+                </div>
+                <div style={{ position: 'relative' }}>
+                  <input type="number" step="any" required value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" dir="ltr"
+                    style={{ width: '100%', backgroundColor: colors.border, color: 'white', border: '1px solid transparent', borderRadius: '4px', padding: '6px 8px', fontSize: '12px', outline: 'none', textAlign: 'left', boxSizing: 'border-box' }} />
+                  <span style={{ position: 'absolute', right: '8px', top: '6px', fontSize: '10px', color: colors.subtext }}>NIL</span>
+                </div>
+                <button type="submit" disabled={submitting} style={{ width: '100%', padding: '8px', marginTop: '8px', borderRadius: '4px', fontWeight: 'bold', fontSize: '11px', border: 'none', backgroundColor: side === 'buy' ? colors.green : colors.red, color: side === 'buy' ? 'black' : 'white' }}>
+                  {submitting ? 'جاري...' : side === 'buy' ? 'شراء NIL' : 'بيع NIL'}
+                </button>
+              </form>
+            )}
           </div>
         </div>
 
