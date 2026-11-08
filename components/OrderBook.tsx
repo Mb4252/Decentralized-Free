@@ -24,17 +24,19 @@ export default function OrderBook() {
   const maxAmount = Math.max(...bids.map(b => b.amount), ...asks.map(a => a.amount), 1)
 
   return (
-    <div className="flex flex-col h-full text-[11px] font-mono w-full" dir="ltr">
+    // إجبار الاتجاه LTR لضمان عدم تداخل الأرقام
+    <div className="flex flex-col h-full text-[10px] font-mono w-full" dir="ltr">
+      
       {/* العناوين */}
-      <div className="flex justify-between text-[#848e9c] mb-1 px-2">
-        <span className="w-1/2 text-left">Price</span>
-        <span className="w-1/2 text-right">Amount</span>
+      <div className="flex justify-between text-[#848e9c] px-2 py-1 border-b border-[#2b3139]">
+        <span className="w-1/2 text-left">Price(SDG)</span>
+        <span className="w-1/2 text-right">Amt(NIL)</span>
       </div>
 
-      {/* المبيعات (Asks) - حمراء */}
-      <div className="flex flex-col-reverse mb-1">
+      {/* المبيعات (Asks) */}
+      <div className="flex flex-col-reverse flex-1">
         {asks.map((a, i) => (
-          <div key={i} className="relative flex justify-between py-1 px-2 hover:bg-[#2b3139]">
+          <div key={i} className="relative flex justify-between py-0.5 px-2">
             <div className="absolute inset-y-0 right-0 bg-[#f6465d]/15" style={{ width: `${(a.amount / maxAmount) * 100}%` }} />
             <span className="text-[#f6465d] z-10 w-1/2 text-left">{formatNumber(a.price, 1)}</span>
             <span className="text-white z-10 w-1/2 text-right">{formatNumber(a.amount, 1)}</span>
@@ -43,14 +45,14 @@ export default function OrderBook() {
       </div>
 
       {/* السعر الحالي */}
-      <div className="text-base font-bold text-[#0ecb81] py-1.5 border-y border-[#2b3139] text-center my-1 bg-[#0b0e11]">
+      <div className="text-sm font-bold text-[#0ecb81] py-1 border-y border-[#2b3139] text-center my-1 bg-[#0b0e11]">
         {formatNumber(asks[0]?.price || bids[0]?.price || 0, 1)}
       </div>
 
-      {/* المشتريات (Bids) - خضراء */}
-      <div>
+      {/* المشتريات (Bids) */}
+      <div className="flex flex-col flex-1">
         {bids.map((b, i) => (
-          <div key={i} className="relative flex justify-between py-1 px-2 hover:bg-[#2b3139]">
+          <div key={i} className="relative flex justify-between py-0.5 px-2">
             <div className="absolute inset-y-0 right-0 bg-[#0ecb81]/15" style={{ width: `${(b.amount / maxAmount) * 100}%` }} />
             <span className="text-[#0ecb81] z-10 w-1/2 text-left">{formatNumber(b.price, 1)}</span>
             <span className="text-white z-10 w-1/2 text-right">{formatNumber(b.amount, 1)}</span>
