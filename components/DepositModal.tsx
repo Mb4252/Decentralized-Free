@@ -15,7 +15,7 @@ export default function DepositModal({ onClose }: { onClose: () => void }) {
         <p style={{ color: '#848e9c', fontSize: '12px', marginBottom: '16px', lineHeight: '1.5' }}>
           قم بتحويل المبلغ إلى الحساب التالي ثم أدخل رقم عملية بنكك:
           <br /><br />
-          <strong style={{ color: 'white' }}>رقم الحساب:</strong> 1234567890
+          <strong style={{ color: 'white' }}>رقم الحساب:</strong> 4426148بي اسم محمد علد المعطي علي
           <br />
           <strong style={{ color: 'white' }}>الاسم:</strong> منصة نيل كوين
         </p>
