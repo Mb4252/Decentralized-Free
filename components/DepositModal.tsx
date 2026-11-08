@@ -11,20 +11,15 @@ export default function DepositModal({ onClose }: { onClose: () => void }) {
   async function handleDeposit() {
     if (!amount || !ref) return toast('أدخل المبلغ ورقم العملية', 'error')
     setLoading(true)
-    
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
     const { error } = await supabase.from('deposits').insert({
-      user_id: user.id,
-      amount: Number(amount),
-      receipt_ref: ref,
-      status: 'pending'
+      user_id: user.id, amount: Number(amount), receipt_ref: ref, status: 'pending'
     })
 
-    if (error) {
-      toast(error.message, 'error')
-    } else {
+    if (error) toast(error.message, 'error')
+    else {
       toast('تم إرسال الطلب، بانتظار موافقة الأدمن', 'success')
       onClose()
     }
@@ -32,23 +27,18 @@ export default function DepositModal({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.8)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
-      <div style={{ backgroundColor: '#181a20', width: '100%', maxWidth: '360px', borderRadius: '8px', border: '1px solid #2b3139', padding: '20px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-          <h2 style={{ color: 'white', margin: 0, fontSize: '18px' }}>إيداع</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#848e9c', cursor: 'pointer', fontSize: '18px' }}>✕</button>
-        </div>
-        
-        <p style={{ color: '#848e9c', fontSize: '12px', marginBottom: '16px' }}>
-          حول المبلغ إلى حساب بنكك: <strong style={{ color: 'white' }}>1234567890</strong>
+    <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" dir="rtl">
+      <div className="bg-[#181a20] w-full max-w-sm rounded-lg border border-[#2b3139] p-5">
+        <h2 className="text-white text-lg font-bold mb-4">إيداع (بنكك)</h2>
+        <p className="text-[#848e9c] text-xs mb-4">
+          حول المبلغ إلى: <strong className="text-white">1234567890</strong> (الاسم: منصة نيل كوين) <br/>ثم أدخل رقم العملية أدناه.
         </p>
-
-        <input type="number" placeholder="المبلغ (SDG)" value={amount} onChange={(e) => setAmount(e.target.value)} style={{ width: '100%', padding: '10px', backgroundColor: '#2b3139', color: 'white', border: 'none', borderRadius: '4px', marginBottom: '10px' }} />
-        <input type="text" placeholder="رقم عملية بنكك" value={ref} onChange={(e) => setRef(e.target.value)} style={{ width: '100%', padding: '10px', backgroundColor: '#2b3139', color: 'white', border: 'none', borderRadius: '4px', marginBottom: '16px' }} />
-        
-        <button onClick={handleDeposit} disabled={loading} style={{ width: '100%', padding: '12px', backgroundColor: '#0ecb81', color: 'black', border: 'none', borderRadius: '4px', fontWeight: 'bold' }}>
-          {loading ? 'جاري...' : 'تأكيد الإيداع'}
-        </button>
+        <input type="number" placeholder="المبلغ (SDG)" value={amount} onChange={e => setAmount(e.target.value)} className="w-full bg-[#2b3139] text-white rounded px-3 py-2 mb-3 text-sm" />
+        <input type="text" placeholder="رقم عملية بنكك" value={ref} onChange={e => setRef(e.target.value)} className="w-full bg-[#2b3139] text-white rounded px-3 py-2 mb-4 text-sm" />
+        <div className="flex gap-2">
+          <button onClick={onClose} className="flex-1 bg-[#2b3139] text-white py-2 rounded text-sm">إلغاء</button>
+          <button onClick={handleDeposit} disabled={loading} className="flex-1 bg-[#0ecb81] text-black font-bold py-2 rounded text-sm">{loading ? '...' : 'تأكيد'}</button>
+        </div>
       </div>
     </div>
   )
