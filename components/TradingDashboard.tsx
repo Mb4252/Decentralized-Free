@@ -20,18 +20,15 @@ export default function TradingDashboard() {
   
   const [tf, setTf] = useState<'15m' | '4h' | '1d'>('15m')
   const [livePrice, setLivePrice] = useState<number>(1290.00)
-
   const [myOrders, setMyOrders] = useState<any[]>([])
   const [bids, setBids] = useState<any[]>([])
   const [asks, setAsks] = useState<any[]>([])
-
   const [side, setSide] = useState<'buy' | 'sell'>('buy')
   const [price, setPrice] = useState('')
   const [amount, setAmount] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
   const isAdmin = user?.email === 'mb425262@gmail.com'
-
   const colors = { bg: '#0b0e11', panel: '#181a20', border: '#2b3139', green: '#0ecb81', red: '#f6465d', text: '#eaecef', subtext: '#848e9c' }
 
   const loadData = async () => {
@@ -62,9 +59,9 @@ export default function TradingDashboard() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!profile) return toast('سجل الدخول أولاً', 'error')
-    const numPrice = Number(price)
-    const numAmount = Number(amount)
+    const numPrice = Number(price); const numAmount = Number(amount)
     
+    // التحقق سيتم في قاعدة البيانات، لكننا نتحقق هنا لتجربة مستخدم أفضل
     if (side === 'buy' && profile.sdg_balance < (numPrice * numAmount)) return toast('رصيد SDG غير كافٍ', 'error')
     if (side === 'sell' && profile.nil_balance < numAmount) return toast('رصيد NIL غير كافٍ', 'error')
 
@@ -72,7 +69,7 @@ export default function TradingDashboard() {
     try {
       const { error } = await supabase.from('orders').insert({ user_id: user.id, side, price: numPrice, amount: numAmount, status: 'open' })
       if (error) throw error
-      toast('تم إرسال الطلب', 'success')
+      toast('تم إرسال الطلب وحجز المبلغ', 'success')
       setPrice(''); setAmount('')
       setProfile(await getUserProfile())
       loadData()
@@ -84,10 +81,13 @@ export default function TradingDashboard() {
   }
 
   async function cancelOrder(id: string) {
-    if (!confirm('إلغاء الطلب؟')) return
-    await supabase.from('orders').update({ status: 'cancelled' }).eq('id', id)
-    toast('تم الإلغاء', 'success')
-    loadData()
+    if (!confirm('إلغاء الطلب وإرجاع المبلغ؟')) return
+    const { error } = await supabase.rpc('cancel_order_and_refund', { order_id: id })
+    if (error) toast(error.message, 'error')
+    else {
+      toast('تم الإلغاء وإرجاع الرصيد', 'success')
+      loadData(); setProfile(await getUserProfile())
+    }
   }
 
   const maxAmount = Math.max(...bids.map(b => b.amount), ...asks.map(a => a.amount), 1)
