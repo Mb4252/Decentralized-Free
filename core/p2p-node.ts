@@ -1,4 +1,3 @@
-import { joinRoom } from 'trystero/torrent';
 import { MarketEntry } from './market-engine';
 
 export interface VerifiedEntry extends MarketEntry {
@@ -147,12 +146,25 @@ interface MeshCallbacks {
   onReceiveMessage: (msg: P2PSyncMessage) => void;
 }
 
+interface TrysteroRoom {
+  makeAction: <T>(
+    name: string
+  ) => [
+    (data: T, targetPeerId?: string | string[] | null) => Promise<void[]>,
+    (cb: (data: T, peerId: string) => void) => void,
+  ];
+  onPeerJoin: (cb: (peerId: string) => void) => void;
+  onPeerLeave: (cb: (peerId: string) => void) => void;
+  leave: () => Promise<void[]>;
+}
+
 export class MeshP2PNetwork {
-  private room: ReturnType<typeof joinRoom> | null = null;
+  private room: TrysteroRoom | null = null;
   private sendRaw: ((data: string, targetPeerId?: string | string[] | null) => Promise<void[]>) | null =
     null;
   private connectedPeerIds = new Set<string>();
   private callbacks: MeshCallbacks;
+  private stopped = false;
 
   constructor(callbacks: MeshCallbacks) {
     this.callbacks = callbacks;
@@ -170,76 +182,82 @@ export class MeshP2PNetwork {
 
   public start(): void {
     if (typeof window === 'undefined') return;
+    this.stopped = false;
 
-    try {
-      const room = joinRoom({ appId: DEFAULT_APP_ID }, DEFAULT_ROOM_ID);
-      this.room = room;
+    void (async () => {
+      try {
+        const { joinRoom } = await import('trystero/torrent');
+        if (this.stopped) return;
 
-      const [sendMsg, getMsg] = room.makeAction<string>('marketSync');
-      this.sendRaw = sendMsg;
+        const room = joinRoom({ appId: DEFAULT_APP_ID }, DEFAULT_ROOM_ID) as unknown as TrysteroRoom;
+        this.room = room;
 
-      room.onPeerJoin((remotePeerId) => {
-        this.connectedPeerIds.add(remotePeerId);
-        this.callbacks.onPeersChange(this.connectedPeerIds.size, 'webrtc-mesh');
+        const [sendMsg, getMsg] = room.makeAction<string>('marketSync');
+        this.sendRaw = sendMsg;
 
-        const currentEntries = this.callbacks.getCurrentEntries();
-        if (currentEntries.length > 0) {
-          this.emitPayload(
-            {
-              type: 'FULL_STATE',
-              entries: currentEntries,
-              senderPeerId: this.callbacks.peerId,
-              sentAt: Date.now(),
-            },
-            remotePeerId
-          );
-        }
-      });
+        room.onPeerJoin((remotePeerId) => {
+          this.connectedPeerIds.add(remotePeerId);
+          this.callbacks.onPeersChange(this.connectedPeerIds.size, 'webrtc-mesh');
 
-      room.onPeerLeave((remotePeerId) => {
-        this.connectedPeerIds.delete(remotePeerId);
-        this.callbacks.onPeersChange(
-          this.connectedPeerIds.size,
-          this.connectedPeerIds.size > 0 ? 'webrtc-mesh' : 'local-gossip'
-        );
-      });
-
-      getMsg((rawData, remotePeerId) => {
-        if (typeof rawData !== 'string') return;
-        try {
-          const parsed = JSON.parse(rawData) as P2PSyncMessage;
-          if (!parsed || typeof parsed !== 'object' || !parsed.type) return;
-
-          if (parsed.type === 'REQUEST_STATE') {
-            const currentEntries = this.callbacks.getCurrentEntries();
-            if (currentEntries.length > 0) {
-              this.emitPayload(
-                {
-                  type: 'FULL_STATE',
-                  entries: currentEntries,
-                  senderPeerId: this.callbacks.peerId,
-                  sentAt: Date.now(),
-                },
-                remotePeerId
-              );
-            }
-            return;
+          const currentEntries = this.callbacks.getCurrentEntries();
+          if (currentEntries.length > 0) {
+            this.emitPayload(
+              {
+                type: 'FULL_STATE',
+                entries: currentEntries,
+                senderPeerId: this.callbacks.peerId,
+                sentAt: Date.now(),
+              },
+              remotePeerId
+            );
           }
+        });
 
-          this.callbacks.onReceiveMessage(parsed);
-        } catch {
-          // تجاهل الرسائل غير الصالحة
-        }
-      });
+        room.onPeerLeave((remotePeerId) => {
+          this.connectedPeerIds.delete(remotePeerId);
+          this.callbacks.onPeersChange(
+            this.connectedPeerIds.size,
+            this.connectedPeerIds.size > 0 ? 'webrtc-mesh' : 'local-gossip'
+          );
+        });
 
-      this.emitPayload({
-        type: 'REQUEST_STATE',
-        senderPeerId: this.callbacks.peerId,
-        sentAt: Date.now(),
-      });
-    } catch {
-      this.callbacks.onPeersChange(0, 'local-gossip');
-    }
+        getMsg((rawData, remotePeerId) => {
+          if (typeof rawData !== 'string') return;
+          try {
+            const parsed = JSON.parse(rawData) as P2PSyncMessage;
+            if (!parsed || typeof parsed !== 'object' || !parsed.type) return;
+
+            if (parsed.type === 'REQUEST_STATE') {
+              const currentEntries = this.callbacks.getCurrentEntries();
+              if (currentEntries.length > 0) {
+                this.emitPayload(
+                  {
+                    type: 'FULL_STATE',
+                    entries: currentEntries,
+                    senderPeerId: this.callbacks.peerId,
+                    sentAt: Date.now(),
+                  },
+                  remotePeerId
+                );
+              }
+              return;
+            }
+
+            this.callbacks.onReceiveMessage(parsed);
+          } catch {
+            // تجاهل الرسائل غير الصالحة
+          }
+        });
+
+        this.emitPayload({
+          type: 'REQUEST_STATE',
+          senderPeerId: this.callbacks.peerId,
+          sentAt: Date.now(),
+        });
+      } catch {
+        this.callbacks.onPeersChange(0, 'local-gossip');
+      }
+    })();
   }
 
   public broadcastNewEntry(entry: MarketEntry): void {
@@ -270,6 +288,7 @@ export class MeshP2PNetwork {
   }
 
   public stop(): void {
+    this.stopped = true;
     this.connectedPeerIds.clear();
     if (this.room) {
       void this.room.leave();
