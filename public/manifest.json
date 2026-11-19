@@ -1,0 +1,12 @@
+{
+  "name": "نظام الجدارة الزمنية",
+  "short_name": "Chronos",
+  "description": "نظام مالي لامركزي قائم على ساعات العطاء",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f0fdf9",
+  "theme_color": "#0d9488",
+  "lang": "ar",
+  "dir": "rtl",
+  "icons": []
+}
