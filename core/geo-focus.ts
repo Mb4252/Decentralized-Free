@@ -11,6 +11,11 @@ export interface ZoneFrequency {
   lastSeenAt: number;
 }
 
+export interface GeoFocusState {
+  mode: GeoFocusMode;
+  focusedZone: string | null;
+}
+
 export interface GeoInferenceResult {
   stats: ZoneFrequency[];
   detectedZone: string | null;
@@ -26,7 +31,7 @@ export function normalizeGeoText(input: string): string {
     .replace(/[أإآٱ]/g, 'ا')
     .replace(/ى/g, 'ي')
     .replace(/ة/g, 'ه')
-    .replace(/[^\p{L}\p{N}\s-]/gu, ' ')
+    .replace(/[^a-zA-Z0-9\u0600-\u06FF\s-]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
