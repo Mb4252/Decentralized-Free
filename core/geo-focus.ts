@@ -11,11 +11,6 @@ export interface ZoneFrequency {
   lastSeenAt: number;
 }
 
-export interface GeoFocusState {
-  mode: GeoFocusMode;
-  focusedZone: string | null;
-}
-
 export interface GeoInferenceResult {
   stats: ZoneFrequency[];
   detectedZone: string | null;
