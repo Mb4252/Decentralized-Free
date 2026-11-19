@@ -149,12 +149,23 @@ interface MeshCallbacks {
 
 export class MeshP2PNetwork {
   private room: ReturnType<typeof joinRoom> | null = null;
-  private sendSync: ((data: P2PSyncMessage, targetPeerId?: string | string[] | null) => Promise<void[]>) | null = null;
+  private sendRaw: ((data: string, targetPeerId?: string | string[] | null) => Promise<void[]>) | null =
+    null;
   private connectedPeerIds = new Set<string>();
   private callbacks: MeshCallbacks;
 
   constructor(callbacks: MeshCallbacks) {
     this.callbacks = callbacks;
+  }
+
+  private emitPayload(payload: P2PSyncMessage, targetPeerId?: string): void {
+    if (!this.sendRaw) return;
+    try {
+      const encoded = JSON.stringify(payload);
+      void this.sendRaw(encoded, targetPeerId);
+    } catch {
+      // تجاهل أخطاء التسلسل
+    }
   }
 
   public start(): void {
@@ -164,16 +175,16 @@ export class MeshP2PNetwork {
       const room = joinRoom({ appId: DEFAULT_APP_ID }, DEFAULT_ROOM_ID);
       this.room = room;
 
-      const [sendMsg, getMsg] = room.makeAction<P2PSyncMessage>('marketSync');
-      this.sendSync = sendMsg;
+      const [sendMsg, getMsg] = room.makeAction<string>('marketSync');
+      this.sendRaw = sendMsg;
 
       room.onPeerJoin((remotePeerId) => {
         this.connectedPeerIds.add(remotePeerId);
         this.callbacks.onPeersChange(this.connectedPeerIds.size, 'webrtc-mesh');
 
         const currentEntries = this.callbacks.getCurrentEntries();
-        if (currentEntries.length > 0 && this.sendSync) {
-          void this.sendSync(
+        if (currentEntries.length > 0) {
+          this.emitPayload(
             {
               type: 'FULL_STATE',
               entries: currentEntries,
@@ -193,29 +204,35 @@ export class MeshP2PNetwork {
         );
       });
 
-      getMsg((data, remotePeerId) => {
-        if (!data || typeof data !== 'object' || !data.type) return;
+      getMsg((rawData, remotePeerId) => {
+        if (typeof rawData !== 'string') return;
+        try {
+          const parsed = JSON.parse(rawData) as P2PSyncMessage;
+          if (!parsed || typeof parsed !== 'object' || !parsed.type) return;
 
-        if (data.type === 'REQUEST_STATE') {
-          const currentEntries = this.callbacks.getCurrentEntries();
-          if (currentEntries.length > 0 && this.sendSync) {
-            void this.sendSync(
-              {
-                type: 'FULL_STATE',
-                entries: currentEntries,
-                senderPeerId: this.callbacks.peerId,
-                sentAt: Date.now(),
-              },
-              remotePeerId
-            );
+          if (parsed.type === 'REQUEST_STATE') {
+            const currentEntries = this.callbacks.getCurrentEntries();
+            if (currentEntries.length > 0) {
+              this.emitPayload(
+                {
+                  type: 'FULL_STATE',
+                  entries: currentEntries,
+                  senderPeerId: this.callbacks.peerId,
+                  sentAt: Date.now(),
+                },
+                remotePeerId
+              );
+            }
+            return;
           }
-          return;
-        }
 
-        this.callbacks.onReceiveMessage(data);
+          this.callbacks.onReceiveMessage(parsed);
+        } catch {
+          // تجاهل الرسائل غير الصالحة
+        }
       });
 
-      void sendMsg({
+      this.emitPayload({
         type: 'REQUEST_STATE',
         senderPeerId: this.callbacks.peerId,
         sentAt: Date.now(),
@@ -226,8 +243,7 @@ export class MeshP2PNetwork {
   }
 
   public broadcastNewEntry(entry: MarketEntry): void {
-    if (!this.sendSync) return;
-    void this.sendSync({
+    this.emitPayload({
       type: 'NEW_ENTRY',
       entry: attachChecksum(entry),
       senderPeerId: this.callbacks.peerId,
@@ -236,8 +252,7 @@ export class MeshP2PNetwork {
   }
 
   public broadcastDeleteEntry(id: string): void {
-    if (!this.sendSync) return;
-    void this.sendSync({
+    this.emitPayload({
       type: 'DELETE_ENTRY',
       deletedId: id,
       senderPeerId: this.callbacks.peerId,
@@ -246,8 +261,7 @@ export class MeshP2PNetwork {
   }
 
   public broadcastFullState(entries: MarketEntry[]): void {
-    if (!this.sendSync) return;
-    void this.sendSync({
+    this.emitPayload({
       type: 'FULL_STATE',
       entries: entries.map((e) => attachChecksum(e)),
       senderPeerId: this.callbacks.peerId,
@@ -261,6 +275,6 @@ export class MeshP2PNetwork {
       void this.room.leave();
       this.room = null;
     }
-    this.sendSync = null;
+    this.sendRaw = null;
   }
 }
