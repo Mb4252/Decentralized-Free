@@ -2,10 +2,10 @@
 
 import React from 'react';
 import { GeoFocusBanner } from '@/components/GeoFocusBanner';
-import { useMarket } from '@/lib/context';
+import { useApp } from '@/lib/context';
 
 export default function PricesPage() {
-  const { priceSummaries, activeZone } = useMarket();
+  const { priceSummaries, activeZone } = useApp();
 
   return (
     <main dir="rtl" className="mx-auto max-w-4xl space-y-4 p-4 text-slate-100">
@@ -29,9 +29,14 @@ export default function PricesPage() {
               <div className="font-semibold text-white">{summary.item}</div>
               <div className="mt-1 text-xs text-slate-400">الفئة: {summary.category}</div>
               <div className="mt-2 flex items-center justify-between text-xs text-emerald-300">
-                <span>الوسيط: {summary.medianPrice}</span>
-                <span>عدد البلاغات: {summary.count}</span>
+                <span>الوسيط: {summary.median ?? '-'}</span>
+                <span>عدد البلاغات: {summary.reports.length}</span>
               </div>
+              {summary.cheapestPlace && (
+                <div className="mt-1 text-xs text-slate-400">
+                  الأقل: {summary.lowestPrice} ({summary.cheapestPlace})
+                </div>
+              )}
             </div>
           ))}
         </div>
