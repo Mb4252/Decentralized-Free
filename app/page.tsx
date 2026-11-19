@@ -5,6 +5,18 @@ import { GeoFocusBanner } from '@/components/GeoFocusBanner';
 import { CommunityRadarSection } from '@/components/CommunityRadarSection';
 import { useApp } from '@/lib/context';
 
+function formatPublishedAt(timestamp?: number): string {
+  if (!timestamp || !Number.isFinite(timestamp)) return 'غير محدد';
+  const date = new Date(timestamp);
+  return date.toLocaleString('ar-EG', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 export default function HomePage() {
   const {
     entries,
@@ -127,6 +139,9 @@ export default function HomePage() {
                         {entry.category}
                       </span>
                     )}
+                    <div className="mt-0.5 text-[11px] text-slate-500">
+                      نُشر: {formatPublishedAt(entry.createdAt)}
+                    </div>
                   </div>
                   <div className="flex items-center gap-3 text-xs text-slate-300">
                     <span>
