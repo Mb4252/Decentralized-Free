@@ -22,6 +22,18 @@ export class SyncEngine {
     }
   }
 
+  public broadcastPrice(priceReport: any): void {
+    this.send('NEW_PRICE', priceReport);
+  }
+
+  public broadcastBarter(barterOffer: any): void {
+    this.send('NEW_BARTER', barterOffer);
+  }
+
+  public broadcast(type: string, payload: any): void {
+    this.send(type, payload);
+  }
+
   public onMessage(callback: (type: string, payload: any) => void): void {
     if (this.channel) {
       this.channel.onmessage = (event: MessageEvent) => {
