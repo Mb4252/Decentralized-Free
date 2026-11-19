@@ -2,10 +2,10 @@
 
 import React from 'react';
 import { GeoFocusBanner } from '@/components/GeoFocusBanner';
-import { useMarket } from '@/lib/context';
+import { useApp } from '@/lib/context';
 
 export default function HomePage() {
-  const { entries, priceSummaries, barterMatches, nodeStatus, activeZone } = useMarket();
+  const { entries, priceSummaries, barterMatches, nodeStatus, activeZone } = useApp();
 
   return (
     <main dir="rtl" className="mx-auto max-w-4xl space-y-4 p-4 text-slate-100">
@@ -41,7 +41,10 @@ export default function HomePage() {
         ) : (
           <ul className="divide-y divide-slate-800">
             {entries.map((entry) => (
-              <li key={entry.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5 text-sm">
+              <li
+                key={entry.id}
+                className="flex flex-wrap items-center justify-between gap-2 py-2.5 text-sm"
+              >
                 <div>
                   <span className="font-semibold text-white">{entry.item}</span>
                   <span className="mr-2 text-xs text-emerald-300">[{entry.location}]</span>
@@ -50,7 +53,9 @@ export default function HomePage() {
                   )}
                 </div>
                 <div className="text-xs text-slate-300">
-                  {typeof entry.price === 'number' ? `${entry.price}` : entry.wantItem || entry.kind}
+                  {entry.kind === 'price' && typeof entry.price === 'number'
+                    ? `${entry.price}`
+                    : entry.wantItem || entry.kind}
                 </div>
               </li>
             ))}
