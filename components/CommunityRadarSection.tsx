@@ -4,6 +4,17 @@ import React, { useMemo, useState } from 'react';
 import { useApp } from '@/lib/context';
 import { PlaceFeedbackVerdict } from '@/core/market-intelligence';
 
+function formatPublishedAt(timestamp?: number): string {
+  if (!timestamp || !Number.isFinite(timestamp)) return 'غير محدد';
+  return new Date(timestamp).toLocaleString('ar-EG', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 export function CommunityRadarSection() {
   const {
     lowestPriceDeals,
@@ -98,7 +109,6 @@ export function CommunityRadarSection() {
 
   return (
     <div className="space-y-4">
-      {/* شريط المشاركة السريعة والمزامنة */}
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-800 bg-slate-900/90 p-3">
         <div className="flex flex-wrap gap-2">
           <button
@@ -123,7 +133,6 @@ export function CommunityRadarSection() {
         )}
       </div>
 
-      {/* بطاقة أفضل خيار موثوق اليوم */}
       {bestTrustedDeal && (
         <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-3.5 text-xs text-slate-200">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -135,16 +144,19 @@ export function CommunityRadarSection() {
               {bestTrustedDeal.location}
             </span>
           </div>
-          {bestTrustedDeal.discountPercent > 0 && (
-            <div className="mt-1 text-[11px] text-emerald-200">
-              أقل من الوسيط السعري بـ {bestTrustedDeal.discountPercent}% (الوسيط:{' '}
-              {bestTrustedDeal.medianPrice})
-            </div>
-          )}
+          <div className="mt-1 flex flex-wrap items-center justify-between gap-2 text-[11px] text-emerald-200">
+            <span>
+              {bestTrustedDeal.discountPercent > 0
+                ? `أقل من الوسيط السعري بـ ${bestTrustedDeal.discountPercent}% (الوسيط: ${bestTrustedDeal.medianPrice})`
+                : `الوسيط: ${bestTrustedDeal.medianPrice ?? '-'}`}
+            </span>
+            <span className="text-slate-400">
+              نُشر: {formatPublishedAt(bestTrustedDeal.entry.createdAt)}
+            </span>
+          </div>
         </div>
       )}
 
-      {/* 1. أقل الأسعار والمخفضة للعامة */}
       <section className="space-y-2.5 rounded-xl border border-slate-800 bg-slate-900/85 p-4 text-slate-100">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-base font-bold text-emerald-300">
@@ -193,6 +205,10 @@ export function CommunityRadarSection() {
                   )}
                 </div>
 
+                <div className="mt-1 text-[10px] text-slate-500">
+                  نُشر: {formatPublishedAt(deal.entry.createdAt)}
+                </div>
+
                 {deal.isExcludedByCommunity && (
                   <div className="mt-1.5 rounded bg-rose-500/20 px-2 py-1 text-[11px] font-medium text-rose-200">
                     مستبعد مؤقتاً بناءً على بلاغات عدم المطابقة/الخداع من سكان المنطقة
@@ -210,7 +226,6 @@ export function CommunityRadarSection() {
         )}
       </section>
 
-      {/* 2. المتاجر والمراكز في المنطقة ورأي أصحاب الحي */}
       <section className="space-y-2.5 rounded-xl border border-slate-800 bg-slate-900/85 p-4 text-slate-100">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-base font-bold text-white">
