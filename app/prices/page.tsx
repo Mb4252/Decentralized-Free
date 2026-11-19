@@ -16,6 +16,16 @@ function formatPublishedAt(timestamp?: number): string {
   });
 }
 
+function computeMedian(values: number[]): number | null {
+  if (values.length === 0) return null;
+  const sorted = values.slice().sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 0) {
+    return Math.round(((sorted[mid - 1] + sorted[mid]) / 2) * 100) / 100;
+  }
+  return sorted[mid];
+}
+
 interface ReportLike {
   id?: string;
   entry?: MarketEntry;
@@ -84,6 +94,7 @@ export default function PricesPage() {
 
             const minPrice = prices.length > 0 ? Math.min.apply(null, prices) : null;
             const maxPrice = prices.length > 0 ? Math.max.apply(null, prices) : null;
+            const medianPrice = computeMedian(prices);
 
             return (
               <div
@@ -107,9 +118,7 @@ export default function PricesPage() {
                   <div className="rounded-lg bg-slate-950/70 p-2">
                     <div className="text-slate-400">الوسيط العادل</div>
                     <div className="mt-0.5 font-bold text-white">
-                      {summary.medianPrice !== null && summary.medianPrice !== undefined
-                        ? summary.medianPrice
-                        : '-'}
+                      {medianPrice !== null ? medianPrice : '-'}
                     </div>
                   </div>
                   <div className="rounded-lg bg-slate-950/70 p-2">
