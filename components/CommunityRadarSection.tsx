@@ -1,32 +1,151 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useApp } from '@/lib/context';
 import { PlaceFeedbackVerdict } from '@/core/market-intelligence';
 
 export function CommunityRadarSection() {
-  const { lowestPriceDeals, zonePlaces, activeZone, submitPlaceFeedback } = useApp();
+  const {
+    lowestPriceDeals,
+    zonePlaces,
+    activeZone,
+    submitPlaceFeedback,
+    exportJsonBundle,
+    importJsonBundle,
+  } = useApp();
+
   const [selectedPlaceKey, setSelectedPlaceKey] = useState<string>('');
   const [reasonText, setReasonText] = useState<string>('');
+  const [noticeMessage, setNoticeMessage] = useState<string>('');
+
+  const showNotice = (msg: string) => {
+    setNoticeMessage(msg);
+    setTimeout(() => {
+      setNoticeMessage((prev) => (prev === msg ? '' : prev));
+    }, 3500);
+  };
+
+  const bestTrustedDeal = useMemo(() => {
+    return (
+      lowestPriceDeals.find((d) => !d.isExcludedByCommunity && !d.isSuspiciousLow) ||
+      lowestPriceDeals.find((d) => !d.isExcludedByCommunity) ||
+      null
+    );
+  }, [lowestPriceDeals]);
 
   const handleFeedback = (
     placeName: string,
     location: string,
     verdict: PlaceFeedbackVerdict
   ) => {
-    submitPlaceFeedback({
+    const res = submitPlaceFeedback({
       placeName,
       location,
       verdict,
       reason: reasonText,
     });
-    setReasonText('');
+    if (res) {
+      setReasonText('');
+      showNotice(`تم تسجيل رأي المجتمع حول «${placeName}».`);
+    }
+  };
+
+  const handleCopyWhatsAppSummary = async () => {
+    const validDeals = lowestPriceDeals.filter((d) => !d.isExcludedByCommunity);
+    const zoneTitle = activeZone ? `منطقة: ${activeZone}` : 'جميع المناطق';
+    const lines: string[] = [
+      `📡 *رادار السعر العادل — ${zoneTitle}*`,
+      `📅 تحديث: ${new Date().toLocaleDateString('ar-EG')}`,
+      '',
+    ];
+
+    if (validDeals.length === 0) {
+      lines.push('لا توجد عروض أسعار مسجلة بعد في هذا النطاق.');
+    } else {
+      lines.push('🏷️ *أقل الأسعار المرصودة اليوم:*');
+      validDeals.slice(0, 10).forEach((deal, idx) => {
+        const placePart = deal.placeName ? ` (${deal.placeName})` : '';
+        const discPart =
+          deal.discountPercent > 0 ? ` — أقل من الوسيط بـ ${deal.discountPercent}%` : '';
+        lines.push(
+          `${idx + 1}. *${deal.item}*: ${deal.price}${placePart} [${deal.location}]${discPart}`
+        );
+      });
+    }
+
+    if (typeof window !== 'undefined') {
+      lines.push(
+        '',
+        '🔗 افتح الرادار وأضف أسعار منطقتك:',
+        window.location.origin + window.location.pathname
+      );
+    }
+
+    const text = lines.join('\n');
+    try {
+      await navigator.clipboard.writeText(text);
+      showNotice('تم نسخ ملخص أسعار اليوم؛ يمكنك لصقه مباشرة في واتساب.');
+    } catch {
+      showNotice('تعذر النسخ التلقائي من المتصفح؛ جرّب مرة أخرى.');
+    }
+  };
+
+  const handleTriggerLocalRefresh = () => {
+    const bundle = exportJsonBundle();
+    importJsonBundle(bundle);
+    showNotice('تمت إعادة مزامنة الحالة وبثها للأقران المتصلين.');
   };
 
   return (
     <div className="space-y-4">
+      {/* شريط المشاركة السريعة والمزامنة */}
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-800 bg-slate-900/90 p-3">
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={handleCopyWhatsAppSummary}
+            className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500"
+          >
+            مشاركة أسعار اليوم (نسخ لواتساب)
+          </button>
+          <button
+            type="button"
+            onClick={handleTriggerLocalRefresh}
+            className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-700"
+          >
+            إعادة مزامنة الأقران الآن
+          </button>
+        </div>
+        {noticeMessage && (
+          <span className="rounded-md bg-emerald-500/15 px-2.5 py-1 text-xs font-medium text-emerald-300">
+            {noticeMessage}
+          </span>
+        )}
+      </div>
+
+      {/* بطاقة أفضل خيار موثوق اليوم */}
+      {bestTrustedDeal && (
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-3.5 text-xs text-slate-200">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="font-bold text-emerald-300">
+              ⭐ أبرز سعر أقل من الوسيط اليوم: {bestTrustedDeal.item} ({bestTrustedDeal.price})
+            </span>
+            <span className="text-slate-300">
+              {bestTrustedDeal.placeName ? `${bestTrustedDeal.placeName} — ` : ''}
+              {bestTrustedDeal.location}
+            </span>
+          </div>
+          {bestTrustedDeal.discountPercent > 0 && (
+            <div className="mt-1 text-[11px] text-emerald-200">
+              أقل من الوسيط السعري بـ {bestTrustedDeal.discountPercent}% (الوسيط:{' '}
+              {bestTrustedDeal.medianPrice})
+            </div>
+          )}
+        </div>
+      )}
+
       {/* 1. أقل الأسعار والمخفضة للعامة */}
-      <section className="space-y-2.5 rounded-xl border border-slate-800 bg-slate-900/75 p-4 text-slate-100">
+      <section className="space-y-2.5 rounded-xl border border-slate-800 bg-slate-900/85 p-4 text-slate-100">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-base font-bold text-emerald-300">
             أقل الأسعار والعروض المخفضة {activeZone ? `في (${activeZone})` : '(كل المناطق)'}
@@ -38,7 +157,7 @@ export function CommunityRadarSection() {
 
         {lowestPriceDeals.length === 0 ? (
           <p className="text-xs text-slate-400">
-            لا توجد بلاغات أسعار كافية بعد لاستخراج العروض المخفضة في هذا النطاق.
+            لا توجد بلاغات أسعار بعد. أضف أسعار اليوم من زر «إضافة» بالأسفل ليبدأ الرصد.
           </p>
         ) : (
           <div className="grid gap-2.5 sm:grid-cols-2">
@@ -47,8 +166,8 @@ export function CommunityRadarSection() {
                 key={deal.id}
                 className={`rounded-lg border p-3 text-xs ${
                   deal.isExcludedByCommunity
-                    ? 'border-rose-500/40 bg-rose-950/25 text-rose-200'
-                    : 'border-slate-800 bg-slate-950/65 text-slate-200'
+                    ? 'border-rose-500/40 bg-rose-950/30 text-rose-200'
+                    : 'border-slate-800 bg-slate-950/75 text-slate-200'
                 }`}
               >
                 <div className="flex items-center justify-between gap-2">
@@ -68,7 +187,9 @@ export function CommunityRadarSection() {
                     الوسيط: {deal.medianPrice ?? '-'} ({deal.reportsCountForItem} بلاغ)
                   </span>
                   {deal.discountPercent > 0 && (
-                    <span className="text-emerald-300">أقل من الوسيط بـ {deal.discountPercent}%</span>
+                    <span className="text-emerald-300">
+                      أقل من الوسيط بـ {deal.discountPercent}%
+                    </span>
                   )}
                 </div>
 
@@ -90,19 +211,19 @@ export function CommunityRadarSection() {
       </section>
 
       {/* 2. المتاجر والمراكز في المنطقة ورأي أصحاب الحي */}
-      <section className="space-y-2.5 rounded-xl border border-slate-800 bg-slate-900/75 p-4 text-slate-100">
+      <section className="space-y-2.5 rounded-xl border border-slate-800 bg-slate-900/85 p-4 text-slate-100">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-base font-bold text-white">
             المتاجر والمراكز {activeZone ? `في (${activeZone})` : '(كل المناطق)'}
           </h2>
           <span className="text-xs text-slate-400">
-            يتم استبعاد المركز تلقائياً إذا أبلغ 3 أشخاص أو أكثر بأنه مخادع أو غير مطابق
+            يُستبعد المركز تلقائياً عند إبلاغ 3 أشخاص أو أكثر بأنه مخادع
           </span>
         </div>
 
         {zonePlaces.length === 0 ? (
           <p className="text-xs text-slate-400">
-            لم يتم رصد متاجر أو مراكز مسجلة في هذا النطاق بعد. أضف بلاغاً باسم المركز أو البقالة ليظهر هنا.
+            لم يتم رصد متاجر أو مراكز بعد. عند إضافة بلاغ وكتابة اسم المركز أو البقالة سيظهر هنا تلقائياً.
           </p>
         ) : (
           <div className="space-y-2.5">
@@ -113,8 +234,8 @@ export function CommunityRadarSection() {
                   key={place.placeKey}
                   className={`rounded-lg border p-3 text-xs ${
                     place.isExcluded
-                      ? 'border-rose-500/40 bg-rose-950/20 opacity-85'
-                      : 'border-slate-800 bg-slate-950/60'
+                      ? 'border-rose-500/40 bg-rose-950/25 opacity-90'
+                      : 'border-slate-800 bg-slate-950/70'
                   }`}
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -161,28 +282,28 @@ export function CommunityRadarSection() {
                       <button
                         type="button"
                         onClick={() => handleFeedback(place.placeName, place.location, 'honest_low')}
-                        className="rounded bg-emerald-600/80 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-emerald-600"
+                        className="rounded bg-emerald-600/85 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-emerald-600"
                       >
                         مخفض وصادق
                       </button>
                       <button
                         type="button"
                         onClick={() => handleFeedback(place.placeName, place.location, 'fair')}
-                        className="rounded bg-sky-600/80 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-sky-600"
+                        className="rounded bg-sky-600/85 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-sky-600"
                       >
                         سعر عادل
                       </button>
                       <button
                         type="button"
                         onClick={() => handleFeedback(place.placeName, place.location, 'expensive')}
-                        className="rounded bg-amber-600/80 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-amber-600"
+                        className="rounded bg-amber-600/85 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-amber-600"
                       >
                         سعره غالي
                       </button>
                       <button
                         type="button"
                         onClick={() => handleFeedback(place.placeName, place.location, 'deceptive')}
-                        className="rounded bg-rose-600/80 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-rose-600"
+                        className="rounded bg-rose-600/85 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-rose-600"
                       >
                         إبلاغ خداع / غير مطابق
                       </button>
@@ -190,9 +311,7 @@ export function CommunityRadarSection() {
 
                     <button
                       type="button"
-                      onClick={() =>
-                        setSelectedPlaceKey(isSelected ? '' : place.placeKey)
-                      }
+                      onClick={() => setSelectedPlaceKey(isSelected ? '' : place.placeKey)}
                       className="text-[11px] text-slate-400 underline hover:text-slate-200"
                     >
                       {isSelected ? 'إخفاء الملاحظة' : 'إضافة سبب/ملاحظة'}
