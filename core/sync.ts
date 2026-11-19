@@ -1,3 +1,8 @@
+export interface SyncEnvelope {
+  type: string;
+  payload: any;
+}
+
 export class SyncEngine {
   private channel: BroadcastChannel | null = null;
   private roomId: string;
@@ -10,15 +15,21 @@ export class SyncEngine {
     }
   }
 
-  public send(data: unknown): void {
+  public send(type: string, payload: any): void {
     if (this.channel) {
-      this.channel.postMessage(data);
+      const message: SyncEnvelope = { type, payload };
+      this.channel.postMessage(message);
     }
   }
 
-  public onMessage(callback: (event: MessageEvent) => void): void {
+  public onMessage(callback: (type: string, payload: any) => void): void {
     if (this.channel) {
-      this.channel.onmessage = callback;
+      this.channel.onmessage = (event: MessageEvent) => {
+        const data = event.data as SyncEnvelope | undefined;
+        if (data && typeof data.type === 'string') {
+          callback(data.type, data.payload);
+        }
+      };
     }
   }
 
