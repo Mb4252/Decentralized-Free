@@ -10,14 +10,15 @@ import React, {
   useState,
 } from 'react';
 import {
-  BarterMatch,
+  DEFAULT_SAMPLE_ITEMS,
+  ItemPriceSummary,
   MarketEntry,
-  PriceSummary,
-  buildBarterMatches,
-  buildPriceSummaries,
-  createMarketEntry,
-  loadInitialEntries,
-  saveEntriesToStorage,
+  ReportKind,
+  SmartMatch,
+  analyzeItemPrices,
+  findSmartMatches,
+  getOrCreateLocalPeer,
+  normalizeText,
 } from '@/core/market-engine';
 import {
   MeshP2PNetwork,
@@ -34,28 +35,31 @@ import {
   filterEntriesByGeoFocus,
 } from '@/core/geo-focus';
 
-const PEER_ID_STORAGE_KEY = 'fair_price_barter_peer_id_v1';
-const GEO_FOCUS_STORAGE_KEY = 'fair_price_barter_geo_focus_v1';
+const ENTRIES_STORAGE_KEY = 'market_radar_entries_v1';
+const GEO_FOCUS_STORAGE_KEY = 'market_radar_geo_focus_v1';
 
-interface NewEntryInput {
-  kind: 'price' | 'have' | 'need';
+export interface NewEntryInput {
+  kind: ReportKind;
   category: string;
   item: string;
   placeName?: string;
-  location: string;
-  price?: number;
   quantity?: string;
   wantItem?: string;
-  notes?: string;
+  location: string;
+  price?: number;
   authorName?: string;
+  contact?: string;
+  note?: string;
 }
 
-interface MarketContextValue {
+interface AppContextValue {
   entries: MarketEntry[];
   allEntries: MarketEntry[];
-  priceSummaries: PriceSummary[];
-  barterMatches: BarterMatch[];
+  priceSummaries: ItemPriceSummary[];
+  barterMatches: SmartMatch[];
   nodeStatus: NodeStatus;
+  peerId: string;
+  defaultName: string;
   focusMode: GeoFocusMode;
   focusedZone: string | null;
   detectedZone: string | null;
@@ -79,18 +83,30 @@ interface MarketContextValue {
   resetDemoData: () => void;
 }
 
-const MarketContext = createContext<MarketContextValue | null>(null);
+const AppContext = createContext<AppContextValue | null>(null);
 
-function getOrCreatePeerId(): string {
-  if (typeof window === 'undefined') return 'peer-ssr';
+function loadStoredEntries(): MarketEntry[] {
+  if (typeof window === 'undefined') return [];
   try {
-    const existing = window.localStorage.getItem(PEER_ID_STORAGE_KEY);
-    if (existing && existing.trim().length >= 4) return existing;
-    const generated = `peer-${Math.random().toString(36).slice(2, 8)}-${Date.now().toString(36).slice(-4)}`;
-    window.localStorage.setItem(PEER_ID_STORAGE_KEY, generated);
-    return generated;
+    const raw = window.localStorage.getItem(ENTRIES_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (item): item is MarketEntry =>
+        Boolean(item && typeof item === 'object' && typeof (item as MarketEntry).id === 'string')
+    );
   } catch {
-    return `peer-${Math.random().toString(36).slice(2, 8)}`;
+    return [];
+  }
+}
+
+function saveStoredEntries(entries: MarketEntry[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(ENTRIES_STORAGE_KEY, JSON.stringify(entries));
+  } catch {
+    // تجاهل أخطاء التخزين المحلي
   }
 }
 
@@ -116,9 +132,9 @@ function loadSavedGeoFocus(): { mode: GeoFocusMode; focusedZone: string | null }
   }
 }
 
-export function MarketProvider({ children }: { children: React.ReactNode }) {
-  const [peerId] = useState<string>(() => getOrCreatePeerId());
-  const [entries, setEntries] = useState<MarketEntry[]>(() => loadInitialEntries());
+export function AppProvider({ children }: { children: React.ReactNode }) {
+  const [{ peerId, defaultName }] = useState(() => getOrCreateLocalPeer());
+  const [entries, setEntries] = useState<MarketEntry[]>(() => loadStoredEntries());
   const [focusMode, setFocusModeState] = useState<GeoFocusMode>(() => loadSavedGeoFocus().mode);
   const [focusedZone, setFocusedZoneState] = useState<string | null>(
     () => loadSavedGeoFocus().focusedZone
@@ -140,7 +156,7 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
   const channelRef = useRef<BroadcastChannel | null>(null);
 
   useEffect(() => {
-    saveEntriesToStorage(entries);
+    saveStoredEntries(entries);
   }, [entries]);
 
   useEffect(() => {
@@ -155,46 +171,49 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
     }
   }, [focusMode, focusedZone]);
 
-  const applyIncomingMessage = useCallback((msg: P2PSyncMessage) => {
-    if (!msg || msg.senderPeerId === peerId) return;
+  const applyIncomingMessage = useCallback(
+    (msg: P2PSyncMessage) => {
+      if (!msg || msg.senderPeerId === peerId) return;
 
-    if (msg.type === 'NEW_ENTRY' && msg.entry) {
-      if (!validateMarketEntry(msg.entry)) {
-        setNodeStatus((prev) => ({ ...prev, rejectedCount: prev.rejectedCount + 1 }));
+      if (msg.type === 'NEW_ENTRY' && msg.entry) {
+        if (!validateMarketEntry(msg.entry)) {
+          setNodeStatus((prev) => ({ ...prev, rejectedCount: prev.rejectedCount + 1 }));
+          return;
+        }
+        const verified = attachChecksum(msg.entry);
+        setEntries((prev) => {
+          if (prev.some((item) => item.id === verified.id)) return prev;
+          return [verified, ...prev].sort((a, b) => b.createdAt - a.createdAt);
+        });
+        setNodeStatus((prev) => ({
+          ...prev,
+          lastSyncAt: Date.now(),
+          verifiedCount: prev.verifiedCount + 1,
+        }));
         return;
       }
-      const verified = attachChecksum(msg.entry);
-      setEntries((prev) => {
-        if (prev.some((item) => item.id === verified.id)) return prev;
-        return [verified, ...prev].sort((a, b) => b.createdAt - a.createdAt);
-      });
-      setNodeStatus((prev) => ({
-        ...prev,
-        lastSyncAt: Date.now(),
-        verifiedCount: prev.verifiedCount + 1,
-      }));
-      return;
-    }
 
-    if (msg.type === 'DELETE_ENTRY' && msg.deletedId) {
-      setEntries((prev) => prev.filter((item) => item.id !== msg.deletedId));
-      setNodeStatus((prev) => ({ ...prev, lastSyncAt: Date.now() }));
-      return;
-    }
+      if (msg.type === 'DELETE_ENTRY' && msg.deletedId) {
+        setEntries((prev) => prev.filter((item) => item.id !== msg.deletedId));
+        setNodeStatus((prev) => ({ ...prev, lastSyncAt: Date.now() }));
+        return;
+      }
 
-    if (msg.type === 'FULL_STATE' && Array.isArray(msg.entries)) {
-      setEntries((prev) => {
-        const result = mergeVerifiedEntries(prev, msg.entries || []);
-        setNodeStatus((st) => ({
-          ...st,
-          lastSyncAt: Date.now(),
-          verifiedCount: st.verifiedCount + result.addedCount,
-          rejectedCount: st.rejectedCount + result.rejectedCount,
-        }));
-        return result.merged;
-      });
-    }
-  }, [peerId]);
+      if (msg.type === 'FULL_STATE' && Array.isArray(msg.entries)) {
+        setEntries((prev) => {
+          const result = mergeVerifiedEntries(prev, msg.entries || []);
+          setNodeStatus((st) => ({
+            ...st,
+            lastSyncAt: Date.now(),
+            verifiedCount: st.verifiedCount + result.addedCount,
+            rejectedCount: st.rejectedCount + result.rejectedCount,
+          }));
+          return result.merged;
+        });
+      }
+    },
+    [peerId]
+  );
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -280,16 +299,34 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
 
   const addEntry = useCallback(
     (input: NewEntryInput): MarketEntry | null => {
-      const created = createMarketEntry({
-        ...input,
+      const item = (input.item || '').trim();
+      const location = (input.location || '').trim();
+      if (!item || !location) return null;
+
+      const created: MarketEntry = {
+        id: `ent-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+        kind: input.kind,
+        category: (input.category || 'بقالة').trim() || 'بقالة',
+        item,
+        placeName: input.placeName?.trim() || undefined,
+        quantity: input.quantity?.trim() || undefined,
+        wantItem: input.wantItem?.trim() || undefined,
+        location,
+        price:
+          typeof input.price === 'number' && Number.isFinite(input.price)
+            ? input.price
+            : undefined,
+        authorName: (input.authorName || defaultName).trim() || defaultName,
         authorPeerId: peerId,
-      });
-      if (!created) return null;
+        contact: input.contact?.trim() || undefined,
+        note: input.note?.trim() || undefined,
+        createdAt: Date.now(),
+      };
 
       const verified = attachChecksum(created);
 
       setEntries((prev) => {
-        if (prev.some((item) => item.id === verified.id)) return prev;
+        if (prev.some((existing) => existing.id === verified.id)) return prev;
         return [verified, ...prev].sort((a, b) => b.createdAt - a.createdAt);
       });
 
@@ -305,7 +342,7 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
 
       return verified;
     },
-    [peerId]
+    [defaultName, peerId]
   );
 
   const deleteEntry = useCallback(
@@ -331,14 +368,17 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
         const parsed = JSON.parse(rawJson) as unknown;
         const candidateList = Array.isArray(parsed)
           ? parsed
-          : parsed && typeof parsed === 'object' && Array.isArray((parsed as { entries?: unknown }).entries)
+          : parsed &&
+              typeof parsed === 'object' &&
+              Array.isArray((parsed as { entries?: unknown }).entries)
             ? (parsed as { entries: unknown[] }).entries
             : null;
 
         if (!candidateList) {
           return {
             ok: false,
-            message: 'صيغة JSON غير صحيحة؛ يجب أن تكون مصفوفة بلاغات أو كائناً يحتوي على entries.',
+            message:
+              'صيغة JSON غير صحيحة؛ يجب أن تكون مصفوفة بلاغات أو كائناً يحتوي على entries.',
             addedCount: 0,
             rejectedCount: 0,
           };
@@ -395,27 +435,42 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
   }, [peerId, activeZone, filteredEntries]);
 
   const resetDemoData = useCallback(() => {
-    const fresh = loadInitialEntries();
-    setEntries(fresh);
-    saveEntriesToStorage(fresh);
+    setEntries([]);
+    saveStoredEntries([]);
   }, []);
 
-  const priceSummaries = useMemo(
-    () => buildPriceSummaries(filteredEntries),
-    [filteredEntries]
-  );
+  const priceSummaries = useMemo(() => {
+    const itemMap = new Map<string, string>();
+    for (const sample of DEFAULT_SAMPLE_ITEMS) {
+      itemMap.set(normalizeText(sample), sample);
+    }
+    for (const entry of filteredEntries) {
+      if (entry.kind === 'price' && entry.item.trim()) {
+        const key = normalizeText(entry.item);
+        if (!itemMap.has(key)) {
+          itemMap.set(key, entry.item.trim());
+        }
+      }
+    }
+
+    return Array.from(itemMap.values())
+      .map((itemName) => analyzeItemPrices(filteredEntries, itemName))
+      .filter((summary) => summary.reports.length > 0);
+  }, [filteredEntries]);
 
   const barterMatches = useMemo(
-    () => buildBarterMatches(filteredEntries),
+    () => findSmartMatches(filteredEntries),
     [filteredEntries]
   );
 
-  const value: MarketContextValue = {
+  const value: AppContextValue = {
     entries: filteredEntries,
     allEntries: entries,
     priceSummaries,
     barterMatches,
     nodeStatus,
+    peerId,
+    defaultName,
     focusMode,
     focusedZone,
     detectedZone: geoInference.detectedZone,
@@ -434,13 +489,13 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
     resetDemoData,
   };
 
-  return <MarketContext.Provider value={value}>{children}</MarketContext.Provider>;
+  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
 
-export function useMarket(): MarketContextValue {
-  const ctx = useContext(MarketContext);
+export function useApp(): AppContextValue {
+  const ctx = useContext(AppContext);
   if (!ctx) {
-    throw new Error('useMarket must be used inside MarketProvider');
+    throw new Error('useApp must be used inside AppProvider');
   }
   return ctx;
 }
