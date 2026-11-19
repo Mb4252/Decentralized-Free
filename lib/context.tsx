@@ -34,9 +34,19 @@ import {
   analyzeUserGeoActivity,
   filterEntriesByGeoFocus,
 } from '@/core/geo-focus';
+import {
+  DiscoveredPlaceSummary,
+  LowestPriceDeal,
+  PlaceFeedbackReport,
+  PlaceFeedbackVerdict,
+  buildPlaceKey,
+  discoverLowestPrices,
+  discoverZonePlaces,
+} from '@/core/market-intelligence';
 
 const ENTRIES_STORAGE_KEY = 'market_radar_entries_v1';
 const GEO_FOCUS_STORAGE_KEY = 'market_radar_geo_focus_v1';
+const PLACE_FEEDBACK_STORAGE_KEY = 'market_radar_place_feedback_v1';
 
 export interface NewEntryInput {
   kind: ReportKind;
@@ -61,12 +71,23 @@ export interface BundleImportResult {
   rejectedCount: number;
 }
 
+export interface SubmitPlaceFeedbackInput {
+  placeName: string;
+  location: string;
+  item?: string;
+  verdict: PlaceFeedbackVerdict;
+  reason?: string;
+}
+
 interface AppContextValue {
   entries: MarketEntry[];
   allEntries: MarketEntry[];
   priceSummaries: ItemPriceSummary[];
   barterMatches: SmartMatch[];
   matches: SmartMatch[];
+  lowestPriceDeals: LowestPriceDeal[];
+  zonePlaces: DiscoveredPlaceSummary[];
+  placeFeedbacks: PlaceFeedbackReport[];
   nodeStatus: NodeStatus;
   peerId: string;
   defaultName: string;
@@ -83,7 +104,9 @@ interface AppContextValue {
   lockToDetectedZone: () => void;
   clearGeoFocus: () => void;
   addEntry: (input: NewEntryInput) => MarketEntry | null;
+  canDeleteEntry: (entry: Pick<MarketEntry, 'authorPeerId'>) => boolean;
   deleteEntry: (id: string) => void;
+  submitPlaceFeedback: (input: SubmitPlaceFeedbackInput) => PlaceFeedbackReport | null;
   importJsonBundle: (rawJson: string) => BundleImportResult;
   exportJsonBundle: () => string;
   importBundleJson: (rawJson: string) => BundleImportResult;
@@ -118,6 +141,36 @@ function saveStoredEntries(entries: MarketEntry[]): void {
   }
 }
 
+function loadStoredFeedbacks(): PlaceFeedbackReport[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(PLACE_FEEDBACK_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (item): item is PlaceFeedbackReport =>
+        Boolean(
+          item &&
+            typeof item === 'object' &&
+            typeof (item as PlaceFeedbackReport).id === 'string' &&
+            typeof (item as PlaceFeedbackReport).verdict === 'string'
+        )
+    );
+  } catch {
+    return [];
+  }
+}
+
+function saveStoredFeedbacks(feedbacks: PlaceFeedbackReport[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(PLACE_FEEDBACK_STORAGE_KEY, JSON.stringify(feedbacks));
+  } catch {
+    // تجاهل أخطاء التخزين المحلي
+  }
+}
+
 function loadSavedGeoFocus(): { mode: GeoFocusMode; focusedZone: string | null } {
   if (typeof window === 'undefined') {
     return { mode: 'auto', focusedZone: null };
@@ -143,6 +196,9 @@ function loadSavedGeoFocus(): { mode: GeoFocusMode; focusedZone: string | null }
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [{ peerId, defaultName }] = useState(() => getOrCreateLocalPeer());
   const [entries, setEntries] = useState<MarketEntry[]>(() => loadStoredEntries());
+  const [placeFeedbacks, setPlaceFeedbacks] = useState<PlaceFeedbackReport[]>(() =>
+    loadStoredFeedbacks()
+  );
   const [focusMode, setFocusModeState] = useState<GeoFocusMode>(() => loadSavedGeoFocus().mode);
   const [focusedZone, setFocusedZoneState] = useState<string | null>(
     () => loadSavedGeoFocus().focusedZone
@@ -166,6 +222,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     saveStoredEntries(entries);
   }, [entries]);
+
+  useEffect(() => {
+    saveStoredFeedbacks(placeFeedbacks);
+  }, [placeFeedbacks]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -353,6 +413,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [defaultName, peerId]
   );
 
+  const canDeleteEntry = useCallback(
+    (entry: Pick<MarketEntry, 'authorPeerId'>) => {
+      return Boolean(entry.authorPeerId && entry.authorPeerId === peerId);
+    },
+    [peerId]
+  );
+
   const deleteEntry = useCallback(
     (id: string) => {
       setEntries((prev) => prev.filter((item) => item.id !== id));
@@ -368,6 +435,42 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       p2pRef.current?.broadcastDeleteEntry(id);
     },
     [peerId]
+  );
+
+  const submitPlaceFeedback = useCallback(
+    (input: SubmitPlaceFeedbackInput): PlaceFeedbackReport | null => {
+      const placeName = (input.placeName || '').trim();
+      const location = (input.location || activeZone || '').trim();
+      if (!placeName || !location) return null;
+
+      const report: PlaceFeedbackReport = {
+        id: `fb-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+        targetPlaceKey: buildPlaceKey(placeName, location),
+        targetPlaceName: placeName,
+        targetLocation: location,
+        targetItem: input.item?.trim() || undefined,
+        verdict: input.verdict,
+        reason: input.reason?.trim() || undefined,
+        reporterPeerId: peerId,
+        reporterName: defaultName,
+        createdAt: Date.now(),
+      };
+
+      setPlaceFeedbacks((prev) => {
+        const withoutSamePeerSameVerdict = prev.filter(
+          (item) =>
+            !(
+              item.reporterPeerId === peerId &&
+              item.targetPlaceKey === report.targetPlaceKey &&
+              item.verdict === report.verdict
+            )
+        );
+        return [report, ...withoutSamePeerSameVerdict];
+      });
+
+      return report;
+    },
+    [activeZone, defaultName, peerId]
   );
 
   const importJsonBundle = useCallback(
@@ -455,7 +558,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const resetDemoData = useCallback(() => {
     setEntries([]);
+    setPlaceFeedbacks([]);
     saveStoredEntries([]);
+    saveStoredFeedbacks([]);
   }, []);
 
   const priceSummaries = useMemo(() => {
@@ -482,6 +587,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [filteredEntries]
   );
 
+  const lowestPriceDeals = useMemo(
+    () => discoverLowestPrices(entries, placeFeedbacks, activeZone),
+    [entries, placeFeedbacks, activeZone]
+  );
+
+  const zonePlaces = useMemo(
+    () => discoverZonePlaces(entries, placeFeedbacks, activeZone),
+    [entries, placeFeedbacks, activeZone]
+  );
+
   const localPeer = useMemo(() => ({ peerId, defaultName }), [peerId, defaultName]);
 
   const value: AppContextValue = {
@@ -490,6 +605,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     priceSummaries,
     barterMatches,
     matches: barterMatches,
+    lowestPriceDeals,
+    zonePlaces,
+    placeFeedbacks,
     nodeStatus,
     peerId,
     defaultName,
@@ -506,7 +624,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     lockToDetectedZone,
     clearGeoFocus,
     addEntry,
+    canDeleteEntry,
     deleteEntry,
+    submitPlaceFeedback,
     importJsonBundle,
     exportJsonBundle,
     importBundleJson: importJsonBundle,
