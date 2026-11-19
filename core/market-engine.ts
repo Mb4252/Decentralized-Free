@@ -109,11 +109,11 @@ export function analyzeItemPrices(entries: MarketEntry[], itemName: string): {
   const median = calculateMedian(rawReports.map((r) => r.price));
 
   const reports: AnalyzedPriceReport[] = rawReports
-    .map((r) => {
+    .map((r): AnalyzedPriceReport => {
       const { tag, deviationPercent } = classifyPrice(r.price, median);
       return {
         ...r,
-        kind: 'price',
+        kind: 'price' as const,
         price: r.price,
         deviationPercent,
         tag,
