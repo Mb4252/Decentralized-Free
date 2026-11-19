@@ -1,64 +1,62 @@
 'use client';
 
-import Link from 'next/link';
-import { useApp } from '@/lib/context';
+import React from 'react';
+import { GeoFocusBanner } from '@/components/GeoFocusBanner';
+import { useMarket } from '@/lib/context';
 
 export default function HomePage() {
-  const { priceReports, barterOffers, matches, localPeer, nodeStatus } = useApp();
+  const { entries, priceSummaries, barterMatches, nodeStatus, activeZone } = useMarket();
 
   return (
-    <div className="mt-4 space-y-5 pb-24">
-      <div className="card space-y-2">
-        <div className="flex items-center justify-between gap-2">
-          <h1 className="text-2xl font-bold text-slate-900">
-            رادار السعر العادل والمقايضة الذكية
-          </h1>
-        </div>
-        <p className="text-sm text-slate-600 leading-relaxed">
-          مؤشر أسعار مجتمعي بالوسيط الحسابي (Median) مع كشف الأسعار الشاذة وسوق مقايضة مباشر عبر شبكة عقد P2P.
-        </p>
+    <main dir="rtl" className="mx-auto max-w-4xl space-y-4 p-4 text-slate-100">
+      <GeoFocusBanner />
 
-        <div className="pt-1 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600 border-t border-slate-100">
-          <span>
-            هويتك: <strong>{localPeer.defaultName}</strong> ({localPeer.peerId})
-          </span>
-          <span className="px-2 py-0.5 rounded bg-teal-50 text-teal-800 border border-teal-200 font-semibold">
-            {nodeStatus.mode === 'webrtc-mesh'
-              ? `شبكة WebRTC نشطة (${nodeStatus.connectedPeers} عقدة)`
-              : 'وضع العقدة المحلية والمزامنة'}
-          </span>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-3">
+          <div className="text-xs text-slate-400">البلاغات المعروضة</div>
+          <div className="mt-1 text-xl font-bold">{entries.length}</div>
+        </div>
+        <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-3">
+          <div className="text-xs text-slate-400">ملخصات الأسعار</div>
+          <div className="mt-1 text-xl font-bold">{priceSummaries.length}</div>
+        </div>
+        <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-3">
+          <div className="text-xs text-slate-400">مطابقات المقايضة</div>
+          <div className="mt-1 text-xl font-bold">{barterMatches.length}</div>
+        </div>
+        <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-3">
+          <div className="text-xs text-slate-400">الأقران المتصلون</div>
+          <div className="mt-1 text-xl font-bold">{nodeStatus.connectedPeers}</div>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <Link href="/prices" className="card hover:border-teal-500 transition">
-          <div className="text-xs text-slate-500">بلاغات الأسعار</div>
-          <div className="text-2xl font-bold text-teal-700 mt-1">{priceReports.length}</div>
-          <div className="text-xs text-teal-600 mt-2">فتح الرادار ←</div>
-        </Link>
-
-        <Link href="/barter" className="card hover:border-teal-500 transition">
-          <div className="text-xs text-slate-500">عروض وطلبات المقايضة</div>
-          <div className="text-2xl font-bold text-teal-700 mt-1">{barterOffers.length}</div>
-          <div className="text-xs text-teal-600 mt-2">سوق المقايضة ←</div>
-        </Link>
-      </div>
-
-      <Link href="/barter" className="card block hover:border-teal-500 transition">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-xs text-slate-500">المطابقات الذكية الجاهزة</div>
-            <div className="text-lg font-bold text-slate-900 mt-0.5">
-              {matches.length} مطابقة مكتشفة
-            </div>
-          </div>
-          <span className="text-xs font-semibold text-teal-700">عرض التفاصيل ←</span>
-        </div>
-      </Link>
-
-      <Link href="/add" className="btn-primary block w-full py-3 text-center">
-        ➕ إضافة بلاغ سعر أو عرض مقايضة
-      </Link>
-    </div>
+      <section className="space-y-2 rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+        <h2 className="text-base font-semibold">
+          أحدث البلاغات والعروض {activeZone ? `في (${activeZone})` : '(كل المناطق)'}
+        </h2>
+        {entries.length === 0 ? (
+          <p className="text-sm text-slate-400">
+            لا توجد عناصر مطابقة للنطاق الحالي. يمكنك التبديل إلى «عرض الكل» أو إضافة بلاغ جديد.
+          </p>
+        ) : (
+          <ul className="divide-y divide-slate-800">
+            {entries.map((entry) => (
+              <li key={entry.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5 text-sm">
+                <div>
+                  <span className="font-semibold text-white">{entry.item}</span>
+                  <span className="mr-2 text-xs text-emerald-300">[{entry.location}]</span>
+                  {entry.placeName && (
+                    <span className="mr-2 text-xs text-slate-400">({entry.placeName})</span>
+                  )}
+                </div>
+                <div className="text-xs text-slate-300">
+                  {typeof entry.price === 'number' ? `${entry.price}` : entry.wantItem || entry.kind}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </main>
   );
 }
