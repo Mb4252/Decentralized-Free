@@ -46,7 +46,12 @@ export interface DiscoveredPlaceSummary {
   uniqueDeceptiveReporters: number;
   trustScore: number;
   isExcluded: boolean;
-  statusLabel: 'معتمد ومخفض' | 'معتمد وعادل' | 'مرتفع السعر' | 'مستبعد (بلاغات خداع)' | 'تحت الرصد';
+  statusLabel:
+    | 'معتمد ومخفض'
+    | 'معتمد وعادل'
+    | 'مرتفع السعر'
+    | 'مستبعد (بلاغات خداع)'
+    | 'تحت الرصد';
   sampleItems: string[];
 }
 
@@ -74,29 +79,46 @@ export function evaluatePlaceTrust(
   statusLabel: DiscoveredPlaceSummary['statusLabel'];
 } {
   const placeKey = buildPlaceKey(placeName, location);
-  const matching = feedbacks.filter((f) => {
-    if (f.targetPlaceKey === placeKey) return true;
+  const matching: PlaceFeedbackReport[] = [];
+
+  for (let i = 0; i < feedbacks.length; i++) {
+    const f = feedbacks[i];
+    if (f.targetPlaceKey === placeKey) {
+      matching.push(f);
+      continue;
+    }
     const samePlace =
-      placeName &&
-      normalizeGeoText(f.targetPlaceName) === normalizeGeoText(placeName);
+      placeName && normalizeGeoText(f.targetPlaceName) === normalizeGeoText(placeName);
     const sameLoc =
       !location ||
       !f.targetLocation ||
       matchesZoneFilter({ location: f.targetLocation }, location);
-    return Boolean(samePlace && sameLoc);
-  });
+    if (samePlace && sameLoc) {
+      matching.push(f);
+    }
+  }
 
-  const deceptiveReports = matching.filter((f) => f.verdict === 'deceptive');
-  const uniqueDeceptivePeers = new Set(
-    deceptiveReports.map((r) => r.reporterPeerId).filter(Boolean)
-  );
+  const deceptiveReports: PlaceFeedbackReport[] = [];
+  const uniqueDeceptivePeers: string[] = [];
+  let honestLowCount = 0;
+  let fairCount = 0;
+  let expensiveCount = 0;
 
-  const honestLowCount = matching.filter((f) => f.verdict === 'honest_low').length;
-  const fairCount = matching.filter((f) => f.verdict === 'fair').length;
-  const expensiveCount = matching.filter((f) => f.verdict === 'expensive').length;
+  for (let i = 0; i < matching.length; i++) {
+    const r = matching[i];
+    if (r.verdict === 'honest_low') honestLowCount += 1;
+    else if (r.verdict === 'fair') fairCount += 1;
+    else if (r.verdict === 'expensive') expensiveCount += 1;
+    else if (r.verdict === 'deceptive') {
+      deceptiveReports.push(r);
+      if (r.reporterPeerId && uniqueDeceptivePeers.indexOf(r.reporterPeerId) === -1) {
+        uniqueDeceptivePeers.push(r.reporterPeerId);
+      }
+    }
+  }
+
   const deceptiveCount = deceptiveReports.length;
-  const uniqueDeceptiveReporters = uniqueDeceptivePeers.size;
-
+  const uniqueDeceptiveReporters = uniqueDeceptivePeers.length;
   const isExcluded = uniqueDeceptiveReporters >= DECEPTIVE_EXCLUSION_THRESHOLD;
 
   const trustScore =
@@ -135,20 +157,31 @@ export function discoverLowestPrices(
   feedbacks: PlaceFeedbackReport[],
   activeZone: string | null
 ): LowestPriceDeal[] {
-  const scopedEntries = activeZone
-    ? entries.filter((e) => matchesZoneFilter(e, activeZone))
-    : entries;
+  const scopedEntries: MarketEntry[] = [];
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i];
+    if (!activeZone || matchesZoneFilter(e, activeZone)) {
+      scopedEntries.push(e);
+    }
+  }
 
-  const priceEntries = scopedEntries.filter(
-    (e): e is MarketEntry & { kind: 'price'; price: number } =>
+  type PricedEntry = MarketEntry & { kind: 'price'; price: number };
+  const priceEntries: PricedEntry[] = [];
+  for (let i = 0; i < scopedEntries.length; i++) {
+    const e = scopedEntries[i];
+    if (
       e.kind === 'price' &&
       typeof e.price === 'number' &&
       Number.isFinite(e.price) &&
       e.price > 0
-  );
+    ) {
+      priceEntries.push(e as PricedEntry);
+    }
+  }
 
-  const byItem = new Map<string, typeof priceEntries>();
-  for (const entry of priceEntries) {
+  const byItem = new Map<string, PricedEntry[]>();
+  for (let i = 0; i < priceEntries.length; i++) {
+    const entry = priceEntries[i];
     const key = normalizeGeoText(entry.item);
     const list = byItem.get(key) || [];
     list.push(entry);
@@ -156,12 +189,15 @@ export function discoverLowestPrices(
   }
 
   const deals: LowestPriceDeal[] = [];
+  const itemGroups = Array.from(byItem.values());
 
-  for (const [, list] of byItem.entries()) {
+  for (let g = 0; g < itemGroups.length; g++) {
+    const list = itemGroups[g];
     const prices = list.map((x) => x.price);
     const medianPrice = calculateMedian(prices);
 
-    for (const entry of list) {
+    for (let i = 0; i < list.length; i++) {
+      const entry = list[i];
       const placeEval = evaluatePlaceTrust(
         entry.placeName || entry.authorName || '',
         entry.location,
@@ -174,11 +210,12 @@ export function discoverLowestPrices(
           ? Math.round(((medianPrice - entry.price) / medianPrice) * 1000) / 10
           : 0;
 
+      const similarLowCount = list.filter((x) => x.price <= entry.price * 1.1).length;
       const isSuspiciousLow = Boolean(
         medianPrice &&
           medianPrice > 0 &&
           entry.price < medianPrice * 0.5 &&
-          list.filter((x) => x.price <= entry.price * 1.1).length < 2
+          similarLowCount < 2
       );
 
       if (discountPercent > 0 || list.length === 1 || deviationPercent <= 0) {
@@ -220,26 +257,35 @@ export function discoverZonePlaces(
   feedbacks: PlaceFeedbackReport[],
   activeZone: string | null
 ): DiscoveredPlaceSummary[] {
-  const scoped = activeZone
-    ? entries.filter((e) => {
-        if (matchesZoneFilter(e, activeZone)) return true;
-        const noteText = e.note || '';
-        return Boolean(noteText && matchesZoneFilter({ location: noteText }, activeZone));
-      })
-    : entries;
-
-  const grouped = new Map<
-    string,
-    {
-      placeName: string;
-      location: string;
-      entries: MarketEntry[];
-      prices: number[];
-      items: Set<string>;
+  const scoped: MarketEntry[] = [];
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i];
+    if (!activeZone) {
+      scoped.push(e);
+      continue;
     }
-  >();
+    if (matchesZoneFilter(e, activeZone)) {
+      scoped.push(e);
+      continue;
+    }
+    const noteText = e.note || '';
+    if (noteText && matchesZoneFilter({ location: noteText }, activeZone)) {
+      scoped.push(e);
+    }
+  }
 
-  for (const entry of scoped) {
+  interface GroupBucket {
+    placeName: string;
+    location: string;
+    entries: MarketEntry[];
+    prices: number[];
+    items: string[];
+  }
+
+  const grouped = new Map<string, GroupBucket>();
+
+  for (let i = 0; i < scoped.length; i++) {
+    const entry = scoped[i];
     const rawPlace =
       (entry.placeName && entry.placeName.trim()) ||
       (entry.kind === 'price' ? `${entry.item.trim()} - نقطة بيع` : '');
@@ -247,6 +293,8 @@ export function discoverZonePlaces(
 
     const key = buildPlaceKey(rawPlace, entry.location);
     const existing = grouped.get(key);
+    const trimmedItem = entry.item.trim();
+
     if (!existing) {
       grouped.set(key, {
         placeName: rawPlace,
@@ -256,28 +304,30 @@ export function discoverZonePlaces(
           entry.kind === 'price' && typeof entry.price === 'number' && entry.price > 0
             ? [entry.price]
             : [],
-        items: new Set([entry.item.trim()].filter(Boolean)),
+        items: trimmedItem ? [trimmedItem] : [],
       });
     } else {
       existing.entries.push(entry);
       if (entry.kind === 'price' && typeof entry.price === 'number' && entry.price > 0) {
         existing.prices.push(entry.price);
       }
-      if (entry.item.trim()) {
-        existing.items.add(entry.item.trim());
+      if (trimmedItem && existing.items.indexOf(trimmedItem) === -1) {
+        existing.items.push(trimmedItem);
       }
     }
   }
 
   const summaries: DiscoveredPlaceSummary[] = [];
+  const buckets = Array.from(grouped.values());
 
-  for (const [, g] of grouped.entries()) {
+  for (let i = 0; i < buckets.length; i++) {
+    const g = buckets[i];
     const trust = evaluatePlaceTrust(g.placeName, g.location, feedbacks);
     const avgPrice =
       g.prices.length > 0
         ? Math.round((g.prices.reduce((a, b) => a + b, 0) / g.prices.length) * 100) / 100
         : null;
-    const lowestPrice = g.prices.length > 0 ? Math.min(...g.prices) : null;
+    const lowestPrice = g.prices.length > 0 ? Math.min.apply(null, g.prices) : null;
 
     summaries.push({
       placeKey: trust.placeKey,
@@ -294,7 +344,7 @@ export function discoverZonePlaces(
       trustScore: trust.trustScore,
       isExcluded: trust.isExcluded,
       statusLabel: trust.statusLabel,
-      sampleItems: Array.from(g.items).slice(0, 5),
+      sampleItems: g.items.slice(0, 5),
     });
   }
 
