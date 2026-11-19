@@ -1,12 +1,11 @@
 'use client';
 
 import React from 'react';
-import { useMarket } from '@/lib/context';
+import { useApp } from '@/lib/context';
 
 export function GeoFocusBanner() {
   const {
     focusMode,
-    focusedZone,
     detectedZone,
     detectedCount,
     shouldSuggestLock,
@@ -15,9 +14,9 @@ export function GeoFocusBanner() {
     setFocusedZone,
     lockToDetectedZone,
     clearGeoFocus,
-  } = useMarket();
+  } = useApp();
 
-  if (!detectedZone && zoneStats.length === 0 && !focusedZone) {
+  if (!detectedZone && zoneStats.length === 0 && !activeZone) {
     return null;
   }
 
