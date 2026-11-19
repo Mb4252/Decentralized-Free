@@ -2,10 +2,20 @@
 
 import React from 'react';
 import { GeoFocusBanner } from '@/components/GeoFocusBanner';
+import { CommunityRadarSection } from '@/components/CommunityRadarSection';
 import { useApp } from '@/lib/context';
 
 export default function HomePage() {
-  const { entries, priceSummaries, barterMatches, nodeStatus, activeZone } = useApp();
+  const {
+    entries,
+    priceSummaries,
+    barterMatches,
+    lowestPriceDeals,
+    nodeStatus,
+    activeZone,
+    canDeleteEntry,
+    deleteEntry,
+  } = useApp();
 
   return (
     <main dir="rtl" className="mx-auto max-w-4xl space-y-4 p-4 text-slate-100">
@@ -17,8 +27,10 @@ export default function HomePage() {
           <div className="mt-1 text-xl font-bold">{entries.length}</div>
         </div>
         <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-3">
-          <div className="text-xs text-slate-400">ملخصات الأسعار</div>
-          <div className="mt-1 text-xl font-bold">{priceSummaries.length}</div>
+          <div className="text-xs text-slate-400">عروض أقل سعر</div>
+          <div className="mt-1 text-xl font-bold text-emerald-300">
+            {lowestPriceDeals.filter((d) => !d.isExcludedByCommunity).length}
+          </div>
         </div>
         <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-3">
           <div className="text-xs text-slate-400">مطابقات المقايضة</div>
@@ -30,6 +42,8 @@ export default function HomePage() {
         </div>
       </div>
 
+      <CommunityRadarSection />
+
       <section className="space-y-2 rounded-xl border border-slate-800 bg-slate-900/60 p-4">
         <h2 className="text-base font-semibold">
           أحدث البلاغات والعروض {activeZone ? `في (${activeZone})` : '(كل المناطق)'}
@@ -40,28 +54,46 @@ export default function HomePage() {
           </p>
         ) : (
           <ul className="divide-y divide-slate-800">
-            {entries.map((entry) => (
-              <li
-                key={entry.id}
-                className="flex flex-wrap items-center justify-between gap-2 py-2.5 text-sm"
-              >
-                <div>
-                  <span className="font-semibold text-white">{entry.item}</span>
-                  <span className="mr-2 text-xs text-emerald-300">[{entry.location}]</span>
-                  {entry.placeName && (
-                    <span className="mr-2 text-xs text-slate-400">({entry.placeName})</span>
-                  )}
-                </div>
-                <div className="text-xs text-slate-300">
-                  {entry.kind === 'price' && typeof entry.price === 'number'
-                    ? `${entry.price}`
-                    : entry.wantItem || entry.kind}
-                </div>
-              </li>
-            ))}
+            {entries.map((entry) => {
+              const owned = canDeleteEntry(entry);
+              return (
+                <li
+                  key={entry.id}
+                  className="flex flex-wrap items-center justify-between gap-2 py-2.5 text-sm"
+                >
+                  <div>
+                    <span className="font-semibold text-white">{entry.item}</span>
+                    <span className="mr-2 text-xs text-emerald-300">[{entry.location}]</span>
+                    {entry.placeName && (
+                      <span className="mr-2 text-xs text-slate-400">({entry.placeName})</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 text-xs text-slate-300">
+                    <span>
+                      {entry.kind === 'price' && typeof entry.price === 'number'
+                        ? `${entry.price}`
+                        : entry.wantItem || entry.kind}
+                    </span>
+                    {owned && (
+                      <button
+                        type="button"
+                        onClick={() => deleteEntry(entry.id)}
+                        className="rounded border border-rose-500/40 bg-rose-950/40 px-2 py-0.5 text-[11px] text-rose-200 hover:bg-rose-900/50"
+                      >
+                        حذف
+                      </button>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>
+
+      <div className="text-xs text-slate-400">
+        عدد السلع المحللة في مؤشر الأسعار: {priceSummaries.length}
+      </div>
     </main>
   );
 }
