@@ -3,9 +3,11 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/context';
-import { ReportKind } from '@/core/market-engine';
-
-const QUICK_ITEMS = ['دقيق', 'سكر', 'زيت', 'ذرة'];
+import {
+  DEFAULT_CATEGORIES,
+  DEFAULT_SAMPLE_ITEMS,
+  ReportKind,
+} from '@/core/market-engine';
 
 export default function AddPage() {
   const router = useRouter();
@@ -13,8 +15,10 @@ export default function AddPage() {
 
   const [step, setStep] = useState<1 | 2>(1);
   const [kind, setKind] = useState<ReportKind>('price');
+  const [category, setCategory] = useState<string>('بقالة');
   const [item, setItem] = useState<string>('دقيق');
 
+  const [placeName, setPlaceName] = useState<string>('');
   const [authorName, setAuthorName] = useState<string>(localPeer.defaultName);
   const [location, setLocation] = useState<string>('الخرطوم');
   const [contact, setContact] = useState<string>('');
@@ -29,6 +33,9 @@ export default function AddPage() {
   const handleNext = (e: React.FormEvent) => {
     e.preventDefault();
     if (!item.trim()) return;
+    if (!category.trim()) {
+      setCategory('عام');
+    }
     if (!authorName.trim()) {
       setAuthorName(localPeer.defaultName);
     }
@@ -46,7 +53,9 @@ export default function AddPage() {
 
     addEntry({
       kind,
+      category: category.trim() || 'عام',
       item: item.trim(),
+      placeName: placeName.trim() || undefined,
       location: location.trim() || 'غير محدد',
       contact: contact.trim() || undefined,
       price: numericPrice,
@@ -66,16 +75,16 @@ export default function AddPage() {
   return (
     <div className="mt-4 space-y-5 pb-24">
       <div className="card space-y-1">
-        <h1 className="text-xl font-bold text-slate-900">إضافة سريعة</h1>
+        <h1 className="text-xl font-bold text-slate-900">إضافة مجتمعية سريعة</h1>
         <p className="text-xs text-slate-500">
-          معرّفك اللامركزي المحلي: <strong>{localPeer.peerId}</strong>
+          هويتك اللامركزية المحلية: <strong>{localPeer.defaultName}</strong> ({localPeer.peerId})
         </p>
       </div>
 
       {step === 1 ? (
         <form onSubmit={handleNext} className="card space-y-4">
           <div className="space-y-2">
-            <label className="block text-sm font-bold text-slate-800">ماذا تريد أن تفعل؟</label>
+            <label className="block text-sm font-bold text-slate-800">ماذا تريد أن تضيف؟</label>
             <div className="grid grid-cols-3 gap-2">
               <button
                 type="button"
@@ -114,24 +123,56 @@ export default function AddPage() {
           </div>
 
           <div className="space-y-2">
-            <label className="block text-sm font-bold text-slate-800">السلعة</label>
+            <label className="block text-sm font-bold text-slate-800">
+              التصنيف (بقالة، محاصيل، مغالق، أدوات كهربائية، مراكز تجارية، أو أي فئة جديدة)
+            </label>
+            <input
+              type="text"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              placeholder="اكتب أي تصنيف يضيفه المجتمع..."
+              className="w-full p-2.5 rounded-lg border border-slate-300 text-sm"
+              required
+            />
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {DEFAULT_CATEGORIES.map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setCategory(cat)}
+                  className={`text-xs px-2.5 py-1 rounded-full transition ${
+                    category === cat
+                      ? 'bg-teal-700 text-white'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="block text-sm font-bold text-slate-800">
+              السلعة أو الخدمة أو المركز
+            </label>
             <input
               type="text"
               value={item}
               onChange={(e) => setItem(e.target.value)}
-              placeholder="مثال: دقيق، سكر، زيت..."
+              placeholder="مثال: دقيق، سكر، مغلق، كابل كهربائي، مركز..."
               className="w-full p-2.5 rounded-lg border border-slate-300 text-sm"
               required
             />
-            <div className="flex flex-wrap gap-2 pt-1">
-              {QUICK_ITEMS.map((q) => (
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {DEFAULT_SAMPLE_ITEMS.map((sample) => (
                 <button
-                  key={q}
+                  key={sample}
                   type="button"
-                  onClick={() => setItem(q)}
+                  onClick={() => setItem(sample)}
                   className="text-xs px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200"
                 >
-                  {q}
+                  {sample}
                 </button>
               ))}
             </div>
@@ -145,7 +186,7 @@ export default function AddPage() {
         <form onSubmit={handleSave} className="card space-y-4">
           <div className="flex items-center justify-between border-b border-slate-100 pb-2">
             <span className="text-sm font-bold text-teal-800">
-              {kind === 'price' ? 'تفاصيل بلاغ السعر' : kind === 'have' ? 'تفاصيل العرض' : 'تفاصيل الطلب'}: {item}
+              {category} — {item}
             </span>
             <button
               type="button"
@@ -178,7 +219,7 @@ export default function AddPage() {
                   type="text"
                   value={quantity}
                   onChange={(e) => setQuantity(e.target.value)}
-                  placeholder="مثال: 1 كجم أو جوال"
+                  placeholder="مثال: 1 كجم أو جوال أو قطعة"
                   className="w-full p-2.5 rounded-lg border border-slate-300 text-sm"
                 />
               </div>
@@ -190,12 +231,25 @@ export default function AddPage() {
                   type="text"
                   value={wantItem}
                   onChange={(e) => setWantItem(e.target.value)}
-                  placeholder="مثال: سكر أو ذرة"
+                  placeholder="مثال: سكر أو ذرة أو أداة كهربائية"
                   className="w-full p-2.5 rounded-lg border border-slate-300 text-sm"
                 />
               </div>
             </>
           )}
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              اسم المركز التجاري أو المحل أو نقطة البيع (اختياري)
+            </label>
+            <input
+              type="text"
+              value={placeName}
+              onChange={(e) => setPlaceName(e.target.value)}
+              placeholder="مثال: مركز النيل، مغالق السوق، محل الأنوار للكهرباء"
+              className="w-full p-2.5 rounded-lg border border-slate-300 text-sm"
+            />
+          </div>
 
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">الاسم أو اللقب الظاهر</label>
@@ -222,7 +276,7 @@ export default function AddPage() {
 
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">
-              وسيلة تواصل (اختياري — تظهر عند التبديل أو المراجعة)
+              وسيلة تواصل (اختياري)
             </label>
             <input
               type="text"
@@ -234,12 +288,12 @@ export default function AddPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">ملاحظة إضافية (اختياري)</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">ملاحظة أو رأي المجتمع (اختياري)</label>
             <input
               type="text"
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="مثال: متوفر قرب السوق المركزي"
+              placeholder="مثال: جودة ممتازة وسعر منافس مقارنة ببقية المحلات"
               className="w-full p-2.5 rounded-lg border border-slate-300 text-sm"
             />
           </div>
@@ -252,10 +306,10 @@ export default function AddPage() {
 
       <div className="card space-y-2.5">
         <h2 className="text-sm font-bold text-slate-900">
-          مشاركة ومزامنة البيانات محلياً / نظير-لنظير (JSON)
+          مزامنة حزم البيانات بين أعضاء المجتمع (JSON بدون خادم مركزي)
         </h2>
         <p className="text-xs text-slate-500">
-          صدّر بياناتك كحزمة JSON لمشاركتها مع جهاز آخر أو مستخدم آخر بدون خادم مركزي، أو الصق حزمة واردة لاستيرادها.
+          صدّر حزمة JSON لمشاركتها مع غيرك، أو الصق حزمة واردة لدمج بلاغات وعروض المجتمع في جهازك.
         </p>
 
         <div className="flex gap-2">
