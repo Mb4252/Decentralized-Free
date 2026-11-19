@@ -55,7 +55,9 @@ export interface NewEntryInput {
 export interface BundleImportResult {
   ok: boolean;
   message: string;
+  error?: string;
   addedCount: number;
+  importedCount: number;
   rejectedCount: number;
 }
 
@@ -380,11 +382,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             : null;
 
         if (!candidateList) {
+          const msg =
+            'صيغة JSON غير صحيحة؛ يجب أن تكون مصفوفة بلاغات أو كائناً يحتوي على entries.';
           return {
             ok: false,
-            message:
-              'صيغة JSON غير صحيحة؛ يجب أن تكون مصفوفة بلاغات أو كائناً يحتوي على entries.',
+            message: msg,
+            error: msg,
             addedCount: 0,
+            importedCount: 0,
             rejectedCount: 0,
           };
         }
@@ -393,25 +398,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           ok: true,
           message: '',
           addedCount: 0,
+          importedCount: 0,
           rejectedCount: 0,
         };
 
         setEntries((prev) => {
           const mergedRes = mergeVerifiedEntries(prev, candidateList);
+          const msg = `تم استيراد ${mergedRes.addedCount} عنصر جديد واستبعاد ${mergedRes.rejectedCount} عنصر غير صالح.`;
           summary = {
             ok: true,
-            message: `تم استيراد ${mergedRes.addedCount} عنصر جديد واستبعاد ${mergedRes.rejectedCount} عنصر غير صالح.`,
+            message: msg,
             addedCount: mergedRes.addedCount,
+            importedCount: mergedRes.addedCount,
             rejectedCount: mergedRes.rejectedCount,
           };
           if (mergedRes.addedCount > 0) {
-            const msg: P2PSyncMessage = {
+            const msgPayload: P2PSyncMessage = {
               type: 'FULL_STATE',
               entries: mergedRes.merged,
               senderPeerId: peerId,
               sentAt: Date.now(),
             };
-            channelRef.current?.postMessage(msg);
+            channelRef.current?.postMessage(msgPayload);
             p2pRef.current?.broadcastFullState(mergedRes.merged);
           }
           return mergedRes.merged;
@@ -419,10 +427,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
         return summary;
       } catch {
+        const msg = 'تعذر قراءة ملف أو نص JSON. تأكد من سلامة التنسيق.';
         return {
           ok: false,
-          message: 'تعذر قراءة ملف أو نص JSON. تأكد من سلامة التنسيق.',
+          message: msg,
+          error: msg,
           addedCount: 0,
+          importedCount: 0,
           rejectedCount: 0,
         };
       }
