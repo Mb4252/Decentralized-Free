@@ -5,7 +5,9 @@ export type PriceTag = 'عادل' | 'مرتفع' | 'منخفض' | 'شاذ';
 export interface MarketEntry {
   id: string;
   kind: ReportKind;
+  category: string;
   item: string;
+  placeName?: string;
   quantity?: string;
   wantItem?: string;
   location: string;
@@ -24,6 +26,17 @@ export interface AnalyzedPriceReport extends MarketEntry {
   tag: PriceTag;
 }
 
+export interface ItemPriceSummary {
+  item: string;
+  category: string;
+  median: number | null;
+  lowestPrice: number | null;
+  highestPrice: number | null;
+  cheapestPlace?: string;
+  priciestPlace?: string;
+  reports: AnalyzedPriceReport[];
+}
+
 export interface SmartMatch {
   id: string;
   type: 'direct' | 'reverse';
@@ -31,6 +44,24 @@ export interface SmartMatch {
   firstParty: MarketEntry;
   secondParty: MarketEntry;
 }
+
+export const DEFAULT_CATEGORIES = [
+  'بقالة',
+  'محاصيل',
+  'مغالق',
+  'أدوات كهربائية',
+  'مراكز تجارية',
+];
+
+export const DEFAULT_SAMPLE_ITEMS = [
+  'دقيق',
+  'سكر',
+  'زيت',
+  'ذرة',
+  'أرز',
+  'كابل كهربائي',
+  'مفتاح إنارة',
+];
 
 export function normalizeText(value: string): string {
   return value.trim().toLowerCase();
@@ -92,10 +123,7 @@ export function classifyPrice(price: number, median: number | null): {
   return { tag: 'عادل', deviationPercent };
 }
 
-export function analyzeItemPrices(entries: MarketEntry[], itemName: string): {
-  median: number | null;
-  reports: AnalyzedPriceReport[];
-} {
+export function analyzeItemPrices(entries: MarketEntry[], itemName: string): ItemPriceSummary {
   const target = normalizeText(itemName);
   const rawReports = entries.filter(
     (e): e is MarketEntry & { kind: 'price'; price: number } =>
@@ -114,14 +142,27 @@ export function analyzeItemPrices(entries: MarketEntry[], itemName: string): {
       return {
         ...r,
         kind: 'price' as const,
+        category: r.category || 'عام',
         price: r.price,
         deviationPercent,
         tag,
       };
     })
-    .sort((a, b) => b.createdAt - a.createdAt);
+    .sort((a, b) => a.price - b.price);
 
-  return { median, reports };
+  const cheapest = reports[0];
+  const priciest = reports[reports.length - 1];
+
+  return {
+    item: itemName,
+    category: cheapest?.category || rawReports[0]?.category || 'عام',
+    median,
+    lowestPrice: cheapest ? cheapest.price : null,
+    highestPrice: priciest ? priciest.price : null,
+    cheapestPlace: cheapest ? cheapest.placeName || cheapest.authorName : undefined,
+    priciestPlace: priciest ? priciest.placeName || priciest.authorName : undefined,
+    reports,
+  };
 }
 
 export function findSmartMatches(entries: MarketEntry[]): SmartMatch[] {
