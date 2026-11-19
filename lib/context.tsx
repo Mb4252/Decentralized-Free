@@ -10,11 +10,14 @@ import React, {
   useState,
 } from 'react';
 import {
+  BarterMatch,
   MarketEntry,
-  SmartMatch,
-  analyzeItemPrices,
-  findSmartMatches,
-  getOrCreateLocalPeer,
+  PriceSummary,
+  buildBarterMatches,
+  buildPriceSummaries,
+  createMarketEntry,
+  loadInitialEntries,
+  saveEntriesToStorage,
 } from '@/core/market-engine';
 import {
   MeshP2PNetwork,
@@ -22,46 +25,107 @@ import {
   P2PSyncMessage,
   attachChecksum,
   mergeVerifiedEntries,
+  validateMarketEntry,
 } from '@/core/p2p-node';
+import {
+  GeoFocusMode,
+  ZoneFrequency,
+  analyzeUserGeoActivity,
+  filterEntriesByGeoFocus,
+} from '@/core/geo-focus';
 
-interface AppContextValue {
-  entries: MarketEntry[];
-  priceReports: MarketEntry[];
-  barterOffers: MarketEntry[];
-  matches: SmartMatch[];
-  localPeer: { peerId: string; defaultName: string };
-  nodeStatus: NodeStatus;
-  addEntry: (
-    entry: Omit<MarketEntry, 'id' | 'createdAt' | 'authorPeerId'> & { authorPeerId?: string }
-  ) => MarketEntry;
-  removeEntry: (id: string) => void;
-  exportBundleJson: () => string;
-  importBundleJson: (rawJson: string) => {
-    ok: boolean;
-    importedCount: number;
-    rejectedCount: number;
-    error?: string;
-  };
-  getItemAnalysis: (itemName: string) => ReturnType<typeof analyzeItemPrices>;
+const PEER_ID_STORAGE_KEY = 'fair_price_barter_peer_id_v1';
+const GEO_FOCUS_STORAGE_KEY = 'fair_price_barter_geo_focus_v1';
+
+interface NewEntryInput {
+  kind: 'price' | 'have' | 'need';
+  category: string;
+  item: string;
+  placeName?: string;
+  location: string;
+  price?: number;
+  quantity?: string;
+  wantItem?: string;
+  notes?: string;
+  authorName?: string;
 }
 
-const STORAGE_KEY = 'market_radar_entries_v1';
-const CHANNEL_NAME = 'market_radar_sync_channel_v1';
+interface MarketContextValue {
+  entries: MarketEntry[];
+  allEntries: MarketEntry[];
+  priceSummaries: PriceSummary[];
+  barterMatches: BarterMatch[];
+  nodeStatus: NodeStatus;
+  focusMode: GeoFocusMode;
+  focusedZone: string | null;
+  detectedZone: string | null;
+  detectedCount: number;
+  shouldSuggestLock: boolean;
+  activeZone: string | null;
+  zoneStats: ZoneFrequency[];
+  setFocusedZone: (zone: string | null) => void;
+  setFocusMode: (mode: GeoFocusMode) => void;
+  lockToDetectedZone: () => void;
+  clearGeoFocus: () => void;
+  addEntry: (input: NewEntryInput) => MarketEntry | null;
+  deleteEntry: (id: string) => void;
+  importJsonBundle: (rawJson: string) => {
+    ok: boolean;
+    message: string;
+    addedCount: number;
+    rejectedCount: number;
+  };
+  exportJsonBundle: () => string;
+  resetDemoData: () => void;
+}
 
-const AppContext = createContext<AppContextValue | null>(null);
+const MarketContext = createContext<MarketContextValue | null>(null);
 
-export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [entries, setEntries] = useState<MarketEntry[]>([]);
-  const entriesRef = useRef<MarketEntry[]>([]);
-  const meshRef = useRef<MeshP2PNetwork | null>(null);
+function getOrCreatePeerId(): string {
+  if (typeof window === 'undefined') return 'peer-ssr';
+  try {
+    const existing = window.localStorage.getItem(PEER_ID_STORAGE_KEY);
+    if (existing && existing.trim().length >= 4) return existing;
+    const generated = `peer-${Math.random().toString(36).slice(2, 8)}-${Date.now().toString(36).slice(-4)}`;
+    window.localStorage.setItem(PEER_ID_STORAGE_KEY, generated);
+    return generated;
+  } catch {
+    return `peer-${Math.random().toString(36).slice(2, 8)}`;
+  }
+}
 
-  const [localPeer, setLocalPeer] = useState<{ peerId: string; defaultName: string }>({
-    peerId: 'P2P-LOCAL',
-    defaultName: 'مستخدم محلي',
-  });
+function loadSavedGeoFocus(): { mode: GeoFocusMode; focusedZone: string | null } {
+  if (typeof window === 'undefined') {
+    return { mode: 'auto', focusedZone: null };
+  }
+  try {
+    const raw = window.localStorage.getItem(GEO_FOCUS_STORAGE_KEY);
+    if (!raw) return { mode: 'auto', focusedZone: null };
+    const parsed = JSON.parse(raw) as { mode?: unknown; focusedZone?: unknown };
+    const mode: GeoFocusMode =
+      parsed.mode === 'locked' || parsed.mode === 'all' || parsed.mode === 'auto'
+        ? parsed.mode
+        : 'auto';
+    const focusedZone =
+      typeof parsed.focusedZone === 'string' && parsed.focusedZone.trim().length > 0
+        ? parsed.focusedZone.trim()
+        : null;
+    return { mode, focusedZone };
+  } catch {
+    return { mode: 'auto', focusedZone: null };
+  }
+}
+
+export function MarketProvider({ children }: { children: React.ReactNode }) {
+  const [peerId] = useState<string>(() => getOrCreatePeerId());
+  const [entries, setEntries] = useState<MarketEntry[]>(() => loadInitialEntries());
+  const [focusMode, setFocusModeState] = useState<GeoFocusMode>(() => loadSavedGeoFocus().mode);
+  const [focusedZone, setFocusedZoneState] = useState<string | null>(
+    () => loadSavedGeoFocus().focusedZone
+  );
 
   const [nodeStatus, setNodeStatus] = useState<NodeStatus>({
-    peerId: 'P2P-LOCAL',
+    peerId,
     connectedPeers: 0,
     mode: 'local-gossip',
     lastSyncAt: null,
@@ -69,266 +133,314 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     rejectedCount: 0,
   });
 
+  const entriesRef = useRef<MarketEntry[]>(entries);
+  entriesRef.current = entries;
+
+  const p2pRef = useRef<MeshP2PNetwork | null>(null);
+  const channelRef = useRef<BroadcastChannel | null>(null);
+
   useEffect(() => {
-    entriesRef.current = entries;
+    saveEntriesToStorage(entries);
   }, [entries]);
 
-  const writeLocalStorage = useCallback((list: MarketEntry[]) => {
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+      window.localStorage.setItem(
+        GEO_FOCUS_STORAGE_KEY,
+        JSON.stringify({ mode: focusMode, focusedZone })
+      );
     } catch {
-      // تجاهل أخطاء التخزين غير المدعوم
+      // تجاهل أخطاء التخزين المحلي
     }
-  }, []);
+  }, [focusMode, focusedZone]);
 
-  const broadcastTabChannel = useCallback((list: MarketEntry[]) => {
-    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
-      const channel = new BroadcastChannel(CHANNEL_NAME);
-      channel.postMessage({ type: 'SYNC_ENTRIES', payload: list });
-      channel.close();
-    }
-  }, []);
+  const applyIncomingMessage = useCallback((msg: P2PSyncMessage) => {
+    if (!msg || msg.senderPeerId === peerId) return;
 
-  const applyIncomingEntries = useCallback(
-    (incoming: unknown[], syncToMesh: boolean) => {
-      setEntries((current) => {
-        const { merged, addedCount, rejectedCount } = mergeVerifiedEntries(current, incoming);
-        writeLocalStorage(merged);
-        entriesRef.current = merged;
-
-        setNodeStatus((prev) => ({
-          ...prev,
-          verifiedCount: merged.length,
-          rejectedCount: prev.rejectedCount + rejectedCount,
-          lastSyncAt: Date.now(),
-        }));
-
-        if (addedCount > 0) {
-          broadcastTabChannel(merged);
-          if (syncToMesh) {
-            meshRef.current?.broadcastFullState(merged);
-          }
-        }
-
-        return merged;
+    if (msg.type === 'NEW_ENTRY' && msg.entry) {
+      if (!validateMarketEntry(msg.entry)) {
+        setNodeStatus((prev) => ({ ...prev, rejectedCount: prev.rejectedCount + 1 }));
+        return;
+      }
+      const verified = attachChecksum(msg.entry);
+      setEntries((prev) => {
+        if (prev.some((item) => item.id === verified.id)) return prev;
+        return [verified, ...prev].sort((a, b) => b.createdAt - a.createdAt);
       });
-    },
-    [broadcastTabChannel, writeLocalStorage]
-  );
+      setNodeStatus((prev) => ({
+        ...prev,
+        lastSyncAt: Date.now(),
+        verifiedCount: prev.verifiedCount + 1,
+      }));
+      return;
+    }
+
+    if (msg.type === 'DELETE_ENTRY' && msg.deletedId) {
+      setEntries((prev) => prev.filter((item) => item.id !== msg.deletedId));
+      setNodeStatus((prev) => ({ ...prev, lastSyncAt: Date.now() }));
+      return;
+    }
+
+    if (msg.type === 'FULL_STATE' && Array.isArray(msg.entries)) {
+      setEntries((prev) => {
+        const result = mergeVerifiedEntries(prev, msg.entries || []);
+        setNodeStatus((st) => ({
+          ...st,
+          lastSyncAt: Date.now(),
+          verifiedCount: st.verifiedCount + result.addedCount,
+          rejectedCount: st.rejectedCount + result.rejectedCount,
+        }));
+        return result.merged;
+      });
+    }
+  }, [peerId]);
 
   useEffect(() => {
-    const peer = getOrCreateLocalPeer();
-    setLocalPeer(peer);
-    setNodeStatus((prev) => ({ ...prev, peerId: peer.peerId }));
+    if (typeof window === 'undefined') return;
 
-    try {
-      const saved = window.localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          const { merged, rejectedCount } = mergeVerifiedEntries([], parsed);
-          setEntries(merged);
-          entriesRef.current = merged;
-          writeLocalStorage(merged);
-          setNodeStatus((prev) => ({
-            ...prev,
-            verifiedCount: merged.length,
-            rejectedCount: prev.rejectedCount + rejectedCount,
-            lastSyncAt: Date.now(),
-          }));
-        }
-      }
-    } catch {
-      // تجاهل أخطاء التخزين
-    }
-
-    let channel: BroadcastChannel | null = null;
-    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
-      channel = new BroadcastChannel(CHANNEL_NAME);
-      channel.onmessage = (event) => {
-        if (event.data?.type === 'SYNC_ENTRIES' && Array.isArray(event.data.payload)) {
-          applyIncomingEntries(event.data.payload, false);
-        }
+    if ('BroadcastChannel' in window) {
+      const bc = new BroadcastChannel('fair-price-barter-local-bus');
+      channelRef.current = bc;
+      bc.onmessage = (event: MessageEvent<P2PSyncMessage>) => {
+        applyIncomingMessage(event.data);
       };
     }
 
     const mesh = new MeshP2PNetwork({
-      peerId: peer.peerId,
+      peerId,
       getCurrentEntries: () => entriesRef.current,
       onPeersChange: (connectedPeers, mode) => {
         setNodeStatus((prev) => ({
           ...prev,
           connectedPeers,
           mode,
-          lastSyncAt: Date.now(),
         }));
       },
-      onReceiveMessage: (msg: P2PSyncMessage) => {
-        if (msg.type === 'FULL_STATE' && Array.isArray(msg.entries)) {
-          applyIncomingEntries(msg.entries, false);
-        } else if (msg.type === 'NEW_ENTRY' && msg.entry) {
-          applyIncomingEntries([msg.entry], false);
-        } else if (msg.type === 'DELETE_ENTRY' && typeof msg.deletedId === 'string') {
-          setEntries((current) => {
-            const next = current.filter((item) => item.id !== msg.deletedId);
-            writeLocalStorage(next);
-            entriesRef.current = next;
-            broadcastTabChannel(next);
-            setNodeStatus((prev) => ({
-              ...prev,
-              verifiedCount: next.length,
-              lastSyncAt: Date.now(),
-            }));
-            return next;
-          });
-        }
-      },
+      onReceiveMessage: applyIncomingMessage,
     });
 
-    meshRef.current = mesh;
+    p2pRef.current = mesh;
     mesh.start();
 
     return () => {
-      channel?.close();
       mesh.stop();
-      meshRef.current = null;
+      p2pRef.current = null;
+      if (channelRef.current) {
+        channelRef.current.close();
+        channelRef.current = null;
+      }
     };
-  }, [applyIncomingEntries, broadcastTabChannel, writeLocalStorage]);
+  }, [peerId, applyIncomingMessage]);
 
-  const addEntry: AppContextValue['addEntry'] = (input) => {
-    const base: MarketEntry = {
-      ...input,
-      id: `entry-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      authorName: input.authorName?.trim() || localPeer.defaultName,
-      authorPeerId: input.authorPeerId || localPeer.peerId,
-      createdAt: Date.now(),
-    };
+  const setFocusedZone = useCallback((zone: string | null) => {
+    const cleaned = zone && zone.trim().length > 0 ? zone.trim() : null;
+    setFocusedZoneState(cleaned);
+    if (cleaned) {
+      setFocusModeState('locked');
+    } else {
+      setFocusModeState('all');
+    }
+  }, []);
 
-    const verified = attachChecksum(base);
-    const next = [verified, ...entriesRef.current];
-    setEntries(next);
-    entriesRef.current = next;
-    writeLocalStorage(next);
-    broadcastTabChannel(next);
-    meshRef.current?.broadcastNewEntry(verified);
+  const setFocusMode = useCallback((mode: GeoFocusMode) => {
+    setFocusModeState(mode);
+    if (mode === 'all') {
+      setFocusedZoneState(null);
+    }
+  }, []);
 
-    setNodeStatus((prev) => ({
-      ...prev,
-      verifiedCount: next.length,
-      lastSyncAt: Date.now(),
-    }));
+  const geoInference = useMemo(
+    () => analyzeUserGeoActivity(entries, peerId),
+    [entries, peerId]
+  );
 
-    return verified;
-  };
+  const lockToDetectedZone = useCallback(() => {
+    if (geoInference.detectedZone) {
+      setFocusedZoneState(geoInference.detectedZone);
+      setFocusModeState('locked');
+    }
+  }, [geoInference.detectedZone]);
 
-  const removeEntry = (id: string) => {
-    const next = entriesRef.current.filter((item) => item.id !== id);
-    setEntries(next);
-    entriesRef.current = next;
-    writeLocalStorage(next);
-    broadcastTabChannel(next);
-    meshRef.current?.broadcastDeleteEntry(id);
+  const clearGeoFocus = useCallback(() => {
+    setFocusedZoneState(null);
+    setFocusModeState('all');
+  }, []);
 
-    setNodeStatus((prev) => ({
-      ...prev,
-      verifiedCount: next.length,
-      lastSyncAt: Date.now(),
-    }));
-  };
+  const { filteredEntries, activeZone } = useMemo(
+    () =>
+      filterEntriesByGeoFocus(
+        entries,
+        focusMode,
+        focusedZone,
+        geoInference.detectedZone
+      ),
+    [entries, focusMode, focusedZone, geoInference.detectedZone]
+  );
 
-  const exportBundleJson = () => {
-    const signedEntries = entriesRef.current.map((e) => attachChecksum(e));
-    return JSON.stringify(
-      {
-        version: 2,
-        protocol: 'fair-price-barter-webrtc-gossip-v1',
-        exportedAt: new Date().toISOString(),
-        entries: signedEntries,
-      },
-      null,
-      2
-    );
-  };
+  const addEntry = useCallback(
+    (input: NewEntryInput): MarketEntry | null => {
+      const created = createMarketEntry({
+        ...input,
+        authorPeerId: peerId,
+      });
+      if (!created) return null;
 
-  const importBundleJson = (rawJson: string) => {
-    try {
-      const parsed = JSON.parse(rawJson);
-      const incoming: unknown[] = Array.isArray(parsed)
-        ? parsed
-        : Array.isArray(parsed?.entries)
-        ? parsed.entries
-        : [];
+      const verified = attachChecksum(created);
 
-      if (!incoming.length) {
+      setEntries((prev) => {
+        if (prev.some((item) => item.id === verified.id)) return prev;
+        return [verified, ...prev].sort((a, b) => b.createdAt - a.createdAt);
+      });
+
+      const msg: P2PSyncMessage = {
+        type: 'NEW_ENTRY',
+        entry: verified,
+        senderPeerId: peerId,
+        sentAt: Date.now(),
+      };
+
+      channelRef.current?.postMessage(msg);
+      p2pRef.current?.broadcastNewEntry(verified);
+
+      return verified;
+    },
+    [peerId]
+  );
+
+  const deleteEntry = useCallback(
+    (id: string) => {
+      setEntries((prev) => prev.filter((item) => item.id !== id));
+
+      const msg: P2PSyncMessage = {
+        type: 'DELETE_ENTRY',
+        deletedId: id,
+        senderPeerId: peerId,
+        sentAt: Date.now(),
+      };
+
+      channelRef.current?.postMessage(msg);
+      p2pRef.current?.broadcastDeleteEntry(id);
+    },
+    [peerId]
+  );
+
+  const importJsonBundle = useCallback(
+    (rawJson: string) => {
+      try {
+        const parsed = JSON.parse(rawJson) as unknown;
+        const candidateList = Array.isArray(parsed)
+          ? parsed
+          : parsed && typeof parsed === 'object' && Array.isArray((parsed as { entries?: unknown }).entries)
+            ? (parsed as { entries: unknown[] }).entries
+            : null;
+
+        if (!candidateList) {
+          return {
+            ok: false,
+            message: 'صيغة JSON غير صحيحة؛ يجب أن تكون مصفوفة بلاغات أو كائناً يحتوي على entries.',
+            addedCount: 0,
+            rejectedCount: 0,
+          };
+        }
+
+        let summary = { addedCount: 0, rejectedCount: 0 };
+
+        setEntries((prev) => {
+          const mergedRes = mergeVerifiedEntries(prev, candidateList);
+          summary = {
+            addedCount: mergedRes.addedCount,
+            rejectedCount: mergedRes.rejectedCount,
+          };
+          if (mergedRes.addedCount > 0) {
+            const msg: P2PSyncMessage = {
+              type: 'FULL_STATE',
+              entries: mergedRes.merged,
+              senderPeerId: peerId,
+              sentAt: Date.now(),
+            };
+            channelRef.current?.postMessage(msg);
+            p2pRef.current?.broadcastFullState(mergedRes.merged);
+          }
+          return mergedRes.merged;
+        });
+
+        return {
+          ok: true,
+          message: `تم استيراد ${summary.addedCount} عنصر جديد واستبعاد ${summary.rejectedCount} عنصر غير صالح.`,
+          addedCount: summary.addedCount,
+          rejectedCount: summary.rejectedCount,
+        };
+      } catch {
         return {
           ok: false,
-          importedCount: 0,
+          message: 'تعذر قراءة ملف أو نص JSON. تأكد من سلامة التنسيق.',
+          addedCount: 0,
           rejectedCount: 0,
-          error: 'لم يتم العثور على عناصر صالحة في البيانات.',
         };
       }
+    },
+    [peerId]
+  );
 
-      const { merged, addedCount, rejectedCount } = mergeVerifiedEntries(entriesRef.current, incoming);
-      setEntries(merged);
-      entriesRef.current = merged;
-      writeLocalStorage(merged);
-      broadcastTabChannel(merged);
-      if (addedCount > 0) {
-        meshRef.current?.broadcastFullState(merged);
-      }
+  const exportJsonBundle = useCallback(() => {
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      peerId,
+      focusedZone: activeZone,
+      count: filteredEntries.length,
+      entries: filteredEntries.map((e) => attachChecksum(e)),
+    };
+    return JSON.stringify(payload, null, 2);
+  }, [peerId, activeZone, filteredEntries]);
 
-      setNodeStatus((prev) => ({
-        ...prev,
-        verifiedCount: merged.length,
-        rejectedCount: prev.rejectedCount + rejectedCount,
-        lastSyncAt: Date.now(),
-      }));
+  const resetDemoData = useCallback(() => {
+    const fresh = loadInitialEntries();
+    setEntries(fresh);
+    saveEntriesToStorage(fresh);
+  }, []);
 
-      return { ok: true, importedCount: addedCount, rejectedCount };
-    } catch {
-      return {
-        ok: false,
-        importedCount: 0,
-        rejectedCount: 0,
-        error: 'صيغة JSON غير صحيحة.',
-      };
-    }
+  const priceSummaries = useMemo(
+    () => buildPriceSummaries(filteredEntries),
+    [filteredEntries]
+  );
+
+  const barterMatches = useMemo(
+    () => buildBarterMatches(filteredEntries),
+    [filteredEntries]
+  );
+
+  const value: MarketContextValue = {
+    entries: filteredEntries,
+    allEntries: entries,
+    priceSummaries,
+    barterMatches,
+    nodeStatus,
+    focusMode,
+    focusedZone,
+    detectedZone: geoInference.detectedZone,
+    detectedCount: geoInference.detectedCount,
+    shouldSuggestLock: geoInference.shouldSuggestLock,
+    activeZone,
+    zoneStats: geoInference.stats,
+    setFocusedZone,
+    setFocusMode,
+    lockToDetectedZone,
+    clearGeoFocus,
+    addEntry,
+    deleteEntry,
+    importJsonBundle,
+    exportJsonBundle,
+    resetDemoData,
   };
 
-  const priceReports = useMemo(() => entries.filter((e) => e.kind === 'price'), [entries]);
-  const barterOffers = useMemo(
-    () => entries.filter((e) => e.kind === 'have' || e.kind === 'need'),
-    [entries]
-  );
-  const matches = useMemo(() => findSmartMatches(entries), [entries]);
-
-  const getItemAnalysis = (itemName: string) => analyzeItemPrices(entries, itemName);
-
-  return (
-    <AppContext.Provider
-      value={{
-        entries,
-        priceReports,
-        barterOffers,
-        matches,
-        localPeer,
-        nodeStatus,
-        addEntry,
-        removeEntry,
-        exportBundleJson,
-        importBundleJson,
-        getItemAnalysis,
-      }}
-    >
-      {children}
-    </AppContext.Provider>
-  );
+  return <MarketContext.Provider value={value}>{children}</MarketContext.Provider>;
 }
 
-export function useApp() {
-  const ctx = useContext(AppContext);
+export function useMarket(): MarketContextValue {
+  const ctx = useContext(MarketContext);
   if (!ctx) {
-    throw new Error('useApp يجب أن يُستخدم داخل AppProvider');
+    throw new Error('useMarket must be used inside MarketProvider');
   }
   return ctx;
 }
