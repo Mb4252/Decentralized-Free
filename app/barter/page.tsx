@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { GeoFocusBanner } from '@/components/GeoFocusBanner';
 import { useApp } from '@/lib/context';
+import { MarketEntry } from '@/core/market-engine';
 
 function formatPublishedAt(timestamp?: number): string {
   if (!timestamp || !Number.isFinite(timestamp)) return 'غير محدد';
@@ -13,6 +14,15 @@ function formatPublishedAt(timestamp?: number): string {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+interface MatchLike {
+  giveEntry?: MarketEntry;
+  wantEntry?: MarketEntry;
+  offer?: MarketEntry;
+  request?: MarketEntry;
+  score?: number;
+  reason?: string;
 }
 
 export default function BarterPage() {
@@ -49,20 +59,34 @@ export default function BarterPage() {
           <p className="text-xs text-slate-400">لا توجد مطابقات متاحة في النطاق الحالي.</p>
         ) : (
           <ul className="space-y-2 text-sm">
-            {barterMatches.map((m, idx) => (
-              <li
-                key={`${m.offer.id}-${m.request.id}-${idx}`}
-                className="rounded-lg border border-slate-800 bg-slate-950/75 p-3"
-              >
-                <div className="font-semibold text-white">
-                  عرض: {m.offer.item} ({m.offer.location}) ⇄ طلب: {m.request.item} (
-                  {m.request.location})
-                </div>
-                <div className="mt-1 text-xs text-slate-400">
-                  درجة التطابق: {m.score}% — {m.reason}
-                </div>
-              </li>
-            ))}
+            {barterMatches.map((rawMatch, idx) => {
+              const m = rawMatch as unknown as MatchLike;
+              const leftEntry = m.giveEntry || m.offer;
+              const rightEntry = m.wantEntry || m.request;
+              const leftId = leftEntry?.id || `left-${idx}`;
+              const rightId = rightEntry?.id || `right-${idx}`;
+
+              return (
+                <li
+                  key={`${leftId}-${rightId}-${idx}`}
+                  className="rounded-lg border border-slate-800 bg-slate-950/75 p-3"
+                >
+                  <div className="font-semibold text-white">
+                    {leftEntry
+                      ? `عرض: ${leftEntry.item} (${leftEntry.location})`
+                      : 'طرف أول'}
+                    {' ⇄ '}
+                    {rightEntry
+                      ? `طلب: ${rightEntry.item} (${rightEntry.location})`
+                      : 'طرف ثانٍ'}
+                  </div>
+                  <div className="mt-1 text-xs text-slate-400">
+                    {typeof m.score === 'number' ? `درجة التطابق: ${m.score}%` : ''}
+                    {m.reason ? `${typeof m.score === 'number' ? ' — ' : ''}${m.reason}` : ''}
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>
