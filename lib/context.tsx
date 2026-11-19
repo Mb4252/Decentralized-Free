@@ -66,6 +66,7 @@ interface AppContextValue {
   allEntries: MarketEntry[];
   priceSummaries: ItemPriceSummary[];
   barterMatches: SmartMatch[];
+  matches: SmartMatch[];
   nodeStatus: NodeStatus;
   peerId: string;
   defaultName: string;
@@ -488,6 +489,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     allEntries: entries,
     priceSummaries,
     barterMatches,
+    matches: barterMatches,
     nodeStatus,
     peerId,
     defaultName,
