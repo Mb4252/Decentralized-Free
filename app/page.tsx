@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useApp } from '@/lib/context';
 
 export default function HomePage() {
-  const { priceReports, barterOffers, matches, localPeer } = useApp();
+  const { priceReports, barterOffers, matches, localPeer, nodeStatus } = useApp();
 
   return (
     <div className="mt-4 space-y-5 pb-24">
@@ -15,10 +15,18 @@ export default function HomePage() {
           </h1>
         </div>
         <p className="text-sm text-slate-600 leading-relaxed">
-          مؤشر أسعار مجتمعي بالوسيط الحسابي (Median) مع كشف الأسعار الشاذة وسوق مقايضة مباشر يوضح الأطراف والتواصل.
+          مؤشر أسعار مجتمعي بالوسيط الحسابي (Median) مع كشف الأسعار الشاذة وسوق مقايضة مباشر عبر شبكة عقد P2P.
         </p>
-        <div className="text-xs text-slate-500 pt-1">
-          هويتك المحلية: <strong>{localPeer.defaultName}</strong> ({localPeer.peerId})
+
+        <div className="pt-1 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600 border-t border-slate-100">
+          <span>
+            هويتك: <strong>{localPeer.defaultName}</strong> ({localPeer.peerId})
+          </span>
+          <span className="px-2 py-0.5 rounded bg-teal-50 text-teal-800 border border-teal-200 font-semibold">
+            {nodeStatus.mode === 'webrtc-mesh'
+              ? `شبكة WebRTC نشطة (${nodeStatus.connectedPeers} عقدة)`
+              : 'وضع العقدة المحلية والمزامنة'}
+          </span>
         </div>
       </div>
 
