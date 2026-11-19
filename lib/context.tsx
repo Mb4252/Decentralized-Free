@@ -52,6 +52,13 @@ export interface NewEntryInput {
   note?: string;
 }
 
+export interface BundleImportResult {
+  ok: boolean;
+  message: string;
+  addedCount: number;
+  rejectedCount: number;
+}
+
 interface AppContextValue {
   entries: MarketEntry[];
   allEntries: MarketEntry[];
@@ -60,6 +67,7 @@ interface AppContextValue {
   nodeStatus: NodeStatus;
   peerId: string;
   defaultName: string;
+  localPeer: { peerId: string; defaultName: string };
   focusMode: GeoFocusMode;
   focusedZone: string | null;
   detectedZone: string | null;
@@ -73,13 +81,10 @@ interface AppContextValue {
   clearGeoFocus: () => void;
   addEntry: (input: NewEntryInput) => MarketEntry | null;
   deleteEntry: (id: string) => void;
-  importJsonBundle: (rawJson: string) => {
-    ok: boolean;
-    message: string;
-    addedCount: number;
-    rejectedCount: number;
-  };
+  importJsonBundle: (rawJson: string) => BundleImportResult;
   exportJsonBundle: () => string;
+  importBundleJson: (rawJson: string) => BundleImportResult;
+  exportBundleJson: () => string;
   resetDemoData: () => void;
 }
 
@@ -363,7 +368,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   );
 
   const importJsonBundle = useCallback(
-    (rawJson: string) => {
+    (rawJson: string): BundleImportResult => {
       try {
         const parsed = JSON.parse(rawJson) as unknown;
         const candidateList = Array.isArray(parsed)
@@ -384,11 +389,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           };
         }
 
-        let summary = { addedCount: 0, rejectedCount: 0 };
+        let summary: BundleImportResult = {
+          ok: true,
+          message: '',
+          addedCount: 0,
+          rejectedCount: 0,
+        };
 
         setEntries((prev) => {
           const mergedRes = mergeVerifiedEntries(prev, candidateList);
           summary = {
+            ok: true,
+            message: `تم استيراد ${mergedRes.addedCount} عنصر جديد واستبعاد ${mergedRes.rejectedCount} عنصر غير صالح.`,
             addedCount: mergedRes.addedCount,
             rejectedCount: mergedRes.rejectedCount,
           };
@@ -405,12 +417,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           return mergedRes.merged;
         });
 
-        return {
-          ok: true,
-          message: `تم استيراد ${summary.addedCount} عنصر جديد واستبعاد ${summary.rejectedCount} عنصر غير صالح.`,
-          addedCount: summary.addedCount,
-          rejectedCount: summary.rejectedCount,
-        };
+        return summary;
       } catch {
         return {
           ok: false,
@@ -463,6 +470,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [filteredEntries]
   );
 
+  const localPeer = useMemo(() => ({ peerId, defaultName }), [peerId, defaultName]);
+
   const value: AppContextValue = {
     entries: filteredEntries,
     allEntries: entries,
@@ -471,6 +480,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     nodeStatus,
     peerId,
     defaultName,
+    localPeer,
     focusMode,
     focusedZone,
     detectedZone: geoInference.detectedZone,
@@ -486,6 +496,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     deleteEntry,
     importJsonBundle,
     exportJsonBundle,
+    importBundleJson: importJsonBundle,
+    exportBundleJson: exportJsonBundle,
     resetDemoData,
   };
 
