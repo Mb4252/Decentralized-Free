@@ -8,6 +8,11 @@ import {
   findSmartMatches,
   getOrCreateLocalPeer,
 } from '@/core/market-engine';
+import {
+  NodeStatus,
+  attachChecksum,
+  mergeVerifiedEntries,
+} from '@/core/p2p-node';
 
 interface AppContextValue {
   entries: MarketEntry[];
@@ -15,10 +20,18 @@ interface AppContextValue {
   barterOffers: MarketEntry[];
   matches: SmartMatch[];
   localPeer: { peerId: string; defaultName: string };
-  addEntry: (entry: Omit<MarketEntry, 'id' | 'createdAt' | 'authorPeerId'> & { authorPeerId?: string }) => MarketEntry;
+  nodeStatus: NodeStatus;
+  addEntry: (
+    entry: Omit<MarketEntry, 'id' | 'createdAt' | 'authorPeerId'> & { authorPeerId?: string }
+  ) => MarketEntry;
   removeEntry: (id: string) => void;
   exportBundleJson: () => string;
-  importBundleJson: (rawJson: string) => { ok: boolean; importedCount: number; error?: string };
+  importBundleJson: (rawJson: string) => {
+    ok: boolean;
+    importedCount: number;
+    rejectedCount: number;
+    error?: string;
+  };
   getItemAnalysis: (itemName: string) => ReturnType<typeof analyzeItemPrices>;
 }
 
@@ -33,15 +46,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     peerId: 'P2P-LOCAL',
     defaultName: 'مستخدم محلي',
   });
+  const [nodeStatus, setNodeStatus] = useState<NodeStatus>({
+    peerId: 'P2P-LOCAL',
+    connectedPeers: 0,
+    mode: 'local-gossip',
+    lastSyncAt: null,
+    verifiedCount: 0,
+    rejectedCount: 0,
+  });
 
   useEffect(() => {
-    setLocalPeer(getOrCreateLocalPeer());
+    const peer = getOrCreateLocalPeer();
+    setLocalPeer(peer);
+    setNodeStatus((prev) => ({ ...prev, peerId: peer.peerId }));
+
     try {
       const saved = window.localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
-          setEntries(parsed);
+          const { merged, rejectedCount } = mergeVerifiedEntries([], parsed);
+          setEntries(merged);
+          setNodeStatus((prev) => ({
+            ...prev,
+            verifiedCount: merged.length,
+            rejectedCount: prev.rejectedCount + rejectedCount,
+            lastSyncAt: Date.now(),
+          }));
         }
       }
     } catch {
@@ -53,12 +84,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       channel = new BroadcastChannel(CHANNEL_NAME);
       channel.onmessage = (event) => {
         if (event.data?.type === 'SYNC_ENTRIES' && Array.isArray(event.data.payload)) {
-          setEntries(event.data.payload);
-          try {
-            window.localStorage.setItem(STORAGE_KEY, JSON.stringify(event.data.payload));
-          } catch {
-            // تجاهل
-          }
+          setEntries((current) => {
+            const { merged, rejectedCount } = mergeVerifiedEntries(current, event.data.payload);
+            try {
+              window.localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+            } catch {
+              // تجاهل
+            }
+            setNodeStatus((prev) => ({
+              ...prev,
+              verifiedCount: merged.length,
+              rejectedCount: prev.rejectedCount + rejectedCount,
+              lastSyncAt: Date.now(),
+            }));
+            return merged;
+          });
         }
       };
     }
@@ -75,6 +115,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // تجاهل
     }
+    setNodeStatus((prev) => ({
+      ...prev,
+      verifiedCount: next.length,
+      lastSyncAt: Date.now(),
+    }));
     if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
       const channel = new BroadcastChannel(CHANNEL_NAME);
       channel.postMessage({ type: 'SYNC_ENTRIES', payload: next });
@@ -83,16 +128,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addEntry: AppContextValue['addEntry'] = (input) => {
-    const created: MarketEntry = {
+    const base: MarketEntry = {
       ...input,
       id: `entry-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       authorName: input.authorName?.trim() || localPeer.defaultName,
       authorPeerId: input.authorPeerId || localPeer.peerId,
       createdAt: Date.now(),
     };
-    const next = [created, ...entries];
+    const verified = attachChecksum(base);
+    const next = [verified, ...entries];
     persistAndBroadcast(next);
-    return created;
+    return verified;
   };
 
   const removeEntry = (id: string) => {
@@ -101,11 +147,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const exportBundleJson = () => {
+    const signedEntries = entries.map((e) => attachChecksum(e));
     return JSON.stringify(
       {
-        version: 1,
+        version: 2,
+        protocol: 'fair-price-barter-gossip-v1',
         exportedAt: new Date().toISOString(),
-        entries,
+        entries: signedEntries,
       },
       null,
       2
@@ -115,23 +163,35 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const importBundleJson = (rawJson: string) => {
     try {
       const parsed = JSON.parse(rawJson);
-      const incoming: MarketEntry[] = Array.isArray(parsed)
+      const incoming: unknown[] = Array.isArray(parsed)
         ? parsed
         : Array.isArray(parsed?.entries)
         ? parsed.entries
         : [];
 
       if (!incoming.length) {
-        return { ok: false, importedCount: 0, error: 'لم يتم العثور على عناصر صالحة في البيانات.' };
+        return {
+          ok: false,
+          importedCount: 0,
+          rejectedCount: 0,
+          error: 'لم يتم العثور على عناصر صالحة في البيانات.',
+        };
       }
 
-      const existingIds = new Set(entries.map((e) => e.id));
-      const fresh = incoming.filter((item) => item && item.id && item.item && !existingIds.has(item.id));
-      const merged = [...fresh, ...entries];
+      const { merged, addedCount, rejectedCount } = mergeVerifiedEntries(entries, incoming);
       persistAndBroadcast(merged);
-      return { ok: true, importedCount: fresh.length };
+      setNodeStatus((prev) => ({
+        ...prev,
+        rejectedCount: prev.rejectedCount + rejectedCount,
+      }));
+      return { ok: true, importedCount: addedCount, rejectedCount };
     } catch {
-      return { ok: false, importedCount: 0, error: 'صيغة JSON غير صحيحة.' };
+      return {
+        ok: false,
+        importedCount: 0,
+        rejectedCount: 0,
+        error: 'صيغة JSON غير صحيحة.',
+      };
     }
   };
 
@@ -149,6 +209,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         barterOffers,
         matches,
         localPeer,
+        nodeStatus,
         addEntry,
         removeEntry,
         exportBundleJson,
