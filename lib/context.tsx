@@ -1,6 +1,14 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   MarketEntry,
   SmartMatch,
@@ -9,7 +17,9 @@ import {
   getOrCreateLocalPeer,
 } from '@/core/market-engine';
 import {
+  MeshP2PNetwork,
   NodeStatus,
+  P2PSyncMessage,
   attachChecksum,
   mergeVerifiedEntries,
 } from '@/core/p2p-node';
@@ -42,10 +52,14 @@ const AppContext = createContext<AppContextValue | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [entries, setEntries] = useState<MarketEntry[]>([]);
+  const entriesRef = useRef<MarketEntry[]>([]);
+  const meshRef = useRef<MeshP2PNetwork | null>(null);
+
   const [localPeer, setLocalPeer] = useState<{ peerId: string; defaultName: string }>({
     peerId: 'P2P-LOCAL',
     defaultName: 'مستخدم محلي',
   });
+
   const [nodeStatus, setNodeStatus] = useState<NodeStatus>({
     peerId: 'P2P-LOCAL',
     connectedPeers: 0,
@@ -54,6 +68,53 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     verifiedCount: 0,
     rejectedCount: 0,
   });
+
+  useEffect(() => {
+    entriesRef.current = entries;
+  }, [entries]);
+
+  const writeLocalStorage = useCallback((list: MarketEntry[]) => {
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+    } catch {
+      // تجاهل أخطاء التخزين غير المدعوم
+    }
+  }, []);
+
+  const broadcastTabChannel = useCallback((list: MarketEntry[]) => {
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      const channel = new BroadcastChannel(CHANNEL_NAME);
+      channel.postMessage({ type: 'SYNC_ENTRIES', payload: list });
+      channel.close();
+    }
+  }, []);
+
+  const applyIncomingEntries = useCallback(
+    (incoming: unknown[], syncToMesh: boolean) => {
+      setEntries((current) => {
+        const { merged, addedCount, rejectedCount } = mergeVerifiedEntries(current, incoming);
+        writeLocalStorage(merged);
+        entriesRef.current = merged;
+
+        setNodeStatus((prev) => ({
+          ...prev,
+          verifiedCount: merged.length,
+          rejectedCount: prev.rejectedCount + rejectedCount,
+          lastSyncAt: Date.now(),
+        }));
+
+        if (addedCount > 0) {
+          broadcastTabChannel(merged);
+          if (syncToMesh) {
+            meshRef.current?.broadcastFullState(merged);
+          }
+        }
+
+        return merged;
+      });
+    },
+    [broadcastTabChannel, writeLocalStorage]
+  );
 
   useEffect(() => {
     const peer = getOrCreateLocalPeer();
@@ -67,6 +128,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (Array.isArray(parsed)) {
           const { merged, rejectedCount } = mergeVerifiedEntries([], parsed);
           setEntries(merged);
+          entriesRef.current = merged;
+          writeLocalStorage(merged);
           setNodeStatus((prev) => ({
             ...prev,
             verifiedCount: merged.length,
@@ -76,7 +139,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
       }
     } catch {
-      // تجاهل أخطاء التخزين غير المدعوم
+      // تجاهل أخطاء التخزين
     }
 
     let channel: BroadcastChannel | null = null;
@@ -84,48 +147,53 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       channel = new BroadcastChannel(CHANNEL_NAME);
       channel.onmessage = (event) => {
         if (event.data?.type === 'SYNC_ENTRIES' && Array.isArray(event.data.payload)) {
-          setEntries((current) => {
-            const { merged, rejectedCount } = mergeVerifiedEntries(current, event.data.payload);
-            try {
-              window.localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
-            } catch {
-              // تجاهل
-            }
-            setNodeStatus((prev) => ({
-              ...prev,
-              verifiedCount: merged.length,
-              rejectedCount: prev.rejectedCount + rejectedCount,
-              lastSyncAt: Date.now(),
-            }));
-            return merged;
-          });
+          applyIncomingEntries(event.data.payload, false);
         }
       };
     }
 
+    const mesh = new MeshP2PNetwork({
+      peerId: peer.peerId,
+      getCurrentEntries: () => entriesRef.current,
+      onPeersChange: (connectedPeers, mode) => {
+        setNodeStatus((prev) => ({
+          ...prev,
+          connectedPeers,
+          mode,
+          lastSyncAt: Date.now(),
+        }));
+      },
+      onReceiveMessage: (msg: P2PSyncMessage) => {
+        if (msg.type === 'FULL_STATE' && Array.isArray(msg.entries)) {
+          applyIncomingEntries(msg.entries, false);
+        } else if (msg.type === 'NEW_ENTRY' && msg.entry) {
+          applyIncomingEntries([msg.entry], false);
+        } else if (msg.type === 'DELETE_ENTRY' && typeof msg.deletedId === 'string') {
+          setEntries((current) => {
+            const next = current.filter((item) => item.id !== msg.deletedId);
+            writeLocalStorage(next);
+            entriesRef.current = next;
+            broadcastTabChannel(next);
+            setNodeStatus((prev) => ({
+              ...prev,
+              verifiedCount: next.length,
+              lastSyncAt: Date.now(),
+            }));
+            return next;
+          });
+        }
+      },
+    });
+
+    meshRef.current = mesh;
+    mesh.start();
+
     return () => {
       channel?.close();
+      mesh.stop();
+      meshRef.current = null;
     };
-  }, []);
-
-  const persistAndBroadcast = (next: MarketEntry[]) => {
-    setEntries(next);
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    } catch {
-      // تجاهل
-    }
-    setNodeStatus((prev) => ({
-      ...prev,
-      verifiedCount: next.length,
-      lastSyncAt: Date.now(),
-    }));
-    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
-      const channel = new BroadcastChannel(CHANNEL_NAME);
-      channel.postMessage({ type: 'SYNC_ENTRIES', payload: next });
-      channel.close();
-    }
-  };
+  }, [applyIncomingEntries, broadcastTabChannel, writeLocalStorage]);
 
   const addEntry: AppContextValue['addEntry'] = (input) => {
     const base: MarketEntry = {
@@ -135,23 +203,45 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       authorPeerId: input.authorPeerId || localPeer.peerId,
       createdAt: Date.now(),
     };
+
     const verified = attachChecksum(base);
-    const next = [verified, ...entries];
-    persistAndBroadcast(next);
+    const next = [verified, ...entriesRef.current];
+    setEntries(next);
+    entriesRef.current = next;
+    writeLocalStorage(next);
+    broadcastTabChannel(next);
+    meshRef.current?.broadcastNewEntry(verified);
+
+    setNodeStatus((prev) => ({
+      ...prev,
+      verifiedCount: next.length,
+      lastSyncAt: Date.now(),
+    }));
+
     return verified;
   };
 
   const removeEntry = (id: string) => {
-    const next = entries.filter((item) => item.id !== id);
-    persistAndBroadcast(next);
+    const next = entriesRef.current.filter((item) => item.id !== id);
+    setEntries(next);
+    entriesRef.current = next;
+    writeLocalStorage(next);
+    broadcastTabChannel(next);
+    meshRef.current?.broadcastDeleteEntry(id);
+
+    setNodeStatus((prev) => ({
+      ...prev,
+      verifiedCount: next.length,
+      lastSyncAt: Date.now(),
+    }));
   };
 
   const exportBundleJson = () => {
-    const signedEntries = entries.map((e) => attachChecksum(e));
+    const signedEntries = entriesRef.current.map((e) => attachChecksum(e));
     return JSON.stringify(
       {
         version: 2,
-        protocol: 'fair-price-barter-gossip-v1',
+        protocol: 'fair-price-barter-webrtc-gossip-v1',
         exportedAt: new Date().toISOString(),
         entries: signedEntries,
       },
@@ -178,12 +268,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         };
       }
 
-      const { merged, addedCount, rejectedCount } = mergeVerifiedEntries(entries, incoming);
-      persistAndBroadcast(merged);
+      const { merged, addedCount, rejectedCount } = mergeVerifiedEntries(entriesRef.current, incoming);
+      setEntries(merged);
+      entriesRef.current = merged;
+      writeLocalStorage(merged);
+      broadcastTabChannel(merged);
+      if (addedCount > 0) {
+        meshRef.current?.broadcastFullState(merged);
+      }
+
       setNodeStatus((prev) => ({
         ...prev,
+        verifiedCount: merged.length,
         rejectedCount: prev.rejectedCount + rejectedCount,
+        lastSyncAt: Date.now(),
       }));
+
       return { ok: true, importedCount: addedCount, rejectedCount };
     } catch {
       return {
@@ -196,7 +296,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const priceReports = useMemo(() => entries.filter((e) => e.kind === 'price'), [entries]);
-  const barterOffers = useMemo(() => entries.filter((e) => e.kind === 'have' || e.kind === 'need'), [entries]);
+  const barterOffers = useMemo(
+    () => entries.filter((e) => e.kind === 'have' || e.kind === 'need'),
+    [entries]
+  );
   const matches = useMemo(() => findSmartMatches(entries), [entries]);
 
   const getItemAnalysis = (itemName: string) => analyzeItemPrices(entries, itemName);
