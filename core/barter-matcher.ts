@@ -1,55 +1,104 @@
-import { BarterOffer, MatchResult } from './types';
+// core/barter.ts
+import type { MarketEntry, RankedMatch } from './types';
+import { geoProximity, normalizeGeoText } from './normalization';
 
-/**
- * البحث عن مطابقات مباشرة ودائرية (A -> B -> C -> A)
- */
-export function findMatches(offers: BarterOffer[]): MatchResult[] {
-  const matches: MatchResult[] = [];
-  const usedIds = new Set<string>();
+function itemKey(s: string): string {
+  return normalizeGeoText(s);
+}
 
-  // 1. المطابقة المباشرة (Direct)
-  for (const offer of offers) {
-    if (offer.type !== 'offer' || usedIds.has(offer.id)) continue;
-    
-    for (const need of offers) {
-      if (need.type !== 'need' || usedIds.has(need.id)) continue;
-      
-      // إذا كان ما أملكه يطابق ما تحتاجه (ويشترطان نفس الحي)
-      if (offer.itemId === need.itemId && offer.location === need.location) {
-        matches.push({ type: 'direct', path: [offer, need] });
-        usedIds.add(offer.id);
-        usedIds.add(need.id);
-        break;
-      }
+function valueBalance(a: MarketEntry, b: MarketEntry): number {
+  const pa = typeof a.price === 'number' ? a.price : null;
+  const pb = typeof b.price === 'number' ? b.price : null;
+  if (pa == null || pb == null || pa <= 0 || pb <= 0) return 0.5;
+  return Math.min(pa, pb) / Math.max(pa, pb);
+}
+
+function recencyScore(createdAt: number, now: number): number {
+  const days = Math.max(0, (now - createdAt) / (24 * 60 * 60 * 1000));
+  return Math.max(0, 1 - days / 30);
+}
+
+export function scoreDirectMatch(
+  offer: MarketEntry,
+  demand: MarketEntry,
+  now: number
+): number {
+  if (offer.authorPeerId && offer.authorPeerId === demand.authorPeerId) return 0;
+  if (offer.kind !== 'have' || demand.kind !== 'need') return 0;
+
+  const overlap =
+    itemKey(offer.item) === itemKey(demand.item) ||
+    (offer.wantItem && itemKey(offer.wantItem) === itemKey(demand.item))
+      ? 1
+      : 0;
+  if (overlap === 0) return 0;
+
+  const reverseOk =
+    demand.wantItem && itemKey(demand.wantItem) === itemKey(offer.item) ? 1 : 0.3;
+
+  const vb = valueBalance(offer, demand);
+  const geo = geoProximity(offer.location, demand.location);
+  const rec = (recencyScore(offer.createdAt, now) + recencyScore(demand.createdAt, now)) / 2;
+
+  return Math.round(
+    (0.45 * overlap + 0.2 * reverseOk + 0.25 * vb + 0.2 * geo + 0.1 * rec) * 100
+  );
+}
+
+export function findRankedMatches(entries: MarketEntry[], now: number): RankedMatch[] {
+  const haves = entries.filter((e) => e.kind === 'have');
+  const needs = entries.filter((e) => e.kind === 'need');
+  const out: RankedMatch[] = [];
+
+  for (const need of needs) {
+    for (const have of haves) {
+      const s = scoreDirectMatch(have, need, now);
+      if (s < 30) continue;
+      const reverse = Boolean(
+        have.wantItem &&
+          need.wantItem &&
+          itemKey(have.wantItem) === itemKey(need.item) &&
+          itemKey(need.wantItem) === itemKey(have.item)
+      );
+      out.push({
+        id: `${have.id}::${need.id}`,
+        type: reverse ? 'reverse' : 'direct',
+        score: s,
+        giveEntry: have,
+        wantEntry: need,
+        reason: reverse ? 'تبادل متكافئ' : 'مطابقة مباشرة',
+      });
     }
   }
 
-  // 2. المطابقة الدائرية الثلاثية (A -> B -> C -> A)
-  // نبحث عن: A يملك ما يحتاجه B، و B يملك ما يحتاجه C، و C يملك ما يحتاجه A
-  const availableOffers = offers.filter(o => !usedIds.has(o.id));
-
-  for (const a of availableOffers) {
-    if (a.type !== 'offer') continue;
-    for (const b of availableOffers) {
-      if (b.type !== 'offer' || a.id === b.id) continue;
-      for (const c of availableOffers) {
-        if (c.type !== 'offer' || c.id === b.id || c.id === a.id) continue;
-
-        // نتحقق من الشروط
-        const aMatchesB = availableOffers.some(n => n.type === 'need' && n.itemId === a.itemId);
-        const bMatchesC = availableOffers.some(n => n.type === 'need' && n.itemId === b.itemId);
-        const cMatchesA = availableOffers.some(n => n.type === 'need' && n.itemId === c.itemId);
-
-        if (aMatchesB && bMatchesC && cMatchesA) {
-          matches.push({ type: 'cycle', path: [a, b, c] });
-          usedIds.add(a.id);
-          usedIds.add(b.id);
-          usedIds.add(c.id);
-          break;
+  for (const a of haves) {
+    for (const b of haves) {
+      if (a.id === b.id) continue;
+      for (const c of haves) {
+        if (c.id === a.id || c.id === b.id) continue;
+        const aToB = needs.some(
+          (n) => n.authorPeerId === b.authorPeerId && itemKey(n.item) === itemKey(a.item)
+        );
+        const bToC = needs.some(
+          (n) => n.authorPeerId === c.authorPeerId && itemKey(n.item) === itemKey(b.item)
+        );
+        const cToA = needs.some(
+          (n) => n.authorPeerId === a.authorPeerId && itemKey(n.item) === itemKey(c.item)
+        );
+        if (aToB && bToC && cToA) {
+          out.push({
+            id: `cycle-${a.id}-${b.id}-${c.id}`,
+            type: 'cycle',
+            score: 80,
+            giveEntry: a,
+            wantEntry: b,
+            cyclePath: [a, b, c],
+            reason: 'دورة ثلاثية مقترحة',
+          });
         }
       }
     }
   }
 
-  return matches;
+  return out.sort((x, y) => y.score - x.score);
 }
