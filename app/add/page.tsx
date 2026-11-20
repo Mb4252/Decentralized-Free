@@ -304,4 +304,14 @@ export default function AddPage() {
             className="w-full rounded-lg border border-slate-700 bg-slate-950 p-2 text-[11px] text-slate-200"
           />
           <button
-            type="
+            type="button"
+            onClick={handleImport}
+            className="mt-2 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-500"
+          >
+            استيراد
+          </button>
+        </div>
+      </section>
+    </main>
+  );
+}
