@@ -1,4 +1,4 @@
-import type { MarketEntry, RankedMatch } from './types';
+import type { MarketEntry, RankedMatch, SmartMatch } from './types';
 import { geoProximity, normalizeGeoText } from './normalization';
 
 function itemKey(s: string): string {
@@ -100,4 +100,11 @@ export function findRankedMatches(entries: MarketEntry[], now: number): RankedMa
   }
 
   return out.sort((x, y) => y.score - x.score);
+}
+
+export function findBarterMatches(
+  entries: MarketEntry[],
+  now: number = Date.now()
+): SmartMatch[] {
+  return findRankedMatches(entries, now) as unknown as SmartMatch[];
 }
