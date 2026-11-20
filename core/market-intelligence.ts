@@ -1,20 +1,14 @@
-import { MarketEntry, calculateMedian, classifyPrice } from './market-engine';
+// core/market-intelligence.ts
+import type { MarketEntry, PlaceFeedbackReport, PlaceFeedbackVerdict } from './types';
 import { matchesZoneFilter, normalizeGeoText } from './geo-focus';
+import { computeFairBand, classifyByBand, isAnomalousLow, type WeightedPricePoint } from './pricing';
+import {
+  computeReputation,
+  DEFAULT_REPORTER_WEIGHT,
+  type ReporterWeightLookup,
+} from './reputation';
 
-export type PlaceFeedbackVerdict = 'honest_low' | 'fair' | 'expensive' | 'deceptive';
-
-export interface PlaceFeedbackReport {
-  id: string;
-  targetPlaceKey: string;
-  targetPlaceName: string;
-  targetLocation: string;
-  targetItem?: string;
-  verdict: PlaceFeedbackVerdict;
-  reason?: string;
-  reporterPeerId: string;
-  reporterName: string;
-  createdAt: number;
-}
+export type { PlaceFeedbackVerdict } from './types';
 
 export interface LowestPriceDeal {
   id: string;
@@ -24,6 +18,8 @@ export interface LowestPriceDeal {
   placeName?: string;
   price: number;
   medianPrice: number | null;
+  p25: number | null;
+  p75: number | null;
   discountPercent: number;
   reportsCountForItem: number;
   isSuspiciousLow: boolean;
@@ -66,7 +62,9 @@ export function buildPlaceKey(placeName: string, location: string): string {
 export function evaluatePlaceTrust(
   placeName: string,
   location: string,
-  feedbacks: PlaceFeedbackReport[]
+  feedbacks: PlaceFeedbackReport[],
+  weightOf: ReporterWeightLookup = DEFAULT_REPORTER_WEIGHT,
+  now: number = Date.now()
 ): {
   placeKey: string;
   honestLowCount: number;
@@ -90,54 +88,23 @@ export function evaluatePlaceTrust(
     const samePlace =
       placeName && normalizeGeoText(f.targetPlaceName) === normalizeGeoText(placeName);
     const sameLoc =
-      !location ||
-      !f.targetLocation ||
-      matchesZoneFilter({ location: f.targetLocation }, location);
-    if (samePlace && sameLoc) {
-      matching.push(f);
-    }
+      !location || !f.targetLocation || matchesZoneFilter({ location: f.targetLocation }, location);
+    if (samePlace && sameLoc) matching.push(f);
   }
 
-  const deceptiveReports: PlaceFeedbackReport[] = [];
-  const uniqueDeceptivePeers: string[] = [];
   let honestLowCount = 0;
   let fairCount = 0;
   let expensiveCount = 0;
+  let deceptiveCount = 0;
 
-  for (let i = 0; i < matching.length; i++) {
-    const r = matching[i];
+  for (const r of matching) {
     if (r.verdict === 'honest_low') honestLowCount += 1;
     else if (r.verdict === 'fair') fairCount += 1;
     else if (r.verdict === 'expensive') expensiveCount += 1;
-    else if (r.verdict === 'deceptive') {
-      deceptiveReports.push(r);
-      if (r.reporterPeerId && uniqueDeceptivePeers.indexOf(r.reporterPeerId) === -1) {
-        uniqueDeceptivePeers.push(r.reporterPeerId);
-      }
-    }
+    else if (r.verdict === 'deceptive') deceptiveCount += 1;
   }
 
-  const deceptiveCount = deceptiveReports.length;
-  const uniqueDeceptiveReporters = uniqueDeceptivePeers.length;
-  const isExcluded = uniqueDeceptiveReporters >= DECEPTIVE_EXCLUSION_THRESHOLD;
-
-  const trustScore =
-    honestLowCount * 3 +
-    fairCount * 2 -
-    expensiveCount * 1 -
-    deceptiveCount * 4 -
-    (isExcluded ? 20 : 0);
-
-  let statusLabel: DiscoveredPlaceSummary['statusLabel'] = 'تحت الرصد';
-  if (isExcluded) {
-    statusLabel = 'مستبعد (بلاغات خداع)';
-  } else if (honestLowCount > 0 && trustScore >= 3) {
-    statusLabel = 'معتمد ومخفض';
-  } else if (expensiveCount > fairCount + honestLowCount && expensiveCount >= 2) {
-    statusLabel = 'مرتفع السعر';
-  } else if (fairCount > 0 || trustScore > 0) {
-    statusLabel = 'معتمد وعادل';
-  }
+  const rep = computeReputation(matching, placeKey, weightOf, now);
 
   return {
     placeKey,
@@ -145,43 +112,35 @@ export function evaluatePlaceTrust(
     fairCount,
     expensiveCount,
     deceptiveCount,
-    uniqueDeceptiveReporters,
-    trustScore,
-    isExcluded,
-    statusLabel,
+    uniqueDeceptiveReporters: rep.deceptiveUnique,
+    trustScore: Math.round((rep.priceScore + rep.honestyScore) * 10) / 10,
+    isExcluded: rep.isExcluded,
+    statusLabel: rep.statusLabel,
   };
 }
 
 export function discoverLowestPrices(
   entries: MarketEntry[],
   feedbacks: PlaceFeedbackReport[],
-  activeZone: string | null
+  activeZone: string | null,
+  weightOf: ReporterWeightLookup = DEFAULT_REPORTER_WEIGHT,
+  now: number = Date.now()
 ): LowestPriceDeal[] {
   const scopedEntries: MarketEntry[] = [];
-  for (let i = 0; i < entries.length; i++) {
-    const e = entries[i];
-    if (!activeZone || matchesZoneFilter(e, activeZone)) {
-      scopedEntries.push(e);
-    }
+  for (const e of entries) {
+    if (!activeZone || matchesZoneFilter(e, activeZone)) scopedEntries.push(e);
   }
 
   type PricedEntry = MarketEntry & { kind: 'price'; price: number };
   const priceEntries: PricedEntry[] = [];
-  for (let i = 0; i < scopedEntries.length; i++) {
-    const e = scopedEntries[i];
-    if (
-      e.kind === 'price' &&
-      typeof e.price === 'number' &&
-      Number.isFinite(e.price) &&
-      e.price > 0
-    ) {
+  for (const e of scopedEntries) {
+    if (e.kind === 'price' && typeof e.price === 'number' && Number.isFinite(e.price) && e.price > 0) {
       priceEntries.push(e as PricedEntry);
     }
   }
 
   const byItem = new Map<string, PricedEntry[]>();
-  for (let i = 0; i < priceEntries.length; i++) {
-    const entry = priceEntries[i];
+  for (const entry of priceEntries) {
     const key = normalizeGeoText(entry.item);
     const list = byItem.get(key) || [];
     list.push(entry);
@@ -189,34 +148,34 @@ export function discoverLowestPrices(
   }
 
   const deals: LowestPriceDeal[] = [];
-  const itemGroups = Array.from(byItem.values());
 
-  for (let g = 0; g < itemGroups.length; g++) {
-    const list = itemGroups[g];
-    const prices = list.map((x) => x.price);
-    const medianPrice = calculateMedian(prices);
+  for (const list of byItem.values()) {
+    const points: WeightedPricePoint[] = list.map((e) => ({
+      price: e.price,
+      weight: 1,
+      createdAt: e.createdAt,
+    }));
+    const band = computeFairBand(points, now);
 
-    for (let i = 0; i < list.length; i++) {
-      const entry = list[i];
+    for (const entry of list) {
       const placeEval = evaluatePlaceTrust(
         entry.placeName || entry.authorName || '',
         entry.location,
-        feedbacks
+        feedbacks,
+        weightOf,
+        now
       );
 
-      const { deviationPercent } = classifyPrice(entry.price, medianPrice);
+      const { deviationPercent } = classifyByBand(entry.price, band);
       const discountPercent =
-        medianPrice && medianPrice > 0
-          ? Math.round(((medianPrice - entry.price) / medianPrice) * 1000) / 10
+        band.median && band.median > 0
+          ? Math.round(((band.median - entry.price) / band.median) * 1000) / 10
           : 0;
 
       const similarLowCount = list.filter((x) => x.price <= entry.price * 1.1).length;
       const isSuspiciousLow = Boolean(
-        medianPrice &&
-          medianPrice > 0 &&
-          entry.price < medianPrice * 0.5 &&
-          similarLowCount < 2
-      );
+        band.median && band.median > 0 && entry.price < band.median * 0.5 && similarLowCount < 2
+      ) || isAnomalousLow(entry.price, band);
 
       if (discountPercent > 0 || list.length === 1 || deviationPercent <= 0) {
         deals.push({
@@ -226,7 +185,9 @@ export function discoverLowestPrices(
           location: entry.location,
           placeName: entry.placeName,
           price: entry.price,
-          medianPrice,
+          medianPrice: band.median,
+          p25: band.p25,
+          p75: band.p75,
           discountPercent,
           reportsCountForItem: list.length,
           isSuspiciousLow,
@@ -239,15 +200,9 @@ export function discoverLowestPrices(
   }
 
   return deals.sort((a, b) => {
-    if (a.isExcludedByCommunity !== b.isExcludedByCommunity) {
-      return a.isExcludedByCommunity ? 1 : -1;
-    }
-    if (a.isSuspiciousLow !== b.isSuspiciousLow) {
-      return a.isSuspiciousLow ? 1 : -1;
-    }
-    if (b.discountPercent !== a.discountPercent) {
-      return b.discountPercent - a.discountPercent;
-    }
+    if (a.isExcludedByCommunity !== b.isExcludedByCommunity) return a.isExcludedByCommunity ? 1 : -1;
+    if (a.isSuspiciousLow !== b.isSuspiciousLow) return a.isSuspiciousLow ? 1 : -1;
+    if (b.discountPercent !== a.discountPercent) return b.discountPercent - a.discountPercent;
     return a.price - b.price;
   });
 }
@@ -255,23 +210,18 @@ export function discoverLowestPrices(
 export function discoverZonePlaces(
   entries: MarketEntry[],
   feedbacks: PlaceFeedbackReport[],
-  activeZone: string | null
+  activeZone: string | null,
+  weightOf: ReporterWeightLookup = DEFAULT_REPORTER_WEIGHT,
+  now: number = Date.now()
 ): DiscoveredPlaceSummary[] {
   const scoped: MarketEntry[] = [];
-  for (let i = 0; i < entries.length; i++) {
-    const e = entries[i];
-    if (!activeZone) {
-      scoped.push(e);
-      continue;
-    }
-    if (matchesZoneFilter(e, activeZone)) {
+  for (const e of entries) {
+    if (!activeZone || matchesZoneFilter(e, activeZone)) {
       scoped.push(e);
       continue;
     }
     const noteText = e.note || '';
-    if (noteText && matchesZoneFilter({ location: noteText }, activeZone)) {
-      scoped.push(e);
-    }
+    if (noteText && matchesZoneFilter({ location: noteText }, activeZone)) scoped.push(e);
   }
 
   interface GroupBucket {
@@ -284,13 +234,11 @@ export function discoverZonePlaces(
 
   const grouped = new Map<string, GroupBucket>();
 
-  for (let i = 0; i < scoped.length; i++) {
-    const entry = scoped[i];
+  for (const entry of scoped) {
     const rawPlace =
       (entry.placeName && entry.placeName.trim()) ||
       (entry.kind === 'price' ? `${entry.item.trim()} - نقطة بيع` : '');
     if (!rawPlace) continue;
-
     const key = buildPlaceKey(rawPlace, entry.location);
     const existing = grouped.get(key);
     const trimmedItem = entry.item.trim();
@@ -311,23 +259,18 @@ export function discoverZonePlaces(
       if (entry.kind === 'price' && typeof entry.price === 'number' && entry.price > 0) {
         existing.prices.push(entry.price);
       }
-      if (trimmedItem && existing.items.indexOf(trimmedItem) === -1) {
-        existing.items.push(trimmedItem);
-      }
+      if (trimmedItem && existing.items.indexOf(trimmedItem) === -1) existing.items.push(trimmedItem);
     }
   }
 
   const summaries: DiscoveredPlaceSummary[] = [];
-  const buckets = Array.from(grouped.values());
-
-  for (let i = 0; i < buckets.length; i++) {
-    const g = buckets[i];
-    const trust = evaluatePlaceTrust(g.placeName, g.location, feedbacks);
+  for (const g of grouped.values()) {
+    const trust = evaluatePlaceTrust(g.placeName, g.location, feedbacks, weightOf, now);
     const avgPrice =
       g.prices.length > 0
         ? Math.round((g.prices.reduce((a, b) => a + b, 0) / g.prices.length) * 100) / 100
         : null;
-    const lowestPrice = g.prices.length > 0 ? Math.min.apply(null, g.prices) : null;
+    const lowestPrice = g.prices.length > 0 ? Math.min(...g.prices) : null;
 
     summaries.push({
       placeKey: trust.placeKey,
