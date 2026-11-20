@@ -1,9 +1,10 @@
+// app/prices/page.tsx
 'use client';
 
 import React, { useState } from 'react';
 import { GeoFocusBanner } from '@/components/GeoFocusBanner';
 import { useApp } from '@/lib/context';
-import { MarketEntry } from '@/core/market-engine';
+import type { MarketEntry } from '@/core/types';
 
 function formatPublishedAt(timestamp?: number): string {
   if (!timestamp || !Number.isFinite(timestamp)) return 'غير محدد';
@@ -20,16 +21,6 @@ function cleanZoneTitle(zone?: string | null): string {
   if (!zone) return '';
   const parts = zone.split(' - ');
   return (parts[0] || zone).trim();
-}
-
-function computeMedian(values: number[]): number | null {
-  if (values.length === 0) return null;
-  const sorted = values.slice().sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  if (sorted.length % 2 === 0) {
-    return Math.round(((sorted[mid - 1] + sorted[mid]) / 2) * 100) / 100;
-  }
-  return sorted[mid];
 }
 
 function extractPhone(text?: string): string | null {
@@ -85,14 +76,15 @@ export default function PricesPage() {
     }
     const targetItem = (rep.item || itemFallback || '').trim();
     const targetLoc = (rep.location || '').trim();
-    const byMatch = entries.find(
-      (e) =>
-        e.kind === 'price' &&
-        e.item.trim() === targetItem &&
-        (!targetLoc || e.location.trim() === targetLoc) &&
-        (typeof rep.price !== 'number' || e.price === rep.price)
+    return (
+      entries.find(
+        (e) =>
+          e.kind === 'price' &&
+          e.item.trim() === targetItem &&
+          (!targetLoc || e.location.trim() === targetLoc) &&
+          (typeof rep.price !== 'number' || e.price === rep.price)
+      ) || null
     );
-    return byMatch || null;
   };
 
   return (
@@ -119,23 +111,17 @@ export default function PricesPage() {
           {priceSummaries.map((summary, summaryIdx) => {
             const rawReports = (summary.reports || []) as unknown as ReportLike[];
             const prices: number[] = [];
-
-            for (let i = 0; i < rawReports.length; i++) {
-              const r = rawReports[i];
+            for (const r of rawReports) {
               const p =
                 typeof r.entry?.price === 'number'
                   ? r.entry.price
                   : typeof r.price === 'number'
                     ? r.price
                     : null;
-              if (typeof p === 'number' && Number.isFinite(p)) {
-                prices.push(p);
-              }
+              if (typeof p === 'number' && Number.isFinite(p)) prices.push(p);
             }
-
-            const minPrice = prices.length > 0 ? Math.min.apply(null, prices) : null;
-            const maxPrice = prices.length > 0 ? Math.max.apply(null, prices) : null;
-            const medianPrice = computeMedian(prices);
+            const minPrice = prices.length > 0 ? Math.min(...prices) : null;
+            const maxPrice = prices.length > 0 ? Math.max(...prices) : null;
 
             return (
               <div
@@ -144,12 +130,10 @@ export default function PricesPage() {
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <h2 className="text-base font-bold text-emerald-300">{summary.item}</h2>
-                  <span className="text-xs text-slate-400">
-                    عدد البلاغات: {rawReports.length}
-                  </span>
+                  <span className="text-xs text-slate-400">عدد البلاغات: {rawReports.length}</span>
                 </div>
 
-                <div className="mt-2.5 grid grid-cols-3 gap-2 text-center text-xs">
+                <div className="mt-2.5 grid grid-cols-2 gap-2 text-center text-xs sm:grid-cols-4">
                   <div className="rounded-lg border border-slate-800 bg-slate-950 p-2">
                     <div className="text-slate-400">أقل سعر</div>
                     <div className="mt-0.5 font-bold text-emerald-300">
@@ -157,15 +141,21 @@ export default function PricesPage() {
                     </div>
                   </div>
                   <div className="rounded-lg border border-slate-800 bg-slate-950 p-2">
-                    <div className="text-slate-400">الوسيط العادل</div>
-                    <div className="mt-0.5 font-bold text-white">
-                      {medianPrice !== null ? medianPrice : '-'}
+                    <div className="text-slate-400">P25 (ربع أدنى)</div>
+                    <div className="mt-0.5 font-bold text-sky-300">
+                      {summary.p25 !== null ? summary.p25 : '-'}
                     </div>
                   </div>
                   <div className="rounded-lg border border-slate-800 bg-slate-950 p-2">
-                    <div className="text-slate-400">أعلى سعر</div>
+                    <div className="text-slate-400">الوسيط العادل</div>
+                    <div className="mt-0.5 font-bold text-white">
+                      {summary.median !== null ? summary.median : '-'}
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-slate-800 bg-slate-950 p-2">
+                    <div className="text-slate-400">P75 (ربع أعلى)</div>
                     <div className="mt-0.5 font-bold text-amber-300">
-                      {maxPrice !== null ? maxPrice : '-'}
+                      {summary.p75 !== null ? summary.p75 : '-'}
                     </div>
                   </div>
                 </div>
@@ -195,12 +185,8 @@ export default function PricesPage() {
                         <div className="space-y-1">
                           <div>
                             <span className="font-bold text-white">{displayPrice}</span>
-                            {placeName && (
-                              <span className="mr-2 text-amber-300">({placeName})</span>
-                            )}
-                            {location && (
-                              <span className="mr-2 text-emerald-300">[{location}]</span>
-                            )}
+                            {placeName && <span className="mr-2 text-amber-300">({placeName})</span>}
+                            {location && <span className="mr-2 text-emerald-300">[{location}]</span>}
                           </div>
 
                           {note && (
