@@ -1,3 +1,4 @@
+// lib/context.tsx
 'use client';
 
 import React, {
@@ -9,14 +10,11 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import type { MarketEntry, RankedMatch, ReportKind } from '@/core/types';
 import {
   DEFAULT_SAMPLE_ITEMS,
   ItemPriceSummary,
-  MarketEntry,
-  ReportKind,
-  SmartMatch,
   analyzeItemPrices,
-  findSmartMatches,
   getOrCreateLocalPeer,
   normalizeText,
 } from '@/core/market-engine';
@@ -37,12 +35,12 @@ import {
 import {
   DiscoveredPlaceSummary,
   LowestPriceDeal,
-  PlaceFeedbackReport,
-  PlaceFeedbackVerdict,
   buildPlaceKey,
   discoverLowestPrices,
   discoverZonePlaces,
 } from '@/core/market-intelligence';
+import type { PlaceFeedbackReport, PlaceFeedbackVerdict } from '@/core/types';
+import { findRankedMatches } from '@/core/barter';
 
 const ENTRIES_STORAGE_KEY = 'market_radar_entries_v1';
 const GEO_FOCUS_STORAGE_KEY = 'market_radar_geo_focus_v1';
@@ -83,8 +81,8 @@ interface AppContextValue {
   entries: MarketEntry[];
   allEntries: MarketEntry[];
   priceSummaries: ItemPriceSummary[];
-  barterMatches: SmartMatch[];
-  matches: SmartMatch[];
+  barterMatches: RankedMatch[];
+  matches: RankedMatch[];
   lowestPriceDeals: LowestPriceDeal[];
   zonePlaces: DiscoveredPlaceSummary[];
   placeFeedbacks: PlaceFeedbackReport[];
@@ -137,7 +135,7 @@ function saveStoredEntries(entries: MarketEntry[]): void {
   try {
     window.localStorage.setItem(ENTRIES_STORAGE_KEY, JSON.stringify(entries));
   } catch {
-    // تجاهل أخطاء التخزين المحلي
+    // تجاهل
   }
 }
 
@@ -167,14 +165,12 @@ function saveStoredFeedbacks(feedbacks: PlaceFeedbackReport[]): void {
   try {
     window.localStorage.setItem(PLACE_FEEDBACK_STORAGE_KEY, JSON.stringify(feedbacks));
   } catch {
-    // تجاهل أخطاء التخزين المحلي
+    // تجاهل
   }
 }
 
 function loadSavedGeoFocus(): { mode: GeoFocusMode; focusedZone: string | null } {
-  if (typeof window === 'undefined') {
-    return { mode: 'auto', focusedZone: null };
-  }
+  if (typeof window === 'undefined') return { mode: 'auto', focusedZone: null };
   try {
     const raw = window.localStorage.getItem(GEO_FOCUS_STORAGE_KEY);
     if (!raw) return { mode: 'auto', focusedZone: null };
@@ -235,7 +231,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         JSON.stringify({ mode: focusMode, focusedZone })
       );
     } catch {
-      // تجاهل أخطاء التخزين المحلي
+      // تجاهل
     }
   }, [focusMode, focusedZone]);
 
@@ -298,11 +294,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       peerId,
       getCurrentEntries: () => entriesRef.current,
       onPeersChange: (connectedPeers, mode) => {
-        setNodeStatus((prev) => ({
-          ...prev,
-          connectedPeers,
-          mode,
-        }));
+        setNodeStatus((prev) => ({ ...prev, connectedPeers, mode }));
       },
       onReceiveMessage: applyIncomingMessage,
     });
@@ -323,18 +315,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const setFocusedZone = useCallback((zone: string | null) => {
     const cleaned = zone && zone.trim().length > 0 ? zone.trim() : null;
     setFocusedZoneState(cleaned);
-    if (cleaned) {
-      setFocusModeState('locked');
-    } else {
-      setFocusModeState('all');
-    }
+    if (cleaned) setFocusModeState('locked');
+    else setFocusModeState('all');
   }, []);
 
   const setFocusMode = useCallback((mode: GeoFocusMode) => {
     setFocusModeState(mode);
-    if (mode === 'all') {
-      setFocusedZoneState(null);
-    }
+    if (mode === 'all') setFocusedZoneState(null);
   }, []);
 
   const geoInference = useMemo(
@@ -355,13 +342,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const { filteredEntries, activeZone } = useMemo(
-    () =>
-      filterEntriesByGeoFocus(
-        entries,
-        focusMode,
-        focusedZone,
-        geoInference.detectedZone
-      ),
+    () => filterEntriesByGeoFocus(entries, focusMode, focusedZone, geoInference.detectedZone),
     [entries, focusMode, focusedZone, geoInference.detectedZone]
   );
 
@@ -414,23 +395,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   );
 
   const canDeleteEntry = useCallback(
-    (entry: Pick<MarketEntry, 'authorPeerId'>) => {
-      return Boolean(entry.authorPeerId && entry.authorPeerId === peerId);
-    },
+    (entry: Pick<MarketEntry, 'authorPeerId'>) => Boolean(entry.authorPeerId && entry.authorPeerId === peerId),
     [peerId]
   );
 
   const deleteEntry = useCallback(
     (id: string) => {
       setEntries((prev) => prev.filter((item) => item.id !== id));
-
       const msg: P2PSyncMessage = {
         type: 'DELETE_ENTRY',
         deletedId: id,
         senderPeerId: peerId,
         sentAt: Date.now(),
       };
-
       channelRef.current?.postMessage(msg);
       p2pRef.current?.broadcastDeleteEntry(id);
     },
@@ -486,60 +463,34 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             : null;
 
         if (!candidateList) {
-          const msg =
-            'صيغة JSON غير صحيحة؛ يجب أن تكون مصفوفة بلاغات أو كائناً يحتوي على entries.';
-          return {
-            ok: false,
-            message: msg,
-            error: msg,
-            addedCount: 0,
-            importedCount: 0,
-            rejectedCount: 0,
-          };
+          const msg = 'صيغة JSON غير صحيحة؛ يجب أن تكون مصفوفة بلاغات أو كائناً يحتوي على entries.';
+          return { ok: false, message: msg, error: msg, addedCount: 0, importedCount: 0, rejectedCount: 0 };
         }
 
-        let summary: BundleImportResult = {
-          ok: true,
-          message: '',
-          addedCount: 0,
-          importedCount: 0,
-          rejectedCount: 0,
-        };
+        const mergedRes = mergeVerifiedEntries(entriesRef.current, candidateList);
+        setEntries(mergedRes.merged);
 
-        setEntries((prev) => {
-          const mergedRes = mergeVerifiedEntries(prev, candidateList);
-          const msg = `تم استيراد ${mergedRes.addedCount} عنصر جديد واستبعاد ${mergedRes.rejectedCount} عنصر غير صالح.`;
-          summary = {
-            ok: true,
-            message: msg,
-            addedCount: mergedRes.addedCount,
-            importedCount: mergedRes.addedCount,
-            rejectedCount: mergedRes.rejectedCount,
+        if (mergedRes.addedCount > 0) {
+          const msgPayload: P2PSyncMessage = {
+            type: 'FULL_STATE',
+            entries: mergedRes.merged,
+            senderPeerId: peerId,
+            sentAt: Date.now(),
           };
-          if (mergedRes.addedCount > 0) {
-            const msgPayload: P2PSyncMessage = {
-              type: 'FULL_STATE',
-              entries: mergedRes.merged,
-              senderPeerId: peerId,
-              sentAt: Date.now(),
-            };
-            channelRef.current?.postMessage(msgPayload);
-            p2pRef.current?.broadcastFullState(mergedRes.merged);
-          }
-          return mergedRes.merged;
-        });
+          channelRef.current?.postMessage(msgPayload);
+          p2pRef.current?.broadcastFullState(mergedRes.merged);
+        }
 
-        return summary;
+        return {
+          ok: true,
+          message: `تم استيراد ${mergedRes.addedCount} عنصر جديد واستبعاد ${mergedRes.rejectedCount} عنصر غير صالح.`,
+          addedCount: mergedRes.addedCount,
+          importedCount: mergedRes.addedCount,
+          rejectedCount: mergedRes.rejectedCount,
+        };
       } catch {
         const msg = 'تعذر قراءة ملف أو نص JSON. تأكد من سلامة التنسيق.';
-        return {
-          ok: false,
-          message: msg,
-          error: msg,
-          addedCount: 0,
-          importedCount: 0,
-          rejectedCount: 0,
-        };
+        return { ok: false, message: msg, error: msg, addedCount: 0, importedCount: 0, rejectedCount: 0 };
       }
     },
     [peerId]
@@ -565,25 +516,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const priceSummaries = useMemo(() => {
     const itemMap = new Map<string, string>();
-    for (const sample of DEFAULT_SAMPLE_ITEMS) {
-      itemMap.set(normalizeText(sample), sample);
-    }
+    for (const sample of DEFAULT_SAMPLE_ITEMS) itemMap.set(normalizeText(sample), sample);
     for (const entry of filteredEntries) {
       if (entry.kind === 'price' && entry.item.trim()) {
         const key = normalizeText(entry.item);
-        if (!itemMap.has(key)) {
-          itemMap.set(key, entry.item.trim());
-        }
+        if (!itemMap.has(key)) itemMap.set(key, entry.item.trim());
       }
     }
-
     return Array.from(itemMap.values())
       .map((itemName) => analyzeItemPrices(filteredEntries, itemName))
       .filter((summary) => summary.reports.length > 0);
   }, [filteredEntries]);
 
   const barterMatches = useMemo(
-    () => findSmartMatches(filteredEntries),
+    () => findRankedMatches(filteredEntries, Date.now()),
     [filteredEntries]
   );
 
@@ -639,8 +585,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
 export function useApp(): AppContextValue {
   const ctx = useContext(AppContext);
-  if (!ctx) {
-    throw new Error('useApp must be used inside AppProvider');
-  }
+  if (!ctx) throw new Error('useApp must be used inside AppProvider');
   return ctx;
 }
