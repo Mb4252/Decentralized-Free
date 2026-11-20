@@ -35,6 +35,12 @@ function cleanZoneOnly(zone?: string | null, placeName?: string): string {
   return text;
 }
 
+function isGenericSourceLabel(placeName?: string): boolean {
+  if (!placeName) return false;
+  const cleaned = placeName.trim();
+  return cleaned === 'الجميع' || cleaned === 'شخصي' || cleaned === 'عام' || cleaned === 'خاص';
+}
+
 function extractPhone(text?: string): string | null {
   if (!text) return null;
   const match = text.match(/(\+?\d[\d\s\-]{6,15}\d)/);
@@ -56,6 +62,28 @@ function getEntryPhone(entry: unknown): string | null {
     return extractPhone(direct) || direct.trim();
   }
   return extractPhone(getEntryNote(entry));
+}
+
+function getKindBadge(kind: string): {
+  text: string;
+  className: string;
+} {
+  if (kind === 'have') {
+    return {
+      text: 'أملك (عرض)',
+      className: 'border-emerald-500/40 bg-emerald-950 text-emerald-300',
+    };
+  }
+  if (kind === 'need') {
+    return {
+      text: 'أحتاج (طلب)',
+      className: 'border-sky-500/40 bg-sky-950 text-sky-300',
+    };
+  }
+  return {
+    text: 'بلاغ سعر',
+    className: 'border-amber-500/40 bg-amber-950 text-amber-300',
+  };
 }
 
 export default function HomePage() {
@@ -119,73 +147,92 @@ export default function HomePage() {
     const note = getEntryNote(entry);
     const phone = getEntryPhone(entry);
     const zoneLabel = cleanZoneOnly(entry.location, entry.placeName);
+    const kindInfo = getKindBadge(entry.kind);
+    const genericPlace = isGenericSourceLabel(entry.placeName);
+
+    const valueLabel =
+      entry.kind === 'price' && typeof entry.price === 'number'
+        ? `السعر: ${entry.price}`
+        : entry.wantItem
+          ? `المقابل: ${entry.wantItem}`
+          : entry.kind === 'have'
+            ? 'متوفر للمقايضة'
+            : entry.kind === 'need'
+              ? 'مطلوب'
+              : '';
 
     return (
       <li
         key={entry.id}
-        className="flex flex-col gap-2 rounded-xl border border-slate-800 bg-slate-950 p-3 text-sm sm:flex-row sm:items-start sm:justify-between"
+        className="flex flex-col gap-2.5 rounded-xl border border-slate-700/90 bg-slate-950 p-3.5 text-sm"
       >
-        <div className="space-y-1">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-bold text-white">{entry.item}</span>
-            {zoneLabel && (
-              <span className="rounded bg-emerald-950 border border-emerald-500/30 px-2 py-0.5 text-[11px] text-emerald-300">
-                📍 {zoneLabel}
-              </span>
-            )}
-            {entry.placeName && (
-              <span className="rounded bg-amber-950 border border-amber-500/30 px-2 py-0.5 text-[11px] text-amber-300">
-                🏪 {entry.placeName}
-              </span>
-            )}
-            {entry.category && (
-              <span className="rounded bg-slate-800 px-2 py-0.5 text-[11px] text-slate-200">
-                {entry.category}
-              </span>
-            )}
+            <span className="text-base font-bold text-white">{entry.item}</span>
+            <span
+              className={`rounded-md border px-2 py-0.5 text-[11px] font-bold ${kindInfo.className}`}
+            >
+              {kindInfo.text}
+            </span>
           </div>
 
-          {note && (
-            <div className="rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs text-slate-200">
-              📝 ملاحظة: {note}
-            </div>
+          {valueLabel && (
+            <span className="rounded-lg border border-emerald-500/30 bg-slate-900 px-3 py-1 text-xs font-bold text-emerald-300">
+              {valueLabel}
+            </span>
           )}
-
-          {phone && (
-            <div className="flex flex-wrap items-center gap-2 pt-0.5">
-              <a
-                href={`tel:${phone}`}
-                className="rounded bg-sky-700 px-2.5 py-0.5 text-[11px] font-medium text-white hover:bg-sky-600"
-              >
-                📞 اتصال: {phone}
-              </a>
-              <a
-                href={`https://wa.me/${phone.replace(/[^\d]/g, '')}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded bg-emerald-700 px-2.5 py-0.5 text-[11px] font-medium text-white hover:bg-emerald-600"
-              >
-                💬 واتساب
-              </a>
-            </div>
-          )}
-
-          <div className="text-[11px] text-slate-400">
-            نُشر: {formatPublishedAt(entry.createdAt)}
-          </div>
         </div>
 
-        <div className="flex items-center justify-between gap-2 sm:justify-end">
-          <span className="rounded-lg bg-slate-800 px-2.5 py-1 text-xs font-bold text-emerald-300">
-            {entry.kind === 'price' && typeof entry.price === 'number'
-              ? `${entry.price}`
-              : entry.wantItem || entry.kind}
-          </span>
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          {zoneLabel && (
+            <span className="rounded-md border border-emerald-500/30 bg-emerald-950/70 px-2 py-0.5 text-emerald-300">
+              📍 {zoneLabel}
+            </span>
+          )}
+          {entry.placeName && (
+            <span className="rounded-md border border-slate-700 bg-slate-900 px-2 py-0.5 text-slate-200">
+              {genericPlace ? `🏷️ ${entry.placeName}` : `🏪 ${entry.placeName}`}
+            </span>
+          )}
+          {entry.category && (
+            <span className="rounded-md bg-slate-800 px-2 py-0.5 text-[11px] text-slate-300">
+              {entry.category}
+            </span>
+          )}
+        </div>
+
+        {note && (
+          <div className="rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-xs leading-relaxed text-slate-200">
+            📝 ملاحظة: {note}
+          </div>
+        )}
+
+        {phone && (
+          <div className="flex flex-wrap items-center gap-2">
+            <a
+              href={`tel:${phone}`}
+              className="rounded-lg bg-sky-700 px-3 py-1 text-xs font-semibold text-white hover:bg-sky-600"
+            >
+              📞 اتصال: {phone}
+            </a>
+            <a
+              href={`https://wa.me/${phone.replace(/[^\d]/g, '')}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-lg bg-emerald-700 px-3 py-1 text-xs font-semibold text-white hover:bg-emerald-600"
+            >
+              💬 واتساب
+            </a>
+          </div>
+        )}
+
+        <div className="flex items-center justify-between gap-2 border-t border-slate-800/80 pt-2 text-[11px] text-slate-400">
+          <span>نُشر: {formatPublishedAt(entry.createdAt)}</span>
           {owned && (
             <button
               type="button"
               onClick={() => handleDelete(entry.id, entry.item)}
-              className="rounded-lg border border-rose-500/50 bg-rose-950/60 px-2.5 py-1 text-[11px] text-rose-200 hover:bg-rose-900/70"
+              className="rounded-lg border border-rose-500/50 bg-rose-950/60 px-3 py-1 text-xs font-medium text-rose-200 hover:bg-rose-900/70"
             >
               حذف
             </button>
@@ -199,7 +246,6 @@ export default function HomePage() {
     <main dir="rtl" className="mx-auto max-w-4xl space-y-4 p-4 text-slate-100">
       <GeoFocusBanner />
 
-      {/* مؤشرات سريعة */}
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
         <div className="rounded-xl border border-slate-700 bg-slate-900 p-3">
           <div className="text-xs text-slate-400">إجمالي البلاغات</div>
@@ -221,7 +267,6 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* شريط الأقسام الرئيسية حتى لا يختلط كل شيء على المستخدم */}
       <nav className="grid grid-cols-2 gap-2 rounded-xl border border-slate-700 bg-slate-900 p-2 sm:grid-cols-4">
         <button
           type="button"
@@ -275,7 +320,6 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* القسم 1: أقسام التصنيفات (كل تصنيف في قسمه الخاص دون خلط) */}
       {activeTab === 'categories' && (
         <section className="space-y-3 rounded-xl border border-slate-700 bg-slate-900 p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -325,7 +369,6 @@ export default function HomePage() {
         </section>
       )}
 
-      {/* القسم 2: أقل الأسعار والمشاركة */}
       {activeTab === 'prices' && (
         <section className="space-y-3 rounded-xl border border-slate-700 bg-slate-900 p-4">
           <h2 className="text-base font-bold text-emerald-300">
@@ -335,7 +378,6 @@ export default function HomePage() {
         </section>
       )}
 
-      {/* القسم 3: المتاجر وتقييم السمعة */}
       {activeTab === 'stores' && (
         <section className="space-y-3 rounded-xl border border-slate-700 bg-slate-900 p-4">
           <h2 className="text-base font-bold text-white">
@@ -345,7 +387,6 @@ export default function HomePage() {
         </section>
       )}
 
-      {/* القسم 4: المقايضة والعروض والطلبات */}
       {activeTab === 'barter' && (
         <section className="space-y-3 rounded-xl border border-slate-700 bg-slate-900 p-4">
           <h2 className="text-base font-bold text-emerald-300">
