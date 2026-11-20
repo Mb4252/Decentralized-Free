@@ -1,4 +1,8 @@
-import { MarketEntry } from './market-engine';
+// core/geo-focus.ts
+import type { MarketEntry } from './types';
+import { normalizeGeoText } from './normalization';
+
+export { normalizeGeoText } from './normalization';
 
 export type GeoFocusMode = 'auto' | 'locked' | 'all';
 
@@ -24,18 +28,6 @@ export interface GeoInferenceResult {
   activeZone: string | null;
 }
 
-export function normalizeGeoText(input: string): string {
-  return input
-    .toLowerCase()
-    .replace(/[\u064B-\u065F\u0670]/g, '')
-    .replace(/[أإآٱ]/g, 'ا')
-    .replace(/ى/g, 'ي')
-    .replace(/ة/g, 'ه')
-    .replace(/[^a-zA-Z0-9\u0600-\u06FF\s-]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
 export function stripGeoPrefixes(normalized: string): string {
   const cleaned = normalized
     .replace(/^(حي|منطقه|منطقة|محله|محلة|سوق|مربع|حاره|حارة)\s+/g, '')
@@ -44,7 +36,9 @@ export function stripGeoPrefixes(normalized: string): string {
   return cleaned || normalized;
 }
 
-export function extractPrimaryZoneLabel(entry: Pick<MarketEntry, 'location' | 'placeName'>): string {
+export function extractPrimaryZoneLabel(
+  entry: Pick<MarketEntry, 'location' | 'placeName'>
+): string {
   const rawLocation = (entry.location || '').trim();
   const rawPlace = (entry.placeName || '').trim();
   const combined = rawLocation || rawPlace;
@@ -55,9 +49,7 @@ export function extractPrimaryZoneLabel(entry: Pick<MarketEntry, 'location' | 'p
     .map((part) => part.trim())
     .filter(Boolean);
 
-  if (parts.length >= 2) {
-    return `${parts[0]} - ${parts[1]}`;
-  }
+  if (parts.length >= 2) return `${parts[0]} - ${parts[1]}`;
 
   if (rawLocation && rawPlace && normalizeGeoText(rawLocation) !== normalizeGeoText(rawPlace)) {
     const placePart = rawPlace.split(/[-–—/|،,]+/)[0]?.trim();
@@ -80,7 +72,6 @@ export function analyzeUserGeoActivity(
   for (const entry of entries) {
     const label = extractPrimaryZoneLabel(entry);
     if (!label) continue;
-
     const normalized = normalizeGeoText(label);
     const key = stripGeoPrefixes(normalized);
     if (!key) continue;
@@ -106,9 +97,7 @@ export function analyzeUserGeoActivity(
       if (isOwn) existing.ownEntryCount += 1;
       if ((entry.createdAt || 0) >= existing.lastSeenAt) {
         existing.lastSeenAt = entry.createdAt || now;
-        if (isOwn || existing.ownEntryCount === 0) {
-          existing.zone = label;
-        }
+        if (isOwn || existing.ownEntryCount === 0) existing.zone = label;
       }
     }
   }
@@ -122,20 +111,15 @@ export function analyzeUserGeoActivity(
   const top = stats[0] || null;
   const totalCount = stats.reduce((acc, item) => acc + item.count, 0);
 
-  const detectedZone = top ? top.zone : null;
-  const detectedCount = top ? top.count : 0;
-
-  const shouldSuggestLock = Boolean(
-    top &&
-      top.count >= 2 &&
-      (top.ownEntryCount >= 2 || (totalCount >= 3 && top.count / totalCount >= 0.5))
-  );
-
   return {
     stats,
-    detectedZone,
-    detectedCount,
-    shouldSuggestLock,
+    detectedZone: top ? top.zone : null,
+    detectedCount: top ? top.count : 0,
+    shouldSuggestLock: Boolean(
+      top &&
+        top.count >= 2 &&
+        (top.ownEntryCount >= 2 || (totalCount >= 3 && top.count / totalCount >= 0.5))
+    ),
   };
 }
 
@@ -155,17 +139,12 @@ export function matchesZoneFilter(
   const entryNorm = normalizeGeoText(entryRaw);
   const entryCore = stripGeoPrefixes(entryNorm);
 
-  if (entryNorm.includes(targetNorm) || entryCore.includes(targetCore)) {
-    return true;
-  }
+  if (entryNorm.includes(targetNorm) || entryCore.includes(targetCore)) return true;
 
   if (targetTokens.length > 0) {
     const matchedTokens = targetTokens.filter((tok) => entryCore.includes(tok));
-    if (matchedTokens.length === targetTokens.length) {
-      return true;
-    }
+    if (matchedTokens.length === targetTokens.length) return true;
   }
-
   return false;
 }
 
@@ -175,18 +154,9 @@ export function filterEntriesByGeoFocus(
   focusedZone: string | null,
   detectedZone: string | null
 ): { filteredEntries: MarketEntry[]; activeZone: string | null } {
-  if (mode === 'all') {
-    return { filteredEntries: entries, activeZone: null };
-  }
-
+  if (mode === 'all') return { filteredEntries: entries, activeZone: null };
   const targetZone = mode === 'locked' ? focusedZone || detectedZone : null;
-  if (!targetZone) {
-    return { filteredEntries: entries, activeZone: null };
-  }
-
+  if (!targetZone) return { filteredEntries: entries, activeZone: null };
   const matched = entries.filter((entry) => matchesZoneFilter(entry, targetZone));
-  return {
-    filteredEntries: matched,
-    activeZone: targetZone,
-  };
+  return { filteredEntries: matched, activeZone: targetZone };
 }
