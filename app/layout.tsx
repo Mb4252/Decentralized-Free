@@ -1,3 +1,4 @@
+// app/layout.tsx
 import type { Metadata } from 'next';
 import './globals.css';
 import { AppProvider } from '@/lib/context';
@@ -14,9 +15,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-screen bg-slate-50 text-slate-800">
         <AppProvider>
           <NavBar />
-          <main className="max-w-md mx-auto p-4 pb-24">
-            {children}
-          </main>
+          <div className="max-w-md mx-auto p-4 pb-24">{children}</div>
         </AppProvider>
       </body>
     </html>
