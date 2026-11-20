@@ -1,26 +1,48 @@
-export interface PriceReport {
-  id: string;
-  itemId: string;      // مثال: "flour_1kg", "sugar_1kg"
-  itemName: string;    // الاسم المعروض
-  price: number;       // السعر بالعملة المحلية
-  unitRef: number;     // ما يعادله بوحدة مرجعية (مثلاً كجم دقيق)
-  location: string;    // الحي/المنطقة
-  timestamp: number;
-}
+// core/types.ts
+// أنواع موحّدة لكل الطبقة الأساسية.
 
-export interface BarterOffer {
+export type ReportKind = 'price' | 'have' | 'need';
+export type PriceTag = 'عادل' | 'مرتفع' | 'منخفض' | 'شاذ';
+
+export interface MarketEntry {
   id: string;
-  type: 'offer' | 'need';
-  userId: string;      // معرف عشوائي للمستخدم (لعدم كشف هويته)
-  itemId: string;
-  itemName: string;
-  quantity: string;    // مثال: "10 كجم"
+  kind: ReportKind;
+  category: string;
+  item: string;
+  placeName?: string;
+  quantity?: string;
+  wantItem?: string;
   location: string;
-  timestamp: number;
-  matchedWith?: string; // معرف العرض المطابق
+  price?: number;
+  authorName: string;
+  authorPeerId: string;
+  contact?: string;
+  note?: string;
+  createdAt: number;
+  checksum?: string;
 }
 
-export interface MatchResult {
-  type: 'direct' | 'cycle';
-  path: BarterOffer[]; // مسار التبادل (أ -> ب -> ج -> أ)
+export type PlaceFeedbackVerdict = 'honest_low' | 'fair' | 'expensive' | 'deceptive';
+
+export interface PlaceFeedbackReport {
+  id: string;
+  targetPlaceKey: string;
+  targetPlaceName: string;
+  targetLocation: string;
+  targetItem?: string;
+  verdict: PlaceFeedbackVerdict;
+  reason?: string;
+  reporterPeerId: string;
+  reporterName: string;
+  createdAt: number;
+}
+
+export interface RankedMatch {
+  id: string;
+  type: 'direct' | 'reverse' | 'cycle';
+  score: number;
+  giveEntry: MarketEntry;
+  wantEntry: MarketEntry;
+  cyclePath?: MarketEntry[];
+  reason: string;
 }
