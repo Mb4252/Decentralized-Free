@@ -1,23 +1,12 @@
-export type ReportKind = 'price' | 'have' | 'need';
+// core/market-engine.ts
+import type {
+  MarketEntry,
+  PriceTag,
+  ReportKind,
+} from './types';
+import { computeFairBand, classifyByBand, type WeightedPricePoint } from './pricing';
 
-export type PriceTag = 'عادل' | 'مرتفع' | 'منخفض' | 'شاذ';
-
-export interface MarketEntry {
-  id: string;
-  kind: ReportKind;
-  category: string;
-  item: string;
-  placeName?: string;
-  quantity?: string;
-  wantItem?: string;
-  location: string;
-  price?: number;
-  authorName: string;
-  authorPeerId: string;
-  contact?: string;
-  note?: string;
-  createdAt: number;
-}
+export type { MarketEntry, PriceTag, ReportKind } from './types';
 
 export interface AnalyzedPriceReport extends MarketEntry {
   kind: 'price';
@@ -32,6 +21,8 @@ export interface ItemPriceSummary {
   median: number | null;
   lowestPrice: number | null;
   highestPrice: number | null;
+  p25: number | null;
+  p75: number | null;
   cheapestPlace?: string;
   priciestPlace?: string;
   reports: AnalyzedPriceReport[];
@@ -101,30 +92,25 @@ export function calculateMedian(values: number[]): number | null {
   return sorted[mid];
 }
 
-export function classifyPrice(price: number, median: number | null): {
-  tag: PriceTag;
-  deviationPercent: number;
-} {
+export function classifyPrice(
+  price: number,
+  median: number | null
+): { tag: PriceTag; deviationPercent: number } {
   if (!median || median <= 0) {
     return { tag: 'عادل', deviationPercent: 0 };
   }
   const diffRatio = (price - median) / median;
   const deviationPercent = Math.round(diffRatio * 1000) / 10;
-
-  if (Math.abs(diffRatio) >= 0.35) {
-    return { tag: 'شاذ', deviationPercent };
-  }
-  if (diffRatio > 0.12) {
-    return { tag: 'مرتفع', deviationPercent };
-  }
-  if (diffRatio < -0.12) {
-    return { tag: 'منخفض', deviationPercent };
-  }
+  if (Math.abs(diffRatio) >= 0.35) return { tag: 'شاذ', deviationPercent };
+  if (diffRatio > 0.12) return { tag: 'مرتفع', deviationPercent };
+  if (diffRatio < -0.12) return { tag: 'منخفض', deviationPercent };
   return { tag: 'عادل', deviationPercent };
 }
 
 export function analyzeItemPrices(entries: MarketEntry[], itemName: string): ItemPriceSummary {
   const target = normalizeText(itemName);
+  const now = Date.now();
+
   const rawReports = entries.filter(
     (e): e is MarketEntry & { kind: 'price'; price: number } =>
       e.kind === 'price' &&
@@ -134,11 +120,18 @@ export function analyzeItemPrices(entries: MarketEntry[], itemName: string): Ite
       normalizeText(e.item) === target
   );
 
-  const median = calculateMedian(rawReports.map((r) => r.price));
+  const points: WeightedPricePoint[] = rawReports.map((r) => ({
+    price: r.price,
+    weight: 1,
+    createdAt: r.createdAt,
+  }));
+
+  const band = computeFairBand(points, now);
+  const median = band.median;
 
   const reports: AnalyzedPriceReport[] = rawReports
     .map((r): AnalyzedPriceReport => {
-      const { tag, deviationPercent } = classifyPrice(r.price, median);
+      const { tag, deviationPercent } = classifyByBand(r.price, band);
       return {
         ...r,
         kind: 'price' as const,
@@ -159,12 +152,15 @@ export function analyzeItemPrices(entries: MarketEntry[], itemName: string): Ite
     median,
     lowestPrice: cheapest ? cheapest.price : null,
     highestPrice: priciest ? priciest.price : null,
+    p25: band.p25,
+    p75: band.p75,
     cheapestPlace: cheapest ? cheapest.placeName || cheapest.authorName : undefined,
     priciestPlace: priciest ? priciest.placeName || priciest.authorName : undefined,
     reports,
   };
 }
 
+/** محفوظ للتوافق الخلفي فقط؛ استخدم findRankedMatches من core/barter.ts */
 export function findSmartMatches(entries: MarketEntry[]): SmartMatch[] {
   const haves = entries.filter((e) => e.kind === 'have');
   const needs = entries.filter((e) => e.kind === 'need');
@@ -176,20 +172,16 @@ export function findSmartMatches(entries: MarketEntry[]): SmartMatch[] {
       if (need.authorPeerId && have.authorPeerId && need.authorPeerId === have.authorPeerId) {
         continue;
       }
-
       const sameItem = normalizeText(need.item) === normalizeText(have.item);
       const crossMatch =
         need.wantItem &&
         have.wantItem &&
         normalizeText(need.wantItem) === normalizeText(have.item) &&
         normalizeText(have.wantItem) === normalizeText(need.item);
-
       if (!sameItem && !crossMatch) continue;
-
       const pairKey = [need.id, have.id].sort().join('::');
       if (seenPairs.has(pairKey)) continue;
       seenPairs.add(pairKey);
-
       matches.push({
         id: pairKey,
         type: crossMatch ? 'reverse' : 'direct',
