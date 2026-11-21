@@ -73,6 +73,36 @@ function getEntryPhone(entry: unknown): string | null {
   return extractPhone(getEntryNote(entry));
 }
 
+function getKindMeta(kind?: string): {
+  label: string;
+  badgeClass: string;
+  rowClass: string;
+  valueClass: string;
+} {
+  if (kind === 'have') {
+    return {
+      label: '🟢 أملك (عرض)',
+      badgeClass: 'border-emerald-500/40 bg-emerald-950/80 text-emerald-300',
+      rowClass: 'border-r-4 border-r-emerald-500 border-slate-800 bg-emerald-950/20',
+      valueClass: 'border-emerald-500/40 bg-emerald-950 text-emerald-200',
+    };
+  }
+  if (kind === 'need') {
+    return {
+      label: '🔵 أحتاج (طلب)',
+      badgeClass: 'border-sky-500/40 bg-sky-950/80 text-sky-300',
+      rowClass: 'border-r-4 border-r-sky-500 border-slate-800 bg-sky-950/20',
+      valueClass: 'border-sky-500/40 bg-sky-950 text-sky-200',
+    };
+  }
+  return {
+    label: '🏷️ بلاغ سعر',
+    badgeClass: 'border-amber-500/40 bg-amber-950/80 text-amber-300',
+    rowClass: 'border-r-4 border-r-amber-500 border-slate-800 bg-slate-900/80',
+    valueClass: 'border-amber-500/40 bg-amber-950 text-amber-200',
+  };
+}
+
 export function CommunityRadarSection({ mode = 'all' }: CommunityRadarSectionProps) {
   const {
     entries,
@@ -116,7 +146,8 @@ export function CommunityRadarSection({ mode = 'all' }: CommunityRadarSectionPro
       return (
         normalizeSourceKey(deal.item).includes(q) ||
         normalizeSourceKey(deal.placeName).includes(q) ||
-        normalizeSourceKey(deal.location).includes(q)
+        normalizeSourceKey(deal.location).includes(q) ||
+        normalizeSourceKey(deal.entry?.category).includes(q)
       );
     });
   }, [lowestPriceDeals, searchQuery]);
@@ -140,6 +171,7 @@ export function CommunityRadarSection({ mode = 'all' }: CommunityRadarSectionPro
         const itemDetails = matchingEntries.map((e) => ({
           id: e.id,
           item: e.item,
+          category: e.category || 'عام',
           kind: e.kind,
           price: typeof e.price === 'number' ? e.price : null,
           wantItem: e.wantItem,
@@ -160,7 +192,10 @@ export function CommunityRadarSection({ mode = 'all' }: CommunityRadarSectionPro
         const inPlace =
           normalizeSourceKey(place.placeName).includes(q) ||
           normalizeSourceKey(place.location).includes(q);
-        const inItems = place.itemDetails.some((it) => normalizeSourceKey(it.item).includes(q));
+        const inItems = place.itemDetails.some(
+          (it) =>
+            normalizeSourceKey(it.item).includes(q) || normalizeSourceKey(it.category).includes(q)
+        );
         return inPlace || inItems;
       });
   }, [zonePlaces, entries, searchQuery, statusFilter]);
@@ -197,13 +232,16 @@ export function CommunityRadarSection({ mode = 'all' }: CommunityRadarSectionPro
       lines.push('🏷️ *أقل الأسعار المرصودة اليوم:*');
       validDeals.slice(0, 10).forEach((deal, idx) => {
         const cleanLoc = cleanZoneOnly(deal.location, deal.placeName);
+        const catPart = deal.entry?.category ? ` (${deal.entry.category})` : '';
         const placePart = deal.placeName ? ` — متجر/جهة: ${deal.placeName}` : '';
         const locPart = cleanLoc ? ` [${cleanLoc}]` : '';
         const discPart =
           deal.discountPercent > 0 ? ` (أقل من الوسيط بـ ${deal.discountPercent}%)` : '';
         const note = getEntryNote(deal.entry);
         const phone = getEntryPhone(deal.entry);
-        lines.push(`${idx + 1}. *${deal.item}*: ${deal.price}${placePart}${locPart}${discPart}`);
+        lines.push(
+          `${idx + 1}. *${deal.item}*${catPart}: ${deal.price}${placePart}${locPart}${discPart}`
+        );
         if (note) lines.push(`   📝 ملاحظة: ${note}`);
         if (phone) lines.push(`   📞 تواصل: ${phone}`);
       });
@@ -236,11 +274,16 @@ export function CommunityRadarSection({ mode = 'all' }: CommunityRadarSectionPro
       lines.push(`أقل سعر: ${place.lowestPrice ?? '-'} | المتوسط: ${place.avgPrice ?? '-'}`);
     }
     if (place.itemDetails.length > 0) {
-      lines.push('السلع والعروض المسجلة:');
+      lines.push('المنشورات والسلع المسجلة:');
       place.itemDetails.forEach((it) => {
+        const meta = getKindMeta(it.kind);
         const val =
-          it.price !== null ? `${it.price}` : it.wantItem ? `مقابل: ${it.wantItem}` : it.kind;
-        lines.push(`• *${it.item}* — ${val}`);
+          it.price !== null
+            ? `السعر: ${it.price}`
+            : it.wantItem
+              ? `المقابل: ${it.wantItem}`
+              : meta.label;
+        lines.push(`• [${meta.label}] *${it.item}* — قسم: ${it.category} — ${val}`);
         if (it.note) lines.push(`  📝 ${it.note}`);
         if (it.phone) lines.push(`  📞 ${it.phone}`);
       });
@@ -271,7 +314,7 @@ export function CommunityRadarSection({ mode = 'all' }: CommunityRadarSectionPro
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="ابحث باسم السلعة (مثل: دقيق، سكر، هاتف) أو المتجر أو الحي..."
+            placeholder="ابحث باسم السلعة، القسم (بقالة، هواتف...)، المتجر، أو الحي..."
             className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white placeholder-slate-400 focus:border-emerald-400 focus:outline-none"
           />
           {searchQuery && (
@@ -325,6 +368,11 @@ export function CommunityRadarSection({ mode = 'all' }: CommunityRadarSectionPro
               ⭐ أبرز سعر أقل من الوسيط اليوم: {bestTrustedDeal.item} ({bestTrustedDeal.price})
             </span>
             <div className="flex flex-wrap gap-1.5">
+              {bestTrustedDeal.entry?.category && (
+                <span className="rounded bg-amber-950 border border-amber-500/30 px-2 py-0.5 text-[11px] font-medium text-amber-200">
+                  📂 قسم: {bestTrustedDeal.entry.category}
+                </span>
+              )}
               {cleanZoneOnly(bestTrustedDeal.location, bestTrustedDeal.placeName) && (
                 <span className="rounded bg-slate-800 px-2 py-0.5 text-[11px] font-medium text-slate-200">
                   📍 {cleanZoneOnly(bestTrustedDeal.location, bestTrustedDeal.placeName)}
@@ -399,6 +447,7 @@ export function CommunityRadarSection({ mode = 'all' }: CommunityRadarSectionPro
                 const dealNote = getEntryNote(deal.entry);
                 const dealPhone = getEntryPhone(deal.entry);
                 const dealZone = cleanZoneOnly(deal.location, deal.placeName);
+                const dealCat = deal.entry?.category || 'عام';
                 return (
                   <div
                     key={deal.id}
@@ -409,7 +458,12 @@ export function CommunityRadarSection({ mode = 'all' }: CommunityRadarSectionPro
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-bold text-white">{deal.item}</span>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-sm font-bold text-white">{deal.item}</span>
+                        <span className="rounded bg-slate-800 px-2 py-0.5 text-[10px] font-medium text-amber-200">
+                          📂 {dealCat}
+                        </span>
+                      </div>
                       <span className="rounded bg-emerald-500/20 px-2 py-0.5 font-bold text-emerald-300">
                         {deal.price}
                       </span>
@@ -490,10 +544,10 @@ export function CommunityRadarSection({ mode = 'all' }: CommunityRadarSectionPro
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <h3 className="text-sm font-bold text-white">
-                المتاجر والمراكز والجهات {displayZone ? `في (${displayZone})` : '(كل المناطق)'}
+                المتاجر والمراكز والجهات والتقييم {displayZone ? `في (${displayZone})` : '(كل المناطق)'}
               </h3>
               <p className="mt-0.5 text-[11px] text-slate-400">
-                كل مركز أو جهة تعرض سلعها مع السعر أو المقابل بوضوح؛ ويُستبعد المركز تلقائياً عند إبلاغ 3 أشخاص أو أكثر بأنه مخادع.
+                كل مركز أو جهة تعرض منشوراتها مع القسم والتفاصيل الكاملة؛ ويُستبعد المركز تلقائياً عند إبلاغ 3 أشخاص أو أكثر بأنه مخادع.
               </p>
             </div>
 
@@ -590,45 +644,76 @@ export function CommunityRadarSection({ mode = 'all' }: CommunityRadarSectionPro
                       </div>
                     </div>
 
-                    {/* عرض السلع المسجلة في هذا المركز/الجهة بوضوح مع السعر/المقابل */}
+                    {/* عرض كل منشور مع نوعه (أملك عرض / أحتاج طلب / بلاغ سعر) وقسمه وجميع تفاصيله */}
                     {place.itemDetails.length > 0 ? (
-                      <div className="mt-2.5 space-y-1.5 rounded-lg border border-slate-800 bg-slate-950 p-2.5">
+                      <div className="mt-2.5 space-y-2 rounded-lg border border-slate-800 bg-slate-950 p-2.5">
                         <div className="text-[11px] font-bold text-emerald-300">
-                          السلع والعروض المسجلة ({place.itemDetails.length}):
+                          المنشورات والسلع المسجلة ({place.itemDetails.length}):
                         </div>
-                        <ul className="divide-y divide-slate-800/80">
+                        <ul className="space-y-2">
                           {place.itemDetails.map((it) => {
+                            const meta = getKindMeta(it.kind);
                             const valueText =
                               it.price !== null
                                 ? `السعر: ${it.price}`
                                 : it.wantItem
                                   ? `المقابل: ${it.wantItem}`
                                   : it.kind === 'have'
-                                    ? 'أملك (عرض)'
+                                    ? 'متاح للمقايضة / العرض'
                                     : it.kind === 'need'
-                                      ? 'أحتاج (طلب)'
-                                      : 'بلاغ';
+                                      ? 'مطلوب توفيره'
+                                      : 'بلاغ سعر';
 
                             return (
-                              <li key={it.id} className="py-1.5 first:pt-0 last:pb-0">
+                              <li
+                                key={it.id}
+                                className={`rounded-lg border p-2.5 ${meta.rowClass}`}
+                              >
                                 <div className="flex flex-wrap items-center justify-between gap-2">
-                                  <span className="font-bold text-white">{it.item}</span>
-                                  <span className="rounded bg-emerald-950 border border-emerald-500/30 px-2 py-0.5 text-[11px] font-bold text-emerald-300">
+                                  <div className="flex flex-wrap items-center gap-1.5">
+                                    <span
+                                      className={`rounded-md border px-2 py-0.5 text-[10px] font-bold ${meta.badgeClass}`}
+                                    >
+                                      {meta.label}
+                                    </span>
+                                    <span className="text-xs font-bold text-white">{it.item}</span>
+                                    <span className="rounded bg-slate-800 px-2 py-0.5 text-[10px] font-medium text-slate-200">
+                                      📂 القسم: {it.category}
+                                    </span>
+                                  </div>
+
+                                  <span
+                                    className={`rounded-md border px-2 py-0.5 text-[11px] font-bold ${meta.valueClass}`}
+                                  >
                                     {valueText}
                                   </span>
                                 </div>
-                                {it.note && (
-                                  <div className="mt-1 text-[11px] text-slate-300">
-                                    📝 {it.note}
+
+                                {it.kind === 'have' && it.wantItem && (
+                                  <div className="mt-1 text-[11px] text-emerald-200/90">
+                                    🔄 يعرض «{it.item}» ويقبل مقابل: {it.wantItem}
                                   </div>
                                 )}
+
+                                {it.kind === 'need' && it.wantItem && (
+                                  <div className="mt-1 text-[11px] text-sky-200/90">
+                                    🔄 يطلب «{it.item}» ويقدّم مقابل: {it.wantItem}
+                                  </div>
+                                )}
+
+                                {it.note && (
+                                  <div className="mt-1.5 rounded bg-slate-950/90 px-2 py-1 text-[11px] text-slate-200">
+                                    📝 ملاحظة: {it.note}
+                                  </div>
+                                )}
+
                                 {it.phone && (
-                                  <div className="mt-1 flex flex-wrap gap-2">
+                                  <div className="mt-1.5 flex flex-wrap gap-2">
                                     <a
                                       href={`tel:${it.phone}`}
                                       className="rounded bg-sky-700 px-2 py-0.5 text-[10px] font-medium text-white hover:bg-sky-600"
                                     >
-                                      📞 {it.phone}
+                                      📞 اتصال: {it.phone}
                                     </a>
                                     <a
                                       href={`https://wa.me/${it.phone.replace(/[^\d]/g, '')}`}
@@ -640,7 +725,8 @@ export function CommunityRadarSection({ mode = 'all' }: CommunityRadarSectionPro
                                     </a>
                                   </div>
                                 )}
-                                <div className="mt-0.5 text-[10px] text-slate-400">
+
+                                <div className="mt-1 text-[10px] text-slate-400">
                                   نُشر: {formatPublishedAt(it.createdAt)}
                                 </div>
                               </li>
@@ -687,53 +773,4 @@ export function CommunityRadarSection({ mode = 'all' }: CommunityRadarSectionPro
                         <button
                           type="button"
                           onClick={() => handleFeedback(place.placeName, place.location, 'expensive')}
-                          className="rounded bg-amber-600 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-amber-500"
-                        >
-                          سعره غالي
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleFeedback(place.placeName, place.location, 'deceptive')}
-                          className="rounded bg-rose-600 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-rose-500"
-                        >
-                          إبلاغ خداع / غير مطابق
-                        </button>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => setSelectedPlaceKey(isSelected ? '' : place.placeKey)}
-                        className="text-[11px] text-slate-300 underline hover:text-white"
-                      >
-                        {isSelected ? 'إخفاء الملاحظة' : 'إضافة سبب/ملاحظة'}
-                      </button>
-                    </div>
-
-                    {isSelected && (
-                      <div className="mt-2 flex gap-2">
-                        <input
-                          type="text"
-                          value={reasonText}
-                          onChange={(e) => setReasonText(e.target.value)}
-                          placeholder="مثال: أعلن عن سكر بسعر منخفض وعند الوصول السعر أعلى..."
-                          className="flex-1 rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-white focus:border-emerald-400 focus:outline-none"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleFeedback(place.placeName, place.location, 'deceptive')}
-                          className="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-rose-500"
-                        >
-                          تأكيد بلاغ الخداع
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </section>
-      )}
-    </div>
-  );
-}
+                          className="rounded bg-amber
