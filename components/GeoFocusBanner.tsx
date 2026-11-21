@@ -60,10 +60,25 @@ async function verifyZoneOnline(query: string): Promise<{ ok: boolean; canonical
 
 export function GeoFocusBanner() {
   const appCtx = useApp();
-  const { entries, activeZone, syncNow } = appCtx;
+  const ctxRecord = appCtx as unknown as Record<string, unknown>;
+  const entries = appCtx.entries;
+  const activeZone = typeof ctxRecord.activeZone === 'string' ? ctxRecord.activeZone : '';
+
+  const triggerSync = () => {
+    const syncFn = ctxRecord.syncNow;
+    if (typeof syncFn === 'function') {
+      (syncFn as () => void)();
+      return;
+    }
+    const expFn = ctxRecord.exportJsonBundle;
+    const impFn = ctxRecord.importJsonBundle;
+    if (typeof expFn === 'function' && typeof impFn === 'function') {
+      const bundle = (expFn as () => unknown)();
+      (impFn as (b: unknown) => void)(bundle);
+    }
+  };
 
   const applyZoneFocus = (zone: string) => {
-    const ctxRecord = appCtx as unknown as Record<string, unknown>;
     const candidateKeys = ['setActiveZone', 'selectZone', 'focusZone', 'setZone', 'updateActiveZone'];
     for (const key of candidateKeys) {
       const fn = ctxRecord[key];
@@ -77,9 +92,7 @@ export function GeoFocusBanner() {
     } catch {
       // تجاهل أخطاء التخزين المحلي
     }
-    if (typeof syncNow === 'function') {
-      syncNow();
-    }
+    triggerSync();
   };
 
   const [savedZones, setSavedZones] = useState<VerifiedZone[]>([]);
@@ -209,7 +222,7 @@ export function GeoFocusBanner() {
           )}
           <button
             type="button"
-            onClick={() => syncNow()}
+            onClick={triggerSync}
             className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500"
           >
             مزامنة الأقران
