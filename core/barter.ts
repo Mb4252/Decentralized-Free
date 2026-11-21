@@ -1,110 +1,97 @@
-import type { MarketEntry, RankedMatch, SmartMatch } from './types';
+import type { MarketEntry, RankedMatch } from './types';
 import { geoProximity, normalizeGeoText } from './normalization';
 
+export type { RankedMatch };
+
+export interface SmartMatch {
+  id: string;
+  type: 'direct' | 'cycle3';
+  giveEntry: MarketEntry;
+  wantEntry: MarketEntry;
+  thirdEntry?: MarketEntry;
+  score: number;
+  reason?: string;
+}
+
 function itemKey(s: string): string {
-  return normalizeGeoText(s);
+  return normalizeGeoText(s).replace(/\s+/g, '');
 }
 
-function valueBalance(a: MarketEntry, b: MarketEntry): number {
-  const pa = typeof a.price === 'number' ? a.price : null;
-  const pb = typeof b.price === 'number' ? b.price : null;
-  if (pa == null || pb == null || pa <= 0 || pb <= 0) return 0.5;
-  return Math.min(pa, pb) / Math.max(pa, pb);
+function isSameItem(a: string | undefined, b: string | undefined): boolean {
+  if (!a || !b) return false;
+  const ka = itemKey(a);
+  const kb = itemKey(b);
+  if (!ka || !kb) return false;
+  return ka === kb || ka.includes(kb) || kb.includes(ka);
 }
 
-function recencyScore(createdAt: number, now: number): number {
-  const days = Math.max(0, (now - createdAt) / (24 * 60 * 60 * 1000));
-  return Math.max(0, 1 - days / 30);
-}
+export function scoreDirectMatch(offer: MarketEntry, request: MarketEntry): number {
+  if (!isSameItem(offer.item, request.item)) return 0;
 
-export function scoreDirectMatch(
-  offer: MarketEntry,
-  demand: MarketEntry,
-  now: number
-): number {
-  if (offer.authorPeerId && offer.authorPeerId === demand.authorPeerId) return 0;
-  if (offer.kind !== 'have' || demand.kind !== 'need') return 0;
+  let score = 60;
 
-  const overlap =
-    itemKey(offer.item) === itemKey(demand.item) ||
-    (offer.wantItem && itemKey(offer.wantItem) === itemKey(demand.item))
-      ? 1
-      : 0;
-  if (overlap === 0) return 0;
-
-  const reverseOk =
-    demand.wantItem && itemKey(demand.wantItem) === itemKey(offer.item) ? 1 : 0.3;
-
-  const vb = valueBalance(offer, demand);
-  const geo = geoProximity(offer.location, demand.location);
-  const rec = (recencyScore(offer.createdAt, now) + recencyScore(demand.createdAt, now)) / 2;
-
-  return Math.round(
-    (0.45 * overlap + 0.2 * reverseOk + 0.25 * vb + 0.2 * geo + 0.1 * rec) * 100
-  );
-}
-
-export function findRankedMatches(entries: MarketEntry[], now: number): RankedMatch[] {
-  const haves = entries.filter((e) => e.kind === 'have');
-  const needs = entries.filter((e) => e.kind === 'need');
-  const out: RankedMatch[] = [];
-
-  for (const need of needs) {
-    for (const have of haves) {
-      const s = scoreDirectMatch(have, need, now);
-      if (s < 30) continue;
-      const reverse = Boolean(
-        have.wantItem &&
-          need.wantItem &&
-          itemKey(have.wantItem) === itemKey(need.item) &&
-          itemKey(need.wantItem) === itemKey(have.item)
-      );
-      out.push({
-        id: `${have.id}::${need.id}`,
-        type: reverse ? 'reverse' : 'direct',
-        score: s,
-        giveEntry: have,
-        wantEntry: need,
-        reason: reverse ? 'تبادل متكافئ' : 'مطابقة مباشرة',
-      });
-    }
+  if (offer.wantItem && request.wantItem && isSameItem(offer.wantItem, request.wantItem)) {
+    score += 20;
+  } else if (offer.wantItem && isSameItem(offer.wantItem, request.item)) {
+    score += 10;
   }
 
-  for (const a of haves) {
-    for (const b of haves) {
-      if (a.id === b.id) continue;
-      for (const c of haves) {
-        if (c.id === a.id || c.id === b.id) continue;
-        const aToB = needs.some(
-          (n) => n.authorPeerId === b.authorPeerId && itemKey(n.item) === itemKey(a.item)
-        );
-        const bToC = needs.some(
-          (n) => n.authorPeerId === c.authorPeerId && itemKey(n.item) === itemKey(b.item)
-        );
-        const cToA = needs.some(
-          (n) => n.authorPeerId === a.authorPeerId && itemKey(n.item) === itemKey(c.item)
-        );
-        if (aToB && bToC && cToA) {
-          out.push({
-            id: `cycle-${a.id}-${b.id}-${c.id}`,
-            type: 'cycle',
-            score: 80,
-            giveEntry: a,
-            wantEntry: b,
-            cyclePath: [a, b, c],
-            reason: 'دورة ثلاثية مقترحة',
-          });
-        }
+  const prox = geoProximity(offer.location, request.location);
+  score += Math.round(prox * 20);
+
+  return Math.min(100, Math.max(0, score));
+}
+
+export function findRankedMatches(entries: MarketEntry[]): RankedMatch[] {
+  const offers = entries.filter((e) => e.kind === 'have');
+  const requests = entries.filter((e) => e.kind === 'need');
+  const results: RankedMatch[] = [];
+
+  for (const offer of offers) {
+    for (const req of requests) {
+      if (offer.id === req.id) continue;
+      const directScore = scoreDirectMatch(offer, req);
+      if (directScore >= 60) {
+        results.push({
+          id: `${offer.id}-${req.id}`,
+          type: 'direct',
+          giveEntry: offer,
+          wantEntry: req,
+          score: directScore,
+          reason: `مطابقة مباشرة لسلعة «${req.item}»`,
+        });
       }
     }
   }
 
-  return out.sort((x, y) => y.score - x.score);
+  for (let i = 0; i < offers.length; i++) {
+    for (let j = 0; j < offers.length; j++) {
+      if (i === j) continue;
+      const a = offers[i];
+      const b = offers[j];
+      if (!a.wantItem || !b.wantItem) continue;
+
+      const reqForA = requests.find((r) => isSameItem(r.item, a.wantItem));
+      const reqForB = requests.find((r) => isSameItem(r.item, b.wantItem));
+      if (reqForA && reqForB && reqForA.id !== reqForB.id) {
+        const prox = geoProximity(a.location, b.location);
+        const cycleScore = Math.min(92, 65 + Math.round(prox * 20));
+        results.push({
+          id: `cycle3-${a.id}-${b.id}-${reqForA.id}`,
+          type: 'cycle3',
+          giveEntry: a,
+          wantEntry: reqForA,
+          thirdEntry: b,
+          score: cycleScore,
+          reason: `مقايضة ثلاثية مقترحة عبر «${a.item}» و«${b.item}»`,
+        });
+      }
+    }
+  }
+
+  return results.sort((x, y) => y.score - x.score);
 }
 
-export function findBarterMatches(
-  entries: MarketEntry[],
-  now: number = Date.now()
-): SmartMatch[] {
-  return findRankedMatches(entries, now) as unknown as SmartMatch[];
+export function findBarterMatches(entries: MarketEntry[]): SmartMatch[] {
+  return findRankedMatches(entries) as SmartMatch[];
 }
