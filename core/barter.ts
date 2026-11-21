@@ -42,7 +42,8 @@ export function scoreDirectMatch(offer: MarketEntry, request: MarketEntry): numb
   return Math.min(100, Math.max(0, score));
 }
 
-function computeSmartMatches(entries: MarketEntry[]): SmartMatch[] {
+function computeSmartMatches(entries: MarketEntry[], _now?: number): SmartMatch[] {
+  void _now;
   const offers = entries.filter((e) => e.kind === 'have');
   const requests = entries.filter((e) => e.kind === 'need');
   const results: SmartMatch[] = [];
@@ -92,13 +93,13 @@ function computeSmartMatches(entries: MarketEntry[]): SmartMatch[] {
   return results.sort((x, y) => y.score - x.score);
 }
 
-export function findRankedMatches(entries: MarketEntry[]): RankedMatch[] {
-  return computeSmartMatches(entries).map(({ thirdEntry: _ignored, reason, ...ranked }) => ({
+export function findRankedMatches(entries: MarketEntry[], now?: number): RankedMatch[] {
+  return computeSmartMatches(entries, now).map(({ thirdEntry: _ignored, reason, ...ranked }) => ({
     ...ranked,
     reason: reason || 'مطابقة مقترحة',
   }));
 }
 
-export function findBarterMatches(entries: MarketEntry[]): SmartMatch[] {
-  return computeSmartMatches(entries);
+export function findBarterMatches(entries: MarketEntry[], now?: number): SmartMatch[] {
+  return computeSmartMatches(entries, now);
 }
