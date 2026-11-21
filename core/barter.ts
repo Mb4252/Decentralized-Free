@@ -10,7 +10,7 @@ export interface SmartMatch {
   wantEntry: MarketEntry;
   thirdEntry?: MarketEntry;
   score: number;
-  reason?: string;
+  reason: string;
 }
 
 function itemKey(s: string): string {
@@ -93,7 +93,10 @@ function computeSmartMatches(entries: MarketEntry[]): SmartMatch[] {
 }
 
 export function findRankedMatches(entries: MarketEntry[]): RankedMatch[] {
-  return computeSmartMatches(entries).map(({ thirdEntry: _ignored, ...ranked }) => ranked);
+  return computeSmartMatches(entries).map(({ thirdEntry: _ignored, reason, ...ranked }) => ({
+    ...ranked,
+    reason: reason || 'مطابقة مقترحة',
+  }));
 }
 
 export function findBarterMatches(entries: MarketEntry[]): SmartMatch[] {
