@@ -5,7 +5,7 @@ export type { RankedMatch };
 
 export interface SmartMatch {
   id: string;
-  type: 'direct' | 'cycle3';
+  type: 'direct' | 'reverse' | 'cycle';
   giveEntry: MarketEntry;
   wantEntry: MarketEntry;
   thirdEntry?: MarketEntry;
@@ -78,7 +78,7 @@ export function findRankedMatches(entries: MarketEntry[]): RankedMatch[] {
         const cycleScore = Math.min(92, 65 + Math.round(prox * 20));
         results.push({
           id: `cycle3-${a.id}-${b.id}-${reqForA.id}`,
-          type: 'cycle3',
+          type: 'cycle',
           giveEntry: a,
           wantEntry: reqForA,
           thirdEntry: b,
