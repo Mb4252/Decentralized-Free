@@ -59,7 +59,28 @@ async function verifyZoneOnline(query: string): Promise<{ ok: boolean; canonical
 }
 
 export function GeoFocusBanner() {
-  const { entries, activeZone, setActiveZone, syncNow } = useApp();
+  const appCtx = useApp();
+  const { entries, activeZone, syncNow } = appCtx;
+
+  const applyZoneFocus = (zone: string) => {
+    const ctxRecord = appCtx as unknown as Record<string, unknown>;
+    const candidateKeys = ['setActiveZone', 'selectZone', 'focusZone', 'setZone', 'updateActiveZone'];
+    for (const key of candidateKeys) {
+      const fn = ctxRecord[key];
+      if (typeof fn === 'function') {
+        (fn as (z: string) => void)(zone);
+        break;
+      }
+    }
+    try {
+      localStorage.setItem('fair_radar_active_zone_v1', zone);
+    } catch {
+      // تجاهل أخطاء التخزين المحلي
+    }
+    if (typeof syncNow === 'function') {
+      syncNow();
+    }
+  };
 
   const [savedZones, setSavedZones] = useState<VerifiedZone[]>([]);
   const [zoneInput, setZoneInput] = useState<string>('');
@@ -141,7 +162,7 @@ export function GeoFocusBanner() {
 
     const finalName = result.ok ? result.canonicalName : cleaned;
     addVerifiedZone(finalName, result.ok ? 'online' : 'manual');
-    setActiveZone(finalName);
+    applyZoneFocus(finalName);
     setZoneInput('');
 
     if (result.ok) {
@@ -155,11 +176,11 @@ export function GeoFocusBanner() {
   const handleSelectZone = (zoneValue: string) => {
     const cleaned = cleanZoneName(zoneValue);
     if (!cleaned) {
-      setActiveZone('');
+      applyZoneFocus('');
       return;
     }
     addVerifiedZone(cleaned, 'manual');
-    setActiveZone(cleaned);
+    applyZoneFocus(cleaned);
   };
 
   return (
@@ -180,7 +201,7 @@ export function GeoFocusBanner() {
           {currentCleanZone && (
             <button
               type="button"
-              onClick={() => setActiveZone('')}
+              onClick={() => applyZoneFocus('')}
               className="rounded-lg border border-slate-600 bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-700"
             >
               عرض كل المناطق
@@ -196,7 +217,6 @@ export function GeoFocusBanner() {
         </div>
       </div>
 
-      {/* تحقق وحفظ منطقة جديدة */}
       <form onSubmit={handleVerifyAndSaveZone} className="flex flex-col gap-2 sm:flex-row">
         <input
           type="text"
@@ -220,7 +240,6 @@ export function GeoFocusBanner() {
         </div>
       )}
 
-      {/* قائمة المناطق المحفوظة والمرصودة للاختيار السريع */}
       <div className="space-y-1.5">
         <div className="text-[11px] font-semibold text-slate-300">
           المناطق المحفوظة ({allZones.length}) — اضغط لاختيار منطقتك:
