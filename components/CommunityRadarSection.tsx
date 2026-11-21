@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { useApp } from '@/lib/context';
-import type { PlaceFeedbackVerdict } from '@/core/types';
+import { PlaceFeedbackVerdict } from '@/core/market-intelligence';
 
 interface CommunityRadarSectionProps {
   mode?: 'all' | 'deals-only' | 'places-only';
@@ -36,6 +36,20 @@ function cleanZoneOnly(zone?: string | null, placeName?: string): string {
   return text;
 }
 
+function normalizeSourceKey(name?: string): string {
+  return (name || '')
+    .trim()
+    .replace(/[أإآ]/g, 'ا')
+    .replace(/ة/g, 'ه')
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
+}
+
+function isGeneralLabel(placeName?: string): boolean {
+  const k = normalizeSourceKey(placeName);
+  return k === 'الجميع' || k === 'عام' || k === 'شخصي' || k === 'خاص';
+}
+
 function extractPhone(text?: string): string | null {
   if (!text) return null;
   const match = text.match(/(\+?\d[\d\s\-]{6,15}\d)/);
@@ -61,6 +75,7 @@ function getEntryPhone(entry: unknown): string | null {
 
 export function CommunityRadarSection({ mode = 'all' }: CommunityRadarSectionProps) {
   const {
+    entries,
     lowestPriceDeals,
     zonePlaces,
     activeZone,
@@ -72,6 +87,8 @@ export function CommunityRadarSection({ mode = 'all' }: CommunityRadarSectionPro
   const [selectedPlaceKey, setSelectedPlaceKey] = useState<string>('');
   const [reasonText, setReasonText] = useState<string>('');
   const [noticeMessage, setNoticeMessage] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'trusted' | 'excluded'>('all');
 
   const displayZone = cleanZoneOnly(activeZone);
   const showDeals = mode === 'all' || mode === 'deals-only';
@@ -92,12 +109,73 @@ export function CommunityRadarSection({ mode = 'all' }: CommunityRadarSectionPro
     );
   }, [lowestPriceDeals]);
 
+  const filteredDeals = useMemo(() => {
+    const q = normalizeSourceKey(searchQuery);
+    return lowestPriceDeals.filter((deal) => {
+      if (!q) return true;
+      return (
+        normalizeSourceKey(deal.item).includes(q) ||
+        normalizeSourceKey(deal.placeName).includes(q) ||
+        normalizeSourceKey(deal.location).includes(q)
+      );
+    });
+  }, [lowestPriceDeals, searchQuery]);
+
+  const enrichedPlaces = useMemo(() => {
+    const q = normalizeSourceKey(searchQuery);
+
+    return zonePlaces
+      .map((place) => {
+        const placeNorm = normalizeSourceKey(place.placeName);
+        const locNorm = normalizeSourceKey(cleanZoneOnly(place.location, place.placeName));
+
+        const matchingEntries = entries.filter((e) => {
+          const ePlaceNorm = normalizeSourceKey(e.placeName);
+          const eLocNorm = normalizeSourceKey(cleanZoneOnly(e.location, e.placeName));
+          const samePlace = Boolean(ePlaceNorm && placeNorm && ePlaceNorm === placeNorm);
+          const sameLoc = !locNorm || !eLocNorm || eLocNorm === locNorm;
+          return samePlace && sameLoc;
+        });
+
+        const itemDetails = matchingEntries.map((e) => ({
+          id: e.id,
+          item: e.item,
+          kind: e.kind,
+          price: typeof e.price === 'number' ? e.price : null,
+          wantItem: e.wantItem,
+          note: getEntryNote(e),
+          phone: getEntryPhone(e),
+          createdAt: e.createdAt,
+        }));
+
+        return {
+          ...place,
+          itemDetails,
+        };
+      })
+      .filter((place) => {
+        if (statusFilter === 'trusted' && place.isExcluded) return false;
+        if (statusFilter === 'excluded' && !place.isExcluded) return false;
+        if (!q) return true;
+        const inPlace =
+          normalizeSourceKey(place.placeName).includes(q) ||
+          normalizeSourceKey(place.location).includes(q);
+        const inItems = place.itemDetails.some((it) => normalizeSourceKey(it.item).includes(q));
+        return inPlace || inItems;
+      });
+  }, [zonePlaces, entries, searchQuery, statusFilter]);
+
   const handleFeedback = (
     placeName: string,
     location: string,
     verdict: PlaceFeedbackVerdict
   ) => {
-    const res = submitPlaceFeedback({ placeName, location, verdict, reason: reasonText });
+    const res = submitPlaceFeedback({
+      placeName,
+      location,
+      verdict,
+      reason: reasonText,
+    });
     if (res) {
       setReasonText('');
       showNotice(`تم تسجيل رأي المجتمع حول «${placeName}».`);
@@ -119,7 +197,7 @@ export function CommunityRadarSection({ mode = 'all' }: CommunityRadarSectionPro
       lines.push('🏷️ *أقل الأسعار المرصودة اليوم:*');
       validDeals.slice(0, 10).forEach((deal, idx) => {
         const cleanLoc = cleanZoneOnly(deal.location, deal.placeName);
-        const placePart = deal.placeName ? ` — متجر: ${deal.placeName}` : '';
+        const placePart = deal.placeName ? ` — متجر/جهة: ${deal.placeName}` : '';
         const locPart = cleanLoc ? ` [${cleanLoc}]` : '';
         const discPart =
           deal.discountPercent > 0 ? ` (أقل من الوسيط بـ ${deal.discountPercent}%)` : '';
@@ -148,6 +226,33 @@ export function CommunityRadarSection({ mode = 'all' }: CommunityRadarSectionPro
     }
   };
 
+  const handleCopyPlaceReport = async (place: (typeof enrichedPlaces)[number]) => {
+    const cleanLoc = cleanZoneOnly(place.location, place.placeName);
+    const lines: string[] = [
+      `🏪 *تقرير ${place.placeName}* ${cleanLoc ? `(${cleanLoc})` : ''}`,
+      `الحالة: ${place.statusLabel} | البلاغات: ${place.entriesCount}`,
+    ];
+    if (place.lowestPrice !== null || place.avgPrice !== null) {
+      lines.push(`أقل سعر: ${place.lowestPrice ?? '-'} | المتوسط: ${place.avgPrice ?? '-'}`);
+    }
+    if (place.itemDetails.length > 0) {
+      lines.push('السلع والعروض المسجلة:');
+      place.itemDetails.forEach((it) => {
+        const val =
+          it.price !== null ? `${it.price}` : it.wantItem ? `مقابل: ${it.wantItem}` : it.kind;
+        lines.push(`• *${it.item}* — ${val}`);
+        if (it.note) lines.push(`  📝 ${it.note}`);
+        if (it.phone) lines.push(`  📞 ${it.phone}`);
+      });
+    }
+    try {
+      await navigator.clipboard.writeText(lines.join('\n'));
+      showNotice(`تم نسخ تقرير «${place.placeName}» للواتساب.`);
+    } catch {
+      showNotice('تعذر النسخ التلقائي من المتصفح.');
+    }
+  };
+
   const handleTriggerLocalRefresh = () => {
     const bundle = exportJsonBundle();
     importJsonBundle(bundle);
@@ -159,6 +264,28 @@ export function CommunityRadarSection({ mode = 'all' }: CommunityRadarSectionPro
 
   return (
     <div className="space-y-4">
+      {/* بحث سريع مشترك */}
+      <div className="rounded-xl border border-slate-700 bg-slate-900 p-3">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="ابحث باسم السلعة (مثل: دقيق، سكر، هاتف) أو المتجر أو الحي..."
+            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white placeholder-slate-400 focus:border-emerald-400 focus:outline-none"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="shrink-0 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-200 hover:bg-slate-700"
+            >
+              مسح البحث
+            </button>
+          )}
+        </div>
+      </div>
+
       {showDeals && (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-700 bg-slate-900 p-3">
           <div className="flex flex-wrap gap-2">
@@ -185,6 +312,12 @@ export function CommunityRadarSection({ mode = 'all' }: CommunityRadarSectionPro
         </div>
       )}
 
+      {showPlaces && !showDeals && noticeMessage && (
+        <div className="rounded-md border border-emerald-500/40 bg-emerald-950 px-3 py-1.5 text-xs font-medium text-emerald-200">
+          {noticeMessage}
+        </div>
+      )}
+
       {showDeals && bestTrustedDeal && (
         <div className="rounded-xl border border-emerald-500/50 bg-slate-950 p-4 text-xs text-slate-100">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -198,8 +331,10 @@ export function CommunityRadarSection({ mode = 'all' }: CommunityRadarSectionPro
                 </span>
               )}
               {bestTrustedDeal.placeName && (
-                <span className="rounded bg-amber-950 border border-amber-500/30 px-2 py-0.5 text-[11px] font-medium text-amber-300">
-                  🏪 {bestTrustedDeal.placeName}
+                <span className="rounded border border-slate-700 bg-slate-900 px-2 py-0.5 text-[11px] font-medium text-slate-200">
+                  {isGeneralLabel(bestTrustedDeal.placeName)
+                    ? `🏷️ ${bestTrustedDeal.placeName}`
+                    : `🏪 ${bestTrustedDeal.placeName}`}
                 </span>
               )}
             </div>
@@ -249,16 +384,18 @@ export function CommunityRadarSection({ mode = 'all' }: CommunityRadarSectionPro
             <h3 className="text-sm font-bold text-emerald-300">
               أقل الأسعار والعروض المخفضة {displayZone ? `في (${displayZone})` : '(كل المناطق)'}
             </h3>
-            <span className="text-xs text-slate-400">مقارنة بأقل سعر مرصود والوسيط السعري</span>
+            <span className="text-xs text-slate-400">
+              مقارنة بأقل سعر مرصود والوسيط السعري
+            </span>
           </div>
 
-          {lowestPriceDeals.length === 0 ? (
+          {filteredDeals.length === 0 ? (
             <p className="text-xs text-slate-400">
-              لا توجد بلاغات أسعار بعد. أضف أسعار اليوم من زر «إضافة» بالأسفل ليبدأ الرصد.
+              لا توجد بلاغات أسعار مطابقة حالياً. أضف أسعار اليوم من زر «إضافة» بالأسفل ليبدأ الرصد.
             </p>
           ) : (
             <div className="grid gap-2.5 sm:grid-cols-2">
-              {lowestPriceDeals.slice(0, 6).map((deal) => {
+              {filteredDeals.slice(0, 8).map((deal) => {
                 const dealNote = getEntryNote(deal.entry);
                 const dealPhone = getEntryPhone(deal.entry);
                 const dealZone = cleanZoneOnly(deal.location, deal.placeName);
@@ -280,7 +417,13 @@ export function CommunityRadarSection({ mode = 'all' }: CommunityRadarSectionPro
 
                     <div className="mt-1 flex flex-wrap gap-2 text-slate-300">
                       {dealZone && <span>📍 {dealZone}</span>}
-                      {deal.placeName && <span className="text-amber-300">🏪 {deal.placeName}</span>}
+                      {deal.placeName && (
+                        <span className="text-amber-300">
+                          {isGeneralLabel(deal.placeName)
+                            ? `🏷️ ${deal.placeName}`
+                            : `🏪 ${deal.placeName}`}
+                        </span>
+                      )}
                     </div>
 
                     <div className="mt-1.5 flex flex-wrap items-center justify-between gap-1 text-[11px] text-slate-300">
@@ -343,56 +486,177 @@ export function CommunityRadarSection({ mode = 'all' }: CommunityRadarSectionPro
       )}
 
       {showPlaces && (
-        <section className="space-y-2.5 rounded-xl border border-slate-700 bg-slate-950 p-4 text-slate-100">
+        <section className="space-y-3 rounded-xl border border-slate-700 bg-slate-950 p-4 text-slate-100">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="text-sm font-bold text-white">
-              المتاجر والمراكز {displayZone ? `في (${displayZone})` : '(كل المناطق)'}
-            </h3>
-            <span className="text-xs text-slate-400">
-              يُستبعد المركز تلقائياً عند إبلاغ 3 أشخاص أو أكثر بأنه مخادع
-            </span>
+            <div>
+              <h3 className="text-sm font-bold text-white">
+                المتاجر والمراكز والجهات {displayZone ? `في (${displayZone})` : '(كل المناطق)'}
+              </h3>
+              <p className="mt-0.5 text-[11px] text-slate-400">
+                كل مركز أو جهة تعرض سلعها مع السعر أو المقابل بوضوح؛ ويُستبعد المركز تلقائياً عند إبلاغ 3 أشخاص أو أكثر بأنه مخادع.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-1.5 text-[11px]">
+              <button
+                type="button"
+                onClick={() => setStatusFilter('all')}
+                className={`rounded-lg px-2.5 py-1 font-semibold ${
+                  statusFilter === 'all'
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                }`}
+              >
+                الكل
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter('trusted')}
+                className={`rounded-lg px-2.5 py-1 font-semibold ${
+                  statusFilter === 'trusted'
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                }`}
+              >
+                غير المستبعدة
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter('excluded')}
+                className={`rounded-lg px-2.5 py-1 font-semibold ${
+                  statusFilter === 'excluded'
+                    ? 'bg-rose-600 text-white'
+                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                }`}
+              >
+                المستبعدة
+              </button>
+            </div>
           </div>
 
-          {zonePlaces.length === 0 ? (
+          {enrichedPlaces.length === 0 ? (
             <p className="text-xs text-slate-400">
-              لم يتم رصد متاجر أو مراكز بعد. عند إضافة بلاغ وكتابة اسم المركز أو البقالة سيظهر هنا تلقائياً.
+              لا توجد مراكز أو جهات مطابقة حالياً. عند إضافة بلاغ وكتابة اسم المركز أو الجهة سيظهر هنا مع السلع وأسعارها.
             </p>
           ) : (
-            <div className="space-y-2.5">
-              {zonePlaces.map((place) => {
+            <div className="space-y-3">
+              {enrichedPlaces.map((place) => {
                 const isSelected = selectedPlaceKey === place.placeKey;
                 const cleanLoc = cleanZoneOnly(place.location, place.placeName);
+                const generalSource = isGeneralLabel(place.placeName);
+
                 return (
                   <div
                     key={place.placeKey}
-                    className={`rounded-lg border p-3 text-xs ${
+                    className={`rounded-xl border p-3.5 text-xs ${
                       place.isExcluded
                         ? 'border-rose-500/50 bg-rose-950/35 text-rose-100'
                         : 'border-slate-800 bg-slate-900 text-slate-100'
                     }`}
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div>
-                        <span className="text-sm font-bold text-white">🏪 {place.placeName}</span>
-                        {cleanLoc && <span className="mr-2 text-slate-400">📍 ({cleanLoc})</span>}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm font-bold text-white">
+                          {generalSource ? `🏷️ ${place.placeName}` : `🏪 ${place.placeName}`}
+                        </span>
+                        {cleanLoc && (
+                          <span className="rounded bg-slate-800 px-2 py-0.5 text-[11px] text-emerald-300">
+                            📍 {cleanLoc}
+                          </span>
+                        )}
                       </div>
 
-                      <span
-                        className={`rounded-md px-2 py-0.5 text-[11px] font-semibold ${
-                          place.isExcluded
-                            ? 'bg-rose-500/25 text-rose-200'
-                            : place.statusLabel === 'معتمد ومخفض'
-                              ? 'bg-emerald-500/20 text-emerald-300'
-                              : place.statusLabel === 'مرتفع السعر'
-                                ? 'bg-amber-500/20 text-amber-200'
-                                : 'bg-sky-500/20 text-sky-300'
-                        }`}
-                      >
-                        {place.statusLabel}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleCopyPlaceReport(place)}
+                          className="rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-1 text-[11px] font-medium text-slate-200 hover:bg-slate-700"
+                        >
+                          نسخ تقرير المركز
+                        </button>
+                        <span
+                          className={`rounded-md px-2 py-0.5 text-[11px] font-semibold ${
+                            place.isExcluded
+                              ? 'bg-rose-500/25 text-rose-200'
+                              : place.statusLabel === 'معتمد ومخفض'
+                                ? 'bg-emerald-500/20 text-emerald-300'
+                                : place.statusLabel === 'مرتفع السعر'
+                                  ? 'bg-amber-500/20 text-amber-200'
+                                  : 'bg-sky-500/20 text-sky-300'
+                          }`}
+                        >
+                          {place.statusLabel}
+                        </span>
+                      </div>
                     </div>
 
-                    <div className="mt-1.5 flex flex-wrap gap-3 text-[11px] text-slate-300">
+                    {/* عرض السلع المسجلة في هذا المركز/الجهة بوضوح مع السعر/المقابل */}
+                    {place.itemDetails.length > 0 ? (
+                      <div className="mt-2.5 space-y-1.5 rounded-lg border border-slate-800 bg-slate-950 p-2.5">
+                        <div className="text-[11px] font-bold text-emerald-300">
+                          السلع والعروض المسجلة ({place.itemDetails.length}):
+                        </div>
+                        <ul className="divide-y divide-slate-800/80">
+                          {place.itemDetails.map((it) => {
+                            const valueText =
+                              it.price !== null
+                                ? `السعر: ${it.price}`
+                                : it.wantItem
+                                  ? `المقابل: ${it.wantItem}`
+                                  : it.kind === 'have'
+                                    ? 'أملك (عرض)'
+                                    : it.kind === 'need'
+                                      ? 'أحتاج (طلب)'
+                                      : 'بلاغ';
+
+                            return (
+                              <li key={it.id} className="py-1.5 first:pt-0 last:pb-0">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <span className="font-bold text-white">{it.item}</span>
+                                  <span className="rounded bg-emerald-950 border border-emerald-500/30 px-2 py-0.5 text-[11px] font-bold text-emerald-300">
+                                    {valueText}
+                                  </span>
+                                </div>
+                                {it.note && (
+                                  <div className="mt-1 text-[11px] text-slate-300">
+                                    📝 {it.note}
+                                  </div>
+                                )}
+                                {it.phone && (
+                                  <div className="mt-1 flex flex-wrap gap-2">
+                                    <a
+                                      href={`tel:${it.phone}`}
+                                      className="rounded bg-sky-700 px-2 py-0.5 text-[10px] font-medium text-white hover:bg-sky-600"
+                                    >
+                                      📞 {it.phone}
+                                    </a>
+                                    <a
+                                      href={`https://wa.me/${it.phone.replace(/[^\d]/g, '')}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="rounded bg-emerald-700 px-2 py-0.5 text-[10px] font-medium text-white hover:bg-emerald-600"
+                                    >
+                                      💬 واتساب
+                                    </a>
+                                  </div>
+                                )}
+                                <div className="mt-0.5 text-[10px] text-slate-400">
+                                  نُشر: {formatPublishedAt(it.createdAt)}
+                                </div>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    ) : (
+                      place.sampleItems.length > 0 && (
+                        <div className="mt-1.5 text-[11px] text-slate-300">
+                          السلع المسجلة: {place.sampleItems.join('، ')}
+                        </div>
+                      )
+                    )}
+
+                    <div className="mt-2 flex flex-wrap gap-3 text-[11px] text-slate-300">
                       <span>البلاغات: {place.entriesCount}</span>
                       {place.lowestPrice !== null && <span>أقل سعر: {place.lowestPrice}</span>}
                       {place.avgPrice !== null && <span>المتوسط: {place.avgPrice}</span>}
@@ -403,12 +667,6 @@ export function CommunityRadarSection({ mode = 'all' }: CommunityRadarSectionPro
                         خداع/غير مطابق: {place.deceptiveCount} ({place.uniqueDeceptiveReporters} مُبلّغ)
                       </span>
                     </div>
-
-                    {place.sampleItems.length > 0 && (
-                      <div className="mt-1 text-[11px] text-slate-400">
-                        أبرز السلع: {place.sampleItems.join('، ')}
-                      </div>
-                    )}
 
                     <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 border-t border-slate-800 pt-2">
                       <div className="flex flex-wrap gap-1.5">
