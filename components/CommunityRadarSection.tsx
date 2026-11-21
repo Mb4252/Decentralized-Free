@@ -307,7 +307,6 @@ export function CommunityRadarSection({ mode = 'all' }: CommunityRadarSectionPro
 
   return (
     <div className="space-y-4">
-      {/* بحث سريع مشترك */}
       <div className="rounded-xl border border-slate-700 bg-slate-900 p-3">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <input
@@ -369,7 +368,7 @@ export function CommunityRadarSection({ mode = 'all' }: CommunityRadarSectionPro
             </span>
             <div className="flex flex-wrap gap-1.5">
               {bestTrustedDeal.entry?.category && (
-                <span className="rounded bg-amber-950 border border-amber-500/30 px-2 py-0.5 text-[11px] font-medium text-amber-200">
+                <span className="rounded border border-amber-500/30 bg-amber-950 px-2 py-0.5 text-[11px] font-medium text-amber-200">
                   📂 قسم: {bestTrustedDeal.entry.category}
                 </span>
               )}
@@ -644,7 +643,6 @@ export function CommunityRadarSection({ mode = 'all' }: CommunityRadarSectionPro
                       </div>
                     </div>
 
-                    {/* عرض كل منشور مع نوعه (أملك عرض / أحتاج طلب / بلاغ سعر) وقسمه وجميع تفاصيله */}
                     {place.itemDetails.length > 0 ? (
                       <div className="mt-2.5 space-y-2 rounded-lg border border-slate-800 bg-slate-950 p-2.5">
                         <div className="text-[11px] font-bold text-emerald-300">
@@ -773,4 +771,53 @@ export function CommunityRadarSection({ mode = 'all' }: CommunityRadarSectionPro
                         <button
                           type="button"
                           onClick={() => handleFeedback(place.placeName, place.location, 'expensive')}
-                          className="rounded bg-amber
+                          className="rounded bg-amber-600 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-amber-500"
+                        >
+                          سعره غالي
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleFeedback(place.placeName, place.location, 'deceptive')}
+                          className="rounded bg-rose-600 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-rose-500"
+                        >
+                          إبلاغ خداع / غير مطابق
+                        </button>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setSelectedPlaceKey(isSelected ? '' : place.placeKey)}
+                        className="text-[11px] text-slate-300 underline hover:text-white"
+                      >
+                        {isSelected ? 'إخفاء الملاحظة' : 'إضافة سبب/ملاحظة'}
+                      </button>
+                    </div>
+
+                    {isSelected && (
+                      <div className="mt-2 flex gap-2">
+                        <input
+                          type="text"
+                          value={reasonText}
+                          onChange={(e) => setReasonText(e.target.value)}
+                          placeholder="مثال: أعلن عن سكر بسعر منخفض وعند الوصول السعر أعلى..."
+                          className="flex-1 rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-white focus:border-emerald-400 focus:outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleFeedback(place.placeName, place.location, 'deceptive')}
+                          className="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-rose-500"
+                        >
+                          تأكيد بلاغ الخداع
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      )}
+    </div>
+  );
+}
