@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎬 صانع الفيديو — يعمل في متصفحك</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
+    <script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎬 صانع الفيديو الذكي</h1>
+            <p class="sub">كل شيء يعمل في متصفحك — صورك لا تترك جهازك أبداً</p>
+        </header>
+
+        <section class="card">
+            <h2>1️⃣ ارفع صورك</h2>
+            <div class="drop-zone" id="dropZone">
+                <p>اسحب الصور هنا أو اضغط للاختيار</p>
+                <input type="file" id="imageInput" accept="image/*" multiple hidden>
+            </div>
+            <div id="imagePreview" class="preview-grid"></div>
+            <button id="clearImages" class="btn-secondary hidden">🗑️ حذف كل الصور</button>
+        </section>
+
+        <section class="card">
+            <h2>2️⃣ الصوت (اختياري)</h2>
+            <input type="file" id="audioInput" accept="audio/*">
+            <audio id="audioPreview" controls class="hidden"></audio>
+        </section>
+
+        <section class="card">
+            <h2>3️⃣ إعدادات الحركة</h2>
+            <label>نوع الحركة</label>
+            <select id="motionType">
+                <option value="kenburns">Ken Burns (احترافي)</option>
+                <option value="zoom_in">تكبير تدريجي</option>
+                <option value="zoom_out">تصغير تدريجي</option>
+                <option value="pan_right">تحريك لليمين</option>
+                <option value="pan_left">تحريك لليسار</option>
+            </select>
+
+            <label>الانتقال بين الصور</label>
+            <select id="transitionType">
+                <option value="fade">تلاشي</option>
+                <option value="slideleft">انزلاق</option>
+                <option value="none">بدون</option>
+            </select>
+
+            <label>مدة كل صورة (ثواني)</label>
+            <input type="number" id="duration" value="3" min="1" max="10" step="0.5">
+
+            <label>الدقة</label>
+            <select id="resolution">
+                <option value="1280x720">720p (موصى به)</option>
+                <option value="1920x1080">1080p (أبطأ)</option>
+                <option value="854x480">480p (أسرع)</option>
+            </select>
+        </section>
+
+        <section class="card">
+            <button id="generateBtn" class="btn-primary">🚀 إنشاء الفيديو</button>
+            <div id="status" class="status hidden"></div>
+        </section>
+
+        <section class="card" id="resultCard" style="display:none;">
+            <h2>🎉 الفيديو جاهز!</h2>
+            <video id="resultVideo" controls></video>
+            <a id="downloadLink" class="btn-primary" download>📥 تحميل الفيديو</a>
+            <p class="hint">الفيديو محفوظ في متصفحك — يمكنك العودة له لاحقاً</p>
+        </section>
+
+        <section class="card">
+            <h2>📚 فيديوهاتي المحفوظة</h2>
+            <div id="savedVideos"></div>
+        </section>
+    </div>
+
+    <script src="storage.js"></script>
+    <script src="ffmpeg-engine.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
