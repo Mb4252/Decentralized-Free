@@ -3,205 +3,567 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>sdm.coin (SDM) — شبكة ومحفظة وتعدين</title>
+  <title>sdm.coin (SDM) — محفظة وشبكة ومزامنة</title>
   <style>
     :root {
-      --bg: #0b1020;
-      --card: #131b33;
-      --border: #25325c;
-      --text: #eef2ff;
+      --bg: #0b0f17;
+      --card: #131b29;
+      --card-2: #182234;
+      --text: #eef3fb;
       --muted: #94a3b8;
-      --accent: #38bdf8;
-      --ok: #22c55e;
-      --warn: #f59e0b;
+      --accent: #22c55e;
+      --accent-2: #38bdf8;
+      --danger: #ef4444;
+      --border: #263349;
     }
-    * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
-    body { margin: 0; background: var(--bg); color: var(--text); padding: 16px; }
-    .container { max-width: 980px; margin: 0 auto; display: grid; gap: 16px; }
-    .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 16px; }
-    h1, h2, h3 { margin: 0 0 10px; }
-    .muted { color: var(--muted); font-size: 13px; }
-    .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-    input, button {
-      padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border);
-      background: #0d1428; color: var(--text); font-size: 14px;
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 16px;
+      font-family: system-ui, -apple-system, "Segoe UI", Tahoma, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
     }
-    input { flex: 1; min-width: 200px; }
-    button { background: var(--accent); color: #05101d; font-weight: 700; cursor: pointer; border: none; }
-    button.secondary { background: #1e293b; color: var(--text); border: 1px solid var(--border); }
-    .grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
-    .stat { background: #0d1428; border: 1px solid var(--border); border-radius: 12px; padding: 12px; }
-    .stat .val { font-size: 18px; font-weight: 800; margin-top: 4px; color: var(--accent); }
-    pre {
-      background: #080d1a; border: 1px solid var(--border); padding: 12px;
-      border-radius: 10px; overflow: auto; max-height: 280px; font-size: 12px; direction: ltr; text-align: left;
+    .container {
+      max-width: 820px;
+      margin: 0 auto;
+      display: grid;
+      gap: 14px;
     }
-    .badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 12px; background: rgba(56,189,248,0.15); color: var(--accent); }
+    .header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 16px;
+    }
+    .title {
+      margin: 0;
+      font-size: 1.25rem;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      background: var(--card-2);
+      border: 1px solid var(--border);
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--muted);
+    }
+    .dot.online { background: var(--accent); }
+    .dot.offline { background: var(--danger); }
+    .grid-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 10px;
+    }
+    .stat {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+    }
+    .stat-label {
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    .stat-value {
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin-top: 4px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      display: grid;
+      gap: 12px;
+    }
+    .card h2 {
+      margin: 0;
+      font-size: 1rem;
+      color: var(--accent-2);
+    }
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    input, textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--card-2);
+      color: var(--text);
+      font-size: 0.92rem;
+    }
+    button {
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.9rem;
+      background: var(--accent-2);
+      color: #061018;
+    }
+    button.primary { background: var(--accent); color: #05160b; }
+    button.secondary { background: var(--card-2); color: var(--text); border: 1px solid var(--border); }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      word-break: break-all;
+      font-size: 0.85rem;
+      background: var(--card-2);
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+    }
+    .msg {
+      font-size: 0.88rem;
+      color: var(--muted);
+      min-height: 20px;
+    }
+    .blocks-list {
+      max-height: 260px;
+      overflow-y: auto;
+      display: grid;
+      gap: 8px;
+    }
+    .block-item {
+      background: var(--card-2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 0.84rem;
+    }
+    details summary {
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
   </style>
 </head>
 <body>
   <div class="container">
+    <div class="header">
+      <div>
+        <h1 class="title">sdm.coin (SDM)</h1>
+        <div class="msg" id="syncStatusText">جاري المزامنة في الخلفية...</div>
+      </div>
+      <div class="badge">
+        <span class="dot" id="connDot"></span>
+        <span id="connLabel">جاري الفحص</span>
+      </div>
+    </div>
+
+    <div class="grid-stats">
+      <div class="stat">
+        <div class="stat-label">ارتفاع السلسلة (Height)</div>
+        <div class="stat-value" id="statHeight">0</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">صعوبة التعدين (Difficulty)</div>
+        <div class="stat-value" id="statDiff">4</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">المستخدمون النشطون</div>
+        <div class="stat-value" id="statUsers">1</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">المعدّن / حد التعدين</div>
+        <div class="stat-value" id="statMined">0 / 10M</div>
+      </div>
+    </div>
+
+    <!-- المحفظة والرصيد -->
     <div class="card">
-      <div class="row" style="justify-content: space-between;">
-        <div>
-          <h1>عملة sdm.coin (SDM)</h1>
-          <div class="muted">حد أقصى ثابت: 50,000,000 SDM • حد التعدين: 10,000,000 SDM • متوافق مع Decentralized-Free</div>
+      <h2>المحفظة والرصيد</h2>
+      <div class="row">
+        <button class="primary" id="newWalletBtn" type="button">إنشاء محفظة جديدة</button>
+        <button class="secondary" id="refreshBalBtn" type="button">تحديث الرصيد</button>
+      </div>
+      <div>
+        <div class="stat-label">عنوان المحفظة (Address)</div>
+        <input id="walletAddressInput" type="text" placeholder="SDM..." />
+      </div>
+      <div>
+        <div class="stat-label">المفتاح الخاص (Private Key — احتفظ به في مكان آمن)</div>
+        <div class="mono" id="walletPrivBox">غير معروض حالياً</div>
+      </div>
+      <div class="stat-value">الرصيد: <span id="balanceValue">0</span> SDM</div>
+    </div>
+
+    <!-- إرسال تحويل -->
+    <div class="card">
+      <h2>إرسال SDM</h2>
+      <input id="toAddressInput" type="text" placeholder="عنوان المستلم (SDM...)" />
+      <input id="amountInput" type="number" min="1" step="1" placeholder="الكمية (SDM)" />
+      <input id="noteInput" type="text" placeholder="ملاحظة (اختياري)" />
+      <button class="primary" id="sendTxBtn" type="button">إرسال المعاملة</button>
+      <div class="msg" id="txMsg"></div>
+    </div>
+
+    <!-- التعدين -->
+    <div class="card">
+      <h2>التعدين (PoW)</h2>
+      <div class="msg">تزداد صعوبة التعدين تلقائياً مع ارتفاع عدد المستخدمين النشطين في الشبكة.</div>
+      <button class="primary" id="mineBtn" type="button">تعدين كتلة جديدة</button>
+      <div class="msg" id="mineMsg"></div>
+    </div>
+
+    <!-- النسخة الاحتياطية والمزامنة والكتل -->
+    <div class="card">
+      <h2>النسخة الاحتياطية وسجل الكتل</h2>
+      <div class="row">
+        <button class="secondary" id="exportBackupBtn" type="button">تنزيل نسخة احتياطية (JSON)</button>
+        <button class="secondary" id="triggerImportBtn" type="button">استعادة نسخة احتياطية</button>
+        <button class="secondary" id="forceSyncBtn" type="button">مزامنة الآن</button>
+        <input id="importFileInput" type="file" accept="application/json" style="display:none;" />
+      </div>
+      <div class="msg" id="backupMsg">يتم حفظ نسخة احتياطية تلقائياً على هذا الهاتف.</div>
+      <div class="blocks-list" id="blocksList"></div>
+
+      <details>
+        <summary>إعدادات العقدة المتقدمة (اختياري — مخفي افتراضياً)</summary>
+        <div class="row" style="margin-top: 8px;">
+          <input id="nodeUrlInput" type="text" placeholder="https://decentralized-free-2.onrender.com" />
+          <button class="secondary" id="saveNodeBtn" type="button">حفظ الرابط</button>
+          <button class="secondary" id="resetNodeBtn" type="button">استعادة الافتراضي</button>
         </div>
-        <span class="badge">Layer 1 / Go Node</span>
-      </div>
-
-      <div class="row" style="margin-top: 14px;">
-        <input id="nodeUrl" type="text" value="http://localhost:8080" placeholder="رابط العقدة النشطة مثل https://your-node-domain" />
-        <button onclick="refreshAll()">اتصال وتحديث</button>
-        <button class="secondary" onclick="syncNode()">مزامنة العقد</button>
-      </div>
-      <div class="muted" style="margin-top: 8px;">
-        ملاحظة: إذا كنت تفتح الصفحة من موقع HTTPS مثل GitHub Pages، يجب أن يكون رابط العقدة HTTPS لتجنب حظر المتصفح.
-      </div>
-    </div>
-
-    <div class="grid-4" id="statsGrid">
-      <div class="stat"><div class="muted">الحد الثابت للعملة</div><div class="val" id="sMax">50,000,000</div></div>
-      <div class="stat"><div class="muted">المعدّن / المتبقي للتعدين</div><div class="val" id="sMined">0 / 10M</div></div>
-      <div class="stat"><div class="muted">ارتفاع السلسلة (Block)</div><div class="val" id="sHeight">0</div></div>
-      <div class="stat"><div class="muted">صعوبة التعدين الحالية</div><div class="val" id="sDiff">5</div></div>
-    </div>
-
-    <div class="card">
-      <h2>1. إنشاء محفظة وفحص الرصيد</h2>
-      <div class="row" style="margin-bottom: 10px;">
-        <button onclick="createWallet()">إنشاء محفظة جديدة</button>
-        <input id="checkAddr" type="text" placeholder="أدخل عنوان المحفظة لفحص الرصيد (مثال SDM1...)" />
-        <button class="secondary" onclick="checkBalance()">فحص الرصيد</button>
-      </div>
-      <div id="balanceResult" class="muted">الرصيد: —</div>
-      <pre id="walletBox">// ستظهر بيانات المحفظة (العنوان، المفتاح العام، المفتاح الخاص) هنا عند إنشائها</pre>
-    </div>
-
-    <div class="card">
-      <h2>2. إرسال تحويل SDM</h2>
-      <div class="row" style="margin-bottom: 10px;">
-        <input id="txFrom" type="text" placeholder="عنوان المرسل (From)" />
-        <input id="txPriv" type="password" placeholder="المفتاح الخاص للتوقيع (Private Key)" />
-      </div>
-      <div class="row">
-        <input id="txTo" type="text" placeholder="عنوان المستلم (To)" />
-        <input id="txAmount" type="number" step="0.00000001" placeholder="الكمية (SDM)" />
-        <button onclick="sendTransfer()">إرسال التحويل</button>
-      </div>
-      <pre id="txResult">// نتيجة التحويل ستظهر هنا</pre>
-    </div>
-
-    <div class="card">
-      <h2>3. التعدين البطيء (Proof of Work)</h2>
-      <div class="row">
-        <input id="minerAddr" type="text" placeholder="عنوان محفظة المعدّن لاستلام مكافأة التعدين" />
-        <button onclick="mineBlock()">بدء تعدين كتلة</button>
-      </div>
-      <div class="muted" style="margin-top: 8px;">يستغرق التعدين وقتاً حقيقياً حسب صعوبة الشبكة ويتوقف تلقائياً عند بلوغ 10,000,000 SDM.</div>
-      <pre id="mineResult">// سجل التعدين سيظهر هنا</pre>
-    </div>
-
-    <div class="card">
-      <h2>4. إضافة عقدة أخرى (Peer) ومستكشف الكتل</h2>
-      <div class="row" style="margin-bottom: 10px;">
-        <input id="peerUrl" type="text" placeholder="رابط عقدة أخرى مثل http://IP:8080" />
-        <button class="secondary" onclick="addPeer()">إضافة عقدة</button>
-      </div>
-      <pre id="chainBox">// آخر الكتل ستظهر هنا</pre>
+      </details>
     </div>
   </div>
 
   <script>
-    const getBase = () => document.getElementById("nodeUrl").value.trim().replace(/\/+$/, "");
+    const DEFAULT_NODE_URL = "https://decentralized-free-2.onrender.com";
 
-    async function refreshAll() {
-      const base = getBase();
+    const KEYS = {
+      nodeUrl: "sdm_node_url_v1",
+      chainBackup: "sdm_chain_backup_v1",
+      wallet: "sdm_wallet_v1",
+      userId: "sdm_phone_user_id_v1"
+    };
+
+    function getUserId() {
+      let uid = localStorage.getItem(KEYS.userId);
+      if (!uid) {
+        uid = "phone_" + Math.random().toString(36).slice(2, 10);
+        localStorage.setItem(KEYS.userId, uid);
+      }
+      return uid;
+    }
+
+    function getNodeUrl() {
+      const custom = (localStorage.getItem(KEYS.nodeUrl) || "").trim();
+      return (custom || DEFAULT_NODE_URL).replace(/\/+$/, "");
+    }
+
+    function setConnectionBadge(online, text) {
+      const dot = document.getElementById("connDot");
+      const label = document.getElementById("connLabel");
+      dot.className = "dot " + (online ? "online" : "offline");
+      label.textContent = text;
+    }
+
+    function saveWallet(wallet) {
+      localStorage.setItem(KEYS.wallet, JSON.stringify(wallet));
+    }
+
+    function loadWallet() {
       try {
-        const res = await fetch(`${base}/status`);
-        const st = await res.json();
-        document.getElementById("sMax").textContent = `${Number(st.fixed_max_supply_sdm).toLocaleString()} SDM`;
-        document.getElementById("sMined").textContent = `${Number(st.mined_supply_sdm).toLocaleString()} / 10M`;
-        document.getElementById("sHeight").textContent = st.block_height;
-        document.getElementById("sDiff").textContent = st.current_difficulty;
-
-        const cRes = await fetch(`${base}/chain`);
-        const cData = await cRes.json();
-        const lastBlocks = (cData.chain || []).slice(-5).reverse();
-        document.getElementById("chainBox").textContent = JSON.stringify(lastBlocks, null, 2);
-      } catch (e) {
-        alert("تعذر الاتصال بالعقدة: " + e.message);
+        const raw = localStorage.getItem(KEYS.wallet);
+        return raw ? JSON.parse(raw) : null;
+      } catch {
+        return null;
       }
     }
 
-    async function syncNode() {
-      const res = await fetch(`${getBase()}/sync`, { method: "POST" });
-      const data = await res.json();
-      alert("تمت المزامنة. السلاسل المحدثة: " + data.synced_chains);
-      refreshAll();
+    function saveChainBackup(syncData) {
+      try {
+        const payload = {
+          saved_at: new Date().toISOString(),
+          height: syncData.height ?? Math.max(0, (syncData.chain?.length || 1) - 1),
+          difficulty: syncData.difficulty ?? 4,
+          active_users: syncData.active_users ?? 1,
+          chain: Array.isArray(syncData.chain) ? syncData.chain : []
+        };
+        localStorage.setItem(KEYS.chainBackup, JSON.stringify(payload));
+        document.getElementById("backupMsg").textContent =
+          `تم حفظ نسخة احتياطية محلية (الارتفاع: ${payload.height}، الكتل: ${payload.chain.length}).`;
+      } catch (err) {
+        console.warn("Backup error:", err);
+      }
     }
 
-    async function createWallet() {
-      const res = await fetch(`${getBase()}/wallet/new`);
-      const w = await res.json();
-      document.getElementById("walletBox").textContent = JSON.stringify(w, null, 2);
-      document.getElementById("checkAddr").value = w.address;
-      document.getElementById("minerAddr").value = w.address;
-      document.getElementById("txFrom").value = w.address;
-      document.getElementById("txPriv").value = w.private_key;
+    function loadChainBackup() {
+      try {
+        const raw = localStorage.getItem(KEYS.chainBackup);
+        return raw ? JSON.parse(raw) : null;
+      } catch {
+        return null;
+      }
     }
 
-    async function checkBalance() {
-      const addr = document.getElementById("checkAddr").value.trim();
-      if (!addr) return;
-      const res = await fetch(`${getBase()}/balance?address=${encodeURIComponent(addr)}`);
-      const data = await res.json();
-      document.getElementById("balanceResult").textContent = `الرصيد: ${data.balance_sdm} SDM (${data.balance_usdm} usdm)`;
+    function renderBlocks(chain) {
+      const list = document.getElementById("blocksList");
+      if (!Array.isArray(chain) || chain.length === 0) {
+        list.innerHTML = `<div class="block-item">لا توجد كتل معروضة بعد.</div>`;
+        return;
+      }
+      const recent = [...chain].reverse().slice(0, 20);
+      list.innerHTML = recent.map((b) => `
+        <div class="block-item">
+          <div><strong>كتلة #${b.index}</strong> — صعوبة: <strong>${b.difficulty ?? "-"}</strong> — معاملات: <strong>${(b.transactions || []).length}</strong></div>
+          <div class="mono" style="margin-top:6px;">Hash: ${b.hash}</div>
+        </div>
+      `).join("");
     }
 
-    async function sendTransfer() {
-      const payload = {
-        from: document.getElementById("txFrom").value.trim(),
-        private_key: document.getElementById("txPriv").value.trim(),
-        to: document.getElementById("txTo").value.trim(),
-        amount: parseFloat(document.getElementById("txAmount").value)
-      };
-      const res = await fetch(`${getBase()}/transfer`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+    function applyStatsToUI(statusData, syncData) {
+      if (statusData) {
+        document.getElementById("statHeight").textContent = statusData.height ?? 0;
+        document.getElementById("statDiff").textContent = statusData.difficulty ?? 4;
+        document.getElementById("statUsers").textContent = statusData.active_users ?? 1;
+        const mined = Number(statusData.mined_supply || 0).toLocaleString("en-US");
+        const cap = Number(statusData.mining_cap || 10000000).toLocaleString("en-US");
+        document.getElementById("statMined").textContent = `${mined} / ${cap}`;
+      }
+      if (syncData && Array.isArray(syncData.chain)) {
+        document.getElementById("statHeight").textContent = Math.max(0, syncData.chain.length - 1);
+        renderBlocks(syncData.chain);
+      }
+    }
+
+    async function refreshBalance() {
+      const addr = document.getElementById("walletAddressInput").value.trim();
+      if (!addr) {
+        document.getElementById("balanceValue").textContent = "0";
+        return;
+      }
+      try {
+        const res = await fetch(`${getNodeUrl()}/balance?address=${encodeURIComponent(addr)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        document.getElementById("balanceValue").textContent = Number(data.balance || 0).toLocaleString("en-US");
+      } catch {
+        // يبقي القيمة الحالية عند الانقطاع المؤقت
+      }
+    }
+
+    async function backgroundSync() {
+      const baseUrl = getNodeUrl();
+      const userId = encodeURIComponent(getUserId());
+      const localBackup = loadChainBackup();
+
+      if (localBackup && Array.isArray(localBackup.chain)) {
+        applyStatsToUI(localBackup, localBackup);
+      }
+
+      try {
+        const [statusRes, syncRes] = await Promise.all([
+          fetch(`${baseUrl}/status?user=${userId}`),
+          fetch(`${baseUrl}/sync`)
+        ]);
+        if (!statusRes.ok || !syncRes.ok) {
+          throw new Error("Node response not ok");
+        }
+
+        const statusData = await statusRes.json();
+        let syncData = await syncRes.json();
+
+        if (
+          localBackup &&
+          Array.isArray(localBackup.chain) &&
+          Array.isArray(syncData.chain) &&
+          localBackup.chain.length > syncData.chain.length
+        ) {
+          const pushRes = await fetch(`${baseUrl}/sync`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ chain: localBackup.chain, user_id: getUserId() })
+          });
+          if (pushRes.ok) {
+            const pushed = await pushRes.json();
+            if (Array.isArray(pushed.chain)) syncData.chain = pushed.chain;
+            if (typeof pushed.height === "number") syncData.height = pushed.height;
+          }
+        }
+
+        saveChainBackup(syncData);
+        applyStatsToUI(statusData, syncData);
+        setConnectionBadge(true, "متصل ويعمل بالخلفية");
+        document.getElementById("syncStatusText").textContent =
+          `آخر مزامنة ناجحة: ${new Date().toLocaleTimeString("ar")}`;
+        await refreshBalance();
+      } catch {
+        setConnectionBadge(false, localBackup ? "نسخة محلية نشطة" : "غير متصل");
+        document.getElementById("syncStatusText").textContent =
+          localBackup
+            ? "تعذر الوصول للخادم حالياً — يتم استخدام النسخة الاحتياطية المحلية."
+            : "تعذر الوصول للعقدة حالياً، سيعاد المحاولة تلقائياً.";
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const nodeInput = document.getElementById("nodeUrlInput");
+      nodeInput.value = getNodeUrl();
+
+      const savedWallet = loadWallet();
+      if (savedWallet?.address) {
+        document.getElementById("walletAddressInput").value = savedWallet.address;
+        if (savedWallet.private_key) {
+          document.getElementById("walletPrivBox").textContent = savedWallet.private_key;
+        }
+      }
+
+      document.getElementById("newWalletBtn").addEventListener("click", async () => {
+        try {
+          const res = await fetch(`${getNodeUrl()}/wallet/new`);
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "خطأ في إنشاء المحفظة");
+          saveWallet(data);
+          document.getElementById("walletAddressInput").value = data.address;
+          document.getElementById("walletPrivBox").textContent = data.private_key || "تم الإنشاء";
+          await refreshBalance();
+        } catch (err) {
+          alert(err.message);
+        }
       });
-      const txt = await res.text();
-      document.getElementById("txResult").textContent = txt;
-      refreshAll();
-    }
 
-    async function mineBlock() {
-      const miner = document.getElementById("minerAddr").value.trim();
-      document.getElementById("mineResult").textContent = "⏳ جاري التعدين... قد يستغرق بعض الوقت حسب الصعوبة";
-      const res = await fetch(`${getBase()}/mine`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ miner })
+      document.getElementById("refreshBalBtn").addEventListener("click", refreshBalance);
+
+      document.getElementById("sendTxBtn").addEventListener("click", async () => {
+        const from = document.getElementById("walletAddressInput").value.trim();
+        const to = document.getElementById("toAddressInput").value.trim();
+        const amount = Number(document.getElementById("amountInput").value);
+        const note = document.getElementById("noteInput").value.trim();
+        const msg = document.getElementById("txMsg");
+
+        if (!from || !to || !amount || amount <= 0) {
+          msg.textContent = "يرجى إدخال عنوان المرسل والمستلم وكمية صحيحة أكبر من صفر.";
+          return;
+        }
+        msg.textContent = "جاري إرسال المعاملة...";
+        try {
+          const res = await fetch(`${getNodeUrl()}/transfer`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ from, to, amount, note, user_id: getUserId() })
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "فشل التحويل");
+          msg.textContent = "تمت إضافة المعاملة إلى قائمة الانتظار (Mempool)، قم بتعدين كتلة لتأكيدها.";
+          document.getElementById("amountInput").value = "";
+          document.getElementById("noteInput").value = "";
+        } catch (err) {
+          msg.textContent = err.message;
+        }
       });
-      const txt = await res.text();
-      document.getElementById("mineResult").textContent = txt;
-      refreshAll();
-    }
 
-    async function addPeer() {
-      const peer = document.getElementById("peerUrl").value.trim();
-      const res = await fetch(`${getBase()}/peers/add`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ peer })
+      document.getElementById("mineBtn").addEventListener("click", async () => {
+        const btn = document.getElementById("mineBtn");
+        const msg = document.getElementById("mineMsg");
+        const miner = document.getElementById("walletAddressInput").value.trim();
+        btn.disabled = true;
+        msg.textContent = "جاري التعدين حسب الصعوبة الحالية...";
+        try {
+          const res = await fetch(`${getNodeUrl()}/mine`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ miner, user_id: getUserId() })
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "فشل التعدين");
+          msg.textContent = `تم تعدين الكتلة #${data.block.index} بمكافأة ${data.reward} SDM (صعوبة ${data.difficulty}).`;
+          await backgroundSync();
+        } catch (err) {
+          msg.textContent = err.message;
+        } finally {
+          btn.disabled = false;
+        }
       });
-      const txt = await res.text();
-      alert(txt);
-      refreshAll();
-    }
 
-    refreshAll();
+      document.getElementById("exportBackupBtn").addEventListener("click", () => {
+        const backup = loadChainBackup() || { chain: [] };
+        const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `sdm-chain-backup-${Date.now()}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+
+      document.getElementById("triggerImportBtn").addEventListener("click", () => {
+        document.getElementById("importFileInput").click();
+      });
+
+      document.getElementById("importFileInput").addEventListener("change", async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        try {
+          const text = await file.text();
+          const parsed = JSON.parse(text);
+          const chain = Array.isArray(parsed.chain) ? parsed.chain : (Array.isArray(parsed) ? parsed : null);
+          if (!chain || chain.length === 0) throw new Error("ملف النسخة الاحتياطية غير صالح.");
+
+          saveChainBackup({
+            height: chain.length - 1,
+            difficulty: chain[chain.length - 1]?.difficulty ?? 4,
+            active_users: 1,
+            chain
+          });
+
+          const res = await fetch(`${getNodeUrl()}/sync`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ chain, user_id: getUserId() })
+          });
+          const data = await res.json();
+          if (res.ok && Array.isArray(data.chain)) {
+            saveChainBackup(data);
+          }
+          await backgroundSync();
+          document.getElementById("backupMsg").textContent = "تمت استعادة النسخة الاحتياطية ومزامنتها.";
+        } catch (err) {
+          alert(err.message);
+        } finally {
+          e.target.value = "";
+        }
+      });
+
+      document.getElementById("forceSyncBtn").addEventListener("click", backgroundSync);
+
+      document.getElementById("saveNodeBtn").addEventListener("click", () => {
+        const val = nodeInput.value.trim().replace(/\/+$/, "");
+        if (val) localStorage.setItem(KEYS.nodeUrl, val);
+        backgroundSync();
+      });
+
+      document.getElementById("resetNodeBtn").addEventListener("click", () => {
+        localStorage.removeItem(KEYS.nodeUrl);
+        nodeInput.value = DEFAULT_NODE_URL;
+        backgroundSync();
+      });
+
+      backgroundSync();
+      setInterval(backgroundSync, 30000);
+    });
   </script>
 </body>
 </html>
