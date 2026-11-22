@@ -1,3 +1,3 @@
-module github.com/mb4252/sdm-coin
+module sdm-node
 
 go 1.22
