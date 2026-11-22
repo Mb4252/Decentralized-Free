@@ -1,7 +1,7 @@
 package main
 
 import (
-	"bytes"
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -18,27 +18,33 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 const (
-	MaxSupply           int64 = 50_000_000
-	GenesisSupply       int64 = 40_000_000
-	MiningCap           int64 = 10_000_000
-	BlockReward         int64 = 50
-	BaseDifficulty            = 4
-	MaxDifficulty             = 8
-	ActiveUserWindow          = 5 * time.Minute
-	UsersPerDiffStep          = 5
-	DefaultChainFile          = "sdm_chain.json"
-	GenesisAddress            = "SDM_GENESIS_VAULT_0001"
+	MaxSupply        int64 = 50_000_000
+	GenesisSupply    int64 = 40_000_000
+	MiningCap        int64 = 10_000_000
+	BlockReward      int64 = 50
+	BaseDifficulty         = 4
+	MaxDifficulty          = 8
+	ActiveUserWindow       = 5 * time.Minute
+	UsersPerDiffStep       = 5
+	MaxDriftSeconds  int64 = 300
+	DefaultChainFile       = "sdm_chain.json"
+	GenesisAddress         = "SDM_GENESIS_VAULT_0001"
 )
 
 type Transaction struct {
 	From      string `json:"from"`
 	To        string `json:"to"`
 	Amount    int64  `json:"amount"`
+	Nonce     uint64 `json:"nonce"`
 	Timestamp int64  `json:"timestamp"`
 	Note      string `json:"note,omitempty"`
+	PublicKey string `json:"public_key,omitempty"`
+	Signature string `json:"signature,omitempty"`
 }
 
 type Block struct {
@@ -52,13 +58,70 @@ type Block struct {
 	Miner        string        `json:"miner,omitempty"`
 }
 
+type PersistedState struct {
+	Chain       []Block          `json:"chain"`
+	Mempool     []Transaction    `json:"mempool"`
+	ActiveUsers map[string]int64 `json:"active_users"`
+	Peers       map[string]int64 `json:"peers"`
+}
+
 type Node struct {
 	mu          sync.RWMutex
-	Chain       []Block            `json:"chain"`
-	Mempool     []Transaction      `json:"mempool"`
-	ActiveUsers map[string]int64   `json:"active_users"`
-	Peers       map[string]int64   `json:"peers"`
-	ChainFile   string             `json:"-"`
+	Chain       []Block          `json:"chain"`
+	Mempool     []Transaction    `json:"mempool"`
+	ActiveUsers map[string]int64 `json:"active_users"`
+	Peers       map[string]int64 `json:"peers"`
+	ChainFile   string           `json:"-"`
+	DBUrl       string           `json:"-"`
+}
+
+func deriveAddressFromPubBytes(pubBytes []byte) string {
+	pubSum := sha256.Sum256(pubBytes)
+	addrHash := sha256.Sum256(pubSum[:])
+	return "SDM" + hex.EncodeToString(addrHash[:16])
+}
+
+func txSigningDigest(tx Transaction) []byte {
+	payload := fmt.Sprintf("%s|%s|%d|%d|%d|%s",
+		tx.From, tx.To, tx.Amount, tx.Nonce, tx.Timestamp, tx.Note)
+	sum := sha256.Sum256([]byte(payload))
+	return sum[:]
+}
+
+func verifyTransactionSignature(tx Transaction) bool {
+	if tx.From == "GENESIS" || tx.From == "COINBASE" || tx.From == "MINING_REWARD" {
+		return true
+	}
+	if tx.PublicKey == "" || tx.Signature == "" || tx.From == "" {
+		return false
+	}
+	pubBytes, err := hex.DecodeString(strings.TrimSpace(tx.PublicKey))
+	if err != nil {
+		return false
+	}
+	expectedAddr := deriveAddressFromPubBytes(pubBytes)
+	if !strings.EqualFold(expectedAddr, tx.From) {
+		return false
+	}
+	x, y := elliptic.UnmarshalCompressed(elliptic.P256(), pubBytes)
+	if x == nil || y == nil {
+		x, y = elliptic.Unmarshal(elliptic.P256(), pubBytes)
+		if x == nil || y == nil {
+			return false
+		}
+	}
+	pubKey := &ecdsa.PublicKey{Curve: elliptic.P256(), X: x, Y: y}
+
+	sigBytes, err := hex.DecodeString(strings.TrimSpace(tx.Signature))
+	if err != nil || len(sigBytes) != 64 {
+		return false
+	}
+	r := new(big.Int).SetBytes(sigBytes[:32])
+	s := new(big.Int).SetBytes(sigBytes[32:])
+	if r.Sign() <= 0 || s.Sign() <= 0 {
+		return false
+	}
+	return ecdsa.Verify(pubKey, txSigningDigest(tx), r, s)
 }
 
 func calculateBlockHash(b Block) string {
@@ -104,6 +167,7 @@ func newGenesisBlock() Block {
 		From:      "GENESIS",
 		To:        GenesisAddress,
 		Amount:    GenesisSupply,
+		Nonce:     0,
 		Timestamp: 1735689600,
 		Note:      "SDM Genesis Allocation (40,000,000 SDM)",
 	}
@@ -120,34 +184,107 @@ func newGenesisBlock() Block {
 	return b
 }
 
-func NewNode(chainFile string) *Node {
+func NewNode(chainFile string, dbUrl string) *Node {
 	n := &Node{
 		ActiveUsers: make(map[string]int64),
 		Peers:       make(map[string]int64),
 		ChainFile:   chainFile,
+		DBUrl:       strings.TrimSpace(dbUrl),
 	}
-	if err := n.loadFromFile(); err != nil {
-		n.Chain = []Block{newGenesisBlock()}
-		_ = n.saveToFile()
+	if n.DBUrl != "" {
+		_ = n.ensureDBTable()
+		if err := n.loadFromDB(); err == nil {
+			return n
+		}
 	}
-	if len(n.Chain) == 0 {
-		n.Chain = []Block{newGenesisBlock()}
-		_ = n.saveToFile()
+	if err := n.loadFromFile(); err == nil {
+		if n.DBUrl != "" {
+			_ = n.saveToDB()
+		}
+		return n
 	}
+	n.Chain = []Block{newGenesisBlock()}
+	_ = n.persistLocked()
 	return n
 }
 
-func (n *Node) loadFromFile() error {
-	data, err := os.ReadFile(n.ChainFile)
+func (n *Node) ensureDBTable() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+	conn, err := pgx.Connect(ctx, n.DBUrl)
 	if err != nil {
 		return err
 	}
-	var loaded struct {
-		Chain       []Block          `json:"chain"`
-		Mempool     []Transaction    `json:"mempool"`
-		ActiveUsers map[string]int64 `json:"active_users"`
-		Peers       map[string]int64 `json:"peers"`
+	defer conn.Close(ctx)
+
+	_, err = conn.Exec(ctx, `
+		CREATE TABLE IF NOT EXISTS sdm_node_state (
+			id INT PRIMARY KEY,
+			state_json TEXT NOT NULL,
+			updated_at BIGINT NOT NULL
+		)
+	`)
+	return err
+}
+
+func (n *Node) loadFromDB() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+	conn, err := pgx.Connect(ctx, n.DBUrl)
+	if err != nil {
+		return err
 	}
+	defer conn.Close(ctx)
+
+	var raw string
+	err = conn.QueryRow(ctx, `SELECT state_json FROM sdm_node_state WHERE id = 1`).Scan(&raw)
+	if err != nil {
+		return err
+	}
+	return n.applyPersistedJSON([]byte(raw))
+}
+
+func (n *Node) saveToDB() error {
+	if n.DBUrl == "" {
+		return nil
+	}
+	snap := PersistedState{
+		Chain:       append([]Block{}, n.Chain...),
+		Mempool:     append([]Transaction{}, n.Mempool...),
+		ActiveUsers: cloneInt64Map(n.ActiveUsers),
+		Peers:       cloneInt64Map(n.Peers),
+	}
+	payload, err := json.Marshal(snap)
+	if err != nil {
+		return err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+	conn, err := pgx.Connect(ctx, n.DBUrl)
+	if err != nil {
+		return err
+	}
+	defer conn.Close(ctx)
+
+	_, err = conn.Exec(ctx, `
+		INSERT INTO sdm_node_state (id, state_json, updated_at)
+		VALUES (1, $1, $2)
+		ON CONFLICT (id) DO UPDATE SET state_json = EXCLUDED.state_json, updated_at = EXCLUDED.updated_at
+	`, string(payload), time.Now().UTC().Unix())
+	return err
+}
+
+func cloneInt64Map(src map[string]int64) map[string]int64 {
+	dst := make(map[string]int64, len(src))
+	for k, v := range src {
+		dst[k] = v
+	}
+	return dst
+}
+
+func (n *Node) applyPersistedJSON(data []byte) error {
+	var loaded PersistedState
 	if err := json.Unmarshal(data, &loaded); err != nil {
 		return err
 	}
@@ -155,27 +292,72 @@ func (n *Node) loadFromFile() error {
 		return errors.New("empty chain")
 	}
 	if !isValidChain(loaded.Chain) {
-		return errors.New("invalid chain in file")
+		return errors.New("invalid chain")
 	}
 	n.Chain = loaded.Chain
-	if loaded.Mempool != nil {
-		n.Mempool = loaded.Mempool
-	}
+	n.Mempool = loaded.Mempool
 	if loaded.ActiveUsers != nil {
 		n.ActiveUsers = loaded.ActiveUsers
+	} else {
+		n.ActiveUsers = make(map[string]int64)
 	}
 	if loaded.Peers != nil {
 		n.Peers = loaded.Peers
+	} else {
+		n.Peers = make(map[string]int64)
 	}
 	return nil
 }
 
-func (n *Node) saveToFile() error {
-	payload, err := json.MarshalIndent(n, "", "  ")
+func (n *Node) loadFromFile() error {
+	data, err := os.ReadFile(n.ChainFile)
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(n.ChainFile, payload, 0600)
+	return n.applyPersistedJSON(data)
+}
+
+func (n *Node) persistLocked() error {
+	snap := PersistedState{
+		Chain:       n.Chain,
+		Mempool:     n.Mempool,
+		ActiveUsers: n.ActiveUsers,
+		Peers:       n.Peers,
+	}
+	payload, err := json.MarshalIndent(snap, "", "  ")
+	if err == nil {
+		_ = os.WriteFile(n.ChainFile, payload, 0600)
+	}
+	if n.DBUrl != "" {
+		go func(b []byte) {
+			_ = n.writeRawToDB(b)
+		}(payload)
+	}
+	return err
+}
+
+func (n *Node) writeRawToDB(raw []byte) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+	conn, err := pgx.Connect(ctx, n.DBUrl)
+	if err != nil {
+		return err
+	}
+	defer conn.Close(ctx)
+
+	_, _ = conn.Exec(ctx, `
+		CREATE TABLE IF NOT EXISTS sdm_node_state (
+			id INT PRIMARY KEY,
+			state_json TEXT NOT NULL,
+			updated_at BIGINT NOT NULL
+		)
+	`)
+	_, err = conn.Exec(ctx, `
+		INSERT INTO sdm_node_state (id, state_json, updated_at)
+		VALUES (1, $1, $2)
+		ON CONFLICT (id) DO UPDATE SET state_json = EXCLUDED.state_json, updated_at = EXCLUDED.updated_at
+	`, string(raw), time.Now().UTC().Unix())
+	return err
 }
 
 func (n *Node) pruneAndCountActiveUsersLocked(now int64) int {
@@ -196,6 +378,9 @@ func (n *Node) touchUserLocked(userID string) int {
 	userID = strings.TrimSpace(userID)
 	if userID == "" {
 		userID = "anonymous"
+	}
+	if len(userID) > 64 {
+		userID = userID[:64]
 	}
 	now := time.Now().UTC().Unix()
 	n.ActiveUsers[userID] = now
@@ -230,17 +415,19 @@ func computeSupplyStatsLocked(chain []Block) (totalSupply int64, minedSupply int
 	return totalSupply, minedSupply
 }
 
-func computeBalancesLocked(chain []Block) map[string]int64 {
-	balances := make(map[string]int64)
+func computeAccountStatesLocked(chain []Block) (balances map[string]int64, nonces map[string]uint64) {
+	balances = make(map[string]int64)
+	nonces = make(map[string]uint64)
 	for _, b := range chain {
 		for _, tx := range b.Transactions {
 			if tx.From != "GENESIS" && tx.From != "COINBASE" && tx.From != "MINING_REWARD" {
 				balances[tx.From] -= tx.Amount
+				nonces[tx.From] = tx.Nonce + 1
 			}
 			balances[tx.To] += tx.Amount
 		}
 	}
-	return balances
+	return balances, nonces
 }
 
 func isValidChain(chain []Block) bool {
@@ -249,6 +436,8 @@ func isValidChain(chain []Block) bool {
 	}
 	var totalSupply int64
 	var minedSupply int64
+	balances := make(map[string]int64)
+	expectedNonce := make(map[string]uint64)
 
 	for i, b := range chain {
 		if b.Index != i {
@@ -266,19 +455,44 @@ func isValidChain(chain []Block) bool {
 			if b.PrevHash != prev.Hash {
 				return false
 			}
+			if b.Timestamp < prev.Timestamp {
+				return false
+			}
 			if !hasValidProof(b.Hash, b.Difficulty) {
 				return false
 			}
 		}
+
+		coinbaseCount := 0
 		for _, tx := range b.Transactions {
-			if tx.Amount < 0 {
+			if tx.Amount <= 0 {
+				return false
+			}
+			if !verifyTransactionSignature(tx) {
 				return false
 			}
 			if i == 0 || tx.From == "GENESIS" {
 				totalSupply += tx.Amount
+				balances[tx.To] += tx.Amount
 			} else if tx.From == "COINBASE" || tx.From == "MINING_REWARD" {
+				coinbaseCount++
+				if coinbaseCount > 1 || tx.Amount > BlockReward {
+					return false
+				}
 				minedSupply += tx.Amount
 				totalSupply += tx.Amount
+				balances[tx.To] += tx.Amount
+			} else {
+				exp := expectedNonce[tx.From]
+				if tx.Nonce != exp {
+					return false
+				}
+				if balances[tx.From] < tx.Amount {
+					return false
+				}
+				balances[tx.From] -= tx.Amount
+				balances[tx.To] += tx.Amount
+				expectedNonce[tx.From] = exp + 1
 			}
 		}
 	}
@@ -289,21 +503,19 @@ func isValidChain(chain []Block) bool {
 	return true
 }
 
-func generateWallet() (address string, publicKeyHex string, privateKeyHex string, err error) {
+func generateWallet() (address string, publicKeyHex string, privateKeyPKCS8Hex string, err error) {
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return "", "", "", err
 	}
 	pubBytes := elliptic.MarshalCompressed(priv.Curve, priv.PublicKey.X, priv.PublicKey.Y)
-	pubSum := sha256.Sum256(pubBytes)
-	addrHash := sha256.Sum256(pubSum[:])
-	address = "SDM" + hex.EncodeToString(addrHash[:16])
+	address = deriveAddressFromPubBytes(pubBytes)
 
-	privDer, err := x509.MarshalECPrivateKey(priv)
+	pkcs8Bytes, err := x509.MarshalPKCS8PrivateKey(priv)
 	if err != nil {
 		return "", "", "", err
 	}
-	return address, hex.EncodeToString(pubBytes), hex.EncodeToString(privDer), nil
+	return address, hex.EncodeToString(pubBytes), hex.EncodeToString(pkcs8Bytes), nil
 }
 
 func enableCORS(w http.ResponseWriter, r *http.Request) bool {
@@ -344,7 +556,7 @@ func (n *Node) handleStatus(w http.ResponseWriter, r *http.Request) {
 	latest := n.Chain[height]
 	mempoolCount := len(n.Mempool)
 	peerCount := len(n.Peers)
-	_ = n.saveToFile()
+	_ = n.persistLocked()
 	n.mu.Unlock()
 
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -373,7 +585,7 @@ func (n *Node) handleWalletNew(w http.ResponseWriter, r *http.Request) {
 	if enableCORS(w, r) {
 		return
 	}
-	addr, pub, priv, err := generateWallet()
+	addr, pub, privPKCS8, err := generateWallet()
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
 		return
@@ -381,7 +593,8 @@ func (n *Node) handleWalletNew(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"address":     addr,
 		"public_key":  pub,
-		"private_key": priv,
+		"private_key": privPKCS8,
+		"nonce":       0,
 	})
 }
 
@@ -395,12 +608,24 @@ func (n *Node) handleBalance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	n.mu.RLock()
-	balances := computeBalancesLocked(n.Chain)
+	balances, nonces := computeAccountStatesLocked(n.Chain)
+	var pendingNonce uint64
+	for _, m := range n.Mempool {
+		if m.From == addr && m.Nonce >= pendingNonce {
+			pendingNonce = m.Nonce + 1
+		}
+	}
+	nextNonce := nonces[addr]
+	if pendingNonce > nextNonce {
+		nextNonce = pendingNonce
+	}
 	n.mu.RUnlock()
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"address": addr,
-		"balance": balances[addr],
+		"address":    addr,
+		"balance":    balances[addr],
+		"nonce":      nonces[addr],
+		"next_nonce": nextNonce,
 	})
 }
 
@@ -413,11 +638,15 @@ func (n *Node) handleTransfer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		From   string `json:"from"`
-		To     string `json:"to"`
-		Amount int64  `json:"amount"`
-		Note   string `json:"note"`
-		UserID string `json:"user_id"`
+		From      string `json:"from"`
+		To        string `json:"to"`
+		Amount    int64  `json:"amount"`
+		Nonce     uint64 `json:"nonce"`
+		Timestamp int64  `json:"timestamp"`
+		Note      string `json:"note"`
+		PublicKey string `json:"public_key"`
+		Signature string `json:"signature"`
+		UserID    string `json:"user_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid JSON body"})
@@ -434,18 +663,57 @@ func (n *Node) handleTransfer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	now := time.Now().UTC().Unix()
+	ts := req.Timestamp
+	if ts == 0 {
+		ts = now
+	}
+	if ts < now-MaxDriftSeconds || ts > now+MaxDriftSeconds {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "timestamp out of allowed drift window"})
+		return
+	}
+
+	tx := Transaction{
+		From:      req.From,
+		To:        req.To,
+		Amount:    req.Amount,
+		Nonce:     req.Nonce,
+		Timestamp: ts,
+		Note:      req.Note,
+		PublicKey: strings.TrimSpace(req.PublicKey),
+		Signature: strings.TrimSpace(req.Signature),
+	}
+
+	if !verifyTransactionSignature(tx) {
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "invalid transaction signature or public key"})
+		return
+	}
+
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
 	n.touchUserLocked(req.UserID)
-	balances := computeBalancesLocked(n.Chain)
+	balances, nonces := computeAccountStatesLocked(n.Chain)
 
+	expectedNonce := nonces[req.From]
 	var pendingOutgoing int64
-	for _, tx := range n.Mempool {
-		if tx.From == req.From {
-			pendingOutgoing += tx.Amount
+	for _, m := range n.Mempool {
+		if m.From == req.From {
+			pendingOutgoing += m.Amount
+			if m.Nonce >= expectedNonce {
+				expectedNonce = m.Nonce + 1
+			}
 		}
 	}
+
+	if req.Nonce != expectedNonce {
+		writeJSON(w, http.StatusConflict, map[string]any{
+			"error":          "invalid transaction nonce",
+			"expected_nonce": expectedNonce,
+		})
+		return
+	}
+
 	available := balances[req.From] - pendingOutgoing
 	if available < req.Amount {
 		writeJSON(w, http.StatusBadRequest, map[string]any{
@@ -455,19 +723,13 @@ func (n *Node) handleTransfer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tx := Transaction{
-		From:      req.From,
-		To:        req.To,
-		Amount:    req.Amount,
-		Timestamp: time.Now().UTC().Unix(),
-		Note:      req.Note,
-	}
 	n.Mempool = append(n.Mempool, tx)
-	_ = n.saveToFile()
+	_ = n.persistLocked()
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"status":      "queued",
 		"transaction": tx,
+		"next_nonce":  expectedNonce + 1,
 	})
 }
 
@@ -521,6 +783,7 @@ func (n *Node) handleMine(w http.ResponseWriter, r *http.Request) {
 			From:      "COINBASE",
 			To:        miner,
 			Amount:    reward,
+			Nonce:     0,
 			Timestamp: time.Now().UTC().Unix(),
 			Note:      "PoW Block Reward",
 		})
@@ -555,7 +818,7 @@ func (n *Node) handleMine(w http.ResponseWriter, r *http.Request) {
 
 	n.Chain = candidateChain
 	n.Mempool = nil
-	_ = n.saveToFile()
+	_ = n.persistLocked()
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"status":       "mined",
@@ -633,7 +896,7 @@ func (n *Node) handleSync(w http.ResponseWriter, r *http.Request) {
 		if len(req.Chain) > len(n.Chain) {
 			n.Chain = append([]Block{}, req.Chain...)
 			adopted = true
-			_ = n.saveToFile()
+			_ = n.persistLocked()
 		}
 
 		writeJSON(w, http.StatusOK, map[string]any{
@@ -679,7 +942,7 @@ func (n *Node) handlePeers(w http.ResponseWriter, r *http.Request) {
 
 		n.mu.Lock()
 		n.Peers[peer] = time.Now().UTC().Unix()
-		_ = n.saveToFile()
+		_ = n.persistLocked()
 		n.mu.Unlock()
 
 		go n.pullFromPeer(peer)
@@ -711,7 +974,7 @@ func (n *Node) pullFromPeer(peerURL string) {
 	defer n.mu.Unlock()
 	if len(remote.Chain) > len(n.Chain) {
 		n.Chain = append([]Block{}, remote.Chain...)
-		_ = n.saveToFile()
+		_ = n.persistLocked()
 	}
 }
 
@@ -736,8 +999,9 @@ func main() {
 	if chainFile == "" {
 		chainFile = DefaultChainFile
 	}
+	dbUrl := os.Getenv("DATABASE_URL")
 
-	node := NewNode(chainFile)
+	node := NewNode(chainFile, dbUrl)
 	go node.startPeerSyncLoop()
 
 	mux := http.NewServeMux()
@@ -750,9 +1014,9 @@ func main() {
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{
-			"node":    "sdm-coin Go Node",
-			"symbol":  "SDM",
-			"status":  "online",
+			"node":      "sdm-coin Go Node",
+			"symbol":    "SDM",
+			"status":    "online",
 			"endpoints": []string{"/status", "/wallet/new", "/balance", "/transfer", "/mine", "/chain", "/sync", "/peers"},
 		})
 	})
@@ -771,10 +1035,7 @@ func main() {
 	}
 
 	addr := ":" + port
-	log.Printf("SDM Go Node listening on %s (chain file: %s)", addr, chainFile)
-
-	var _ = bytes.NewReader
-	var _ = big.NewInt
+	log.Printf("SDM Go Node listening on %s (chain file: %s, db enabled: %v)", addr, chainFile, dbUrl != "")
 
 	if err := http.ListenAndServe(addr, mux); err != nil {
 		log.Fatalf("server error: %v", err)
