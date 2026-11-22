@@ -165,21 +165,26 @@
       </div>
     </div>
 
-    <!-- المحفظة والرصيد -->
     <div class="card">
       <h2>المحفظة والرصيد</h2>
+      <input id="walletPassInput" type="password" placeholder="كلمة مرور تشفير وفك قفل المحفظة (8 أحرف فأكثر)" />
       <div class="row">
         <button class="primary" id="newWalletBtn" type="button">إنشاء محفظة جديدة</button>
+        <button class="secondary" id="unlockWalletBtn" type="button">فك قفل المحفظة</button>
+        <button class="secondary" id="lockWalletBtn" type="button">قفل المحفظة</button>
         <button class="secondary" id="refreshBalBtn" type="button">تحديث الرصيد</button>
+        <button class="secondary" id="exportWalletBtn" type="button">نسخة مشفرة للمحفظة</button>
+        <button class="secondary" id="importWalletBtn" type="button">استعادة محفظة</button>
+        <input id="walletFileInput" type="file" accept="application/json" style="display:none;" />
       </div>
       <div>
         <div class="stat-label">عنوان المحفظة (Address)</div>
         <input id="walletAddressInput" type="text" placeholder="SDM..." />
       </div>
+      <div class="msg" id="walletStateMsg"></div>
 
-      <!-- يظهر المفتاح الخاص لمرة واحدة فقط عند الإنشاء ثم يختفي تلقائياً -->
       <div id="oneTimePrivSection" style="display: none;">
-        <div class="stat-label" id="privCountdownLabel">المفتاح الخاص (يظهر لمرة واحدة فقط وسيختفي تلقائياً — احفظه فوراً)</div>
+        <div class="stat-label" id="privCountdownLabel"></div>
         <div class="mono" id="walletPrivBox"></div>
         <button class="secondary" id="hidePrivNowBtn" type="button" style="margin-top: 8px;">إخفاء الآن</button>
       </div>
@@ -187,17 +192,15 @@
       <div class="stat-value">الرصيد: <span id="balanceValue">0</span> SDM</div>
     </div>
 
-    <!-- إرسال تحويل -->
     <div class="card">
       <h2>إرسال SDM</h2>
       <input id="toAddressInput" type="text" placeholder="عنوان المستلم (SDM...)" />
       <input id="amountInput" type="number" min="1" step="1" placeholder="الكمية (SDM)" />
       <input id="noteInput" type="text" placeholder="ملاحظة (اختياري)" />
-      <button class="primary" id="sendTxBtn" type="button">إرسال المعاملة</button>
+      <button class="primary" id="sendTxBtn" type="button">توقيع وإرسال المعاملة</button>
       <div class="msg" id="txMsg"></div>
     </div>
 
-    <!-- التعدين -->
     <div class="card">
       <h2>التعدين (PoW)</h2>
       <div class="msg">تزداد صعوبة التعدين تلقائياً مع ارتفاع عدد المستخدمين النشطين في الشبكة.</div>
@@ -205,7 +208,6 @@
       <div class="msg" id="mineMsg"></div>
     </div>
 
-    <!-- النسخة الاحتياطية والمزامنة والكتل -->
     <div class="card">
       <h2>النسخة الاحتياطية وسجل الكتل</h2>
       <div class="row">
@@ -214,11 +216,11 @@
         <button class="secondary" id="forceSyncBtn" type="button">مزامنة الآن</button>
         <input id="importFileInput" type="file" accept="application/json" style="display:none;" />
       </div>
-      <div class="msg" id="backupMsg">يتم حفظ نسخة احتياطية تلقائياً على هذا الهاتف.</div>
+      <div class="msg" id="backupMsg"></div>
       <div class="blocks-list" id="blocksList"></div>
 
       <details>
-        <summary>إعدادات العقدة المتقدمة (اختياري — مخفي افتراضياً)</summary>
+        <summary>إعدادات العقدة المتقدمة (اختياري)</summary>
         <div class="row" style="margin-top: 8px;">
           <input id="nodeUrlInput" type="text" placeholder="https://decentralized-free-2.onrender.com" />
           <button class="secondary" id="saveNodeBtn" type="button">حفظ الرابط</button>
@@ -234,10 +236,11 @@
     const KEYS = {
       nodeUrl: "sdm_node_url_v1",
       chainBackup: "sdm_chain_backup_v1",
-      wallet: "sdm_wallet_v1",
+      encryptedWallet: "sdm_encrypted_wallet_v1",
       userId: "sdm_phone_user_id_v1"
     };
 
+    let unlockedWallet = null;
     let privHideTimer = null;
     let privCountdownInterval = null;
 
@@ -268,12 +271,12 @@
       section.style.display = "block";
 
       let remaining = seconds;
-      label.textContent = `المفتاح الخاص (يظهر لمرة واحدة فقط وسيختفي خلال ${remaining} ثانية — احفظه الآن)`;
+      label.textContent = `المفتاح الخاص (يظهر لمرة واحدة وسيختفي خلال ${remaining} ثانية)`;
 
       privCountdownInterval = setInterval(() => {
         remaining -= 1;
         if (remaining > 0) {
-          label.textContent = `المفتاح الخاص (يظهر لمرة واحدة فقط وسيختفي خلال ${remaining} ثانية — احفظه الآن)`;
+          label.textContent = `المفتاح الخاص (يظهر لمرة واحدة وسيختفي خلال ${remaining} ثانية)`;
         }
       }, 1000);
 
@@ -296,17 +299,111 @@
       return (custom || DEFAULT_NODE_URL).replace(/\/+$/, "");
     }
 
-    function saveWallet(wallet) {
-      localStorage.setItem(KEYS.wallet, JSON.stringify(wallet));
+    function hexToBytes(hex) {
+      const clean = hex.trim().replace(/^0x/i, "");
+      const arr = new Uint8Array(clean.length / 2);
+      for (let i = 0; i < arr.length; i++) {
+        arr[i] = parseInt(clean.slice(i * 2, i * 2 + 2), 16);
+      }
+      return arr;
     }
 
-    function loadWallet() {
+    function bytesToHex(buf) {
+      return Array.from(new Uint8Array(buf))
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
+    }
+
+    async function deriveAesKey(password, saltBytes) {
+      const enc = new TextEncoder();
+      const baseKey = await crypto.subtle.importKey(
+        "raw",
+        enc.encode(password),
+        "PBKDF2",
+        false,
+        ["deriveKey"]
+      );
+      return crypto.subtle.deriveKey(
+        {
+          name: "PBKDF2",
+          salt: saltBytes,
+          iterations: 150000,
+          hash: "SHA-256"
+        },
+        baseKey,
+        { name: "AES-GCM", length: 256 },
+        false,
+        ["encrypt", "decrypt"]
+      );
+    }
+
+    async function encryptWalletObject(walletObj, password) {
+      if (!password || password.length < 8) {
+        throw new Error("أدخل كلمة مرور من 8 أحرف على الأقل لتشفير المحفظة.");
+      }
+      const salt = crypto.getRandomValues(new Uint8Array(16));
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const key = await deriveAesKey(password, salt);
+      const encoded = new TextEncoder().encode(JSON.stringify(walletObj));
+      const cipher = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, encoded);
+
+      return {
+        v: 1,
+        address: walletObj.address,
+        salt: bytesToHex(salt),
+        iv: bytesToHex(iv),
+        ciphertext: bytesToHex(cipher)
+      };
+    }
+
+    async function decryptWalletObject(encObj, password) {
+      if (!encObj?.salt || !encObj?.iv || !encObj?.ciphertext) {
+        throw new Error("بيانات المحفظة المشفرة غير صالحة.");
+      }
+      if (!password) {
+        throw new Error("أدخل كلمة مرور المحفظة لفك التشفير.");
+      }
+      const salt = hexToBytes(encObj.salt);
+      const iv = hexToBytes(encObj.iv);
+      const cipher = hexToBytes(encObj.ciphertext);
+      const key = await deriveAesKey(password, salt);
+      const plainBuffer = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, cipher);
+      return JSON.parse(new TextDecoder().decode(plainBuffer));
+    }
+
+    function saveEncryptedWallet(encObj) {
+      localStorage.setItem(KEYS.encryptedWallet, JSON.stringify(encObj));
+    }
+
+    function loadEncryptedWallet() {
       try {
-        const raw = localStorage.getItem(KEYS.wallet);
+        const raw = localStorage.getItem(KEYS.encryptedWallet);
         return raw ? JSON.parse(raw) : null;
       } catch {
         return null;
       }
+    }
+
+    async function signTransactionWithWallet(wallet, txFields) {
+      if (!wallet?.private_key || !wallet?.public_key) {
+        throw new Error("يلزم فك قفل المحفظة أولاً لتوقيع المعاملة.");
+      }
+      const pkcs8Bytes = hexToBytes(wallet.private_key);
+      const cryptoKey = await crypto.subtle.importKey(
+        "pkcs8",
+        pkcs8Bytes,
+        { name: "ECDSA", namedCurve: "P-256" },
+        false,
+        ["sign"]
+      );
+      const payloadStr = `${txFields.from}|${txFields.to}|${txFields.amount}|${txFields.nonce}|${txFields.timestamp}|${txFields.note}`;
+      const encoded = new TextEncoder().encode(payloadStr);
+      const sigBuffer = await crypto.subtle.sign(
+        { name: "ECDSA", hash: { name: "SHA-256" } },
+        cryptoKey,
+        encoded
+      );
+      return bytesToHex(sigBuffer);
     }
 
     function saveChainBackup(syncData) {
@@ -322,9 +419,9 @@
         };
         localStorage.setItem(KEYS.chainBackup, JSON.stringify(payload));
         document.getElementById("backupMsg").textContent =
-          `تم حفظ نسخة احتياطية محلية (الارتفاع: ${payload.height}، الكتل: ${payload.chain.length}).`;
+          `نسخة احتياطية محلية محفوظة (الارتفاع: ${payload.height}، الكتل: ${payload.chain.length})`;
       } catch (err) {
-        console.warn("Backup error:", err);
+        console.warn(err);
       }
     }
 
@@ -367,6 +464,12 @@
       }
     }
 
+    async function fetchAccountState(addr) {
+      const res = await fetch(`${getNodeUrl()}/balance?address=${encodeURIComponent(addr)}`);
+      if (!res.ok) return null;
+      return res.json();
+    }
+
     async function refreshBalance() {
       const addr = document.getElementById("walletAddressInput").value.trim();
       if (!addr) {
@@ -374,13 +477,10 @@
         return;
       }
       try {
-        const res = await fetch(`${getNodeUrl()}/balance?address=${encodeURIComponent(addr)}`);
-        if (!res.ok) return;
-        const data = await res.json();
+        const data = await fetchAccountState(addr);
+        if (!data) return;
         document.getElementById("balanceValue").textContent = Number(data.balance || 0).toLocaleString("en-US");
-      } catch {
-        // يبقي القيمة الحالية عند الانقطاع المؤقت
-      }
+      } catch {}
     }
 
     async function backgroundSync() {
@@ -433,38 +533,123 @@
         saveChainBackup(mergedForBackup);
         applyStatsToUI(statusData, syncData);
         await refreshBalance();
-      } catch {
-        // يعمل بصمت في الخلفية
-      }
+      } catch {}
     }
 
     document.addEventListener("DOMContentLoaded", () => {
       const nodeInput = document.getElementById("nodeUrlInput");
-      nodeInput.value = getNodeUrl();
+      const passInput = document.getElementById("walletPassInput");
+      const stateMsg = document.getElementById("walletStateMsg");
 
-      // لا نعرض المفتاح الخاص عند تحميل الصفحة؛ يظهر فقط عند الإنشاء لمرة واحدة ثم يختفي
+      nodeInput.value = getNodeUrl();
       hidePrivateKeyOnce();
 
-      const savedWallet = loadWallet();
-      if (savedWallet?.address) {
-        document.getElementById("walletAddressInput").value = savedWallet.address;
+      const encWallet = loadEncryptedWallet();
+      if (encWallet?.address) {
+        document.getElementById("walletAddressInput").value = encWallet.address;
+        stateMsg.textContent = "المحفظة مقفلة ومشفرة محلياً — أدخل كلمة المرور لفك القفل.";
+      } else {
+        stateMsg.textContent = "لا توجد محفظة محفوظة بعد.";
       }
 
       document.getElementById("hidePrivNowBtn").addEventListener("click", hidePrivateKeyOnce);
 
       document.getElementById("newWalletBtn").addEventListener("click", async () => {
         try {
+          const pass = passInput.value;
+          if (!pass || pass.length < 8) {
+            alert("يرجى إدخال كلمة مرور من 8 أحرف على الأقل قبل إنشاء المحفظة لتشفيرها.");
+            return;
+          }
           const res = await fetch(`${getNodeUrl()}/wallet/new`);
           const data = await res.json();
           if (!res.ok) throw new Error(data.error || "خطأ في إنشاء المحفظة");
-          saveWallet(data);
+
+          const enc = await encryptWalletObject(data, pass);
+          saveEncryptedWallet(enc);
+          unlockedWallet = data;
+
           document.getElementById("walletAddressInput").value = data.address;
+          stateMsg.textContent = "المحفظة مفتوحة ومشفرة محلياً.";
           if (data.private_key) {
             showPrivateKeyOnce(data.private_key, 20);
           }
           await refreshBalance();
         } catch (err) {
           alert(err.message);
+        }
+      });
+
+      document.getElementById("unlockWalletBtn").addEventListener("click", async () => {
+        try {
+          const enc = loadEncryptedWallet();
+          if (!enc) throw new Error("لا توجد محفظة محفوظة لفك قفلها.");
+          const plain = await decryptWalletObject(enc, passInput.value);
+          unlockedWallet = plain;
+          document.getElementById("walletAddressInput").value = plain.address;
+          stateMsg.textContent = "تم فك قفل المحفظة بنجاح.";
+          await refreshBalance();
+        } catch (err) {
+          alert(err.message);
+        }
+      });
+
+      document.getElementById("lockWalletBtn").addEventListener("click", () => {
+        unlockedWallet = null;
+        hidePrivateKeyOnce();
+        stateMsg.textContent = "تم قفل المحفظة وحذف المفتاح من الذاكرة النشطة.";
+      });
+
+      document.getElementById("exportWalletBtn").addEventListener("click", () => {
+        const enc = loadEncryptedWallet();
+        if (!enc) {
+          alert("لا توجد محفظة مشفرة لتصديرها.");
+          return;
+        }
+        const blob = new Blob([JSON.stringify(enc, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `sdm-wallet-encrypted-${enc.address || Date.now()}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+
+      document.getElementById("importWalletBtn").addEventListener("click", () => {
+        document.getElementById("walletFileInput").click();
+      });
+
+      document.getElementById("walletFileInput").addEventListener("change", async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        try {
+          const text = await file.text();
+          const parsed = JSON.parse(text);
+          if (!parsed?.address) throw new Error("ملف المحفظة غير صالح.");
+
+          if (parsed.ciphertext && parsed.salt && parsed.iv) {
+            saveEncryptedWallet(parsed);
+            unlockedWallet = null;
+            document.getElementById("walletAddressInput").value = parsed.address;
+            stateMsg.textContent = "تم استيراد محفظة مشفرة — أدخل كلمة المرور لفك قفلها.";
+          } else if (parsed.private_key && parsed.public_key) {
+            const pass = passInput.value;
+            if (!pass || pass.length < 8) {
+              throw new Error("أدخل كلمة مرور (8 أحرف فأكثر) لتشفير وحفظ المحفظة المستوردة.");
+            }
+            const enc = await encryptWalletObject(parsed, pass);
+            saveEncryptedWallet(enc);
+            unlockedWallet = parsed;
+            document.getElementById("walletAddressInput").value = parsed.address;
+            stateMsg.textContent = "تم تشفير وحفظ المحفظة المستوردة بنجاح.";
+          } else {
+            throw new Error("صيغة ملف المحفظة غير مدعومة.");
+          }
+          await refreshBalance();
+        } catch (err) {
+          alert(err.message);
+        } finally {
+          e.target.value = "";
         }
       });
 
@@ -481,16 +666,43 @@
           msg.textContent = "يرجى إدخال عنوان المرسل والمستلم وكمية صحيحة أكبر من صفر.";
           return;
         }
-        msg.textContent = "جاري إرسال المعاملة...";
+        if (!unlockedWallet || unlockedWallet.address !== from) {
+          msg.textContent = "أدخل كلمة المرور واضغط فك قفل المحفظة أولاً.";
+          return;
+        }
+
+        msg.textContent = "جاري جلب رقم Nonce وتوقيع وإرسال المعاملة...";
         try {
+          const acct = await fetchAccountState(from);
+          const nonce = Number(acct?.next_nonce ?? acct?.nonce ?? 0);
+          const timestamp = Math.floor(Date.now() / 1000);
+          const signature = await signTransactionWithWallet(unlockedWallet, {
+            from,
+            to,
+            amount,
+            nonce,
+            timestamp,
+            note
+          });
+
           const res = await fetch(`${getNodeUrl()}/transfer`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ from, to, amount, note, user_id: getUserId() })
+            body: JSON.stringify({
+              from,
+              to,
+              amount,
+              nonce,
+              timestamp,
+              note,
+              public_key: unlockedWallet.public_key,
+              signature,
+              user_id: getUserId()
+            })
           });
           const data = await res.json();
           if (!res.ok) throw new Error(data.error || "فشل التحويل");
-          msg.textContent = "تمت إضافة المعاملة إلى قائمة الانتظار (Mempool)، قم بتعدين كتلة لتأكيدها.";
+          msg.textContent = "تم توقيع المعاملة وإضافتها إلى قائمة الانتظار (Mempool)، قم بتعدين كتلة لتأكيدها.";
           document.getElementById("amountInput").value = "";
           document.getElementById("noteInput").value = "";
         } catch (err) {
