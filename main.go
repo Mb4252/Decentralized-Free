@@ -28,6 +28,7 @@ const (
 	BlockReward       int64         = 50
 	BaseDifficulty                  = 4
 	MaxDifficulty                   = 8
+	TargetBlockSecs   int64         = 30
 	ActiveUserWindow                = 5 * time.Minute
 	UsersPerDiffStep                = 5
 	MaxDriftSeconds   int64         = 300
@@ -228,6 +229,48 @@ func cumulativeDifficulty(chain []Block) *big.Int {
 	return total
 }
 
+func computeExpectedBlockDifficulty(prev Block, currentTs int64, activeUsers int) int {
+	base := computeDifficulty(activeUsers)
+	elapsed := currentTs - prev.Timestamp
+	adj := prev.Difficulty
+	if adj < BaseDifficulty {
+		adj = BaseDifficulty
+	}
+	if adj > MaxDifficulty {
+		adj = MaxDifficulty
+	}
+	if elapsed > 0 && elapsed < TargetBlockSecs/2 {
+		adj++
+	} else if elapsed > TargetBlockSecs*2 {
+		adj--
+	}
+	if adj < BaseDifficulty {
+		adj = BaseDifficulty
+	}
+	if adj > MaxDifficulty {
+		adj = MaxDifficulty
+	}
+	if base > adj {
+		return base
+	}
+	return adj
+}
+
+func isBlockDifficultyAcceptable(prev Block, b Block) bool {
+	if b.Difficulty < BaseDifficulty || b.Difficulty > MaxDifficulty {
+		return false
+	}
+	minAllowed := prev.Difficulty - 1
+	if minAllowed < BaseDifficulty {
+		minAllowed = BaseDifficulty
+	}
+	maxAllowed := prev.Difficulty + 1
+	if maxAllowed > MaxDifficulty {
+		maxAllowed = MaxDifficulty
+	}
+	return b.Difficulty >= minAllowed && b.Difficulty <= maxAllowed
+}
+
 func mineBlockContext(ctx context.Context, index int, txs []Transaction, prevHash string, difficulty int, miner string) (Block, error) {
 	normTxs := normalizeTxs(txs)
 	var nonce int64 = 0
@@ -295,8 +338,8 @@ func NewNode(chainFile string, dbUrl string, allowedOrigin string) *Node {
 			pool.Close()
 		} else {
 			n.pool = pool
-			if tblErr := n.ensureDBTable(ctx); tblErr != nil {
-				log.Printf("db table init warning: %v", tblErr)
+			if tblErr := n.ensureDBSchema(ctx); tblErr != nil {
+				log.Printf("db schema init warning: %v", tblErr)
 			} else if loadErr := n.loadFromDB(ctx); loadErr == nil {
 				cancel()
 				return n
@@ -307,7 +350,7 @@ func NewNode(chainFile string, dbUrl string, allowedOrigin string) *Node {
 
 	if err := n.loadFromFile(); err == nil {
 		if n.pool != nil {
-			ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			if err := n.saveToDB(ctx); err != nil {
 				log.Printf("db initial sync warning: %v", err)
 			}
@@ -322,7 +365,7 @@ func NewNode(chainFile string, dbUrl string, allowedOrigin string) *Node {
 	return n
 }
 
-func (n *Node) ensureDBTable(ctx context.Context) error {
+func (n *Node) ensureDBSchema(ctx context.Context) error {
 	if n.pool == nil {
 		return errors.New("db pool not initialized")
 	}
@@ -331,7 +374,15 @@ func (n *Node) ensureDBTable(ctx context.Context) error {
 			id INT PRIMARY KEY,
 			state_json TEXT NOT NULL,
 			updated_at BIGINT NOT NULL
-		)
+		);
+		CREATE TABLE IF NOT EXISTS sdm_blocks (
+			block_index INT PRIMARY KEY,
+			block_hash TEXT NOT NULL,
+			prev_hash TEXT NOT NULL,
+			difficulty INT NOT NULL,
+			block_timestamp BIGINT NOT NULL,
+			block_json TEXT NOT NULL
+		);
 	`)
 	return err
 }
@@ -367,7 +418,30 @@ func (n *Node) saveToDB(ctx context.Context) error {
 		VALUES (1, $1, $2)
 		ON CONFLICT (id) DO UPDATE SET state_json = EXCLUDED.state_json, updated_at = EXCLUDED.updated_at
 	`, string(payload), time.Now().UTC().Unix())
-	return err
+	if err != nil {
+		return err
+	}
+
+	for _, b := range snap.Chain {
+		bJSON, bErr := json.Marshal(b)
+		if bErr != nil {
+			return bErr
+		}
+		_, bExecErr := n.pool.Exec(ctx, `
+			INSERT INTO sdm_blocks (block_index, block_hash, prev_hash, difficulty, block_timestamp, block_json)
+			VALUES ($1, $2, $3, $4, $5, $6)
+			ON CONFLICT (block_index) DO UPDATE SET
+				block_hash = EXCLUDED.block_hash,
+				prev_hash = EXCLUDED.prev_hash,
+				difficulty = EXCLUDED.difficulty,
+				block_timestamp = EXCLUDED.block_timestamp,
+				block_json = EXCLUDED.block_json
+		`, b.Index, b.Hash, b.PrevHash, b.Difficulty, b.Timestamp, string(bJSON))
+		if bExecErr != nil {
+			return bExecErr
+		}
+	}
+	return nil
 }
 
 func cloneInt64Map(src map[string]int64) map[string]int64 {
@@ -424,19 +498,15 @@ func (n *Node) persistLocked() error {
 		_ = os.WriteFile(n.ChainFile, payload, 0600)
 	}
 	if n.pool != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		if tblErr := n.ensureDBTable(ctx); tblErr != nil {
-			log.Printf("db ensure table error: %v", tblErr)
+		if tblErr := n.ensureDBSchema(ctx); tblErr != nil {
+			log.Printf("db ensure schema error: %v", tblErr)
 			return tblErr
 		}
-		if _, execErr := n.pool.Exec(ctx, `
-			INSERT INTO sdm_node_state (id, state_json, updated_at)
-			VALUES (1, $1, $2)
-			ON CONFLICT (id) DO UPDATE SET state_json = EXCLUDED.state_json, updated_at = EXCLUDED.updated_at
-		`, string(payload), time.Now().UTC().Unix()); execErr != nil {
-			log.Printf("db write error: %v", execErr)
-			return execErr
+		if saveErr := n.saveToDB(ctx); saveErr != nil {
+			log.Printf("db write error: %v", saveErr)
+			return saveErr
 		}
 	}
 	return err
@@ -520,6 +590,7 @@ func isValidChain(chain []Block) bool {
 	if len(chain) == 0 {
 		return false
 	}
+	now := time.Now().UTC().Unix()
 	var totalSupply int64
 	var minedSupply int64
 	balances := make(map[string]int64)
@@ -536,15 +607,18 @@ func isValidChain(chain []Block) bool {
 			if b.PrevHash != strings.Repeat("0", 64) {
 				return false
 			}
+			if b.Difficulty < BaseDifficulty || b.Difficulty > MaxDifficulty {
+				return false
+			}
 		} else {
 			prev := chain[i-1]
 			if b.PrevHash != prev.Hash {
 				return false
 			}
-			if b.Timestamp < prev.Timestamp {
+			if b.Timestamp < prev.Timestamp || b.Timestamp > now+MaxDriftSeconds {
 				return false
 			}
-			if b.Difficulty < BaseDifficulty || b.Difficulty > MaxDifficulty {
+			if !isBlockDifficultyAcceptable(prev, b) {
 				return false
 			}
 			if !hasValidProof(b.Hash, b.Difficulty) {
@@ -648,6 +722,46 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 	_ = json.NewEncoder(w).Encode(payload)
 }
 
+func (n *Node) handleTxDigest(w http.ResponseWriter, r *http.Request) {
+	if n.checkCommonHeadersAndLimit(w, r) {
+		return
+	}
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "POST required"})
+		return
+	}
+	var req struct {
+		From      string `json:"from"`
+		To        string `json:"to"`
+		Amount    int64  `json:"amount"`
+		Nonce     uint64 `json:"nonce"`
+		Timestamp int64  `json:"timestamp"`
+		Note      string `json:"note"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid JSON body"})
+		return
+	}
+	ts := req.Timestamp
+	if ts == 0 {
+		ts = time.Now().UTC().Unix()
+	}
+	tx := Transaction{
+		From:      strings.TrimSpace(req.From),
+		To:        strings.TrimSpace(req.To),
+		Amount:    req.Amount,
+		Nonce:     req.Nonce,
+		Timestamp: ts,
+		Note:      req.Note,
+	}
+	digest := txSigningDigest(tx)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"digest_hex": hex.EncodeToString(digest),
+		"fee":        computeTransferFee(tx.Amount),
+		"timestamp":  ts,
+	})
+}
+
 func (n *Node) handleStatus(w http.ResponseWriter, r *http.Request) {
 	if n.checkCommonHeadersAndLimit(w, r) {
 		return
@@ -659,14 +773,14 @@ func (n *Node) handleStatus(w http.ResponseWriter, r *http.Request) {
 
 	n.mu.Lock()
 	activeUsers := n.touchUserLocked(userID)
-	diff := computeDifficulty(activeUsers)
+	height := len(n.Chain) - 1
+	latest := n.Chain[height]
+	diff := computeExpectedBlockDifficulty(latest, time.Now().UTC().Unix(), activeUsers)
 	totalSupply, minedSupply := computeSupplyStatsLocked(n.Chain)
 	remainingMining := MiningCap - minedSupply
 	if remainingMining < 0 {
 		remainingMining = 0
 	}
-	height := len(n.Chain) - 1
-	latest := n.Chain[height]
 	mempoolCount := len(n.Mempool)
 	peerCount := len(n.Peers)
 	n.mu.Unlock()
@@ -869,7 +983,8 @@ func (n *Node) handleMine(w http.ResponseWriter, r *http.Request) {
 
 	n.mu.Lock()
 	activeUsers := n.touchUserLocked(userID)
-	diff := computeDifficulty(activeUsers)
+	prev := n.Chain[len(n.Chain)-1]
+	diff := computeExpectedBlockDifficulty(prev, time.Now().UTC().Unix(), activeUsers)
 	totalSupply, minedSupply := computeSupplyStatsLocked(n.Chain)
 	remainingMining := MiningCap - minedSupply
 	if remainingMining < 0 {
@@ -901,7 +1016,6 @@ func (n *Node) handleMine(w http.ResponseWriter, r *http.Request) {
 	}
 	txs = append(txs, n.Mempool...)
 
-	prev := n.Chain[len(n.Chain)-1]
 	nextIndex := prev.Index + 1
 	prevHash := prev.Hash
 	n.mu.Unlock()
@@ -959,7 +1073,8 @@ func (n *Node) handleChain(w http.ResponseWriter, r *http.Request) {
 	chainCopy := append([]Block{}, n.Chain...)
 	totalSupply, minedSupply := computeSupplyStatsLocked(chainCopy)
 	activeUsers := n.pruneAndCountActiveUsersLocked(time.Now().UTC().Unix())
-	diff := computeDifficulty(activeUsers)
+	latest := chainCopy[len(chainCopy)-1]
+	diff := computeExpectedBlockDifficulty(latest, time.Now().UTC().Unix(), activeUsers)
 	n.mu.RUnlock()
 
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -983,7 +1098,8 @@ func (n *Node) handleSync(w http.ResponseWriter, r *http.Request) {
 		chainCopy := append([]Block{}, n.Chain...)
 		mempoolCopy := normalizeTxs(n.Mempool)
 		activeUsers := n.pruneAndCountActiveUsersLocked(time.Now().UTC().Unix())
-		diff := computeDifficulty(activeUsers)
+		latest := chainCopy[len(chainCopy)-1]
+		diff := computeExpectedBlockDifficulty(latest, time.Now().UTC().Unix(), activeUsers)
 		n.mu.RUnlock()
 
 		writeJSON(w, http.StatusOK, map[string]any{
@@ -1024,10 +1140,11 @@ func (n *Node) handleSync(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
+		latest := n.Chain[len(n.Chain)-1]
 		writeJSON(w, http.StatusOK, map[string]any{
 			"adopted":      adopted,
 			"height":       len(n.Chain) - 1,
-			"difficulty":   computeDifficulty(activeUsers),
+			"difficulty":   computeExpectedBlockDifficulty(latest, time.Now().UTC().Unix(), activeUsers),
 			"active_users": activeUsers,
 			"chain":        n.Chain,
 		})
@@ -1154,11 +1271,12 @@ func main() {
 			"node":      "sdm-coin Go Node",
 			"symbol":    "SDM",
 			"status":    "online",
-			"endpoints": []string{"/status", "/balance", "/transfer", "/mine", "/chain", "/sync", "/peers"},
+			"endpoints": []string{"/status", "/balance", "/tx/digest", "/transfer", "/mine", "/chain", "/sync", "/peers"},
 		})
 	})
 	mux.HandleFunc("/status", node.handleStatus)
 	mux.HandleFunc("/balance", node.handleBalance)
+	mux.HandleFunc("/tx/digest", node.handleTxDigest)
 	mux.HandleFunc("/transfer", node.handleTransfer)
 	mux.HandleFunc("/mine", node.handleMine)
 	mux.HandleFunc("/chain", node.handleChain)
