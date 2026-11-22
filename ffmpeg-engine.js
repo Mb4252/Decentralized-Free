@@ -1,9 +1,19 @@
 // ffmpeg-engine.js
 const { FFmpeg } = FFmpegWASM;
-const { fetchFile } = FFmpegUtil;
+const { fetchFile, toBlobURL } = FFmpegUtil;
 
 let ffmpeg = null;
 let ffmpegLoaded = false;
+
+async function createSameOriginWorkerURL(workerUrl) {
+    const response = await fetch(workerUrl);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch worker script: ${response.status}`);
+    }
+    const scriptText = await response.text();
+    const blob = new Blob([scriptText], { type: 'application/javascript' });
+    return URL.createObjectURL(blob);
+}
 
 async function initFFmpeg(onProgress) {
     if (ffmpegLoaded) return ffmpeg;
@@ -18,10 +28,17 @@ async function initFFmpeg(onProgress) {
         if (onProgress) onProgress(Math.min(99, Math.round(progress * 100)));
     });
 
-    // تحميل FFmpeg core من CDN
+    const baseCoreURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
+    const workerSourceURL = 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/814.ffmpeg.js';
+
+    const classWorkerURL = await createSameOriginWorkerURL(workerSourceURL);
+    const coreURL = await toBlobURL(`${baseCoreURL}/ffmpeg-core.js`, 'text/javascript');
+    const wasmURL = await toBlobURL(`${baseCoreURL}/ffmpeg-core.wasm`, 'application/wasm');
+
     await ffmpeg.load({
-        coreURL: 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js',
-        wasmURL: 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.wasm',
+        classWorkerURL,
+        coreURL,
+        wasmURL,
     });
 
     ffmpegLoaded = true;
