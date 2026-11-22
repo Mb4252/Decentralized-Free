@@ -4,36 +4,39 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
-	"crypto/rand"
 	"crypto/sha256"
-	"crypto/x509"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"math/big"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 const (
-	MaxSupply        int64 = 50_000_000
-	GenesisSupply    int64 = 40_000_000
-	MiningCap        int64 = 10_000_000
-	BlockReward      int64 = 50
-	BaseDifficulty         = 4
-	MaxDifficulty          = 8
-	ActiveUserWindow       = 5 * time.Minute
-	UsersPerDiffStep       = 5
-	MaxDriftSeconds  int64 = 300
-	DefaultChainFile       = "sdm_chain.json"
-	GenesisAddress         = "SDM_GENESIS_VAULT_0001"
+	MaxSupply         int64         = 50_000_000
+	MiningCap         int64         = 50_000_000
+	BlockReward       int64         = 50
+	BaseDifficulty                  = 4
+	MaxDifficulty                   = 8
+	ActiveUserWindow                = 5 * time.Minute
+	UsersPerDiffStep                = 5
+	MaxDriftSeconds   int64         = 300
+	MaxMineIterations int64         = 25_000_000
+	MaxMempoolSize                  = 500
+	RateLimitWindow                 = time.Minute
+	MaxRequestsPerMin               = 90
+	DefaultChainFile                = "sdm_chain.json"
+	FeeVaultAddress                 = "SDM45e41bcbe77ee00f43b9b8db62722871"
 )
 
 type Transaction struct {
@@ -65,14 +68,82 @@ type PersistedState struct {
 	Peers       map[string]int64 `json:"peers"`
 }
 
+type rateEntry struct {
+	count     int
+	windowEnd time.Time
+}
+
+type RateLimiter struct {
+	mu      sync.Mutex
+	entries map[string]rateEntry
+}
+
+func NewRateLimiter() *RateLimiter {
+	return &RateLimiter{
+		entries: make(map[string]rateEntry),
+	}
+}
+
+func (rl *RateLimiter) Allow(key string) bool {
+	now := time.Now()
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	if len(rl.entries) > 4096 {
+		for k, v := range rl.entries {
+			if now.After(v.windowEnd) {
+				delete(rl.entries, k)
+			}
+		}
+	}
+
+	cur, ok := rl.entries[key]
+	if !ok || now.After(cur.windowEnd) {
+		rl.entries[key] = rateEntry{
+			count:     1,
+			windowEnd: now.Add(RateLimitWindow),
+		}
+		return true
+	}
+	if cur.count >= MaxRequestsPerMin {
+		return false
+	}
+	cur.count++
+	rl.entries[key] = cur
+	return true
+}
+
 type Node struct {
-	mu          sync.RWMutex
-	Chain       []Block          `json:"chain"`
-	Mempool     []Transaction    `json:"mempool"`
-	ActiveUsers map[string]int64 `json:"active_users"`
-	Peers       map[string]int64 `json:"peers"`
-	ChainFile   string           `json:"-"`
-	DBUrl       string           `json:"-"`
+	mu            sync.RWMutex
+	Chain         []Block          `json:"chain"`
+	Mempool       []Transaction    `json:"mempool"`
+	ActiveUsers   map[string]int64 `json:"active_users"`
+	Peers         map[string]int64 `json:"peers"`
+	ChainFile     string           `json:"-"`
+	DBUrl         string           `json:"-"`
+	AllowedOrigin string           `json:"-"`
+	pool          *pgxpool.Pool
+	limiter       *RateLimiter
+}
+
+func normalizeTxs(txs []Transaction) []Transaction {
+	if len(txs) == 0 {
+		return []Transaction{}
+	}
+	out := make([]Transaction, len(txs))
+	copy(out, txs)
+	return out
+}
+
+func computeTransferFee(amount int64) int64 {
+	if amount <= 0 {
+		return 0
+	}
+	fee := amount / 100
+	if fee < 1 {
+		fee = 1
+	}
+	return fee
 }
 
 func deriveAddressFromPubBytes(pubBytes []byte) string {
@@ -82,8 +153,9 @@ func deriveAddressFromPubBytes(pubBytes []byte) string {
 }
 
 func txSigningDigest(tx Transaction) []byte {
-	payload := fmt.Sprintf("%s|%s|%d|%d|%d|%s",
-		tx.From, tx.To, tx.Amount, tx.Nonce, tx.Timestamp, tx.Note)
+	fee := computeTransferFee(tx.Amount)
+	payload := fmt.Sprintf("%s|%s|%d|%d|%d|%d|%s",
+		tx.From, tx.To, tx.Amount, fee, tx.Nonce, tx.Timestamp, tx.Note)
 	sum := sha256.Sum256([]byte(payload))
 	return sum[:]
 }
@@ -125,7 +197,7 @@ func verifyTransactionSignature(tx Transaction) bool {
 }
 
 func calculateBlockHash(b Block) string {
-	txBytes, _ := json.Marshal(b.Transactions)
+	txBytes, _ := json.Marshal(normalizeTxs(b.Transactions))
 	record := fmt.Sprintf("%d|%d|%s|%s|%d|%d|%s",
 		b.Index, b.Timestamp, string(txBytes), b.PrevHash, b.Nonce, b.Difficulty, b.Miner)
 	sum := sha256.Sum256([]byte(record))
@@ -140,14 +212,41 @@ func hasValidProof(hash string, difficulty int) bool {
 	return strings.HasPrefix(hash, prefix)
 }
 
-func mineBlock(index int, txs []Transaction, prevHash string, difficulty int, miner string) Block {
+func cumulativeDifficulty(chain []Block) *big.Int {
+	total := new(big.Int)
+	for _, b := range chain {
+		diff := b.Difficulty
+		if diff < 0 {
+			diff = 0
+		}
+		if diff > 60 {
+			diff = 60
+		}
+		weight := new(big.Int).Lsh(big.NewInt(1), uint(diff))
+		total.Add(total, weight)
+	}
+	return total
+}
+
+func mineBlockContext(ctx context.Context, index int, txs []Transaction, prevHash string, difficulty int, miner string) (Block, error) {
+	normTxs := normalizeTxs(txs)
 	var nonce int64 = 0
 	for {
+		if nonce%50_000 == 0 {
+			select {
+			case <-ctx.Done():
+				return Block{}, ctx.Err()
+			default:
+			}
+			if nonce > MaxMineIterations {
+				return Block{}, errors.New("mining iteration limit reached for current difficulty")
+			}
+		}
 		ts := time.Now().UTC().Unix()
 		candidate := Block{
 			Index:        index,
 			Timestamp:    ts,
-			Transactions: txs,
+			Transactions: normTxs,
 			PrevHash:     prevHash,
 			Nonce:        nonce,
 			Difficulty:   difficulty,
@@ -156,68 +255,78 @@ func mineBlock(index int, txs []Transaction, prevHash string, difficulty int, mi
 		h := calculateBlockHash(candidate)
 		if hasValidProof(h, difficulty) {
 			candidate.Hash = h
-			return candidate
+			return candidate, nil
 		}
 		nonce++
 	}
 }
 
 func newGenesisBlock() Block {
-	genesisTx := Transaction{
-		From:      "GENESIS",
-		To:        GenesisAddress,
-		Amount:    GenesisSupply,
-		Nonce:     0,
-		Timestamp: 1735689600,
-		Note:      "SDM Genesis Allocation (40,000,000 SDM)",
-	}
 	b := Block{
 		Index:        0,
 		Timestamp:    1735689600,
-		Transactions: []Transaction{genesisTx},
+		Transactions: []Transaction{},
 		PrevHash:     strings.Repeat("0", 64),
 		Nonce:        0,
 		Difficulty:   BaseDifficulty,
-		Miner:        "GENESIS",
+		Miner:        FeeVaultAddress,
 	}
 	b.Hash = calculateBlockHash(b)
 	return b
 }
 
-func NewNode(chainFile string, dbUrl string) *Node {
+func NewNode(chainFile string, dbUrl string, allowedOrigin string) *Node {
 	n := &Node{
-		ActiveUsers: make(map[string]int64),
-		Peers:       make(map[string]int64),
-		ChainFile:   chainFile,
-		DBUrl:       strings.TrimSpace(dbUrl),
+		ActiveUsers:   make(map[string]int64),
+		Peers:         make(map[string]int64),
+		ChainFile:     chainFile,
+		DBUrl:         strings.TrimSpace(dbUrl),
+		AllowedOrigin: strings.TrimSpace(allowedOrigin),
+		limiter:       NewRateLimiter(),
 	}
+
 	if n.DBUrl != "" {
-		_ = n.ensureDBTable()
-		if err := n.loadFromDB(); err == nil {
-			return n
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		pool, err := pgxpool.New(ctx, n.DBUrl)
+		if err != nil {
+			log.Printf("db pool connect warning: %v", err)
+		} else if pingErr := pool.Ping(ctx); pingErr != nil {
+			log.Printf("db pool ping warning: %v", pingErr)
+			pool.Close()
+		} else {
+			n.pool = pool
+			if tblErr := n.ensureDBTable(ctx); tblErr != nil {
+				log.Printf("db table init warning: %v", tblErr)
+			} else if loadErr := n.loadFromDB(ctx); loadErr == nil {
+				cancel()
+				return n
+			}
 		}
+		cancel()
 	}
+
 	if err := n.loadFromFile(); err == nil {
-		if n.DBUrl != "" {
-			_ = n.saveToDB()
+		if n.pool != nil {
+			ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+			if err := n.saveToDB(ctx); err != nil {
+				log.Printf("db initial sync warning: %v", err)
+			}
+			cancel()
 		}
 		return n
 	}
+
 	n.Chain = []Block{newGenesisBlock()}
+	n.Mempool = []Transaction{}
 	_ = n.persistLocked()
 	return n
 }
 
-func (n *Node) ensureDBTable() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
-	defer cancel()
-	conn, err := pgx.Connect(ctx, n.DBUrl)
-	if err != nil {
-		return err
+func (n *Node) ensureDBTable(ctx context.Context) error {
+	if n.pool == nil {
+		return errors.New("db pool not initialized")
 	}
-	defer conn.Close(ctx)
-
-	_, err = conn.Exec(ctx, `
+	_, err := n.pool.Exec(ctx, `
 		CREATE TABLE IF NOT EXISTS sdm_node_state (
 			id INT PRIMARY KEY,
 			state_json TEXT NOT NULL,
@@ -227,30 +336,25 @@ func (n *Node) ensureDBTable() error {
 	return err
 }
 
-func (n *Node) loadFromDB() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
-	defer cancel()
-	conn, err := pgx.Connect(ctx, n.DBUrl)
-	if err != nil {
-		return err
+func (n *Node) loadFromDB(ctx context.Context) error {
+	if n.pool == nil {
+		return errors.New("db pool not initialized")
 	}
-	defer conn.Close(ctx)
-
 	var raw string
-	err = conn.QueryRow(ctx, `SELECT state_json FROM sdm_node_state WHERE id = 1`).Scan(&raw)
+	err := n.pool.QueryRow(ctx, `SELECT state_json FROM sdm_node_state WHERE id = 1`).Scan(&raw)
 	if err != nil {
 		return err
 	}
 	return n.applyPersistedJSON([]byte(raw))
 }
 
-func (n *Node) saveToDB() error {
-	if n.DBUrl == "" {
+func (n *Node) saveToDB(ctx context.Context) error {
+	if n.pool == nil {
 		return nil
 	}
 	snap := PersistedState{
 		Chain:       append([]Block{}, n.Chain...),
-		Mempool:     append([]Transaction{}, n.Mempool...),
+		Mempool:     normalizeTxs(n.Mempool),
 		ActiveUsers: cloneInt64Map(n.ActiveUsers),
 		Peers:       cloneInt64Map(n.Peers),
 	}
@@ -258,16 +362,7 @@ func (n *Node) saveToDB() error {
 	if err != nil {
 		return err
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
-	defer cancel()
-	conn, err := pgx.Connect(ctx, n.DBUrl)
-	if err != nil {
-		return err
-	}
-	defer conn.Close(ctx)
-
-	_, err = conn.Exec(ctx, `
+	_, err = n.pool.Exec(ctx, `
 		INSERT INTO sdm_node_state (id, state_json, updated_at)
 		VALUES (1, $1, $2)
 		ON CONFLICT (id) DO UPDATE SET state_json = EXCLUDED.state_json, updated_at = EXCLUDED.updated_at
@@ -295,7 +390,7 @@ func (n *Node) applyPersistedJSON(data []byte) error {
 		return errors.New("invalid chain")
 	}
 	n.Chain = loaded.Chain
-	n.Mempool = loaded.Mempool
+	n.Mempool = normalizeTxs(loaded.Mempool)
 	if loaded.ActiveUsers != nil {
 		n.ActiveUsers = loaded.ActiveUsers
 	} else {
@@ -320,7 +415,7 @@ func (n *Node) loadFromFile() error {
 func (n *Node) persistLocked() error {
 	snap := PersistedState{
 		Chain:       n.Chain,
-		Mempool:     n.Mempool,
+		Mempool:     normalizeTxs(n.Mempool),
 		ActiveUsers: n.ActiveUsers,
 		Peers:       n.Peers,
 	}
@@ -328,35 +423,22 @@ func (n *Node) persistLocked() error {
 	if err == nil {
 		_ = os.WriteFile(n.ChainFile, payload, 0600)
 	}
-	if n.DBUrl != "" {
-		go func(b []byte) {
-			_ = n.writeRawToDB(b)
-		}(payload)
+	if n.pool != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+		defer cancel()
+		if tblErr := n.ensureDBTable(ctx); tblErr != nil {
+			log.Printf("db ensure table error: %v", tblErr)
+			return tblErr
+		}
+		if _, execErr := n.pool.Exec(ctx, `
+			INSERT INTO sdm_node_state (id, state_json, updated_at)
+			VALUES (1, $1, $2)
+			ON CONFLICT (id) DO UPDATE SET state_json = EXCLUDED.state_json, updated_at = EXCLUDED.updated_at
+		`, string(payload), time.Now().UTC().Unix()); execErr != nil {
+			log.Printf("db write error: %v", execErr)
+			return execErr
+		}
 	}
-	return err
-}
-
-func (n *Node) writeRawToDB(raw []byte) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
-	defer cancel()
-	conn, err := pgx.Connect(ctx, n.DBUrl)
-	if err != nil {
-		return err
-	}
-	defer conn.Close(ctx)
-
-	_, _ = conn.Exec(ctx, `
-		CREATE TABLE IF NOT EXISTS sdm_node_state (
-			id INT PRIMARY KEY,
-			state_json TEXT NOT NULL,
-			updated_at BIGINT NOT NULL
-		)
-	`)
-	_, err = conn.Exec(ctx, `
-		INSERT INTO sdm_node_state (id, state_json, updated_at)
-		VALUES (1, $1, $2)
-		ON CONFLICT (id) DO UPDATE SET state_json = EXCLUDED.state_json, updated_at = EXCLUDED.updated_at
-	`, string(raw), time.Now().UTC().Unix())
 	return err
 }
 
@@ -402,11 +484,9 @@ func computeDifficulty(activeUsers int) int {
 }
 
 func computeSupplyStatsLocked(chain []Block) (totalSupply int64, minedSupply int64) {
-	for bIdx, b := range chain {
+	for _, b := range chain {
 		for _, tx := range b.Transactions {
-			if bIdx == 0 || tx.From == "GENESIS" {
-				totalSupply += tx.Amount
-			} else if tx.From == "COINBASE" || tx.From == "MINING_REWARD" {
+			if tx.From == "COINBASE" || tx.From == "MINING_REWARD" {
 				minedSupply += tx.Amount
 				totalSupply += tx.Amount
 			}
@@ -420,11 +500,17 @@ func computeAccountStatesLocked(chain []Block) (balances map[string]int64, nonce
 	nonces = make(map[string]uint64)
 	for _, b := range chain {
 		for _, tx := range b.Transactions {
-			if tx.From != "GENESIS" && tx.From != "COINBASE" && tx.From != "MINING_REWARD" {
-				balances[tx.From] -= tx.Amount
+			if tx.From == "COINBASE" || tx.From == "MINING_REWARD" {
+				balances[tx.To] += tx.Amount
+			} else if tx.From != "GENESIS" {
+				fee := computeTransferFee(tx.Amount)
+				balances[tx.From] -= (tx.Amount + fee)
 				nonces[tx.From] = tx.Nonce + 1
+				balances[tx.To] += tx.Amount
+				balances[FeeVaultAddress] += fee
+			} else {
+				balances[tx.To] += tx.Amount
 			}
-			balances[tx.To] += tx.Amount
 		}
 	}
 	return balances, nonces
@@ -458,6 +544,9 @@ func isValidChain(chain []Block) bool {
 			if b.Timestamp < prev.Timestamp {
 				return false
 			}
+			if b.Difficulty < BaseDifficulty || b.Difficulty > MaxDifficulty {
+				return false
+			}
 			if !hasValidProof(b.Hash, b.Difficulty) {
 				return false
 			}
@@ -471,10 +560,7 @@ func isValidChain(chain []Block) bool {
 			if !verifyTransactionSignature(tx) {
 				return false
 			}
-			if i == 0 || tx.From == "GENESIS" {
-				totalSupply += tx.Amount
-				balances[tx.To] += tx.Amount
-			} else if tx.From == "COINBASE" || tx.From == "MINING_REWARD" {
+			if tx.From == "COINBASE" || tx.From == "MINING_REWARD" {
 				coinbaseCount++
 				if coinbaseCount > 1 || tx.Amount > BlockReward {
 					return false
@@ -482,16 +568,21 @@ func isValidChain(chain []Block) bool {
 				minedSupply += tx.Amount
 				totalSupply += tx.Amount
 				balances[tx.To] += tx.Amount
+			} else if tx.From == "GENESIS" {
+				balances[tx.To] += tx.Amount
 			} else {
+				fee := computeTransferFee(tx.Amount)
+				totalCost := tx.Amount + fee
 				exp := expectedNonce[tx.From]
 				if tx.Nonce != exp {
 					return false
 				}
-				if balances[tx.From] < tx.Amount {
+				if balances[tx.From] < totalCost {
 					return false
 				}
-				balances[tx.From] -= tx.Amount
+				balances[tx.From] -= totalCost
 				balances[tx.To] += tx.Amount
+				balances[FeeVaultAddress] += fee
 				expectedNonce[tx.From] = exp + 1
 			}
 		}
@@ -503,28 +594,50 @@ func isValidChain(chain []Block) bool {
 	return true
 }
 
-func generateWallet() (address string, publicKeyHex string, privateKeyPKCS8Hex string, err error) {
-	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		return "", "", "", err
+func clientIP(r *http.Request) string {
+	host, _, err := net.SplitHostPort(strings.TrimSpace(r.RemoteAddr))
+	if err == nil && host != "" {
+		return host
 	}
-	pubBytes := elliptic.MarshalCompressed(priv.Curve, priv.PublicKey.X, priv.PublicKey.Y)
-	address = deriveAddressFromPubBytes(pubBytes)
-
-	pkcs8Bytes, err := x509.MarshalPKCS8PrivateKey(priv)
-	if err != nil {
-		return "", "", "", err
-	}
-	return address, hex.EncodeToString(pubBytes), hex.EncodeToString(pkcs8Bytes), nil
+	return strings.TrimSpace(r.RemoteAddr)
 }
 
-func enableCORS(w http.ResponseWriter, r *http.Request) bool {
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+func validatePeerURL(raw string) (string, error) {
+	clean := strings.TrimSpace(strings.TrimRight(raw, "/"))
+	u, err := url.Parse(clean)
+	if err != nil {
+		return "", errors.New("invalid peer URL")
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return "", errors.New("peer_url must use http or https")
+	}
+	host := strings.ToLower(u.Hostname())
+	if host == "" || host == "localhost" || host == "0.0.0.0" {
+		return "", errors.New("disallowed peer host")
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		if ip.IsLoopback() || ip.IsPrivate() || ip.IsUnspecified() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+			return "", errors.New("disallowed private or loopback IP")
+		}
+	}
+	return u.String(), nil
+}
+
+func (n *Node) checkCommonHeadersAndLimit(w http.ResponseWriter, r *http.Request) bool {
+	if n.AllowedOrigin != "" {
+		w.Header().Set("Access-Control-Allow-Origin", n.AllowedOrigin)
+		w.Header().Set("Vary", "Origin")
+	}
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-User-Id")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	if r.Method == http.MethodOptions {
 		w.WriteHeader(http.StatusNoContent)
+		return true
+	}
+	if n.limiter != nil && !n.limiter.Allow(clientIP(r)) {
+		writeJSON(w, http.StatusTooManyRequests, map[string]any{"error": "rate limit exceeded"})
 		return true
 	}
 	return false
@@ -536,7 +649,7 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 }
 
 func (n *Node) handleStatus(w http.ResponseWriter, r *http.Request) {
-	if enableCORS(w, r) {
+	if n.checkCommonHeadersAndLimit(w, r) {
 		return
 	}
 	userID := r.URL.Query().Get("user")
@@ -556,24 +669,24 @@ func (n *Node) handleStatus(w http.ResponseWriter, r *http.Request) {
 	latest := n.Chain[height]
 	mempoolCount := len(n.Mempool)
 	peerCount := len(n.Peers)
-	_ = n.persistLocked()
 	n.mu.Unlock()
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"symbol":               "SDM",
 		"name":                 "sdm.coin",
 		"max_supply":           MaxSupply,
-		"genesis_supply":       GenesisSupply,
 		"mining_cap":           MiningCap,
 		"total_supply":         totalSupply,
 		"mined_supply":         minedSupply,
 		"remaining_mining_cap": remainingMining,
 		"block_reward":         BlockReward,
+		"fee_recipient":        FeeVaultAddress,
 		"height":               height,
 		"blocks_count":         len(n.Chain),
 		"difficulty":           diff,
 		"base_difficulty":      BaseDifficulty,
 		"max_difficulty":       MaxDifficulty,
+		"users_per_diff_step":  UsersPerDiffStep,
 		"active_users":         activeUsers,
 		"mempool_count":        mempoolCount,
 		"peers_count":          peerCount,
@@ -581,25 +694,8 @@ func (n *Node) handleStatus(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (n *Node) handleWalletNew(w http.ResponseWriter, r *http.Request) {
-	if enableCORS(w, r) {
-		return
-	}
-	addr, pub, privPKCS8, err := generateWallet()
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"address":     addr,
-		"public_key":  pub,
-		"private_key": privPKCS8,
-		"nonce":       0,
-	})
-}
-
 func (n *Node) handleBalance(w http.ResponseWriter, r *http.Request) {
-	if enableCORS(w, r) {
+	if n.checkCommonHeadersAndLimit(w, r) {
 		return
 	}
 	addr := strings.TrimSpace(r.URL.Query().Get("address"))
@@ -630,7 +726,7 @@ func (n *Node) handleBalance(w http.ResponseWriter, r *http.Request) {
 }
 
 func (n *Node) handleTransfer(w http.ResponseWriter, r *http.Request) {
-	if enableCORS(w, r) {
+	if n.checkCommonHeadersAndLimit(w, r) {
 		return
 	}
 	if r.Method != http.MethodPost {
@@ -689,8 +785,16 @@ func (n *Node) handleTransfer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	fee := computeTransferFee(tx.Amount)
+	totalCost := tx.Amount + fee
+
 	n.mu.Lock()
 	defer n.mu.Unlock()
+
+	if len(n.Mempool) >= MaxMempoolSize {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "mempool is full, please try again later"})
+		return
+	}
 
 	n.touchUserLocked(req.UserID)
 	balances, nonces := computeAccountStatesLocked(n.Chain)
@@ -699,7 +803,7 @@ func (n *Node) handleTransfer(w http.ResponseWriter, r *http.Request) {
 	var pendingOutgoing int64
 	for _, m := range n.Mempool {
 		if m.From == req.From {
-			pendingOutgoing += m.Amount
+			pendingOutgoing += m.Amount + computeTransferFee(m.Amount)
 			if m.Nonce >= expectedNonce {
 				expectedNonce = m.Nonce + 1
 			}
@@ -715,26 +819,33 @@ func (n *Node) handleTransfer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	available := balances[req.From] - pendingOutgoing
-	if available < req.Amount {
+	if available < totalCost {
 		writeJSON(w, http.StatusBadRequest, map[string]any{
 			"error":     "insufficient balance",
 			"available": available,
+			"required":  totalCost,
+			"fee":       fee,
 		})
 		return
 	}
 
 	n.Mempool = append(n.Mempool, tx)
-	_ = n.persistLocked()
+	if err := n.persistLocked(); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "failed to persist transaction"})
+		return
+	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"status":      "queued",
 		"transaction": tx,
+		"fee":         fee,
+		"total_cost":  totalCost,
 		"next_nonce":  expectedNonce + 1,
 	})
 }
 
 func (n *Node) handleMine(w http.ResponseWriter, r *http.Request) {
-	if enableCORS(w, r) {
+	if n.checkCommonHeadersAndLimit(w, r) {
 		return
 	}
 	var req struct {
@@ -749,7 +860,7 @@ func (n *Node) handleMine(w http.ResponseWriter, r *http.Request) {
 		miner = strings.TrimSpace(r.URL.Query().Get("miner"))
 	}
 	if miner == "" {
-		miner = GenesisAddress
+		miner = FeeVaultAddress
 	}
 	userID := strings.TrimSpace(req.UserID)
 	if userID == "" {
@@ -785,7 +896,7 @@ func (n *Node) handleMine(w http.ResponseWriter, r *http.Request) {
 			Amount:    reward,
 			Nonce:     0,
 			Timestamp: time.Now().UTC().Unix(),
-			Note:      "PoW Block Reward",
+			Note:      "PoW Block Reward & Network Security",
 		})
 	}
 	txs = append(txs, n.Mempool...)
@@ -795,7 +906,14 @@ func (n *Node) handleMine(w http.ResponseWriter, r *http.Request) {
 	prevHash := prev.Hash
 	n.mu.Unlock()
 
-	mined := mineBlock(nextIndex, txs, prevHash, diff, miner)
+	mineCtx, cancel := context.WithTimeout(r.Context(), 25*time.Second)
+	defer cancel()
+
+	mined, err := mineBlockContext(mineCtx, nextIndex, txs, prevHash, diff, miner)
+	if err != nil {
+		writeJSON(w, http.StatusRequestTimeout, map[string]any{"error": err.Error()})
+		return
+	}
 
 	n.mu.Lock()
 	defer n.mu.Unlock()
@@ -817,8 +935,11 @@ func (n *Node) handleMine(w http.ResponseWriter, r *http.Request) {
 	}
 
 	n.Chain = candidateChain
-	n.Mempool = nil
-	_ = n.persistLocked()
+	n.Mempool = []Transaction{}
+	if err := n.persistLocked(); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "failed to persist mined block"})
+		return
+	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"status":       "mined",
@@ -831,7 +952,7 @@ func (n *Node) handleMine(w http.ResponseWriter, r *http.Request) {
 }
 
 func (n *Node) handleChain(w http.ResponseWriter, r *http.Request) {
-	if enableCORS(w, r) {
+	if n.checkCommonHeadersAndLimit(w, r) {
 		return
 	}
 	n.mu.RLock()
@@ -848,18 +969,19 @@ func (n *Node) handleChain(w http.ResponseWriter, r *http.Request) {
 		"active_users": activeUsers,
 		"total_supply": totalSupply,
 		"mined_supply": minedSupply,
+		"mining_cap":   MiningCap,
 		"chain":        chainCopy,
 	})
 }
 
 func (n *Node) handleSync(w http.ResponseWriter, r *http.Request) {
-	if enableCORS(w, r) {
+	if n.checkCommonHeadersAndLimit(w, r) {
 		return
 	}
 	if r.Method == http.MethodGet {
 		n.mu.RLock()
 		chainCopy := append([]Block{}, n.Chain...)
-		mempoolCopy := append([]Transaction{}, n.Mempool...)
+		mempoolCopy := normalizeTxs(n.Mempool)
 		activeUsers := n.pruneAndCountActiveUsersLocked(time.Now().UTC().Unix())
 		diff := computeDifficulty(activeUsers)
 		n.mu.RUnlock()
@@ -893,10 +1015,13 @@ func (n *Node) handleSync(w http.ResponseWriter, r *http.Request) {
 
 		activeUsers := n.touchUserLocked(req.UserID)
 		adopted := false
-		if len(req.Chain) > len(n.Chain) {
+		if cumulativeDifficulty(req.Chain).Cmp(cumulativeDifficulty(n.Chain)) > 0 {
 			n.Chain = append([]Block{}, req.Chain...)
 			adopted = true
-			_ = n.persistLocked()
+			if err := n.persistLocked(); err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "failed to persist synced chain"})
+				return
+			}
 		}
 
 		writeJSON(w, http.StatusOK, map[string]any{
@@ -913,7 +1038,7 @@ func (n *Node) handleSync(w http.ResponseWriter, r *http.Request) {
 }
 
 func (n *Node) handlePeers(w http.ResponseWriter, r *http.Request) {
-	if enableCORS(w, r) {
+	if n.checkCommonHeadersAndLimit(w, r) {
 		return
 	}
 	if r.Method == http.MethodGet {
@@ -934,16 +1059,20 @@ func (n *Node) handlePeers(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid JSON"})
 			return
 		}
-		peer := strings.TrimSpace(strings.TrimRight(req.PeerURL, "/"))
-		if !strings.HasPrefix(peer, "http://") && !strings.HasPrefix(peer, "https://") {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "peer_url must start with http:// or https://"})
+		peer, err := validatePeerURL(req.PeerURL)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 			return
 		}
 
 		n.mu.Lock()
 		n.Peers[peer] = time.Now().UTC().Unix()
-		_ = n.persistLocked()
+		err = n.persistLocked()
 		n.mu.Unlock()
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "failed to persist peer"})
+			return
+		}
 
 		go n.pullFromPeer(peer)
 		writeJSON(w, http.StatusOK, map[string]any{"status": "registered", "peer_url": peer})
@@ -953,8 +1082,12 @@ func (n *Node) handlePeers(w http.ResponseWriter, r *http.Request) {
 }
 
 func (n *Node) pullFromPeer(peerURL string) {
+	validURL, err := validatePeerURL(peerURL)
+	if err != nil {
+		return
+	}
 	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Get(peerURL + "/sync")
+	resp, err := client.Get(validURL + "/sync")
 	if err != nil {
 		return
 	}
@@ -972,7 +1105,7 @@ func (n *Node) pullFromPeer(peerURL string) {
 
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	if len(remote.Chain) > len(n.Chain) {
+	if cumulativeDifficulty(remote.Chain).Cmp(cumulativeDifficulty(n.Chain)) > 0 {
 		n.Chain = append([]Block{}, remote.Chain...)
 		_ = n.persistLocked()
 	}
@@ -1000,13 +1133,17 @@ func main() {
 		chainFile = DefaultChainFile
 	}
 	dbUrl := os.Getenv("DATABASE_URL")
+	allowedOrigin := os.Getenv("ALLOWED_ORIGIN")
 
-	node := NewNode(chainFile, dbUrl)
+	node := NewNode(chainFile, dbUrl, allowedOrigin)
+	if node.pool != nil {
+		defer node.pool.Close()
+	}
 	go node.startPeerSyncLoop()
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if enableCORS(w, r) {
+		if node.checkCommonHeadersAndLimit(w, r) {
 			return
 		}
 		if r.URL.Path != "/" {
@@ -1017,11 +1154,10 @@ func main() {
 			"node":      "sdm-coin Go Node",
 			"symbol":    "SDM",
 			"status":    "online",
-			"endpoints": []string{"/status", "/wallet/new", "/balance", "/transfer", "/mine", "/chain", "/sync", "/peers"},
+			"endpoints": []string{"/status", "/balance", "/transfer", "/mine", "/chain", "/sync", "/peers"},
 		})
 	})
 	mux.HandleFunc("/status", node.handleStatus)
-	mux.HandleFunc("/wallet/new", node.handleWalletNew)
 	mux.HandleFunc("/balance", node.handleBalance)
 	mux.HandleFunc("/transfer", node.handleTransfer)
 	mux.HandleFunc("/mine", node.handleMine)
@@ -1035,7 +1171,7 @@ func main() {
 	}
 
 	addr := ":" + port
-	log.Printf("SDM Go Node listening on %s (chain file: %s, db enabled: %v)", addr, chainFile, dbUrl != "")
+	log.Printf("SDM Go Node listening on %s (chain file: %s, db enabled: %v)", addr, chainFile, node.pool != nil)
 
 	if err := http.ListenAndServe(addr, mux); err != nil {
 		log.Fatalf("server error: %v", err)
