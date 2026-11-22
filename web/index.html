@@ -161,7 +161,7 @@
       </div>
       <div class="stat">
         <div class="stat-label">المعدّن / حد التعدين</div>
-        <div class="stat-value" id="statMined">0 / 10,000,000</div>
+        <div class="stat-value" id="statMined">0 / 50,000,000</div>
       </div>
     </div>
 
@@ -232,6 +232,7 @@
 
   <script>
     const DEFAULT_NODE_URL = "https://decentralized-free-2.onrender.com";
+    const DEFAULT_MINING_CAP = 50000000;
 
     const KEYS = {
       nodeUrl: "sdm_node_url_v1",
@@ -312,6 +313,51 @@
       return Array.from(new Uint8Array(buf))
         .map((b) => b.toString(16).padStart(2, "0"))
         .join("");
+    }
+
+    async function sha256Bytes(bytes) {
+      const hashBuf = await crypto.subtle.digest("SHA-256", bytes);
+      return new Uint8Array(hashBuf);
+    }
+
+    async function deriveAddressFromUncompressedPub(rawPubBytes) {
+      const first = await sha256Bytes(rawPubBytes);
+      const second = await sha256Bytes(first);
+      return "SDM" + bytesToHex(second.slice(0, 16));
+    }
+
+    async function generateLocalWallet() {
+      if (!window.crypto?.subtle) {
+        throw new Error("يلزم تشغيل الصفحة عبر HTTPS أو متصفح يدعم WebCrypto لتوليد المفاتيح.");
+      }
+      const keyPair = await crypto.subtle.generateKey(
+        { name: "ECDSA", namedCurve: "P-256" },
+        true,
+        ["sign", "verify"]
+      );
+      const jwk = await crypto.subtle.exportKey("jwk", keyPair.privateKey);
+      const pkcs8 = await crypto.subtle.exportKey("pkcs8", keyPair.privateKey);
+
+      const xBytes = Uint8Array.from(atob(jwk.x.replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0));
+      const yBytes = Uint8Array.from(atob(jwk.y.replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0));
+
+      const uncompressedPub = new Uint8Array(1 + xBytes.length + yBytes.length);
+      uncompressedPub[0] = 0x04;
+      uncompressedPub.set(xBytes, 1);
+      uncompressedPub.set(yBytes, 1 + xBytes.length);
+
+      const address = await deriveAddressFromUncompressedPub(uncompressedPub);
+      return {
+        address,
+        public_key: bytesToHex(uncompressedPub),
+        private_key: bytesToHex(pkcs8)
+      };
+    }
+
+    function computeTransferFee(amount) {
+      if (!amount || amount <= 0) return 0;
+      const fee = Math.floor(amount / 100);
+      return fee < 1 ? 1 : fee;
     }
 
     async function deriveAesKey(password, saltBytes) {
@@ -396,12 +442,39 @@
         false,
         ["sign"]
       );
-      const payloadStr = `${txFields.from}|${txFields.to}|${txFields.amount}|${txFields.nonce}|${txFields.timestamp}|${txFields.note}`;
-      const encoded = new TextEncoder().encode(payloadStr);
+
+      let digestBytes;
+      try {
+        const res = await fetch(`${getNodeUrl()}/tx/digest`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            from: txFields.from,
+            to: txFields.to,
+            amount: txFields.amount,
+            nonce: txFields.nonce,
+            timestamp: txFields.timestamp,
+            note: txFields.note
+          })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.digest_hex) {
+            digestBytes = hexToBytes(data.digest_hex);
+          }
+        }
+      } catch {}
+
+      if (!digestBytes) {
+        const fee = computeTransferFee(txFields.amount);
+        const payloadStr = `${txFields.from}|${txFields.to}|${txFields.amount}|${fee}|${txFields.nonce}|${txFields.timestamp}|${txFields.note}`;
+        digestBytes = await sha256Bytes(new TextEncoder().encode(payloadStr));
+      }
+
       const sigBuffer = await crypto.subtle.sign(
         { name: "ECDSA", hash: { name: "SHA-256" } },
         cryptoKey,
-        encoded
+        digestBytes
       );
       return bytesToHex(sigBuffer);
     }
@@ -414,7 +487,7 @@
           difficulty: syncData.difficulty ?? 4,
           active_users: syncData.active_users ?? 1,
           mined_supply: syncData.mined_supply ?? 0,
-          mining_cap: syncData.mining_cap ?? 10000000,
+          mining_cap: syncData.mining_cap ?? DEFAULT_MINING_CAP,
           chain: Array.isArray(syncData.chain) ? syncData.chain : []
         };
         localStorage.setItem(KEYS.chainBackup, JSON.stringify(payload));
@@ -455,7 +528,7 @@
         document.getElementById("statDiff").textContent = statusData.difficulty ?? 4;
         document.getElementById("statUsers").textContent = statusData.active_users ?? 1;
         const minedVal = Number(statusData.mined_supply ?? 0).toLocaleString("en-US");
-        const capVal = Number(statusData.mining_cap ?? 10000000).toLocaleString("en-US");
+        const capVal = Number(statusData.mining_cap ?? DEFAULT_MINING_CAP).toLocaleString("en-US");
         document.getElementById("statMined").textContent = `${minedVal} / ${capVal}`;
       }
       if (syncData && Array.isArray(syncData.chain)) {
@@ -525,7 +598,7 @@
         const mergedForBackup = {
           ...syncData,
           mined_supply: statusData.mined_supply ?? 0,
-          mining_cap: statusData.mining_cap ?? 10000000,
+          mining_cap: statusData.mining_cap ?? DEFAULT_MINING_CAP,
           active_users: statusData.active_users ?? syncData.active_users ?? 1,
           difficulty: statusData.difficulty ?? syncData.difficulty ?? 4
         };
@@ -561,16 +634,14 @@
             alert("يرجى إدخال كلمة مرور من 8 أحرف على الأقل قبل إنشاء المحفظة لتشفيرها.");
             return;
           }
-          const res = await fetch(`${getNodeUrl()}/wallet/new`);
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error || "خطأ في إنشاء المحفظة");
+          const data = await generateLocalWallet();
 
           const enc = await encryptWalletObject(data, pass);
           saveEncryptedWallet(enc);
           unlockedWallet = data;
 
           document.getElementById("walletAddressInput").value = data.address;
-          stateMsg.textContent = "المحفظة مفتوحة ومشفرة محلياً.";
+          stateMsg.textContent = "تم إنشاء المحفظة محلياً وتشفيرها.";
           if (data.private_key) {
             showPrivateKeyOnce(data.private_key, 20);
           }
