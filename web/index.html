@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>sdm.coin (SDM) — محفظة وشبكة ومزامنة</title>
+  <title>sdm.coin (SDM)</title>
   <style>
     :root {
       --bg: #0b0f17;
@@ -46,24 +46,6 @@
       margin: 0;
       font-size: 1.25rem;
     }
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 5px 10px;
-      border-radius: 999px;
-      font-size: 0.85rem;
-      background: var(--card-2);
-      border: 1px solid var(--border);
-    }
-    .dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--muted);
-    }
-    .dot.online { background: var(--accent); }
-    .dot.offline { background: var(--danger); }
     .grid-stats {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -102,7 +84,7 @@
       flex-wrap: wrap;
       gap: 8px;
     }
-    input, textarea {
+    input {
       width: 100%;
       padding: 10px 12px;
       border-radius: 10px;
@@ -161,14 +143,7 @@
 <body>
   <div class="container">
     <div class="header">
-      <div>
-        <h1 class="title">sdm.coin (SDM)</h1>
-        <div class="msg" id="syncStatusText">جاري المزامنة في الخلفية...</div>
-      </div>
-      <div class="badge">
-        <span class="dot" id="connDot"></span>
-        <span id="connLabel">جاري الفحص</span>
-      </div>
+      <h1 class="title">sdm.coin (SDM)</h1>
     </div>
 
     <div class="grid-stats">
@@ -186,7 +161,7 @@
       </div>
       <div class="stat">
         <div class="stat-label">المعدّن / حد التعدين</div>
-        <div class="stat-value" id="statMined">0 / 10M</div>
+        <div class="stat-value" id="statMined">0 / 10,000,000</div>
       </div>
     </div>
 
@@ -201,10 +176,14 @@
         <div class="stat-label">عنوان المحفظة (Address)</div>
         <input id="walletAddressInput" type="text" placeholder="SDM..." />
       </div>
-      <div>
-        <div class="stat-label">المفتاح الخاص (Private Key — احتفظ به في مكان آمن)</div>
-        <div class="mono" id="walletPrivBox">غير معروض حالياً</div>
+
+      <!-- يظهر المفتاح الخاص لمرة واحدة فقط عند الإنشاء ثم يختفي تلقائياً -->
+      <div id="oneTimePrivSection" style="display: none;">
+        <div class="stat-label" id="privCountdownLabel">المفتاح الخاص (يظهر لمرة واحدة فقط وسيختفي تلقائياً — احفظه فوراً)</div>
+        <div class="mono" id="walletPrivBox"></div>
+        <button class="secondary" id="hidePrivNowBtn" type="button" style="margin-top: 8px;">إخفاء الآن</button>
       </div>
+
       <div class="stat-value">الرصيد: <span id="balanceValue">0</span> SDM</div>
     </div>
 
@@ -259,6 +238,50 @@
       userId: "sdm_phone_user_id_v1"
     };
 
+    let privHideTimer = null;
+    let privCountdownInterval = null;
+
+    function hidePrivateKeyOnce() {
+      if (privHideTimer) {
+        clearTimeout(privHideTimer);
+        privHideTimer = null;
+      }
+      if (privCountdownInterval) {
+        clearInterval(privCountdownInterval);
+        privCountdownInterval = null;
+      }
+      const box = document.getElementById("walletPrivBox");
+      const section = document.getElementById("oneTimePrivSection");
+      if (box) box.textContent = "";
+      if (section) section.style.display = "none";
+    }
+
+    function showPrivateKeyOnce(privKey, seconds = 20) {
+      if (!privKey) return;
+      hidePrivateKeyOnce();
+
+      const box = document.getElementById("walletPrivBox");
+      const label = document.getElementById("privCountdownLabel");
+      const section = document.getElementById("oneTimePrivSection");
+
+      box.textContent = privKey;
+      section.style.display = "block";
+
+      let remaining = seconds;
+      label.textContent = `المفتاح الخاص (يظهر لمرة واحدة فقط وسيختفي خلال ${remaining} ثانية — احفظه الآن)`;
+
+      privCountdownInterval = setInterval(() => {
+        remaining -= 1;
+        if (remaining > 0) {
+          label.textContent = `المفتاح الخاص (يظهر لمرة واحدة فقط وسيختفي خلال ${remaining} ثانية — احفظه الآن)`;
+        }
+      }, 1000);
+
+      privHideTimer = setTimeout(() => {
+        hidePrivateKeyOnce();
+      }, seconds * 1000);
+    }
+
     function getUserId() {
       let uid = localStorage.getItem(KEYS.userId);
       if (!uid) {
@@ -271,13 +294,6 @@
     function getNodeUrl() {
       const custom = (localStorage.getItem(KEYS.nodeUrl) || "").trim();
       return (custom || DEFAULT_NODE_URL).replace(/\/+$/, "");
-    }
-
-    function setConnectionBadge(online, text) {
-      const dot = document.getElementById("connDot");
-      const label = document.getElementById("connLabel");
-      dot.className = "dot " + (online ? "online" : "offline");
-      label.textContent = text;
     }
 
     function saveWallet(wallet) {
@@ -300,6 +316,8 @@
           height: syncData.height ?? Math.max(0, (syncData.chain?.length || 1) - 1),
           difficulty: syncData.difficulty ?? 4,
           active_users: syncData.active_users ?? 1,
+          mined_supply: syncData.mined_supply ?? 0,
+          mining_cap: syncData.mining_cap ?? 10000000,
           chain: Array.isArray(syncData.chain) ? syncData.chain : []
         };
         localStorage.setItem(KEYS.chainBackup, JSON.stringify(payload));
@@ -339,9 +357,9 @@
         document.getElementById("statHeight").textContent = statusData.height ?? 0;
         document.getElementById("statDiff").textContent = statusData.difficulty ?? 4;
         document.getElementById("statUsers").textContent = statusData.active_users ?? 1;
-        const mined = Number(statusData.mined_supply || 0).toLocaleString("en-US");
-        const cap = Number(statusData.mining_cap || 10000000).toLocaleString("en-US");
-        document.getElementById("statMined").textContent = `${mined} / ${cap}`;
+        const minedVal = Number(statusData.mined_supply ?? 0).toLocaleString("en-US");
+        const capVal = Number(statusData.mining_cap ?? 10000000).toLocaleString("en-US");
+        document.getElementById("statMined").textContent = `${minedVal} / ${capVal}`;
       }
       if (syncData && Array.isArray(syncData.chain)) {
         document.getElementById("statHeight").textContent = Math.max(0, syncData.chain.length - 1);
@@ -404,18 +422,19 @@
           }
         }
 
-        saveChainBackup(syncData);
+        const mergedForBackup = {
+          ...syncData,
+          mined_supply: statusData.mined_supply ?? 0,
+          mining_cap: statusData.mining_cap ?? 10000000,
+          active_users: statusData.active_users ?? syncData.active_users ?? 1,
+          difficulty: statusData.difficulty ?? syncData.difficulty ?? 4
+        };
+
+        saveChainBackup(mergedForBackup);
         applyStatsToUI(statusData, syncData);
-        setConnectionBadge(true, "متصل ويعمل بالخلفية");
-        document.getElementById("syncStatusText").textContent =
-          `آخر مزامنة ناجحة: ${new Date().toLocaleTimeString("ar")}`;
         await refreshBalance();
       } catch {
-        setConnectionBadge(false, localBackup ? "نسخة محلية نشطة" : "غير متصل");
-        document.getElementById("syncStatusText").textContent =
-          localBackup
-            ? "تعذر الوصول للخادم حالياً — يتم استخدام النسخة الاحتياطية المحلية."
-            : "تعذر الوصول للعقدة حالياً، سيعاد المحاولة تلقائياً.";
+        // يعمل بصمت في الخلفية
       }
     }
 
@@ -423,13 +442,15 @@
       const nodeInput = document.getElementById("nodeUrlInput");
       nodeInput.value = getNodeUrl();
 
+      // لا نعرض المفتاح الخاص عند تحميل الصفحة؛ يظهر فقط عند الإنشاء لمرة واحدة ثم يختفي
+      hidePrivateKeyOnce();
+
       const savedWallet = loadWallet();
       if (savedWallet?.address) {
         document.getElementById("walletAddressInput").value = savedWallet.address;
-        if (savedWallet.private_key) {
-          document.getElementById("walletPrivBox").textContent = savedWallet.private_key;
-        }
       }
+
+      document.getElementById("hidePrivNowBtn").addEventListener("click", hidePrivateKeyOnce);
 
       document.getElementById("newWalletBtn").addEventListener("click", async () => {
         try {
@@ -438,7 +459,9 @@
           if (!res.ok) throw new Error(data.error || "خطأ في إنشاء المحفظة");
           saveWallet(data);
           document.getElementById("walletAddressInput").value = data.address;
-          document.getElementById("walletPrivBox").textContent = data.private_key || "تم الإنشاء";
+          if (data.private_key) {
+            showPrivateKeyOnce(data.private_key, 20);
+          }
           await refreshBalance();
         } catch (err) {
           alert(err.message);
