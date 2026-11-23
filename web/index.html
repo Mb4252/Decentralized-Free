@@ -443,33 +443,14 @@
         ["sign"]
       );
 
-      let digestBytes;
-      try {
-        const res = await fetch(`${getNodeUrl()}/tx/digest`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            from: txFields.from,
-            to: txFields.to,
-            amount: txFields.amount,
-            nonce: txFields.nonce,
-            timestamp: txFields.timestamp,
-            note: txFields.note
-          })
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data?.digest_hex) {
-            digestBytes = hexToBytes(data.digest_hex);
-          }
-        }
-      } catch {}
+      const amt = Math.trunc(Number(txFields.amount));
+      const fee = computeTransferFee(amt);
+      const nonce = Math.trunc(Number(txFields.nonce));
+      const ts = Math.trunc(Number(txFields.timestamp));
+      const note = String(txFields.note ?? "");
 
-      if (!digestBytes) {
-        const fee = computeTransferFee(txFields.amount);
-        const payloadStr = `${txFields.from}|${txFields.to}|${txFields.amount}|${fee}|${txFields.nonce}|${txFields.timestamp}|${txFields.note}`;
-        digestBytes = await sha256Bytes(new TextEncoder().encode(payloadStr));
-      }
+      const payloadStr = `${txFields.from}|${txFields.to}|${amt}|${fee}|${nonce}|${ts}|${note}`;
+      const digestBytes = await sha256Bytes(new TextEncoder().encode(payloadStr));
 
       const sigBuffer = await crypto.subtle.sign(
         { name: "ECDSA", hash: { name: "SHA-256" } },
@@ -729,7 +710,7 @@
       document.getElementById("sendTxBtn").addEventListener("click", async () => {
         const from = document.getElementById("walletAddressInput").value.trim();
         const to = document.getElementById("toAddressInput").value.trim();
-        const amount = Number(document.getElementById("amountInput").value);
+        const amount = Math.trunc(Number(document.getElementById("amountInput").value));
         const note = document.getElementById("noteInput").value.trim();
         const msg = document.getElementById("txMsg");
 
@@ -745,7 +726,7 @@
         msg.textContent = "جاري جلب رقم Nonce وتوقيع وإرسال المعاملة...";
         try {
           const acct = await fetchAccountState(from);
-          const nonce = Number(acct?.next_nonce ?? acct?.nonce ?? 0);
+          const nonce = Math.trunc(Number(acct?.next_nonce ?? acct?.nonce ?? 0));
           const timestamp = Math.floor(Date.now() / 1000);
           const signature = await signTransactionWithWallet(unlockedWallet, {
             from,
