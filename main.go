@@ -35,6 +35,7 @@ const (
 	MaxDriftSeconds      int64         = 300
 	MaxMineIterations    int64         = 25_000_000
 	MaxMempoolSize                     = 500
+	MaxBodyBytes         int64         = 2 * 1024 * 1024
 	RateLimitWindow                    = time.Minute
 	MaxRequestsPerMin                  = 90
 	MaxWriteRequestsPerM               = 20
@@ -123,6 +124,7 @@ func (rl *RateLimiter) Allow(key string) bool {
 
 type Node struct {
 	mu            sync.RWMutex
+	miningMu      sync.Mutex
 	Chain         []Block          `json:"chain"`
 	Mempool       []Transaction    `json:"mempool"`
 	ActiveUsers   map[string]int64 `json:"active_users"`
@@ -435,7 +437,8 @@ func (n *Node) saveToDB(ctx context.Context) error {
 		return err
 	}
 
-	for _, b := range snap.Chain {
+	if len(snap.Chain) > 0 {
+		b := snap.Chain[len(snap.Chain)-1]
 		bJSON, bErr := json.Marshal(b)
 		if bErr != nil {
 			return bErr
@@ -725,13 +728,23 @@ func isValidChain(chain []Block) bool {
 			toKey := canonicalAddress(tx.To)
 			if tx.From == "COINBASE" || tx.From == "MINING_REWARD" {
 				coinbaseCount++
-				if coinbaseCount > 1 || tx.Amount > BlockReward {
+				if coinbaseCount > 1 || tx.Nonce != 0 || tx.Amount > BlockReward {
+					return false
+				}
+				if strings.TrimSpace(b.Miner) == "" || toKey != canonicalAddress(b.Miner) {
+					return false
+				}
+				if minedSupply+tx.Amount > MiningCap || totalSupply+tx.Amount > MaxSupply {
 					return false
 				}
 				minedSupply += tx.Amount
 				totalSupply += tx.Amount
 				balances[toKey] += tx.Amount
 			} else if tx.From == "GENESIS" {
+				if totalSupply+tx.Amount > MaxSupply {
+					return false
+				}
+				totalSupply += tx.Amount
 				balances[toKey] += tx.Amount
 			} else {
 				fee := computeTransferFee(tx.Amount)
@@ -798,6 +811,9 @@ func (n *Node) checkCommonHeadersAndLimit(w http.ResponseWriter, r *http.Request
 	if r.Method == http.MethodOptions {
 		w.WriteHeader(http.StatusNoContent)
 		return true
+	}
+	if r.Body != nil {
+		r.Body = http.MaxBytesReader(w, r.Body, MaxBodyBytes)
 	}
 	ip := clientIP(r)
 	if n.limiter != nil && !n.limiter.Allow(ip) {
@@ -1066,6 +1082,12 @@ func (n *Node) handleMine(w http.ResponseWriter, r *http.Request) {
 	if n.checkCommonHeadersAndLimit(w, r, true) {
 		return
 	}
+	if !n.miningMu.TryLock() {
+		writeJSON(w, http.StatusConflict, map[string]any{"error": "another mining operation is currently in progress"})
+		return
+	}
+	defer n.miningMu.Unlock()
+
 	var req struct {
 		Miner  string `json:"miner"`
 		UserID string `json:"user_id"`
@@ -1409,7 +1431,15 @@ func main() {
 	addr := ":" + port
 	log.Printf("SDM Go Node listening on %s (chain file: %s, db enabled: %v)", addr, chainFile, node.pool != nil)
 
-	if err := http.ListenAndServe(addr, mux); err != nil {
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           mux,
+		ReadHeaderTimeout: 10 * time.Second,
+		WriteTimeout:      35 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+
+	if err := srv.ListenAndServe(); err != nil {
 		log.Fatalf("server error: %v", err)
 	}
 }
