@@ -196,6 +196,7 @@
       <h2>إرسال SDM</h2>
       <input id="toAddressInput" type="text" placeholder="عنوان المستلم (SDM...)" />
       <input id="amountInput" type="number" min="1" step="1" placeholder="الكمية (SDM)" />
+      <div class="msg" id="feePreviewMsg">الرسوم المتوقعة: 0 SDM | الإجمالي المطلوب: 0 SDM</div>
       <input id="noteInput" type="text" placeholder="ملاحظة (اختياري)" />
       <button class="primary" id="sendTxBtn" type="button">توقيع وإرسال المعاملة</button>
       <div class="msg" id="txMsg"></div>
@@ -360,6 +361,18 @@
       return fee < 1 ? 1 : fee;
     }
 
+    function updateFeePreview() {
+      const rawAmt = Math.trunc(Number(document.getElementById("amountInput").value));
+      const feeEl = document.getElementById("feePreviewMsg");
+      if (!rawAmt || rawAmt <= 0) {
+        feeEl.textContent = "الرسوم المتوقعة: 0 SDM | الإجمالي المطلوب: 0 SDM";
+        return;
+      }
+      const fee = computeTransferFee(rawAmt);
+      const total = rawAmt + fee;
+      feeEl.textContent = `الرسوم المتوقعة: ${fee.toLocaleString("en-US")} SDM | الإجمالي المطلوب: ${total.toLocaleString("en-US")} SDM`;
+    }
+
     async function deriveAesKey(password, saltBytes) {
       const enc = new TextEncoder();
       const baseKey = await crypto.subtle.importKey(
@@ -450,12 +463,12 @@
       const note = String(txFields.note ?? "");
 
       const payloadStr = `${txFields.from}|${txFields.to}|${amt}|${fee}|${nonce}|${ts}|${note}`;
-      const digestBytes = await sha256Bytes(new TextEncoder().encode(payloadStr));
+      const msgBytes = new TextEncoder().encode(payloadStr);
 
       const sigBuffer = await crypto.subtle.sign(
         { name: "ECDSA", hash: { name: "SHA-256" } },
         cryptoKey,
-        digestBytes
+        msgBytes
       );
       return bytesToHex(sigBuffer);
     }
@@ -593,10 +606,13 @@
     document.addEventListener("DOMContentLoaded", () => {
       const nodeInput = document.getElementById("nodeUrlInput");
       const passInput = document.getElementById("walletPassInput");
+      const amountInput = document.getElementById("amountInput");
       const stateMsg = document.getElementById("walletStateMsg");
 
       nodeInput.value = getNodeUrl();
       hidePrivateKeyOnce();
+      updateFeePreview();
+      amountInput.addEventListener("input", updateFeePreview);
 
       const encWallet = loadEncryptedWallet();
       if (encWallet?.address) {
@@ -710,7 +726,7 @@
       document.getElementById("sendTxBtn").addEventListener("click", async () => {
         const from = document.getElementById("walletAddressInput").value.trim();
         const to = document.getElementById("toAddressInput").value.trim();
-        const amount = Math.trunc(Number(document.getElementById("amountInput").value));
+        const amount = Math.trunc(Number(amountInput.value));
         const note = document.getElementById("noteInput").value.trim();
         const msg = document.getElementById("txMsg");
 
@@ -755,8 +771,9 @@
           const data = await res.json();
           if (!res.ok) throw new Error(data.error || "فشل التحويل");
           msg.textContent = "تم توقيع المعاملة وإضافتها إلى قائمة الانتظار (Mempool)، قم بتعدين كتلة لتأكيدها.";
-          document.getElementById("amountInput").value = "";
+          amountInput.value = "";
           document.getElementById("noteInput").value = "";
+          updateFeePreview();
         } catch (err) {
           msg.textContent = err.message;
         }
