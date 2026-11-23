@@ -16,6 +16,7 @@ import (
 	"net/url"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -34,11 +35,11 @@ const (
 	UsersPerDiffStep                   = 5
 	MaxDriftSeconds      int64         = 300
 	MaxMineIterations    int64         = 25_000_000
-	MaxMempoolSize                     = 500
+	MaxMempoolSize                     = 2000
 	MaxBodyBytes         int64         = 2 * 1024 * 1024
 	RateLimitWindow                    = time.Minute
-	MaxRequestsPerMin                  = 90
-	MaxWriteRequestsPerM               = 20
+	MaxRequestsPerMin                  = 180
+	MaxWriteRequestsPerM               = 45
 	DefaultChainFile                   = "sdm_chain.json"
 	FeeVaultAddress                    = "SDM45e41bcbe77ee00f43b9b8db62722871"
 )
@@ -72,6 +73,23 @@ type PersistedState struct {
 	Peers       map[string]int64 `json:"peers"`
 }
 
+type mineJob struct {
+	miner  string
+	userID string
+	result chan mineJobResult
+}
+
+type mineJobResult struct {
+	status      string
+	block       Block
+	reward      int64
+	difficulty  int
+	activeUsers int
+	height      int
+	err         error
+	code        int
+}
+
 type rateEntry struct {
 	count     int
 	windowEnd time.Time
@@ -98,7 +116,7 @@ func (rl *RateLimiter) Allow(key string) bool {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 
-	if len(rl.entries) > 4096 {
+	if len(rl.entries) > 8192 {
 		for k, v := range rl.entries {
 			if now.After(v.windowEnd) {
 				delete(rl.entries, k)
@@ -124,7 +142,6 @@ func (rl *RateLimiter) Allow(key string) bool {
 
 type Node struct {
 	mu            sync.RWMutex
-	miningMu      sync.Mutex
 	Chain         []Block          `json:"chain"`
 	Mempool       []Transaction    `json:"mempool"`
 	ActiveUsers   map[string]int64 `json:"active_users"`
@@ -135,6 +152,13 @@ type Node struct {
 	pool          *pgxpool.Pool
 	limiter       *RateLimiter
 	writeLimiter  *RateLimiter
+	mineQueue     chan mineJob
+
+	// ذاكرة تخزين مؤقت للحالة لتجنب مسح كامل السلسلة في كل طلب
+	cacheDirty   bool
+	cachedHeight int
+	cachedBal    map[string]int64
+	cachedNonces map[string]uint64
 }
 
 func canonicalAddress(addr string) string {
@@ -341,6 +365,10 @@ func NewNode(chainFile string, dbUrl string, allowedOrigin string) *Node {
 		AllowedOrigin: strings.TrimSpace(allowedOrigin),
 		limiter:       NewRateLimiter(MaxRequestsPerMin),
 		writeLimiter:  NewRateLimiter(MaxWriteRequestsPerM),
+		mineQueue:     make(chan mineJob, 64),
+		cacheDirty:    true,
+		cachedBal:     make(map[string]int64),
+		cachedNonces:  make(map[string]uint64),
 	}
 
 	if n.DBUrl != "" {
@@ -356,6 +384,7 @@ func NewNode(chainFile string, dbUrl string, allowedOrigin string) *Node {
 			if tblErr := n.ensureDBSchema(ctx); tblErr != nil {
 				log.Printf("db schema init warning: %v", tblErr)
 			} else if loadErr := n.loadFromDB(ctx); loadErr == nil {
+				n.rebuildStateCacheLocked()
 				cancel()
 				return n
 			}
@@ -364,6 +393,7 @@ func NewNode(chainFile string, dbUrl string, allowedOrigin string) *Node {
 	}
 
 	if err := n.loadFromFile(); err == nil {
+		n.rebuildStateCacheLocked()
 		if n.pool != nil {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			if err := n.saveToDB(ctx); err != nil {
@@ -376,8 +406,53 @@ func NewNode(chainFile string, dbUrl string, allowedOrigin string) *Node {
 
 	n.Chain = []Block{newGenesisBlock()}
 	n.Mempool = []Transaction{}
+	n.rebuildStateCacheLocked()
 	_ = n.persistLocked()
 	return n
+}
+
+func (n *Node) rebuildStateCacheLocked() {
+	balances := make(map[string]int64)
+	nonces := make(map[string]uint64)
+	vaultKey := canonicalAddress(FeeVaultAddress)
+
+	for _, b := range n.Chain {
+		for _, tx := range b.Transactions {
+			toKey := canonicalAddress(tx.To)
+			fromKey := canonicalAddress(tx.From)
+			if tx.From == "COINBASE" || tx.From == "MINING_REWARD" {
+				balances[toKey] += tx.Amount
+			} else if tx.From != "GENESIS" {
+				fee := computeTransferFee(tx.Amount)
+				balances[fromKey] -= (tx.Amount + fee)
+				nonces[fromKey] = tx.Nonce + 1
+				balances[toKey] += tx.Amount
+				balances[vaultKey] += fee
+			} else {
+				balances[toKey] += tx.Amount
+			}
+		}
+	}
+
+	n.cachedBal = balances
+	n.cachedNonces = nonces
+	n.cachedHeight = len(n.Chain) - 1
+	n.cacheDirty = false
+}
+
+func (n *Node) getCachedStatesLocked() (map[string]int64, map[string]uint64) {
+	if n.cacheDirty || n.cachedHeight != len(n.Chain)-1 {
+		n.rebuildStateCacheLocked()
+	}
+	balCopy := make(map[string]int64, len(n.cachedBal))
+	for k, v := range n.cachedBal {
+		balCopy[k] = v
+	}
+	nonceCopy := make(map[string]uint64, len(n.cachedNonces))
+	for k, v := range n.cachedNonces {
+		nonceCopy[k] = v
+	}
+	return balCopy, nonceCopy
 }
 
 func (n *Node) ensureDBSchema(ctx context.Context) error {
@@ -491,6 +566,7 @@ func (n *Node) applyPersistedJSON(data []byte) error {
 	} else {
 		n.Peers = make(map[string]int64)
 	}
+	n.cacheDirty = true
 	return nil
 }
 
@@ -581,30 +657,6 @@ func computeSupplyStatsLocked(chain []Block) (totalSupply int64, minedSupply int
 	return totalSupply, minedSupply
 }
 
-func computeAccountStatesLocked(chain []Block) (balances map[string]int64, nonces map[string]uint64) {
-	balances = make(map[string]int64)
-	nonces = make(map[string]uint64)
-	vaultKey := canonicalAddress(FeeVaultAddress)
-	for _, b := range chain {
-		for _, tx := range b.Transactions {
-			toKey := canonicalAddress(tx.To)
-			fromKey := canonicalAddress(tx.From)
-			if tx.From == "COINBASE" || tx.From == "MINING_REWARD" {
-				balances[toKey] += tx.Amount
-			} else if tx.From != "GENESIS" {
-				fee := computeTransferFee(tx.Amount)
-				balances[fromKey] -= (tx.Amount + fee)
-				nonces[fromKey] = tx.Nonce + 1
-				balances[toKey] += tx.Amount
-				balances[vaultKey] += fee
-			} else {
-				balances[toKey] += tx.Amount
-			}
-		}
-	}
-	return balances, nonces
-}
-
 func txKey(tx Transaction) string {
 	return fmt.Sprintf("%s|%s|%d|%d|%d|%s",
 		canonicalAddress(tx.From),
@@ -620,7 +672,7 @@ func (n *Node) pruneMempoolAgainstChainLocked(candidates []Transaction) []Transa
 	if len(candidates) == 0 {
 		return []Transaction{}
 	}
-	balances, nonces := computeAccountStatesLocked(n.Chain)
+	balances, nonces := n.getCachedStatesLocked()
 	vaultKey := canonicalAddress(FeeVaultAddress)
 
 	sorted := make([]Transaction, len(candidates))
@@ -771,6 +823,16 @@ func isValidChain(chain []Block) bool {
 }
 
 func clientIP(r *http.Request) string {
+	if xff := strings.TrimSpace(r.Header.Get("X-Forwarded-For")); xff != "" {
+		parts := strings.Split(xff, ",")
+		first := strings.TrimSpace(parts[0])
+		if net.ParseIP(first) != nil {
+			return first
+		}
+	}
+	if xrip := strings.TrimSpace(r.Header.Get("X-Real-IP")); xrip != "" && net.ParseIP(xrip) != nil {
+		return xrip
+	}
 	host, _, err := net.SplitHostPort(strings.TrimSpace(r.RemoteAddr))
 	if err == nil && host != "" {
 		return host
@@ -929,8 +991,8 @@ func (n *Node) handleBalance(w http.ResponseWriter, r *http.Request) {
 	}
 	addrKey := canonicalAddress(addr)
 
-	n.mu.RLock()
-	balances, nonces := computeAccountStatesLocked(n.Chain)
+	n.mu.Lock()
+	balances, nonces := n.getCachedStatesLocked()
 	var pendingNonce uint64
 	for _, m := range n.Mempool {
 		if canonicalAddress(m.From) == addrKey && m.Nonce >= pendingNonce {
@@ -943,7 +1005,7 @@ func (n *Node) handleBalance(w http.ResponseWriter, r *http.Request) {
 	}
 	bal := balances[addrKey]
 	confirmedNonce := nonces[addrKey]
-	n.mu.RUnlock()
+	n.mu.Unlock()
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"address":    addr,
@@ -1027,7 +1089,7 @@ func (n *Node) handleTransfer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	n.touchUserLocked(req.UserID)
-	balances, nonces := computeAccountStatesLocked(n.Chain)
+	balances, nonces := n.getCachedStatesLocked()
 
 	expectedNonce := nonces[fromKey]
 	var pendingOutgoing int64
@@ -1078,35 +1140,7 @@ func (n *Node) handleTransfer(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (n *Node) handleMine(w http.ResponseWriter, r *http.Request) {
-	if n.checkCommonHeadersAndLimit(w, r, true) {
-		return
-	}
-	if !n.miningMu.TryLock() {
-		writeJSON(w, http.StatusConflict, map[string]any{"error": "another mining operation is currently in progress"})
-		return
-	}
-	defer n.miningMu.Unlock()
-
-	var req struct {
-		Miner  string `json:"miner"`
-		UserID string `json:"user_id"`
-	}
-	if r.Method == http.MethodPost {
-		_ = json.NewDecoder(r.Body).Decode(&req)
-	}
-	miner := strings.TrimSpace(req.Miner)
-	if miner == "" {
-		miner = strings.TrimSpace(r.URL.Query().Get("miner"))
-	}
-	if miner == "" {
-		miner = FeeVaultAddress
-	}
-	userID := strings.TrimSpace(req.UserID)
-	if userID == "" {
-		userID = miner
-	}
-
+func (n *Node) executeMineJob(parentCtx context.Context, miner string, userID string) mineJobResult {
 	n.mu.Lock()
 	activeUsers := n.touchUserLocked(userID)
 	prev := n.Chain[len(n.Chain)-1]
@@ -1147,13 +1181,12 @@ func (n *Node) handleMine(w http.ResponseWriter, r *http.Request) {
 	prevHash := prev.Hash
 	n.mu.Unlock()
 
-	mineCtx, cancel := context.WithTimeout(r.Context(), 25*time.Second)
+	mineCtx, cancel := context.WithTimeout(parentCtx, 25*time.Second)
 	defer cancel()
 
 	mined, err := mineBlockContext(mineCtx, nextIndex, txs, prevHash, diff, miner)
 	if err != nil {
-		writeJSON(w, http.StatusRequestTimeout, map[string]any{"error": err.Error()})
-		return
+		return mineJobResult{err: err, code: http.StatusRequestTimeout}
 	}
 
 	n.mu.Lock()
@@ -1161,18 +1194,12 @@ func (n *Node) handleMine(w http.ResponseWriter, r *http.Request) {
 
 	latest := n.Chain[len(n.Chain)-1]
 	if latest.Hash != prevHash || latest.Index+1 != mined.Index {
-		writeJSON(w, http.StatusConflict, map[string]any{
-			"error": "chain tip changed while mining, please retry",
-		})
-		return
+		return mineJobResult{err: errors.New("chain tip changed while mining, please retry"), code: http.StatusConflict}
 	}
 
 	candidateChain := append(append([]Block{}, n.Chain...), mined)
 	if !isValidChain(candidateChain) {
-		writeJSON(w, http.StatusBadRequest, map[string]any{
-			"error": "mined block violated supply or chain rules",
-		})
-		return
+		return mineJobResult{err: errors.New("mined block violated supply or chain rules"), code: http.StatusBadRequest}
 	}
 
 	includedKeys := make(map[string]bool, len(batchTxs))
@@ -1187,43 +1214,135 @@ func (n *Node) handleMine(w http.ResponseWriter, r *http.Request) {
 	}
 
 	n.Chain = candidateChain
+	n.cacheDirty = true
+	n.rebuildStateCacheLocked()
 	n.Mempool = n.pruneMempoolAgainstChainLocked(remainingPool)
 	if err := n.persistLocked(); err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "failed to persist mined block"})
+		return mineJobResult{err: errors.New("failed to persist mined block"), code: http.StatusInternalServerError}
+	}
+
+	return mineJobResult{
+		status:      "mined",
+		block:       mined,
+		reward:      reward,
+		difficulty:  diff,
+		activeUsers: activeUsers,
+		height:      len(n.Chain) - 1,
+	}
+}
+
+func (n *Node) startMiningWorker() {
+	for job := range n.mineQueue {
+		res := n.executeMineJob(context.Background(), job.miner, job.userID)
+		if job.result != nil {
+			job.result <- res
+			close(job.result)
+		}
+	}
+}
+
+func (n *Node) handleMine(w http.ResponseWriter, r *http.Request) {
+	if n.checkCommonHeadersAndLimit(w, r, true) {
+		return
+	}
+	var req struct {
+		Miner  string `json:"miner"`
+		UserID string `json:"user_id"`
+	}
+	if r.Method == http.MethodPost {
+		_ = json.NewDecoder(r.Body).Decode(&req)
+	}
+	miner := strings.TrimSpace(req.Miner)
+	if miner == "" {
+		miner = strings.TrimSpace(r.URL.Query().Get("miner"))
+	}
+	if miner == "" {
+		miner = FeeVaultAddress
+	}
+	userID := strings.TrimSpace(req.UserID)
+	if userID == "" {
+		userID = miner
+	}
+
+	resCh := make(chan mineJobResult, 1)
+	job := mineJob{miner: miner, userID: userID, result: resCh}
+	select {
+	case n.mineQueue <- job:
+	default:
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "mining queue is busy, try again shortly"})
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
-		"status":       "mined",
-		"block":        mined,
-		"reward":       reward,
-		"difficulty":   diff,
-		"active_users": activeUsers,
-		"height":       len(n.Chain) - 1,
-	})
+	select {
+	case res := <-resCh:
+		if res.err != nil {
+			writeJSON(w, res.code, map[string]any{"error": res.err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{
+			"status":       res.status,
+			"block":        res.block,
+			"reward":       res.reward,
+			"difficulty":   res.difficulty,
+			"active_users": res.activeUsers,
+			"height":       res.height,
+		})
+	case <-r.Context().Done():
+		writeJSON(w, http.StatusRequestTimeout, map[string]any{"error": "client disconnected while mining"})
+	}
+}
+
+func parseSinceHeight(raw string) int {
+	clean := strings.TrimSpace(raw)
+	if clean == "" {
+		return -1
+	}
+	v, err := strconv.Atoi(clean)
+	if err != nil || v < -1 {
+		return -1
+	}
+	return v
 }
 
 func (n *Node) handleChain(w http.ResponseWriter, r *http.Request) {
 	if n.checkCommonHeadersAndLimit(w, r, false) {
 		return
 	}
+	since := parseSinceHeight(r.URL.Query().Get("since"))
+
 	n.mu.RLock()
-	chainCopy := append([]Block{}, n.Chain...)
-	totalSupply, minedSupply := computeSupplyStatsLocked(chainCopy)
+	height := len(n.Chain) - 1
+	latest := n.Chain[height]
+	totalSupply, minedSupply := computeSupplyStatsLocked(n.Chain)
 	activeUsers := n.pruneAndCountActiveUsersLocked(time.Now().UTC().Unix())
-	latest := chainCopy[len(chainCopy)-1]
 	diff := computeExpectedBlockDifficulty(latest, time.Now().UTC().Unix(), activeUsers)
+
+	var sliceBlocks []Block
+	if since >= 0 {
+		startIdx := since + 1
+		if startIdx < 0 {
+			startIdx = 0
+		}
+		if startIdx < len(n.Chain) {
+			sliceBlocks = append([]Block{}, n.Chain[startIdx:]...)
+		} else {
+			sliceBlocks = []Block{}
+		}
+	} else {
+		sliceBlocks = append([]Block{}, n.Chain...)
+	}
 	n.mu.RUnlock()
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"symbol":       "SDM",
-		"height":       len(chainCopy) - 1,
+		"height":       height,
+		"since":        since,
 		"difficulty":   diff,
 		"active_users": activeUsers,
 		"total_supply": totalSupply,
 		"mined_supply": minedSupply,
 		"mining_cap":   MiningCap,
-		"chain":        chainCopy,
+		"chain":        sliceBlocks,
 	})
 }
 
@@ -1232,21 +1351,43 @@ func (n *Node) handleSync(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method == http.MethodGet {
+		since := parseSinceHeight(r.URL.Query().Get("since"))
+		summaryOnly := r.URL.Query().Get("summary") == "1"
+
 		n.mu.RLock()
-		chainCopy := append([]Block{}, n.Chain...)
-		mempoolCopy := normalizeTxs(n.Mempool)
+		height := len(n.Chain) - 1
+		latest := n.Chain[height]
+		mempoolCount := len(n.Mempool)
 		activeUsers := n.pruneAndCountActiveUsersLocked(time.Now().UTC().Unix())
-		latest := chainCopy[len(chainCopy)-1]
 		diff := computeExpectedBlockDifficulty(latest, time.Now().UTC().Unix(), activeUsers)
+
+		var deltaChain []Block
+		if !summaryOnly {
+			if since >= 0 {
+				startIdx := since + 1
+				if startIdx < len(n.Chain) {
+					deltaChain = append([]Block{}, n.Chain[startIdx:]...)
+				} else {
+					deltaChain = []Block{}
+				}
+			} else {
+				deltaChain = append([]Block{}, n.Chain...)
+			}
+		}
 		n.mu.RUnlock()
 
-		writeJSON(w, http.StatusOK, map[string]any{
-			"height":       len(chainCopy) - 1,
-			"difficulty":   diff,
-			"active_users": activeUsers,
-			"chain":        chainCopy,
-			"mempool":      mempoolCopy,
-		})
+		resp := map[string]any{
+			"height":        height,
+			"since":         since,
+			"difficulty":    diff,
+			"active_users":  activeUsers,
+			"mempool_count": mempoolCount,
+			"latest_hash":   latest.Hash,
+		}
+		if !summaryOnly {
+			resp["chain"] = deltaChain
+		}
+		writeJSON(w, http.StatusOK, resp)
 		return
 	}
 
@@ -1271,6 +1412,8 @@ func (n *Node) handleSync(w http.ResponseWriter, r *http.Request) {
 		adopted := false
 		if cumulativeDifficulty(req.Chain).Cmp(cumulativeDifficulty(n.Chain)) > 0 {
 			n.Chain = append([]Block{}, req.Chain...)
+			n.cacheDirty = true
+			n.rebuildStateCacheLocked()
 			n.Mempool = n.pruneMempoolAgainstChainLocked(n.Mempool)
 			adopted = true
 			if err := n.persistLocked(); err != nil {
@@ -1363,6 +1506,8 @@ func (n *Node) pullFromPeer(peerURL string) {
 	defer n.mu.Unlock()
 	if cumulativeDifficulty(remote.Chain).Cmp(cumulativeDifficulty(n.Chain)) > 0 {
 		n.Chain = append([]Block{}, remote.Chain...)
+		n.cacheDirty = true
+		n.rebuildStateCacheLocked()
 		n.Mempool = n.pruneMempoolAgainstChainLocked(n.Mempool)
 		_ = n.persistLocked()
 	}
@@ -1396,6 +1541,7 @@ func main() {
 	if node.pool != nil {
 		defer node.pool.Close()
 	}
+	go node.startMiningWorker()
 	go node.startPeerSyncLoop()
 
 	mux := http.NewServeMux()
