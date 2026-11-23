@@ -166,20 +166,24 @@ func verifyTransactionSignature(tx Transaction) bool {
 		return true
 	}
 	if tx.PublicKey == "" || tx.Signature == "" || tx.From == "" {
+		log.Printf("tx verify fail: missing fields from=%q pubLen=%d sigLen=%d", tx.From, len(tx.PublicKey), len(tx.Signature))
 		return false
 	}
 	pubBytes, err := hex.DecodeString(strings.TrimSpace(tx.PublicKey))
 	if err != nil {
+		log.Printf("tx verify fail: invalid pubkey hex: %v", err)
 		return false
 	}
 	expectedAddr := deriveAddressFromPubBytes(pubBytes)
 	if !strings.EqualFold(expectedAddr, tx.From) {
+		log.Printf("tx verify fail: address mismatch got=%q expected=%q", tx.From, expectedAddr)
 		return false
 	}
 	x, y := elliptic.UnmarshalCompressed(elliptic.P256(), pubBytes)
 	if x == nil || y == nil {
 		x, y = elliptic.Unmarshal(elliptic.P256(), pubBytes)
 		if x == nil || y == nil {
+			log.Printf("tx verify fail: invalid P-256 public key")
 			return false
 		}
 	}
@@ -187,14 +191,21 @@ func verifyTransactionSignature(tx Transaction) bool {
 
 	sigBytes, err := hex.DecodeString(strings.TrimSpace(tx.Signature))
 	if err != nil || len(sigBytes) != 64 {
+		log.Printf("tx verify fail: invalid sig hex or len=%d err=%v", len(sigBytes), err)
 		return false
 	}
 	r := new(big.Int).SetBytes(sigBytes[:32])
 	s := new(big.Int).SetBytes(sigBytes[32:])
 	if r.Sign() <= 0 || s.Sign() <= 0 {
+		log.Printf("tx verify fail: non-positive r or s")
 		return false
 	}
-	return ecdsa.Verify(pubKey, txSigningDigest(tx), r, s)
+	ok := ecdsa.Verify(pubKey, txSigningDigest(tx), r, s)
+	if !ok {
+		log.Printf("tx verify fail: ecdsa.Verify returned false (from=%s to=%s amt=%d nonce=%d ts=%d)",
+			tx.From, tx.To, tx.Amount, tx.Nonce, tx.Timestamp)
+	}
+	return ok
 }
 
 func calculateBlockHash(b Block) string {
