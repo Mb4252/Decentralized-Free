@@ -208,7 +208,7 @@
 
     <div class="card">
       <h2>التعدين (PoW)</h2>
-      <div class="msg">تزداد صعوبة التعدين تلقائياً مع ارتفاع عدد المستخدمين النشطين في الشبكة.</div>
+      <div class="msg">يتم تنفيذ التعدين عبر عامل خلفي في العقدة وتزداد الصعوبة تدريجياً مع ارتفاع عدد المستخدمين النشطين.</div>
       <button class="primary" id="mineBtn" type="button">تعدين كتلة جديدة</button>
       <div class="msg" id="mineMsg"></div>
     </div>
@@ -477,17 +477,41 @@
       return bytesToHex(sigBuffer);
     }
 
+    function mergeChainBlocks(existingChain, incomingBlocks) {
+      const map = new Map();
+      if (Array.isArray(existingChain)) {
+        for (const b of existingChain) {
+          if (b && typeof b.index === "number") {
+            map.set(b.index, b);
+          }
+        }
+      }
+      if (Array.isArray(incomingBlocks)) {
+        for (const b of incomingBlocks) {
+          if (b && typeof b.index === "number") {
+            map.set(b.index, b);
+          }
+        }
+      }
+      return Array.from(map.values()).sort((a, b) => a.index - b.index);
+    }
+
     function saveChainBackup(syncData) {
       try {
+        const prev = loadChainBackup();
+        const chain = Array.isArray(syncData.chain)
+          ? mergeChainBlocks(prev?.chain, syncData.chain)
+          : (prev?.chain || []);
+
         const payload = {
           saved_at: new Date().toISOString(),
-          height: syncData.height ?? Math.max(0, (syncData.chain?.length || 1) - 1),
+          height: syncData.height ?? Math.max(0, chain.length - 1),
           difficulty: syncData.difficulty ?? 4,
           active_users: syncData.active_users ?? 1,
-          mempool_count: syncData.mempool_count ?? (Array.isArray(syncData.mempool) ? syncData.mempool.length : 0),
-          mined_supply: syncData.mined_supply ?? 0,
-          mining_cap: syncData.mining_cap ?? DEFAULT_MINING_CAP,
-          chain: Array.isArray(syncData.chain) ? syncData.chain : []
+          mempool_count: syncData.mempool_count ?? 0,
+          mined_supply: syncData.mined_supply ?? prev?.mined_supply ?? 0,
+          mining_cap: syncData.mining_cap ?? prev?.mining_cap ?? DEFAULT_MINING_CAP,
+          chain
         };
         localStorage.setItem(KEYS.chainBackup, JSON.stringify(payload));
         document.getElementById("backupMsg").textContent =
@@ -521,19 +545,18 @@
       `).join("");
     }
 
-    function applyStatsToUI(statusData, syncData) {
+    function applyStatsToUI(statusData, chainList) {
       if (statusData) {
         document.getElementById("statHeight").textContent = statusData.height ?? 0;
         document.getElementById("statDiff").textContent = statusData.difficulty ?? 4;
         document.getElementById("statUsers").textContent = statusData.active_users ?? 1;
-        document.getElementById("statMempool").textContent = statusData.mempool_count ?? (Array.isArray(syncData?.mempool) ? syncData.mempool.length : 0);
+        document.getElementById("statMempool").textContent = statusData.mempool_count ?? 0;
         const minedVal = Number(statusData.mined_supply ?? 0).toLocaleString("en-US");
         const capVal = Number(statusData.mining_cap ?? DEFAULT_MINING_CAP).toLocaleString("en-US");
         document.getElementById("statMined").textContent = `${minedVal} / ${capVal}`;
       }
-      if (syncData && Array.isArray(syncData.chain)) {
-        document.getElementById("statHeight").textContent = Math.max(0, syncData.chain.length - 1);
-        renderBlocks(syncData.chain);
+      if (Array.isArray(chainList)) {
+        renderBlocks(chainList);
       }
     }
 
@@ -562,50 +585,44 @@
       const localBackup = loadChainBackup();
 
       if (localBackup && Array.isArray(localBackup.chain)) {
-        applyStatsToUI(localBackup, localBackup);
+        applyStatsToUI(localBackup, localBackup.chain);
       }
 
       try {
-        const [statusRes, syncRes] = await Promise.all([
-          fetch(`${baseUrl}/status?user=${userId}`),
-          fetch(`${baseUrl}/sync`)
-        ]);
-        if (!statusRes.ok || !syncRes.ok) {
-          throw new Error("Node response not ok");
+        const statusRes = await fetch(`${baseUrl}/status?user=${userId}`);
+        if (!statusRes.ok) {
+          throw new Error("Node status response not ok");
         }
-
         const statusData = await statusRes.json();
-        let syncData = await syncRes.json();
 
-        if (
-          localBackup &&
-          Array.isArray(localBackup.chain) &&
-          Array.isArray(syncData.chain) &&
-          localBackup.chain.length > syncData.chain.length
-        ) {
-          const pushRes = await fetch(`${baseUrl}/sync`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ chain: localBackup.chain, user_id: getUserId() })
-          });
-          if (pushRes.ok) {
-            const pushed = await pushRes.json();
-            if (Array.isArray(pushed.chain)) syncData.chain = pushed.chain;
-            if (typeof pushed.height === "number") syncData.height = pushed.height;
+        const localChain = Array.isArray(localBackup?.chain) ? localBackup.chain : [];
+        const localMaxIndex = localChain.length > 0 ? localChain[localChain.length - 1].index : -1;
+        const remoteHeight = typeof statusData.height === "number" ? statusData.height : 0;
+
+        let fullChain = localChain;
+        if (remoteHeight > localMaxIndex || localChain.length === 0) {
+          const sinceParam = localChain.length > 0 ? `?since=${encodeURIComponent(localMaxIndex)}` : "";
+          const deltaRes = await fetch(`${baseUrl}/sync${sinceParam}`);
+          if (deltaRes.ok) {
+            const deltaData = await deltaRes.json();
+            if (Array.isArray(deltaData.chain)) {
+              fullChain = mergeChainBlocks(localChain, deltaData.chain);
+            }
           }
         }
 
         const mergedForBackup = {
-          ...syncData,
+          height: statusData.height ?? Math.max(0, fullChain.length - 1),
           mined_supply: statusData.mined_supply ?? 0,
           mining_cap: statusData.mining_cap ?? DEFAULT_MINING_CAP,
-          active_users: statusData.active_users ?? syncData.active_users ?? 1,
-          mempool_count: statusData.mempool_count ?? (Array.isArray(syncData.mempool) ? syncData.mempool.length : 0),
-          difficulty: statusData.difficulty ?? syncData.difficulty ?? 4
+          active_users: statusData.active_users ?? 1,
+          mempool_count: statusData.mempool_count ?? 0,
+          difficulty: statusData.difficulty ?? 4,
+          chain: fullChain
         };
 
         saveChainBackup(mergedForBackup);
-        applyStatsToUI(statusData, syncData);
+        applyStatsToUI(statusData, fullChain);
         await refreshBalance();
       } catch {}
     }
@@ -792,7 +809,7 @@
         const msg = document.getElementById("mineMsg");
         const miner = document.getElementById("walletAddressInput").value.trim();
         btn.disabled = true;
-        msg.textContent = "جاري التعدين حسب الصعوبة الحالية...";
+        msg.textContent = "جاري إرسال مهمة التعدين إلى العامل الخلفي...";
         try {
           const res = await fetch(`${getNodeUrl()}/mine`, {
             method: "POST",
