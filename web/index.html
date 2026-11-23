@@ -160,6 +160,10 @@
         <div class="stat-value" id="statUsers">1</div>
       </div>
       <div class="stat">
+        <div class="stat-label">قائمة الانتظار (Mempool)</div>
+        <div class="stat-value" id="statMempool">0</div>
+      </div>
+      <div class="stat">
         <div class="stat-label">المعدّن / حد التعدين</div>
         <div class="stat-value" id="statMined">0 / 50,000,000</div>
       </div>
@@ -480,6 +484,7 @@
           height: syncData.height ?? Math.max(0, (syncData.chain?.length || 1) - 1),
           difficulty: syncData.difficulty ?? 4,
           active_users: syncData.active_users ?? 1,
+          mempool_count: syncData.mempool_count ?? (Array.isArray(syncData.mempool) ? syncData.mempool.length : 0),
           mined_supply: syncData.mined_supply ?? 0,
           mining_cap: syncData.mining_cap ?? DEFAULT_MINING_CAP,
           chain: Array.isArray(syncData.chain) ? syncData.chain : []
@@ -521,6 +526,7 @@
         document.getElementById("statHeight").textContent = statusData.height ?? 0;
         document.getElementById("statDiff").textContent = statusData.difficulty ?? 4;
         document.getElementById("statUsers").textContent = statusData.active_users ?? 1;
+        document.getElementById("statMempool").textContent = statusData.mempool_count ?? (Array.isArray(syncData?.mempool) ? syncData.mempool.length : 0);
         const minedVal = Number(statusData.mined_supply ?? 0).toLocaleString("en-US");
         const capVal = Number(statusData.mining_cap ?? DEFAULT_MINING_CAP).toLocaleString("en-US");
         document.getElementById("statMined").textContent = `${minedVal} / ${capVal}`;
@@ -594,6 +600,7 @@
           mined_supply: statusData.mined_supply ?? 0,
           mining_cap: statusData.mining_cap ?? DEFAULT_MINING_CAP,
           active_users: statusData.active_users ?? syncData.active_users ?? 1,
+          mempool_count: statusData.mempool_count ?? (Array.isArray(syncData.mempool) ? syncData.mempool.length : 0),
           difficulty: statusData.difficulty ?? syncData.difficulty ?? 4
         };
 
@@ -774,6 +781,7 @@
           amountInput.value = "";
           document.getElementById("noteInput").value = "";
           updateFeePreview();
+          await backgroundSync();
         } catch (err) {
           msg.textContent = err.message;
         }
